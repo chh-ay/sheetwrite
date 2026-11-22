@@ -141,20 +141,20 @@ const RELEASES: readonly Release[] = [
 
 /** The Releases index: one tile per release, newest first, with its headline. */
 function ReleaseHeadlines() {
-  const newestFirst = [...RELEASES].reverse();
+  const newest_first = [...RELEASES].reverse();
   return (
     <TileFigure
       columns={4}
       narrowColumns={2}
       text={{
         title: "The headline of each release",
-        description: newestFirst
+        description: newest_first
           .map(
             ({ version, headline: [title, lines] }) => `${version}: ${title}. ${lines.join(" ")}`,
           )
           .join(" "),
       }}
-      tiles={newestFirst.map(({ version, headline: [title, lines] }) => ({
+      tiles={newest_first.map(({ version, headline: [title, lines] }) => ({
         eyebrow: version,
         title,
         lines,

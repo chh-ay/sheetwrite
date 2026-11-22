@@ -25,9 +25,9 @@ afterEach(() => {
   for (const store of stores.splice(0)) store.dispose();
 });
 
-function workbook(rowCount: number, extraSheets = 0): Workbook {
-  const sheets = [sheet("data", rowCount), sheet("other", rowCount)];
-  for (let index = 0; index < extraSheets; index++) sheets.push(sheet(`extra${index}`, rowCount));
+function workbook(row_count: number, extra_sheets = 0): Workbook {
+  const sheets = [sheet("data", row_count), sheet("other", row_count)];
+  for (let index = 0; index < extra_sheets; index++) sheets.push(sheet(`extra${index}`, row_count));
   return { activeSheet: "data", sheets };
 }
 
@@ -44,16 +44,16 @@ function apply(store: SheetwriteStore, patches: DocumentOp[]): void {
   expect(store.applyTransaction({ patches }).status).toBe("applied");
 }
 
-function set(sheetId: string, row: number, col: number, value: number | string): DocumentOp {
-  return { op: "set", addr: { sheet: sheetId, row, col }, value: { kind: "literal", value } };
+function set(sheet_id: string, row: number, col: number, value: number | string): DocumentOp {
+  return { op: "set", addr: { sheet: sheet_id, row, col }, value: { kind: "literal", value } };
 }
 
-function formula(sheetId: string, row: number, col: number, src: string): DocumentOp {
-  return { op: "set", addr: { sheet: sheetId, row, col }, value: { kind: "formula", src } };
+function formula(sheet_id: string, row: number, col: number, src: string): DocumentOp {
+  return { op: "set", addr: { sheet: sheet_id, row, col }, value: { kind: "formula", src } };
 }
 
-function setup(rowCount = 10, extraSheets = 0) {
-  const store = new SheetwriteStore(workbook(rowCount, extraSheets));
+function setup(row_count = 10, extra_sheets = 0) {
+  const store = new SheetwriteStore(workbook(row_count, extra_sheets));
   stores.push(store);
   apply(store, [
     set("data", 0, 0, "Q1"),
@@ -105,7 +105,7 @@ describe("chart change events", () => {
     expect(resolveChartView(store, "data", "growth")?.series[0]?.values).toEqual([4, 6]);
   });
 
-  const structuralCases: Array<{
+  const structural_cases: Array<{
     name: string;
     patch: DocumentOp;
     row: number;
@@ -149,7 +149,7 @@ describe("chart change events", () => {
     },
   ];
 
-  for (const { name, patch, row, col } of structuralCases) {
+  for (const { name, patch, row, col } of structural_cases) {
     it(`reports source and owner hits after ${name} and tracks the rewritten source`, () => {
       const store = new SheetwriteStore(workbook(10));
       stores.push(store);
@@ -217,25 +217,25 @@ it("refreshes a chart over pivot output on a source edit, a set and a removal, a
     ],
     { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
   );
-  const [exitCode, stdout, stderr] = await Promise.all([
+  const [exit_code, stdout, stderr] = await Promise.all([
     probe.exited,
     new Response(probe.stdout).text(),
     new Response(probe.stderr).text(),
   ]);
-  expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+  expect({ exitCode: exit_code, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
 });
 
 it("calls no engine when its grid is destroyed while the pivot views load", async () => {
   const restore = installCanvasTestStubs();
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const pivotChart: ChartDefinition = {
+  const pivot_chart: ChartDefinition = {
     ...chart("over-pivot", range("data", 0, 1, 1, 1)),
     series: [],
     pivot: "sales",
   };
   const grid = createGrid(host, {
-    workbook: { activeSheet: "data", sheets: [{ ...sheet("data"), charts: [pivotChart] }] },
+    workbook: { activeSheet: "data", sheets: [{ ...sheet("data"), charts: [pivot_chart] }] },
   });
   const engine = storeEngine(grid.store);
   if (engine === null) throw new Error("the grid's store has no engine");

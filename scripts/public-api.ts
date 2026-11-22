@@ -171,27 +171,27 @@ function posix(path: string): string {
   return path.split(sep).join("/");
 }
 
-function selectTypesTarget(value: unknown): string | undefined {
+function select_types_target(value: unknown): string | undefined {
   if (typeof value === "string") return value;
   if (value === null || typeof value !== "object") return undefined;
   const conditions = value as Record<string, unknown>;
   const preferred = conditions.types ?? conditions.svelte ?? conditions.default;
-  if (preferred !== undefined) return selectTypesTarget(preferred);
+  if (preferred !== undefined) return select_types_target(preferred);
   for (const nested of Object.values(conditions)) {
-    const target = selectTypesTarget(nested);
+    const target = select_types_target(nested);
     if (target !== undefined) return target;
   }
   return undefined;
 }
 
-function exportedSubpaths(manifest: PackageJson): Array<[string, string]> {
+function exported_subpaths(manifest: PackageJson): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
   if (manifest.exports !== undefined) {
     if (typeof manifest.exports === "string") return [[".", manifest.exports]];
     if (manifest.exports !== null && typeof manifest.exports === "object") {
       for (const [subpath, value] of Object.entries(manifest.exports)) {
         if (!subpath.startsWith(".")) continue;
-        const target = selectTypesTarget(value);
+        const target = select_types_target(value);
         if (target !== undefined) entries.push([subpath, target]);
       }
     }
@@ -201,28 +201,28 @@ function exportedSubpaths(manifest: PackageJson): Array<[string, string]> {
   return entries.sort(([left], [right]) => left.localeCompare(right));
 }
 
-function isTypescriptTarget(target: string): boolean {
+function is_typescript_target(target: string): boolean {
   return /(?:\.d)?\.[cm]?tsx?$/.test(target);
 }
 
-async function resolveSource(packageRoot: string, target: string): Promise<string | undefined> {
+async function resolve_source(package_root: string, target: string): Promise<string | undefined> {
   const normalized = target.replace(/^\.\//, "");
-  const published = resolve(packageRoot, normalized);
-  const sourceCandidates: string[] = [];
+  const published = resolve(package_root, normalized);
+  const source_candidates: string[] = [];
   if (normalized.startsWith("dist/")) {
-    const sourcePath = normalized.slice("dist/".length);
-    sourceCandidates.push(
-      join(packageRoot, "src", sourcePath.replace(/\.d\.[cm]?ts$/, ".ts")),
-      join(packageRoot, "src", sourcePath.replace(/\.d\.[cm]?ts$/, ".tsx")),
-      join(packageRoot, "src", sourcePath.replace(/\.[cm]?js$/, ".ts")),
+    const source_path = normalized.slice("dist/".length);
+    source_candidates.push(
+      join(package_root, "src", source_path.replace(/\.d\.[cm]?ts$/, ".ts")),
+      join(package_root, "src", source_path.replace(/\.d\.[cm]?ts$/, ".tsx")),
+      join(package_root, "src", source_path.replace(/\.[cm]?js$/, ".ts")),
     );
   }
   if (/\.[cm]?js$/.test(normalized)) {
-    sourceCandidates.push(resolve(packageRoot, normalized.replace(/\.[cm]?js$/, ".ts")));
-    sourceCandidates.push(resolve(packageRoot, normalized.replace(/\.[cm]?js$/, ".tsx")));
+    source_candidates.push(resolve(package_root, normalized.replace(/\.[cm]?js$/, ".ts")));
+    source_candidates.push(resolve(package_root, normalized.replace(/\.[cm]?js$/, ".tsx")));
   }
 
-  for (const candidate of sourceCandidates) {
+  for (const candidate of source_candidates) {
     if (await exists(candidate)) return candidate;
   }
   if (await exists(published)) return published;
@@ -230,9 +230,9 @@ async function resolveSource(packageRoot: string, target: string): Promise<strin
 }
 
 export async function packageDirectories(repositoryRoot: string): Promise<string[]> {
-  const rootManifest = await readJson<PackageJson>(join(repositoryRoot, "package.json"));
+  const root_manifest = await readJson<PackageJson>(join(repositoryRoot, "package.json"));
   const directories: string[] = [];
-  for (const workspace of rootManifest.workspaces ?? []) {
+  for (const workspace of root_manifest.workspaces ?? []) {
     if (!workspace.endsWith("/*")) continue;
     const parent = resolve(repositoryRoot, workspace.slice(0, -2));
     if (!(await exists(parent))) continue;
@@ -245,41 +245,41 @@ export async function packageDirectories(repositoryRoot: string): Promise<string
   return directories.sort();
 }
 
-function classifyEntry(
-  packageName: string,
+function classify_entry(
+  package_name: string,
   subpath: string,
   kind: "typescript" | "asset",
 ): ApiEntryClassification | undefined {
   if (kind === "asset") return "asset";
-  if (packageName === "@sheetwrite/core" && subpath === "./testing") return "test-only";
+  if (package_name === "@sheetwrite/core" && subpath === "./testing") return "test-only";
   if (
-    (packageName === "@sheetwrite/wasm" || packageName === "@sheetwrite/formulas") &&
+    (package_name === "@sheetwrite/wasm" || package_name === "@sheetwrite/formulas") &&
     subpath === "."
   )
     return "internal";
   // `@sheetwrite/core/history` loads the diff kernel; hosts only point at its WASM asset.
-  if (packageName === "@sheetwrite/wasm" && subpath === "./history") return "internal";
+  if (package_name === "@sheetwrite/wasm" && subpath === "./history") return "internal";
   // Sheetwrite's own codecs reach core's codec plumbing here; applications do not.
-  if (packageName === "@sheetwrite/core" && subpath === "./codec") return "internal";
-  if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
+  if (package_name === "@sheetwrite/core" && subpath === "./codec") return "internal";
+  if (SUPPORTED_PACKAGES[package_name] === true) return "supported";
   return undefined;
 }
 
-async function resolveEntries(
-  packageRoot: string,
+async function resolve_entries(
+  package_root: string,
   manifest: PackageJson,
 ): Promise<{ entries: ResolvedEntry[]; issues: ApiIssue[] }> {
   const entries: ResolvedEntry[] = [];
   const issues: ApiIssue[] = [];
-  const packageName = manifest.name ?? "";
-  for (const [subpath, target] of exportedSubpaths(manifest)) {
-    const kind = isTypescriptTarget(target) ? "typescript" : "asset";
-    const classification = classifyEntry(packageName, subpath, kind);
+  const package_name = manifest.name ?? "";
+  for (const [subpath, target] of exported_subpaths(manifest)) {
+    const kind = is_typescript_target(target) ? "typescript" : "asset";
+    const classification = classify_entry(package_name, subpath, kind);
     if (classification === undefined) {
       issues.push({
         code: "unclassified-entry",
-        message: `${packageName} ${subpath} (${target}) has no public API classification`,
-        package: packageName,
+        message: `${package_name} ${subpath} (${target}) has no public API classification`,
+        package: package_name,
         entryPoint: subpath,
       });
       continue;
@@ -291,7 +291,7 @@ async function resolveEntries(
     entries.push({
       subpath,
       target,
-      source: await resolveSource(packageRoot, target),
+      source: await resolve_source(package_root, target),
       kind,
       classification,
     });
@@ -321,17 +321,21 @@ interface EntryProjectFile {
   readonly contents: string;
 }
 
-function entryProjectFile(repositoryRoot: string, index: number, source: string): EntryProjectFile {
+function entry_project_file(
+  repository_root: string,
+  index: number,
+  source: string,
+): EntryProjectFile {
   return {
     source,
-    configFileName: join(repositoryRoot, `tsconfig.public-api.${index}.json`),
+    configFileName: join(repository_root, `tsconfig.public-api.${index}.json`),
     contents: `${JSON.stringify({ compilerOptions: ENTRY_COMPILER_OPTIONS, files: [source] }, null, 2)}\n`,
   };
 }
 
-async function analyzeEntry(
-  packageName: string,
-  packageRoot: string,
+async function analyze_entry(
+  package_name: string,
+  package_root: string,
   entry: ResolvedEntry,
   project: Project | undefined,
 ): Promise<{ entry: ApiEntryPoint; issues: ApiIssue[] }> {
@@ -339,24 +343,24 @@ async function analyzeEntry(
   if (entry.source === undefined) {
     issues.push({
       code: "unresolved-entry",
-      message: `${packageName}${entry.subpath === "." ? "" : entry.subpath.slice(1)} cannot resolve ${entry.target}`,
-      package: packageName,
+      message: `${package_name}${entry.subpath === "." ? "" : entry.subpath.slice(1)} cannot resolve ${entry.target}`,
+      package: package_name,
       entryPoint: entry.subpath,
     });
     return { entry: { ...entry, exports: [] }, issues };
   }
 
-  const sourceFile =
+  const source_file =
     project === undefined ? undefined : await project.program.getSourceFile(entry.source);
-  if (project === undefined || sourceFile === undefined) {
+  if (project === undefined || source_file === undefined) {
     issues.push({
       code: "parse-error",
-      message: `${packageName} ${entry.subpath} was resolved but not parsed`,
-      package: packageName,
+      message: `${package_name} ${entry.subpath} was resolved but not parsed`,
+      package: package_name,
       entryPoint: entry.subpath,
     });
     return {
-      entry: { ...entry, source: posix(relative(packageRoot, entry.source)), exports: [] },
+      entry: { ...entry, source: posix(relative(package_root, entry.source)), exports: [] },
       issues,
     };
   }
@@ -365,7 +369,7 @@ async function analyzeEntry(
     issues.push({
       code: "parse-error",
       message: diagnosticText(diagnostic),
-      package: packageName,
+      package: package_name,
       entryPoint: entry.subpath,
     });
   }
@@ -374,43 +378,47 @@ async function analyzeEntry(
     issues.push({
       code: "duplicate-export",
       message: diagnosticText(diagnostic),
-      package: packageName,
+      package: package_name,
       entryPoint: entry.subpath,
     });
   }
 
   const checker = project.checker;
-  const moduleSymbol = await checker.getSymbolAtLocation(sourceFile);
-  if (moduleSymbol === undefined) {
+  const module_symbol = await checker.getSymbolAtLocation(source_file);
+  if (module_symbol === undefined) {
     issues.push({
       code: "parse-error",
-      message: `${packageName} ${entry.subpath} is not an external module`,
-      package: packageName,
+      message: `${package_name} ${entry.subpath} is not an external module`,
+      package: package_name,
       entryPoint: entry.subpath,
     });
     return {
-      entry: { ...entry, source: posix(relative(packageRoot, entry.source)), exports: [] },
+      entry: { ...entry, source: posix(relative(package_root, entry.source)), exports: [] },
       issues,
     };
   }
 
-  const mergedDeclarationSymbols: string[] = [];
-  const apiExports: ApiExport[] = [];
-  for (const exported of await checker.getExportsOfModule(moduleSymbol)) {
-    apiExports.push(await describeExport(exported, packageRoot, project, mergedDeclarationSymbols));
+  const merged_declaration_symbols: string[] = [];
+  const api_exports: ApiExport[] = [];
+  for (const exported of await checker.getExportsOfModule(module_symbol)) {
+    api_exports.push(
+      await describe_export(exported, package_root, project, merged_declaration_symbols),
+    );
   }
 
-  apiExports.sort((left, right) => left.name.localeCompare(right.name));
-  issues.push(...exportPolicyIssues(packageName, entry, apiExports, mergedDeclarationSymbols));
+  api_exports.sort((left, right) => left.name.localeCompare(right.name));
+  issues.push(
+    ...export_policy_issues(package_name, entry, api_exports, merged_declaration_symbols),
+  );
 
   return {
     entry: {
       subpath: entry.subpath,
       target: entry.target,
-      source: posix(relative(packageRoot, entry.source)),
+      source: posix(relative(package_root, entry.source)),
       kind: entry.kind,
       classification: entry.classification,
-      exports: apiExports,
+      exports: api_exports,
     },
     issues,
   };
@@ -419,34 +427,34 @@ async function analyzeEntry(
 /**
  * Read one export's declarations, source link, tags and documentation from
  * the compiler. Exports that merge several structural declarations are
- * recorded in `mergedDeclarationSymbols`.
+ * recorded in `merged_declaration_symbols`.
  */
-async function describeExport(
+async function describe_export(
   exported: ApiSymbol,
-  packageRoot: string,
+  package_root: string,
   project: Project,
-  mergedDeclarationSymbols: string[],
+  merged_declaration_symbols: string[],
 ): Promise<ApiExport> {
   const target = await resolvedSymbol(exported, project);
   const declarations = await declarationsOf(target, project);
-  const structuralDeclarations = declarations.filter(
+  const structural_declarations = declarations.filter(
     (candidate) =>
       isInterfaceDeclaration(candidate) ||
       isTypeAliasDeclaration(candidate) ||
       isEnumDeclaration(candidate),
   );
-  if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.name);
+  if (structural_declarations.length > 1) merged_declaration_symbols.push(exported.name);
 
   const owners = new Set(
     declarations.map((declaration) =>
-      posix(relative(packageRoot, declaration.getSourceFile().fileName)),
+      posix(relative(package_root, declaration.getSourceFile().fileName)),
     ),
   );
   const declaration = declarations[0];
   const source =
     declaration === undefined
       ? ""
-      : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
+      : `${posix(relative(package_root, declaration.getSourceFile().fileName))}#L${
           declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line + 1
         }`;
 
@@ -476,58 +484,58 @@ async function describeExport(
 }
 
 /** Export policy: one owner, no deprecated or merged symbols, documented and stable errors. */
-function exportPolicyIssues(
-  packageName: string,
+function export_policy_issues(
+  package_name: string,
   entry: ResolvedEntry,
-  apiExports: readonly ApiExport[],
-  mergedDeclarationSymbols: readonly string[],
+  api_exports: readonly ApiExport[],
+  merged_declaration_symbols: readonly string[],
 ): ApiIssue[] {
   const issues: ApiIssue[] = [];
   const issue = (code: ApiIssue["code"], message: string, symbol: string): void => {
-    issues.push({ code, message, package: packageName, entryPoint: entry.subpath, symbol });
+    issues.push({ code, message, package: package_name, entryPoint: entry.subpath, symbol });
   };
 
-  for (const symbol of mergedDeclarationSymbols) {
+  for (const symbol of merged_declaration_symbols) {
     issue(
       "duplicate-export",
-      `${packageName} ${entry.subpath} export ${symbol} merges multiple structural declarations; the joined signature cannot render as one declaration`,
+      `${package_name} ${entry.subpath} export ${symbol} merges multiple structural declarations; the joined signature cannot render as one declaration`,
       symbol,
     );
   }
 
-  for (const apiExport of apiExports) {
-    if (apiExport.owners.length > 1) {
+  for (const api_export of api_exports) {
+    if (api_export.owners.length > 1) {
       issue(
         "duplicate-export",
-        `${packageName} ${entry.subpath} gives ${apiExport.name} multiple owners: ${apiExport.owners.join(", ")}`,
-        apiExport.name,
+        `${package_name} ${entry.subpath} gives ${api_export.name} multiple owners: ${api_export.owners.join(", ")}`,
+        api_export.name,
       );
     }
 
-    if (apiExport.jsDocTags.includes("deprecated")) {
+    if (api_export.jsDocTags.includes("deprecated")) {
       issue(
         "deprecated-symbol",
-        `${packageName} ${entry.subpath} exports deprecated symbol ${apiExport.name}`,
-        apiExport.name,
+        `${package_name} ${entry.subpath} exports deprecated symbol ${api_export.name}`,
+        api_export.name,
       );
     }
 
     if (entry.classification !== "supported") continue;
 
-    if (apiExport.documentation.trim().length === 0) {
+    if (api_export.documentation.trim().length === 0) {
       issue(
         "missing-documentation",
-        `${packageName} ${entry.subpath} export ${apiExport.name} has no source JSDoc summary`,
-        apiExport.name,
+        `${package_name} ${entry.subpath} export ${api_export.name} has no source JSDoc summary`,
+        api_export.name,
       );
     }
 
-    const errorContractIssue = unstableErrorContract(apiExport);
-    if (errorContractIssue !== null) {
+    const error_contract_issue = unstableErrorContract(api_export);
+    if (error_contract_issue !== null) {
       issue(
         "unstable-error-contract",
-        `${packageName} ${entry.subpath} export ${errorContractIssue}`,
-        apiExport.name,
+        `${package_name} ${entry.subpath} export ${error_contract_issue}`,
+        api_export.name,
       );
     }
   }
@@ -544,19 +552,19 @@ export interface PublicApiAnalysis {
 export async function analyzePublicApi(repositoryRoot: string): Promise<PublicApiAnalysis> {
   const packages: ApiPackage[] = [];
   const issues: ApiIssue[] = [];
-  const packageEntries: Array<{
+  const package_entries: Array<{
     name: string;
     packageRoot: string;
     entries: ResolvedEntry[];
   }> = [];
-  for (const packageRoot of await packageDirectories(repositoryRoot)) {
-    const packageManifest = await readJson<PackageJson>(join(packageRoot, "package.json"));
-    if (packageManifest.name === undefined || packageManifest.private === true) continue;
-    const resolved = await resolveEntries(packageRoot, packageManifest);
+  for (const package_root of await packageDirectories(repositoryRoot)) {
+    const package_manifest = await readJson<PackageJson>(join(package_root, "package.json"));
+    if (package_manifest.name === undefined || package_manifest.private === true) continue;
+    const resolved = await resolve_entries(package_root, package_manifest);
     issues.push(...resolved.issues);
-    packageEntries.push({
-      name: packageManifest.name,
-      packageRoot,
+    package_entries.push({
+      name: package_manifest.name,
+      packageRoot: package_root,
       entries: resolved.entries,
     });
   }
@@ -564,43 +572,45 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<PublicAp
   // Each entry point is analyzed in its own single-root project, reproducing
   // the program the classic compiler API built for it — including the closure
   // of files that program contained, which drives the diagnostics reported.
-  const projectFiles = [
+  const project_files = [
     ...new Set(
-      packageEntries.flatMap(({ entries }) =>
+      package_entries.flatMap(({ entries }) =>
         entries.flatMap((entry) => (entry.source === undefined ? [] : [entry.source])),
       ),
     ),
-  ].map((source, index) => entryProjectFile(repositoryRoot, index, source));
-  const virtualConfigs = new Map(projectFiles.map((file) => [file.configFileName, file.contents]));
-  const configBySource = new Map(projectFiles.map((file) => [file.source, file.configFileName]));
+  ].map((source, index) => entry_project_file(repositoryRoot, index, source));
+  const virtual_configs = new Map(
+    project_files.map((file) => [file.configFileName, file.contents]),
+  );
+  const config_by_source = new Map(project_files.map((file) => [file.source, file.configFileName]));
   const api = new API({
     cwd: repositoryRoot,
     fs: {
-      fileExists: (fileName) => (virtualConfigs.has(fileName) ? true : undefined),
-      readFile: (fileName) => virtualConfigs.get(fileName),
+      fileExists: (file_name) => (virtual_configs.has(file_name) ? true : undefined),
+      readFile: (file_name) => virtual_configs.get(file_name),
     },
   });
   try {
     const snapshot = await api.updateSnapshot({
-      openProjects: projectFiles.map((file) => file.configFileName),
+      openProjects: project_files.map((file) => file.configFileName),
     });
     try {
-      for (const { name, packageRoot, entries } of packageEntries) {
-        const entryPoints: ApiEntryPoint[] = [];
+      for (const { name, packageRoot: package_root, entries } of package_entries) {
+        const entry_points: ApiEntryPoint[] = [];
         for (const entry of entries) {
           if (entry.kind === "asset") {
-            entryPoints.push({ ...entry, exports: [] });
+            entry_points.push({ ...entry, exports: [] });
             continue;
           }
-          const configFileName =
-            entry.source === undefined ? undefined : configBySource.get(entry.source);
+          const config_file_name =
+            entry.source === undefined ? undefined : config_by_source.get(entry.source);
           const project =
-            configFileName === undefined ? undefined : snapshot.getProject(configFileName);
-          const analyzed = await analyzeEntry(name, packageRoot, entry, project);
-          entryPoints.push(analyzed.entry);
+            config_file_name === undefined ? undefined : snapshot.getProject(config_file_name);
+          const analyzed = await analyze_entry(name, package_root, entry, project);
+          entry_points.push(analyzed.entry);
           issues.push(...analyzed.issues);
         }
-        if (entryPoints.length > 0) packages.push({ name, entryPoints });
+        if (entry_points.length > 0) packages.push({ name, entryPoints: entry_points });
       }
     } finally {
       await snapshot.dispose();
@@ -613,23 +623,23 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<PublicAp
   issues.push(...validateManifest(manifest));
 
   const core = packages.find((pkg) => pkg.name === "@sheetwrite/core");
-  const coreRoot = core?.entryPoints.find((entry) => entry.subpath === ".");
-  const allExports = new Set(
+  const core_root = core?.entryPoints.find((entry) => entry.subpath === ".");
+  const all_exports = new Set(
     packages.flatMap((pkg) =>
       pkg.entryPoints.flatMap((entry) => entry.exports.map((item) => item.name)),
     ),
   );
   for (const name of FORBIDDEN_EXPORTS) {
-    if (!allExports.has(name)) continue;
+    if (!all_exports.has(name)) continue;
     issues.push({
       code: "forbidden-export",
       message: `Forbidden compatibility export: ${name}`,
       symbol: name,
     });
   }
-  const coreExports = new Set(coreRoot?.exports.map((item) => item.name) ?? []);
+  const core_exports = new Set(core_root?.exports.map((item) => item.name) ?? []);
   for (const name of REQUIRED_CORE_EXPORTS) {
-    if (coreExports.has(name)) continue;
+    if (core_exports.has(name)) continue;
     issues.push({
       code: "missing-export",
       message: `Missing canonical @sheetwrite/core export: ${name}`,
@@ -639,21 +649,21 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<PublicAp
     });
   }
   if (
-    coreRoot !== undefined &&
-    (coreRoot.source === "dist/index.d.ts" || coreRoot.source === "src/index.ts")
+    core_root !== undefined &&
+    (core_root.source === "dist/index.d.ts" || core_root.source === "src/index.ts")
   ) {
-    const builtDeclarations = coreRoot.source.startsWith("dist/");
-    for (const [domainName, domain] of Object.entries(PUBLIC_TYPE_DOMAINS)) {
-      const expectedOwner = builtDeclarations
-        ? `dist/types/${domainName}.d.ts`
-        : `src/types/${domainName}.ts`;
+    const built_declarations = core_root.source.startsWith("dist/");
+    for (const [domain_name, domain] of Object.entries(PUBLIC_TYPE_DOMAINS)) {
+      const expected_owner = built_declarations
+        ? `dist/types/${domain_name}.d.ts`
+        : `src/types/${domain_name}.ts`;
       for (const name of domain.exports) {
-        const apiExport = coreRoot.exports.find((item) => item.name === name);
-        if (apiExport === undefined) continue;
-        if (apiExport.owners.length === 1 && apiExport.owners[0] === expectedOwner) continue;
+        const api_export = core_root.exports.find((item) => item.name === name);
+        if (api_export === undefined) continue;
+        if (api_export.owners.length === 1 && api_export.owners[0] === expected_owner) continue;
         issues.push({
           code: "wrong-owner",
-          message: `@sheetwrite/core ${name} must be owned by ${expectedOwner}; found ${apiExport.owners.join(", ") || "none"}`,
+          message: `@sheetwrite/core ${name} must be owned by ${expected_owner}; found ${api_export.owners.join(", ") || "none"}`,
           package: "@sheetwrite/core",
           entryPoint: ".",
           symbol: name,
@@ -678,26 +688,26 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<PublicAp
   return { manifest, issues };
 }
 
-function formatIssues(issues: readonly ApiIssue[]): string {
+function format_issues(issues: readonly ApiIssue[]): string {
   return issues.map((issue) => `${issue.code}: ${issue.message}`).join("\n");
 }
 
 if (import.meta.main) {
   const mode = process.argv[2];
-  const repositoryRoot = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
+  const repository_root = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
   if (mode !== "check" && mode !== "baseline") {
     throw new Error("Usage: bun scripts/public-api.ts <check|baseline> [repository-root]");
   }
-  const result = await analyzePublicApi(repositoryRoot);
+  const result = await analyzePublicApi(repository_root);
   if (mode === "baseline") {
-    if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
-    const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
-    const exportCount = Object.keys(baseline.exports).length;
-    process.stdout.write(`Public API baseline lists ${exportCount} exports\n`);
+    if (result.issues.length > 0) throw new Error(format_issues(result.issues));
+    const baseline = await writePublicApiBaseline(repository_root, result.manifest);
+    const export_count = Object.keys(baseline.exports).length;
+    process.stdout.write(`Public API baseline lists ${export_count} exports\n`);
   } else {
-    const baseline = await readPublicApiBaseline(repositoryRoot);
+    const baseline = await readPublicApiBaseline(repository_root);
     const issues = [...result.issues, ...checkPublicApiBaseline(result.manifest, baseline)];
-    if (issues.length > 0) throw new Error(formatIssues(issues));
+    if (issues.length > 0) throw new Error(format_issues(issues));
     process.stdout.write("Public API policy check passed\n");
   }
 }

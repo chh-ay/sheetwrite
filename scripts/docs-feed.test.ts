@@ -13,7 +13,7 @@ function text(element: Element, name: string): string {
 }
 
 /** The feed's items, after checking the RSS 2.0 envelope every reader relies on. */
-function rssItems(xml: string): Element[] {
+function rss_items(xml: string): Element[] {
   expect(xml).toStartWith('<?xml version="1.0" encoding="UTF-8"?>\n');
   const document = new DOMParser().parseFromString(xml, "application/xml");
   expect(document.getElementsByTagName("parsererror")).toHaveLength(0);
@@ -44,7 +44,7 @@ describe("changelog feed", () => {
       (release) => !("unreleased" in release && release.unreleased === true),
     );
     // Same releases, newest first: a feed of the right size can still name the wrong versions.
-    expect(rssItems(feed.content).map((item) => text(item, "guid"))).toEqual(
+    expect(rss_items(feed.content).map((item) => text(item, "guid"))).toEqual(
       published.map((release) => `${SITE_URL}${releaseHref(release.version)}`),
     );
     expect(feed.content).toContain(

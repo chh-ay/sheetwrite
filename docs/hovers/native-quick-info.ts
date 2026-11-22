@@ -36,14 +36,14 @@ const QUOTED_NAME = /^ `([^`]+)`/;
 const DECLARATION_LINK = /\[(`?)([^\]]*?)\1\]\(file:\/\/[^)\s]*\)/g;
 const URL_LINK = /\[([^\]]*)\]\((https?:\/\/[^)\s]*)\)/g;
 
-function declarationLinks(text: string, format: "link" | "name"): string {
+function declaration_links(text: string, format: "link" | "name"): string {
   return text.replace(DECLARATION_LINK, (_, quote: string, label: string) => {
     if (format === "name") return label;
     return quote ? `{@linkcode ${label}}` : `{@link ${label}}`;
   });
 }
 
-function tagText(name: string, body: string): string | undefined {
+function tag_text(name: string, body: string): string | undefined {
   if (name === "example") return body.replace(/^\n/, "").replace(/\n$/, "") || undefined;
   let rest = body;
   let prefix = "";
@@ -54,12 +54,12 @@ function tagText(name: string, body: string): string | undefined {
   }
   rest = rest.replace(DASH_PREFIX, "").replace(/^ /, "");
   const text = [prefix, rest].filter(Boolean).join(" ");
-  if (name !== "see") return declarationLinks(text, "link") || undefined;
+  if (name !== "see") return declaration_links(text, "link") || undefined;
   // `@see {@link https://…}` keeps its tag syntax in 5.9; prose links only occur in summaries.
   const urls = text.replace(URL_LINK, (_, label: string, url: string) =>
     label === url ? `{@link ${url}}` : `{@link ${url} ${label}}`,
   );
-  return declarationLinks(urls, "name") || undefined;
+  return declaration_links(urls, "name") || undefined;
 }
 
 /**
@@ -70,30 +70,30 @@ function tagText(name: string, body: string): string | undefined {
  */
 export function parseNativeHover(markdown: string, internal?: RegExp): NativeQuickInfo | undefined {
   for (const projection of markdown.split(PROJECTION_SEPARATOR)) {
-    const quickInfo = parseProjection(projection);
-    if (quickInfo && !internal?.test(quickInfo.text.replace(GENERATED_TYPE_ARGUMENT, ""))) {
-      return quickInfo;
+    const quick_info = parse_projection(projection);
+    if (quick_info && !internal?.test(quick_info.text.replace(GENERATED_TYPE_ARGUMENT, ""))) {
+      return quick_info;
     }
   }
   return undefined;
 }
 
-function parseProjection(projection: string): NativeQuickInfo | undefined {
+function parse_projection(projection: string): NativeQuickInfo | undefined {
   const signature = SIGNATURE_FENCE.exec(projection);
   if (!signature) return undefined;
   const documentation = projection.slice(signature[0].length);
 
   const starts = [...documentation.matchAll(TAG_START)];
-  const summaryEnd = starts[0]?.index ?? documentation.length;
+  const summary_end = starts[0]?.index ?? documentation.length;
   const tags = starts.map((match, index): [string, string | undefined] => {
     const name = match[1] ?? "";
-    const bodyStart = (match.index ?? 0) + match[0].length;
-    const bodyEnd = starts[index + 1]?.index ?? documentation.length;
-    return [name, tagText(name, documentation.slice(bodyStart, bodyEnd))];
+    const body_start = (match.index ?? 0) + match[0].length;
+    const body_end = starts[index + 1]?.index ?? documentation.length;
+    return [name, tag_text(name, documentation.slice(body_start, body_end))];
   });
   return {
     text: signature[2] ?? "",
-    docs: declarationLinks(documentation.slice(0, summaryEnd), "link"),
+    docs: declaration_links(documentation.slice(0, summary_end), "link"),
     tags,
   };
 }

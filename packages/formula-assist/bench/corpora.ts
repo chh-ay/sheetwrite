@@ -47,7 +47,7 @@ export const DEVELOPMENT_SETS: readonly ReplaySetName[] = [
 export type ReplaySetName = (typeof REPLAY_SETS)[number];
 
 /** A sheet of `rows` by `cols` with `cells` in one block. */
-function sheetSnapshot(
+function sheet_snapshot(
   id: string,
   name: string,
   order: number,
@@ -71,18 +71,22 @@ function sheetSnapshot(
   };
 }
 
-function workbookSnapshot(
+function workbook_snapshot(
   sheets: SheetSnapshot[],
-  namedRanges: NamedRangeSnapshot[] = [],
+  named_ranges: NamedRangeSnapshot[] = [],
 ): WorkbookSnapshot {
   const first = sheets[0];
   if (first === undefined) throw new Error("A replay workbook needs at least one sheet");
-  return { schemaVersion: 1, workbook: { activeSheet: first.id, namedRanges }, sheets };
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: first.id, namedRanges: named_ranges },
+    sheets,
+  };
 }
 
 const A1_CELL = /^([A-Z]+)([1-9][0-9]*)$/;
 
-function a1Cell(text: string): { row: number; col: number } {
+function a1_cell(text: string): { row: number; col: number } {
   const match = A1_CELL.exec(text);
   const [, letters, digits] = match ?? [];
   if (letters === undefined || digits === undefined) throw new Error(`Invalid A1 cell ${text}`);
@@ -93,28 +97,28 @@ function a1Cell(text: string): { row: number; col: number } {
 const ORACLE_SIZE = { rows: 256, cols: 32 };
 
 /** Every formula case of the conformance corpus, each in a workbook of its inputs. */
-async function* conformanceWorkbooks(): AsyncGenerator<ReplayWorkbook> {
+async function* conformance_workbooks(): AsyncGenerator<ReplayWorkbook> {
   const { corpus } = generateConformanceEvidence(await readFormulaInventory());
   for (const entry of corpus.cases) {
     if (entry.formula === undefined || entry.target === undefined) continue;
 
     const cells = (entry.inputs ?? []).map(({ cell, value }) => {
-      const { row, col } = a1Cell(cell);
+      const { row, col } = a1_cell(cell);
       const literal: CellValue = { kind: "literal", value };
       return { rowOffset: row, colOffset: col, value: literal };
     });
-    const sheet = sheetSnapshot("oracle", "Oracle", 0, ORACLE_SIZE, cells);
-    const target = a1Cell(entry.target);
+    const sheet = sheet_snapshot("oracle", "Oracle", 0, ORACLE_SIZE, cells);
+    const target = a1_cell(entry.target);
     yield {
       id: entry.id,
-      snapshot: workbookSnapshot([sheet]),
+      snapshot: workbook_snapshot([sheet]),
       targets: [{ cell: { sheet: "oracle", ...target }, formula: entry.formula }],
     };
   }
 }
 
 /** Every formula cell of a snapshot, in sheet and block order. */
-function formulaTargets(snapshot: WorkbookSnapshot): ReplayTarget[] {
+function formula_targets(snapshot: WorkbookSnapshot): ReplayTarget[] {
   const targets: ReplayTarget[] = [];
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {
@@ -141,7 +145,7 @@ const FIXTURE_FOLDERS = [
 ];
 
 /** Each XLSX fixture that holds formulas. Files the reader refuses on purpose (corrupt, unsafe) are not workbooks to type in. */
-async function* fixtureWorkbooks(): AsyncGenerator<ReplayWorkbook> {
+async function* fixture_workbooks(): AsyncGenerator<ReplayWorkbook> {
   for (const folder of FIXTURE_FOLDERS) {
     const names = (await readdir(folder)).filter((name) => name.endsWith(".xlsx")).sort();
     for (const name of names) {
@@ -154,7 +158,7 @@ async function* fixtureWorkbooks(): AsyncGenerator<ReplayWorkbook> {
         throw error;
       }
 
-      const targets = formulaTargets(snapshot);
+      const targets = formula_targets(snapshot);
       if (targets.length > 0) yield { id: name, snapshot, targets };
     }
   }
@@ -190,7 +194,7 @@ interface EnronSample {
 }
 
 /** Whether `value` has the sample's shape down to its workbooks' fields; the cells are trusted. */
-function isEnronSample(value: unknown): value is EnronSample {
+function is_enron_sample(value: unknown): value is EnronSample {
   if (typeof value !== "object" || value === null || !("workbooks" in value)) return false;
   const { workbooks } = value;
   return (
@@ -211,7 +215,7 @@ function isEnronSample(value: unknown): value is EnronSample {
   );
 }
 
-function enronValue(value: CellScalar): CellValue {
+function enron_value(value: CellScalar): CellValue {
   return typeof value === "string" && value.startsWith("=")
     ? { kind: "formula", src: value }
     : { kind: "literal", value };
@@ -221,7 +225,7 @@ function enronValue(value: CellScalar): CellValue {
 const MAX_CAUSES = 8;
 
 /** The defined name the engine refused, found along `error`'s causes; null for any other failure. */
-function refusedName(error: unknown): string | null {
+function refused_name(error: unknown): string | null {
   let current: unknown = error;
   for (let depth = 0; depth < MAX_CAUSES && current instanceof Error; depth++) {
     if (current instanceof SheetwriteError && current.message.startsWith("invalid named range")) {
@@ -239,7 +243,7 @@ function refusedName(error: unknown): string | null {
  * that are gone can be invalid; it is left out, as the formulas that use it
  * still read the name as text.
  */
-function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
+function with_accepted_names(snapshot: WorkbookSnapshot): WorkbookSnapshot {
   let names = snapshot.workbook.namedRanges ?? [];
   for (;;) {
     const candidate = { ...snapshot, workbook: { ...snapshot.workbook, namedRanges: names } };
@@ -247,7 +251,7 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
       openReplayStore(candidate).dispose();
       return candidate;
     } catch (error) {
-      const refused = refusedName(error);
+      const refused = refused_name(error);
       if (refused === null) throw error;
       const remaining = names.filter((named) => named.name !== refused);
       if (remaining.length === names.length) throw error;
@@ -262,7 +266,7 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
  * (see enron/README.md). The `dev-large` and `-whole` sets are not
  * committed; enron/build.ts builds them.
  */
-async function* enronWorkbooks(
+async function* enron_workbooks(
   set: "dev" | "dev2" | "dev-large" | "dev-large-whole" | "heldout" | "heldout-whole",
 ): AsyncGenerator<ReplayWorkbook> {
   const path = new URL(`./enron/${set}.json`, import.meta.url);
@@ -272,11 +276,11 @@ async function* enronWorkbooks(
     );
   }
   const sample: unknown = JSON.parse(await readFile(path, "utf8"));
-  if (!isEnronSample(sample)) throw new Error(`${path.pathname} is not an Enron sample file`);
+  if (!is_enron_sample(sample)) throw new Error(`${path.pathname} is not an Enron sample file`);
 
   for (const workbook of sample.workbooks) {
     const sheets = workbook.sheets.map((sheet, index) =>
-      sheetSnapshot(
+      sheet_snapshot(
         `s${index}`,
         sheet.name,
         index,
@@ -284,7 +288,7 @@ async function* enronWorkbooks(
         sheet.cells.map(([row, col, value]) => ({
           rowOffset: row,
           colOffset: col,
-          value: enronValue(value),
+          value: enron_value(value),
         })),
       ),
     );
@@ -319,7 +323,7 @@ async function* enronWorkbooks(
       const range = { start: clip(named.sheet, named.start), end: clip(named.sheet, named.end) };
       return { name: named.name, range: { sheet: `s${named.sheet}`, ...range } };
     });
-    const snapshot = withAcceptedNames(workbookSnapshot(sheets, names));
+    const snapshot = with_accepted_names(workbook_snapshot(sheets, names));
     yield { id: workbook.file, snapshot, targets };
   }
 }
@@ -328,20 +332,20 @@ async function* enronWorkbooks(
 export function replayWorkbooks(set: ReplaySetName): AsyncGenerator<ReplayWorkbook> {
   switch (set) {
     case "conformance":
-      return conformanceWorkbooks();
+      return conformance_workbooks();
     case "fixtures":
-      return fixtureWorkbooks();
+      return fixture_workbooks();
     case "enron-dev":
-      return enronWorkbooks("dev");
+      return enron_workbooks("dev");
     case "enron-heldout":
-      return enronWorkbooks("heldout");
+      return enron_workbooks("heldout");
     case "enron-dev2":
-      return enronWorkbooks("dev2");
+      return enron_workbooks("dev2");
     case "enron-dev-large":
-      return enronWorkbooks("dev-large");
+      return enron_workbooks("dev-large");
     case "enron-dev-large-whole":
-      return enronWorkbooks("dev-large-whole");
+      return enron_workbooks("dev-large-whole");
     case "enron-heldout-whole":
-      return enronWorkbooks("heldout-whole");
+      return enron_workbooks("heldout-whole");
   }
 }

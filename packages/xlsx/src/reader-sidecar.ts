@@ -42,10 +42,10 @@ export function claimSidecarSheets(
   const claims: (SheetSnapshot | undefined)[] = sources.map(() => undefined);
   if (!metadata) return claims;
 
-  const claimedIds = new Set<string>();
+  const claimed_ids = new Set<string>();
   const claim = (order: number, meta: SheetSnapshot | undefined): boolean => {
-    if (!meta || claimedIds.has(meta.id)) return false;
-    claimedIds.add(meta.id);
+    if (!meta || claimed_ids.has(meta.id)) return false;
+    claimed_ids.add(meta.id);
     claims[order] = meta;
     return true;
   };
@@ -139,21 +139,21 @@ export function restoreSidecarFields(
     if (!meta || sheet.cells.length === 0) continue;
     // Index the sidecar, which holds only the cells it restores, so the sheet's
     // cells are scanned once instead of indexed.
-    const sidecarCells = new Map<number, SnapshotCell[]>();
+    const sidecar_cells = new Map<number, SnapshotCell[]>();
     for (const block of meta.cells) {
       for (const sidecar of block.cells) {
         const row = block.startRow + sidecar.rowOffset;
         const col = block.startCol + sidecar.colOffset;
         const offset = row * sheet.columns.length + col;
-        const restored = sidecarCells.get(offset);
+        const restored = sidecar_cells.get(offset);
         if (restored) restored.push(sidecar);
-        else sidecarCells.set(offset, [sidecar]);
+        else sidecar_cells.set(offset, [sidecar]);
       }
     }
-    if (sidecarCells.size === 0) continue;
+    if (sidecar_cells.size === 0) continue;
     for (const existing of sheet.cells[0]?.cells ?? []) {
       const offset = existing.rowOffset * sheet.columns.length + existing.colOffset;
-      for (const sidecar of sidecarCells.get(offset) ?? []) {
+      for (const sidecar of sidecar_cells.get(offset) ?? []) {
         if (sidecar.value.kind === "ref" && existing.value.kind === "formula") {
           const reference = sidecar.value;
           const target = snapshot.sheets.find(
@@ -163,11 +163,11 @@ export function restoreSidecarFields(
           const expected = `='${target.name.replaceAll("'", "''")}'!${cellA1(reference.target.row, reference.target.col)}`;
           if (existing.value.src === expected) existing.value = structuredClone(reference);
         }
-        const sidecarBorder = sidecar.style?.border;
-        const hasExactWidth = Object.values(sidecarBorder ?? {}).some(
+        const sidecar_border = sidecar.style?.border;
+        const has_exact_width = Object.values(sidecar_border ?? {}).some(
           (border) => border.width !== undefined && border.width !== 1 && border.width !== 2,
         );
-        if (hasExactWidth) {
+        if (has_exact_width) {
           existing.style = structuredClone(sidecar.style);
         }
       }
@@ -175,7 +175,7 @@ export function restoreSidecarFields(
   }
 }
 
-function projectedConditionalStyle(style: CellStyle): string {
+function projected_conditional_style(style: CellStyle): string {
   const color = (value: string | undefined): string | undefined =>
     value?.replace(/^#/, "").toUpperCase();
   const projected: CellStyle = {
@@ -210,7 +210,7 @@ function projectedConditionalStyle(style: CellStyle): string {
   return JSON.stringify(projected);
 }
 
-function conditionalPredicateFingerprint(predicate: ConditionalFormatPredicate): string {
+function conditional_predicate_fingerprint(predicate: ConditionalFormatPredicate): string {
   if (predicate.kind === "contains") {
     return JSON.stringify({
       kind: predicate.kind,
@@ -237,10 +237,10 @@ export function reconcileConditionalFormats(
         sidecar.range.start.col === native.range.start.col &&
         sidecar.range.end.row === native.range.end.row &&
         sidecar.range.end.col === native.range.end.col &&
-        conditionalPredicateFingerprint(sidecar.when) ===
-          conditionalPredicateFingerprint(native.when) &&
+        conditional_predicate_fingerprint(sidecar.when) ===
+          conditional_predicate_fingerprint(native.when) &&
         sidecar.stopIfTrue === native.stopIfTrue &&
-        projectedConditionalStyle(sidecar.style) === projectedConditionalStyle(native.style),
+        projected_conditional_style(sidecar.style) === projected_conditional_style(native.style),
     );
     const sidecar = match === undefined ? undefined : sidecarRules?.[match];
     if (match === undefined || !sidecar) return structuredClone(native);

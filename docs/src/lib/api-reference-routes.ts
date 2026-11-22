@@ -25,23 +25,23 @@ export interface ApiManifestShape {
 
 type ManifestPackage = ApiManifestShape["packages"][number];
 
-function coreFirst(packages: ApiManifestShape["packages"]): ManifestPackage[] {
+function core_first(packages: ApiManifestShape["packages"]): ManifestPackage[] {
   return [...packages].sort((left, right) =>
     left.name === "@sheetwrite/core" ? -1 : right.name === "@sheetwrite/core" ? 1 : 0,
   );
 }
 
-function rootFirst(entryPoints: ManifestPackage["entryPoints"]) {
-  return [...entryPoints].sort((left, right) =>
+function root_first(entry_points: ManifestPackage["entryPoints"]) {
+  return [...entry_points].sort((left, right) =>
     left.subpath === "." ? -1 : right.subpath === "." ? 1 : 0,
   );
 }
 
-function entrySlug(packageName: string, subpath: string): string {
-  const packageSlug = packageName.replace("@sheetwrite/", "");
+function entry_slug(package_name: string, subpath: string): string {
+  const package_slug = package_name.replace("@sheetwrite/", "");
   return subpath === "."
-    ? packageSlug
-    : `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+    ? package_slug
+    : `${package_slug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
 }
 
 /** A JSDoc tag as `[name, text]`, the shape the language server's hovers use. */
@@ -84,10 +84,10 @@ export interface MemberReference {
  */
 export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<string, string> {
   const routes = new Map<string, string>();
-  for (const pkg of coreFirst(manifest.packages)) {
-    for (const entry of rootFirst(pkg.entryPoints)) {
+  for (const pkg of core_first(manifest.packages)) {
+    for (const entry of root_first(pkg.entryPoints)) {
       if (entry.classification !== "supported") continue;
-      const slug = entrySlug(pkg.name, entry.subpath);
+      const slug = entry_slug(pkg.name, entry.subpath);
       const pages = apiPageSlugs(entry.exports ?? []);
       for (const item of entry.exports ?? []) {
         if (!routes.has(item.name)) {
@@ -112,8 +112,8 @@ export interface SymbolPreview {
  */
 export function apiSymbolPreviews(manifest: ApiManifestShape): ReadonlyMap<string, SymbolPreview> {
   const previews = new Map<string, SymbolPreview>();
-  for (const pkg of coreFirst(manifest.packages)) {
-    for (const entry of rootFirst(pkg.entryPoints)) {
+  for (const pkg of core_first(manifest.packages)) {
+    for (const entry of root_first(pkg.entryPoints)) {
       if (entry.classification !== "supported") continue;
       for (const item of entry.exports ?? []) {
         if (!item.signature || previews.has(item.name)) continue;
@@ -136,10 +136,10 @@ export function apiMemberReferences(
   manifest: ApiManifestShape,
 ): ReadonlyMap<string, MemberReference> {
   const members = new Map<string, MemberReference>();
-  for (const pkg of coreFirst(manifest.packages)) {
+  for (const pkg of core_first(manifest.packages)) {
     for (const entry of pkg.entryPoints) {
       if (entry.classification !== "supported") continue;
-      const slug = entrySlug(pkg.name, entry.subpath);
+      const slug = entry_slug(pkg.name, entry.subpath);
       const pages = apiPageSlugs(entry.exports ?? []);
       for (const item of entry.exports ?? []) {
         for (const member of item.memberDocs ?? []) {

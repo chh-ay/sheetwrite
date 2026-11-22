@@ -9,7 +9,7 @@ const page = (url: string, title: string, content = title): PagefindResultData =
   content,
 });
 
-const pageUrls = (pages: readonly PagefindResultData[], query: string): string[] =>
+const page_urls = (pages: readonly PagefindResultData[], query: string): string[] =>
   rankEntries(pages, query).map((entry) => entry.url);
 
 describe("docs search ranking", () => {
@@ -25,7 +25,7 @@ describe("docs search ranking", () => {
       page("/docs/api/charts/charts-addon/", "chartsAddon", "charts add-on"),
       page("/docs/features/analysis/charts/", "Charts", "charts from a range"),
     ];
-    expect(pageUrls(pages, "charts")[0]).toBe("/docs/features/analysis/charts/");
+    expect(page_urls(pages, "charts")[0]).toBe("/docs/features/analysis/charts/");
   });
 
   it("matches a guide title in the plural and lists it before the API type", () => {
@@ -33,7 +33,7 @@ describe("docs search ranking", () => {
       page("/docs/api/core/data-source/", "DataSource", "datasource contract"),
       page("/docs/features/data/datasources/", "Datasources", "datasource pages"),
     ];
-    expect(pageUrls(pages, "datasource")[0]).toBe("/docs/features/data/datasources/");
+    expect(page_urls(pages, "datasource")[0]).toBe("/docs/features/data/datasources/");
   });
 
   it("ranks a title that holds every word in another order above other pages", () => {
@@ -45,7 +45,7 @@ describe("docs search ranking", () => {
       ),
       page("/docs/import-export/xlsx-import/", "XLSX import", "import an xlsx file"),
     ];
-    expect(pageUrls(pages, "import xlsx")[0]).toBe("/docs/import-export/xlsx-import/");
+    expect(page_urls(pages, "import xlsx")[0]).toBe("/docs/import-export/xlsx-import/");
   });
 
   it("keeps the API page first for a query that names code", () => {
@@ -53,7 +53,7 @@ describe("docs search ranking", () => {
       page("/docs/start/first-grid/", "First grid", "createGrid mounts a grid"),
       page("/docs/api/core/create-grid/", "createGrid", "createGrid"),
     ];
-    expect(pageUrls(pages, "createGrid")[0]).toBe("/docs/api/core/create-grid/");
+    expect(page_urls(pages, "createGrid")[0]).toBe("/docs/api/core/create-grid/");
   });
 
   it("does not lift an API page whose one-word title a question holds", () => {
@@ -61,6 +61,6 @@ describe("docs search ranking", () => {
       page("/docs/api/core/theme/", "Theme", "dark theme tokens"),
       page("/docs/features/formatting/styles/", "Styles and themes", "a dark theme"),
     ];
-    expect(pageUrls(pages, "dark theme")[0]).toBe("/docs/features/formatting/styles/");
+    expect(page_urls(pages, "dark theme")[0]).toBe("/docs/features/formatting/styles/");
   });
 });

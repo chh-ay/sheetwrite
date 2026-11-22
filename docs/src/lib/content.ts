@@ -47,9 +47,9 @@ export interface DocumentRecord {
 }
 
 /** Every docs page, from the docs site's content (generated pages included). */
-const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
+const source_modules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
-function hrefFromSource(source: string): string {
+function href_from_source(source: string): string {
   const relative = source
     .replace(/^.*\/content\/docs\//, "")
     .replace(/\.(?:md|mdx)$/, "")
@@ -58,8 +58,8 @@ function hrefFromSource(source: string): string {
 }
 
 const DOCUMENT_SOURCES = new Map(
-  Object.entries(sourceModules).map(([source, load]) => {
-    const href = hrefFromSource(source);
+  Object.entries(source_modules).map(([source, load]) => {
+    const href = href_from_source(source);
     return [
       href,
       {

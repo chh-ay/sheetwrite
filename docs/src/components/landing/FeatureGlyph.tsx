@@ -114,14 +114,14 @@ function ScaleGlyph() {
     <>
       <For each={grid(4, 9)}>
         {({ row, column }) => {
-          const onPath = row === 1 || row === 2;
+          const on_path = row === 1 || row === 2;
           return (
             <rect
               class="fg-tile"
-              data-path={onPath ? "true" : undefined}
+              data-path={on_path ? "true" : undefined}
               height={18}
               rx={3}
-              style={onPath ? order(column) : undefined}
+              style={on_path ? order(column) : undefined}
               width={18}
               x={14 + column * 24}
               y={12 + row * 24}
@@ -193,30 +193,30 @@ function CollaborationGlyph() {
 /** The reload icon: an arc around (RELOAD.x, RELOAD.y) with a gap at the top. */
 const RELOAD = { x: 202, y: 54, r: 17 } as const;
 
-function reloadIcon(): { arc: string; head: string } {
+function reload_icon(): { arc: string; head: string } {
   const { x, y, r } = RELOAD;
   const point = (degrees: number) => {
     const angle = (degrees * Math.PI) / 180;
     return [x + r * Math.cos(angle), y + r * Math.sin(angle)] as const;
   };
-  const [startX, startY] = point(-60);
-  const [endX, endY] = point(-120);
+  const [start_x, start_y] = point(-60);
+  const [end_x, end_y] = point(-120);
   // The arc runs with increasing angle (clockwise on screen); its direction
   // at the end angle θ is (-sin θ, cos θ).
   const end = (-120 * Math.PI) / 180;
   const tangent = [-Math.sin(end), Math.cos(end)] as const;
   const normal = [-tangent[1], tangent[0]] as const;
-  const tip = [endX + tangent[0] * 5, endY + tangent[1] * 5];
-  const baseX = endX - tangent[0] * 2;
-  const baseY = endY - tangent[1] * 2;
+  const tip = [end_x + tangent[0] * 5, end_y + tangent[1] * 5];
+  const base_x = end_x - tangent[0] * 2;
+  const base_y = end_y - tangent[1] * 2;
   const fixed = (value: number) => value.toFixed(1);
   return {
-    arc: `M ${fixed(startX)} ${fixed(startY)} A ${r} ${r} 0 1 1 ${fixed(endX)} ${fixed(endY)}`,
-    head: `M ${fixed(tip[0] ?? 0)} ${fixed(tip[1] ?? 0)} L ${fixed(baseX + normal[0] * 5)} ${fixed(baseY + normal[1] * 5)} L ${fixed(baseX - normal[0] * 5)} ${fixed(baseY - normal[1] * 5)} Z`,
+    arc: `M ${fixed(start_x)} ${fixed(start_y)} A ${r} ${r} 0 1 1 ${fixed(end_x)} ${fixed(end_y)}`,
+    head: `M ${fixed(tip[0] ?? 0)} ${fixed(tip[1] ?? 0)} L ${fixed(base_x + normal[0] * 5)} ${fixed(base_y + normal[1] * 5)} L ${fixed(base_x - normal[0] * 5)} ${fixed(base_y - normal[1] * 5)} Z`,
   };
 }
 
-const RELOAD_ICON = reloadIcon();
+const RELOAD_ICON = reload_icon();
 
 function DatabaseGlyph() {
   return (

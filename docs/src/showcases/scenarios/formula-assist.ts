@@ -90,7 +90,7 @@ export function budgetWorkbook(): Workbook {
   };
 }
 
-function isOpen(row: number, col: number): boolean {
+function is_open(row: number, col: number): boolean {
   return Object.values(OPEN_CELLS).some((cell) => cell.row === row && cell.col === col);
 }
 
@@ -98,7 +98,7 @@ function isOpen(row: number, col: number): boolean {
 export function budgetOperations(): DocumentOp[] {
   const operations: DocumentOp[] = [];
   const put = (sheet: string, row: number, col: number, value: string | number): void => {
-    if (isOpen(row, col) && sheet === BUDGET_SHEET) return;
+    if (is_open(row, col) && sheet === BUDGET_SHEET) return;
     const cell =
       typeof value === "string" && value.startsWith("=")
         ? { kind: "formula" as const, src: value }
@@ -110,7 +110,7 @@ export function budgetOperations(): DocumentOp[] {
   MONTHS.forEach((month, index) => put(BUDGET_SHEET, 0, 1 + index, month));
   put(BUDGET_SHEET, 0, TOTAL_COL, "Total");
   put(BUDGET_SHEET, 0, SHARE_COL, "Share");
-  const totalsLine = line(TOTALS_ROW);
+  const totals_line = line(TOTALS_ROW);
   DEPARTMENTS.forEach((department, index) => {
     const row = FIRST_ROW + index;
     put(BUDGET_SHEET, row, 0, department);
@@ -122,7 +122,7 @@ export function budgetOperations(): DocumentOp[] {
       BUDGET_SHEET,
       row,
       SHARE_COL,
-      `=${letter(TOTAL_COL)}${line(row)}/${letter(TOTAL_COL)}$${totalsLine}`,
+      `=${letter(TOTAL_COL)}${line(row)}/${letter(TOTAL_COL)}$${totals_line}`,
     );
     put(RATES_SHEET, index, 0, department);
     put(RATES_SHEET, index, 1, 0.02 + (index % 5) * 0.01);
@@ -174,9 +174,9 @@ export function createFormulaAssistScenario(host: HTMLElement): FormulaAssistSce
     if (!shell) return;
     grid = shell.grid;
     requireApplied(grid.applyRemoteOperations(budgetOperations()), "The budget");
-    const stopChanges = grid.on("change", () => listeners.notify());
+    const stop_changes = grid.on("change", () => listeners.notify());
     dispose = () => {
-      stopChanges();
+      stop_changes();
       shell.dispose();
     };
     listeners.notify();

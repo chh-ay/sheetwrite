@@ -18,7 +18,7 @@ beforeAll(async () => {
   await import("../src/sheet-tab-panels.js");
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let store: SheetwriteStore;
 let grid: Grid;
 let host: HTMLDivElement;
@@ -28,7 +28,7 @@ function named(id: SheetId, name: string): Sheet {
 }
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   const workbook: Workbook = {
     activeSheet: "a",
     sheets: [
@@ -46,11 +46,11 @@ beforeEach(() => {
 afterEach(() => {
   grid.destroy();
   store.dispose();
-  restoreStubs();
+  restore_stubs();
 });
 
 const names = (): string[] => store.getWorkbook().sheets.map((candidate) => candidate.name);
-const sheetById = (id: SheetId): Sheet | undefined =>
+const sheet_by_id = (id: SheetId): Sheet | undefined =>
   store.getWorkbook().sheets.find((candidate) => candidate.id === id);
 
 function press(key: string, init: KeyboardEventInit): void {
@@ -60,13 +60,13 @@ function press(key: string, init: KeyboardEventInit): void {
 }
 
 /** Let a panel whose code loads on first use open. */
-function panelLoaded(): Promise<void> {
+function panel_loaded(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function set(sheetId: SheetId, row: number, value: CellValue): void {
+function set(sheet_id: SheetId, row: number, value: CellValue): void {
   store.applyTransaction({
-    patches: [{ op: "set", addr: { sheet: sheetId, row, col: 0 }, value }],
+    patches: [{ op: "set", addr: { sheet: sheet_id, row, col: 0 }, value }],
   });
 }
 
@@ -115,13 +115,13 @@ describe("Insert", () => {
     grid.setActiveSheet("b");
     press("F11", { shiftKey: true });
     expect(names()).toEqual(["Sales", "Sheet5", "Costs", "Old", "Notes"]);
-    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet5");
+    expect(sheet_by_id(grid.getActiveSheet())?.name).toBe("Sheet5");
   });
 
   it("takes typed numbers, percentages and dates in a new sheet, as Excel's General does", () => {
     press("F11", { shiftKey: true });
     const id = grid.getActiveSheet();
-    expect(new Set(sheetById(id)?.columns.map((column) => column.type))).toEqual(
+    expect(new Set(sheet_by_id(id)?.columns.map((column) => column.type))).toEqual(
       new Set(["general"]),
     );
     const enter = (row: number, text: string): void => {
@@ -147,7 +147,7 @@ describe("Insert", () => {
 describe("Tab Color", () => {
   it("colors a tab as one undo step and keeps the color in a snapshot", () => {
     expect(grid.setSheetTabColor("b", "#C00000").status).toBe("applied");
-    expect(sheetById("b")?.tabColor).toBe("#C00000");
+    expect(sheet_by_id("b")?.tabColor).toBe("#C00000");
     const saved = store.exportSnapshot();
     expect(saved.sheets.find((candidate) => candidate.id === "b")?.tabColor).toBe("#C00000");
     const reloaded = SheetwriteStore.fromSnapshot(saved);
@@ -157,7 +157,7 @@ describe("Tab Color", () => {
     reloaded.dispose();
 
     grid.undo();
-    expect(sheetById("b")?.tabColor).toBeUndefined();
+    expect(sheet_by_id("b")?.tabColor).toBeUndefined();
     expect(grid.setSheetTabColor("b", "red").status).toBe("rejected");
   });
 });
@@ -191,21 +191,21 @@ describe("the sheet menu", () => {
   async function choose(label: string): Promise<HTMLElement | null> {
     host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button")!.click();
     host.querySelector<HTMLButtonElement>(`[role="menuitem"][aria-label="${label}"]`)!.click();
-    await panelLoaded();
+    await panel_loaded();
     return host.querySelector<HTMLElement>(".sheetwrite-tab-panel");
   }
 
   it("inserts a sheet before the sheet and activates it", async () => {
     await choose("Insert a sheet before Sales");
     expect(names()).toEqual(["Sheet5", "Sales", "Costs", "Old", "Notes"]);
-    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet5");
+    expect(sheet_by_id(grid.getActiveSheet())?.name).toBe("Sheet5");
   });
 
   it("colors the tab from Excel's Tab Color palette", async () => {
     const palette = (await choose("Tab color for Sales sheet"))!;
     expect(palette.querySelectorAll('[role="menuitemradio"]').length).toBe(11);
     palette.querySelector<HTMLButtonElement>('[aria-label="Dark Red"]')!.click();
-    expect(sheetById("a")?.tabColor).toBe("#C00000");
+    expect(sheet_by_id("a")?.tabColor).toBe("#C00000");
     expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
     const tab = host.querySelector<HTMLElement>('[role="tab"][data-sheet-id="a"]')!;
     expect(tab.style.getPropertyValue("--sheetwrite-tab-color")).toBe("#C00000");
@@ -213,11 +213,11 @@ describe("the sheet menu", () => {
     (await choose("Tab color for Sales sheet"))!
       .querySelector<HTMLButtonElement>('[aria-label="No Color"]')!
       .click();
-    expect(sheetById("a")?.tabColor).toBeUndefined();
+    expect(sheet_by_id("a")?.tabColor).toBeUndefined();
   });
 
   it("copies or moves the sheet from the Move or Copy dialog", async () => {
-    const moveOrCopy = async (name: string, before: string, copy: boolean): Promise<void> => {
+    const move_or_copy = async (name: string, before: string, copy: boolean): Promise<void> => {
       const dialog = (await choose(`Move or copy ${name} sheet`))!;
       const list = dialog.querySelector<HTMLSelectElement>('select[aria-label="Before sheet"]')!;
       // The hidden sheet is not offered.
@@ -229,13 +229,13 @@ describe("the sheet menu", () => {
     };
 
     // The copy goes before the chosen sheet and is activated.
-    await moveOrCopy("Sales", "Notes", true);
+    await move_or_copy("Sales", "Notes", true);
     expect(names()).toEqual(["Sales", "Costs", "Old", "Sales (2)", "Notes"]);
-    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sales (2)");
+    expect(sheet_by_id(grid.getActiveSheet())?.name).toBe("Sales (2)");
 
-    await moveOrCopy("Sales (2)", "(move to end)", false);
+    await move_or_copy("Sales (2)", "(move to end)", false);
     expect(names()).toEqual(["Sales", "Costs", "Old", "Notes", "Sales (2)"]);
-    await moveOrCopy("Sales (2)", "Sales", false);
+    await move_or_copy("Sales (2)", "Sales", false);
     expect(names()).toEqual(["Sales (2)", "Sales", "Costs", "Old", "Notes"]);
   });
 });

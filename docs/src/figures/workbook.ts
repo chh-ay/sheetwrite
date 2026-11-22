@@ -74,21 +74,21 @@ const MONTHS = [
 const SEASON = [0.86, 0.82, 0.94, 0.9, 0.84, 0.8, 0.88, 0.93, 1.02, 1.12, 1.24, 1.36] as const;
 
 /** Units of one product in one region and month; a fixed spread, no randomness. */
-function units(regionIndex: number, productIndex: number, monthIndex: number): number {
-  const region = REGIONS[regionIndex]!;
-  const spread = 1 + ((regionIndex * 7 + productIndex * 5 + monthIndex * 3) % 9) / 40;
-  const base = [120, 160, 210, 420][productIndex]!;
-  return Math.round(base * region.weight * SEASON[monthIndex]! * spread);
+function units(region_index: number, product_index: number, month_index: number): number {
+  const region = REGIONS[region_index]!;
+  const spread = 1 + ((region_index * 7 + product_index * 5 + month_index * 3) % 9) / 40;
+  const base = [120, 160, 210, 420][product_index]!;
+  return Math.round(base * region.weight * SEASON[month_index]! * spread);
 }
 
 const ORDER_HEADERS = ["Month", "Region", "Product", "Units", "Revenue"] as const;
 
-function ordersRows(): CellScalar[][] {
+function orders_rows(): CellScalar[][] {
   const rows: CellScalar[][] = [];
-  for (const [monthIndex, month] of MONTHS.entries())
-    for (const [regionIndex, region] of REGIONS.entries())
-      for (const [productIndex, product] of PRODUCTS.entries()) {
-        const count = units(regionIndex, productIndex, monthIndex);
+  for (const [month_index, month] of MONTHS.entries())
+    for (const [region_index, region] of REGIONS.entries())
+      for (const [product_index, product] of PRODUCTS.entries()) {
+        const count = units(region_index, product_index, month_index);
         rows.push([month, region.name, product.name, count, count * product.price]);
       }
   return rows;
@@ -101,8 +101,12 @@ function block(rows: readonly (readonly CellScalar[])[]): CellBlock {
     startCol: 0,
     rowCount: rows.length,
     colCount: rows[0]?.length ?? 0,
-    cells: rows.flatMap((row, rowOffset) =>
-      row.map((value, colOffset) => ({ rowOffset, colOffset, value: { kind: "literal", value } })),
+    cells: rows.flatMap((row, row_offset) =>
+      row.map((value, col_offset) => ({
+        rowOffset: row_offset,
+        colOffset: col_offset,
+        value: { kind: "literal", value },
+      })),
     ),
   };
 }
@@ -111,15 +115,15 @@ function block(rows: readonly (readonly CellScalar[])[]): CellBlock {
  * The Orders sheet. In the data-grid presentation the column headers name the
  * fields, so the cells start at the first order and the table has no header row.
  */
-function ordersSheet(presentation: GridPresentation): SheetSnapshot {
-  const rows = ordersRows();
-  const headerRows = presentation === "data-grid" ? 0 : 1;
+function orders_sheet(presentation: GridPresentation): SheetSnapshot {
+  const rows = orders_rows();
+  const header_rows = presentation === "data-grid" ? 0 : 1;
   return {
     id: FIGURE_SHEETS.orders,
     name: "Orders",
     order: 0,
-    rowCount: rows.length + headerRows,
-    frozenRows: headerRows,
+    rowCount: rows.length + header_rows,
+    frozenRows: header_rows,
     columns: [
       { key: "month", header: "Month", width: 96, type: "text" },
       { key: "region", header: "Region", width: 104, type: "text" },
@@ -134,18 +138,18 @@ function ordersSheet(presentation: GridPresentation): SheetSnapshot {
         range: {
           sheet: FIGURE_SHEETS.orders,
           start: { row: 0, col: 0 },
-          end: { row: rows.length + headerRows - 1, col: ORDER_HEADERS.length - 1 },
+          end: { row: rows.length + header_rows - 1, col: ORDER_HEADERS.length - 1 },
         },
         columns: ORDER_HEADERS.map((name) => ({ id: name.toLowerCase(), name })),
-        headerRow: headerRows === 1,
+        headerRow: header_rows === 1,
         totalsRow: false,
       },
     ],
-    cells: [block(headerRows === 1 ? [[...ORDER_HEADERS], ...rows] : rows)],
+    cells: [block(header_rows === 1 ? [[...ORDER_HEADERS], ...rows] : rows)],
   };
 }
 
-function regionsSheet(): SheetSnapshot {
+function regions_sheet(): SheetSnapshot {
   const rows: CellScalar[][] = [
     ["Region", "Manager", "Target"],
     ...REGIONS.map((region) => [region.name, region.manager, region.target]),
@@ -213,7 +217,7 @@ const REPORT_NUMBER_COLUMNS = new Set([2, 3, 4]);
  * SUMIFS reads from the Orders table, wrapped comments, a status list, a note,
  * a total row and a column chart of revenue by region.
  */
-function reportSheet(): SheetSnapshot {
+function report_sheet(): SheetSnapshot {
   const sheet = FIGURE_SHEETS.report;
   const header = ["Region", "Manager", "Revenue", "Target", "Attainment", "Status", "Comment"];
   const rows: ReportCell[][] = [
@@ -296,10 +300,10 @@ function reportSheet(): SheetSnapshot {
         startCol: 0,
         rowCount: rows.length,
         colCount: header.length,
-        cells: rows.flatMap((row, rowOffset) =>
-          row.map(([value, style], colOffset) => ({
-            rowOffset,
-            colOffset,
+        cells: rows.flatMap((row, row_offset) =>
+          row.map(([value, style], col_offset) => ({
+            rowOffset: row_offset,
+            colOffset: col_offset,
             value,
             ...(style === undefined ? {} : { style }),
           })),
@@ -325,7 +329,7 @@ const ORDERS_PIVOT: PivotDefinition = {
 };
 
 /** The pivot, and a PivotChart of its revenue beside it. */
-function pivotSheet(): SheetSnapshot {
+function pivot_sheet(): SheetSnapshot {
   return {
     id: FIGURE_SHEETS.pivot,
     name: "Pivot",
@@ -356,7 +360,7 @@ function pivotSheet(): SheetSnapshot {
 }
 
 /** A GROUPBY that totals revenue by region from the Orders table, spilled from A1. */
-function formulasSheet(): SheetSnapshot {
+function formulas_sheet(): SheetSnapshot {
   return {
     id: FIGURE_SHEETS.formulas,
     name: "Formulas",
@@ -458,7 +462,7 @@ const NARROW_BOXES: Readonly<Record<"tablet" | "phone", Readonly<Record<string, 
   },
 };
 
-function narrowLayout(sheet: SheetSnapshot, layout: "tablet" | "phone"): SheetSnapshot {
+function narrow_layout(sheet: SheetSnapshot, layout: "tablet" | "phone"): SheetSnapshot {
   const boxes = NARROW_BOXES[layout];
   const items = (sheet.dashboard?.items ?? []).flatMap((item) => {
     const box = boxes[item.id];
@@ -467,7 +471,7 @@ function narrowLayout(sheet: SheetSnapshot, layout: "tablet" | "phone"): SheetSn
   return { ...sheet, dashboard: { items } };
 }
 
-function dashboardSheet(): SheetSnapshot {
+function dashboard_sheet(): SheetSnapshot {
   return {
     id: FIGURE_SHEETS.dashboard,
     name: "Dashboard",
@@ -596,11 +600,11 @@ export function figureWorkbook(
       },
     },
     sheets: [
-      ordersSheet(presentation),
-      regionsSheet(),
-      layout === "wide" ? dashboardSheet() : narrowLayout(dashboardSheet(), layout),
+      orders_sheet(presentation),
+      regions_sheet(),
+      layout === "wide" ? dashboard_sheet() : narrow_layout(dashboard_sheet(), layout),
       ...(ANALYSIS_SHEETS.includes(activeSheet)
-        ? [reportSheet(), pivotSheet(), formulasSheet()]
+        ? [report_sheet(), pivot_sheet(), formulas_sheet()]
         : []),
     ],
   };

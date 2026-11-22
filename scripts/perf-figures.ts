@@ -29,13 +29,13 @@ const FIGURE_END = "<!--/perf-figure-->";
  * out of the page into its own static HTML asset: the page's script then
  * carries a placeholder, not the figure.
  */
-function pageFigure(id: string, markup: string): string {
+function page_figure(id: string, markup: string): string {
   return `${FIGURE_START}${id}-->\n${markup}\n${FIGURE_END}`;
 }
 
 /** Bars as static HTML for a Performance page; icons are inlined, so the figure needs no JavaScript. */
 export function perfFigure(figure: PerfFigure): string {
-  return pageFigure(
+  return page_figure(
     figure.id,
     renderPerfBars(figure, (name) => inlineIcon(name)),
   );
@@ -43,7 +43,7 @@ export function perfFigure(figure: PerfFigure): string {
 
 /** The speed story as static HTML for a Performance page. */
 export function speedStory(story: SpeedupStory): string {
-  return pageFigure(
+  return page_figure(
     story.id,
     renderSpeedupStory(story, (name) => inlineIcon(name)),
   );
@@ -51,7 +51,7 @@ export function speedStory(story: SpeedupStory): string {
 
 /** An engine change across every workload, as static HTML for a Performance page. */
 export function releaseChange(change: ReleaseChange): string {
-  return pageFigure(
+  return page_figure(
     change.id,
     renderReleaseChange(change, (name) => inlineIcon(name)),
   );
@@ -146,7 +146,7 @@ interface CaptureScopeReceipt {
 }
 
 /** "12th Gen Intel(R) Core(TM) i9-12900H" reads "Intel Core i9-12900H". */
-function cpuName(cpu: string): string {
+function cpu_name(cpu: string): string {
   return cpu
     .replaceAll(/\((R|TM)\)/gu, "")
     .replace(/^\d+(st|nd|rd|th) Gen /u, "")
@@ -154,8 +154,8 @@ function cpuName(cpu: string): string {
     .trim();
 }
 
-function readJson<T>(relativePath: string): T | undefined {
-  const path = join(repositoryRoot, relativePath);
+function read_json<T>(relative_path: string): T | undefined {
+  const path = join(repositoryRoot, relative_path);
   return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : undefined;
 }
 
@@ -166,15 +166,15 @@ function readJson<T>(relativePath: string): T | undefined {
  */
 export function captureMachines(): readonly CaptureMachine[] {
   const machines: CaptureMachine[] = [];
-  const linuxCpu = readJson<CaptureScopeReceipt>(
+  const linux_cpu = read_json<CaptureScopeReceipt>(
     `${LINUX_DIRECTORY}/capture-runs/render-scale.json`,
   )?.metadata?.cpu;
   machines.push({
     machine: "linux",
     directory: LINUX_DIRECTORY,
-    label: `Linux · x86-64${linuxCpu ? ` · ${cpuName(linuxCpu)}` : ""}`,
+    label: `Linux · x86-64${linux_cpu ? ` · ${cpu_name(linux_cpu)}` : ""}`,
   });
-  const mac = readJson<MachineCaptureManifest>(`${MAC_DIRECTORY}/capture.json`);
+  const mac = read_json<MachineCaptureManifest>(`${MAC_DIRECTORY}/capture.json`);
   if (mac !== undefined) {
     if (mac.protocol !== "sheetwrite-machine-capture-v1") {
       throw new Error(`${MAC_DIRECTORY}/capture.json is not a machine capture manifest`);
@@ -183,7 +183,7 @@ export function captureMachines(): readonly CaptureMachine[] {
       machine: "mac",
       directory: MAC_DIRECTORY,
       // "Apple M5 Pro" under "Apple Silicon" names the maker once: "M5 Pro".
-      label: `Mac · Apple Silicon · ${cpuName(mac.machine.cpu).replace(/^Apple /u, "")}`,
+      label: `Mac · Apple Silicon · ${cpu_name(mac.machine.cpu).replace(/^Apple /u, "")}`,
       manifest: mac,
     });
   }

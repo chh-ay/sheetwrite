@@ -30,9 +30,9 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-async function waitFor(isReady: () => boolean, what: string): Promise<void> {
+async function wait_for(is_ready: () => boolean, what: string): Promise<void> {
   const deadline = Date.now() + LOAD_TIMEOUT_MS;
-  while (!isReady()) {
+  while (!is_ready()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await Bun.sleep(POLL_MS);
   }
@@ -43,11 +43,11 @@ function keydown(key: string): KeyboardEvent {
 }
 
 // The help layer goes to the field's offset parent, which is the body in tests.
-function itemsOf(): string[] {
+function items_of(): string[] {
   return [...document.querySelectorAll('[role="option"]')].map((el) => el.textContent ?? "");
 }
 
-function selectedItem(): string | null {
+function selected_item(): string | null {
   return document.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
 }
 
@@ -63,7 +63,7 @@ function deps(highlights: (HighlightRange[] | null)[] = [], source = store): Ass
 }
 
 /** A cell editor with formula help, as the grid builds it, after `begin`. */
-function beginEdit(source = store): {
+function begin_edit(source = store): {
   editor: EditController;
   textarea: HTMLTextAreaElement;
   state: { cancelled: boolean; committed: string | null; highlights: (HighlightRange[] | null)[] };
@@ -109,13 +109,13 @@ function type(textarea: HTMLTextAreaElement, text: string, caret = text.length):
 }
 
 /** Type `text` and wait until the help lists `name`. */
-async function typeUntilListed(
+async function type_until_listed(
   textarea: HTMLTextAreaElement,
   text: string,
   name: string,
 ): Promise<void> {
   type(textarea, text);
-  await waitFor(() => itemsOf().includes(name), `${name} in the function list`);
+  await wait_for(() => items_of().includes(name), `${name} in the function list`);
 }
 
 describe("formula help loading", () => {
@@ -128,16 +128,16 @@ describe("formula help loading", () => {
 
 describe("function list", () => {
   it("moves with the arrow keys, wraps, and accepts with Enter", async () => {
-    const { textarea } = beginEdit();
-    await typeUntilListed(textarea, "=CO", "COUNT");
-    const items = itemsOf();
+    const { textarea } = begin_edit();
+    await type_until_listed(textarea, "=CO", "COUNT");
+    const items = items_of();
     expect(items.length).toBeGreaterThan(2);
 
     textarea.dispatchEvent(keydown("ArrowDown"));
-    expect(selectedItem()).toBe(items[1] ?? "missing");
+    expect(selected_item()).toBe(items[1] ?? "missing");
     textarea.dispatchEvent(keydown("ArrowUp"));
     textarea.dispatchEvent(keydown("ArrowUp"));
-    expect(selectedItem()).toBe(items.at(-1) ?? "missing");
+    expect(selected_item()).toBe(items.at(-1) ?? "missing");
 
     textarea.dispatchEvent(keydown("Enter"));
     expect(textarea.value).toBe(`=${items.at(-1)}(`);
@@ -145,8 +145,8 @@ describe("function list", () => {
   });
 
   it("closes on the first Escape and cancels the edit on the second", async () => {
-    const { editor, textarea, state } = beginEdit();
-    await typeUntilListed(textarea, "=SUM(A", "ABS");
+    const { editor, textarea, state } = begin_edit();
+    await type_until_listed(textarea, "=SUM(A", "ABS");
 
     textarea.dispatchEvent(keydown("Escape"));
     expect(document.querySelector('[role="listbox"]')).toBeNull();
@@ -184,13 +184,13 @@ describe("function list", () => {
         },
       ],
     });
-    const { textarea } = beginEdit(named);
-    await typeUntilListed(textarea, "=Sa", "SalesUnits");
+    const { textarea } = begin_edit(named);
+    await type_until_listed(textarea, "=Sa", "SalesUnits");
     type(textarea, "=Orders[A");
-    expect(itemsOf()).toEqual(["Amount"]);
+    expect(items_of()).toEqual(["Amount"]);
 
     type(textarea, "=VLOOKUP(A1,A1:B3,2,");
-    expect(itemsOf()).toEqual(["TRUE - Approximate match", "FALSE - Exact match"]);
+    expect(items_of()).toEqual(["TRUE - Approximate match", "FALSE - Exact match"]);
     textarea.dispatchEvent(keydown("ArrowDown"));
     textarea.dispatchEvent(keydown("Tab"));
     expect(textarea.value).toBe("=VLOOKUP(A1,A1:B3,2,FALSE");
@@ -204,8 +204,8 @@ describe("function list", () => {
 
 describe("reference colours", () => {
   it("fills each referenced range in the colour of its text, and clears on commit", async () => {
-    const { editor, textarea, state } = beginEdit();
-    await typeUntilListed(textarea, "=SU", "SUM");
+    const { editor, textarea, state } = begin_edit();
+    await type_until_listed(textarea, "=SU", "SUM");
 
     type(textarea, "=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
 
@@ -215,9 +215,9 @@ describe("reference colours", () => {
       { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 } },
       { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     ]);
-    const [first, second, sameSheet] = ranges;
+    const [first, second, same_sheet] = ranges;
     expect(first?.color).not.toBe(second?.color);
-    expect(sameSheet?.color).not.toBe(first?.color);
+    expect(same_sheet?.color).not.toBe(first?.color);
 
     const mirrored = [...document.querySelectorAll<HTMLElement>(".sheetwrite-formula-mirror span")];
     const a1b2 = mirrored.find((span) => span.textContent === "A1:B2");
@@ -233,20 +233,20 @@ describe("reference colours", () => {
 
 describe("result preview", () => {
   it("shows the result once typing pauses, and nothing for an unfinished formula", async () => {
-    const { textarea } = beginEdit();
+    const { textarea } = begin_edit();
     const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";
 
     type(textarea, "=ROUND(1/3,2)*3");
-    await waitFor(() => preview() === "= 0.99", "the preview of a value");
+    await wait_for(() => preview() === "= 0.99", "the preview of a value");
     expect(textarea.getAttribute("aria-describedby")).toContain(
       document.querySelector(".sheetwrite-formula-preview")?.id ?? "missing",
     );
 
     type(textarea, "=SEQUENCE(2,3,5)");
-    await waitFor(() => preview() === "= 5 … (2 × 3 array)", "the preview of an array");
+    await wait_for(() => preview() === "= 5 … (2 × 3 array)", "the preview of an array");
 
     type(textarea, "=RAND()");
-    await waitFor(() => preview().startsWith("No preview"), "a refused preview");
+    await wait_for(() => preview().startsWith("No preview"), "a refused preview");
 
     type(textarea, "=ROUND(");
     expect(preview()).toBe("");
@@ -254,25 +254,25 @@ describe("result preview", () => {
 
   // Excel shows no result while a function name is still being typed (#1001).
   it("shows nothing while the name at the caret is unfinished", async () => {
-    const { textarea } = beginEdit();
+    const { textarea } = begin_edit();
     const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";
 
-    await typeUntilListed(textarea, "=AVER", "AVERAGE");
+    await type_until_listed(textarea, "=AVER", "AVERAGE");
     // Longer than the pause after which the preview calculates.
     await Bun.sleep(300);
     expect(preview()).toBe("");
 
     type(textarea, "=AVERAGE(1,3)");
-    await waitFor(() => preview() === "= 2", "the preview once the call is written");
+    await wait_for(() => preview() === "= 2", "the preview once the call is written");
   });
 });
 
 describe("fixes for live errors", () => {
   it("offers the fix under the error and applies it with Tab or a click", async () => {
     const named = new SheetwriteStore({ ...makeWorkbook(2), namedRanges: [SALES_UNITS] });
-    const { textarea } = beginEdit(named);
+    const { textarea } = begin_edit(named);
     const fix = () => document.querySelector<HTMLButtonElement>(".sheetwrite-formula-fix");
-    await typeUntilListed(textarea, "=SU", "SUM");
+    await type_until_listed(textarea, "=SU", "SUM");
 
     type(textarea, "=SUMM(A1:A3)");
     expect(fix()?.textContent).toBe("Did you mean SUM?");
@@ -299,14 +299,14 @@ describe("fixes for live errors", () => {
   });
 
   it("commits the fixed formula on Enter, as without a fix", async () => {
-    const { textarea, state } = beginEdit();
-    await typeUntilListed(textarea, "=SU", "SUM");
+    const { textarea, state } = begin_edit();
+    await type_until_listed(textarea, "=SU", "SUM");
 
     type(textarea, "=SUMM(A1:A3)");
     textarea.dispatchEvent(keydown("Tab"));
     expect(textarea.value).toBe("=SUM(A1:A3)");
     // The caret now ends the name SUM, but the fix opens no function list.
-    expect(itemsOf()).toEqual([]);
+    expect(items_of()).toEqual([]);
     textarea.dispatchEvent(keydown("Enter"));
     expect(state.committed).toBe("=SUM(A1:A3)");
   });

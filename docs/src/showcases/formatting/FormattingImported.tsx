@@ -13,8 +13,8 @@ export function FormattingImported() {
           on(report, (current) => {
             let dispose: (() => void) | undefined;
             let removed = false;
-            void import("./boot.js").then(({ showImportedBudget }) => {
-              if (!removed) dispose = showImportedBudget(host, current.snapshot);
+            void import("./boot.js").then(({ showImportedBudget: show_imported_budget }) => {
+              if (!removed) dispose = show_imported_budget(host, current.snapshot);
             });
             onCleanup(() => {
               removed = true;

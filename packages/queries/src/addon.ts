@@ -31,24 +31,24 @@ export function createQueriesAddon(
 ): SheetwriteAddon<QueriesAddonOptions> {
   return {
     name: "queries",
-    grid({ grid, settings, queryCommands }) {
+    grid({ grid, settings, queryCommands: query_commands }) {
       const merged: QueriesAddonOptions = { ...options, ...settings };
-      const fetchSource = merged.fetchSource;
-      if (fetchSource === undefined) return;
+      const fetch_source = merged.fetchSource;
+      if (fetch_source === undefined) return;
 
       let session: QuerySession | undefined;
-      let isDestroyed = false;
+      let is_destroyed = false;
 
       // The session module loads with the engine, never with the package entry.
       const pending = Promise.all([loadEngine(merged), import("./session.js")]).then(
-        ([engine, { createSessionWithEngine }]) => {
-          session = createSessionWithEngine(
+        ([engine, { createSessionWithEngine: create_session_with_engine }]) => {
+          session = create_session_with_engine(
             grid,
             engine,
-            { fetchSource, limits: merged.limits },
-            queryCommands,
+            { fetchSource: fetch_source, limits: merged.limits },
+            query_commands,
           );
-          if (isDestroyed) session.dispose();
+          if (is_destroyed) session.dispose();
 
           return session;
         },
@@ -56,7 +56,7 @@ export function createQueriesAddon(
       SESSIONS.set(grid, pending);
 
       return () => {
-        isDestroyed = true;
+        is_destroyed = true;
         session?.dispose();
         SESSIONS.delete(grid);
       };

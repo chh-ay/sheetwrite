@@ -49,7 +49,7 @@ interface Bounds {
   c1: number;
 }
 
-function boundsOf(range: Range): Bounds {
+function bounds_of(range: Range): Bounds {
   return {
     r0: Math.min(range.start.row, range.end.row),
     c0: Math.min(range.start.col, range.end.col),
@@ -59,7 +59,7 @@ function boundsOf(range: Range): Bounds {
 }
 
 /** A rule cut down to `part` of its range; a formula follows its new top-left. */
-function rulePart(rule: ConditionalFormatRule, from: Bounds, part: Bounds, sheet: SheetId) {
+function rule_part(rule: ConditionalFormatRule, from: Bounds, part: Bounds, sheet: SheetId) {
   const when =
     rule.when.kind === "formula"
       ? {
@@ -75,7 +75,7 @@ function rulePart(rule: ConditionalFormatRule, from: Bounds, part: Bounds, sheet
 }
 
 export function copyNotes(sheet: Sheet, block: Range): CopiedNote[] {
-  const b = boundsOf(block);
+  const b = bounds_of(block);
   const notes: CopiedNote[] = [];
   for (const note of sheet.notes ?? []) {
     const { row, col } = note.addr;
@@ -86,10 +86,10 @@ export function copyNotes(sheet: Sheet, block: Range): CopiedNote[] {
 }
 
 export function copyConditionalFormats(sheet: Sheet, block: Range): CopiedConditionalFormat[] {
-  const b = boundsOf(block);
+  const b = bounds_of(block);
   const parts: CopiedConditionalFormat[] = [];
   for (const rule of sheet.conditionalFormats ?? []) {
-    const r = boundsOf(rule.range);
+    const r = bounds_of(rule.range);
     const part = {
       r0: Math.max(r.r0, b.r0),
       c0: Math.max(r.c0, b.c0),
@@ -97,7 +97,7 @@ export function copyConditionalFormats(sheet: Sheet, block: Range): CopiedCondit
       c1: Math.min(r.c1, b.c1),
     };
     if (part.r0 > part.r1 || part.c0 > part.c1) continue;
-    const { range: _, ...cut } = rulePart(rule, r, part, block.sheet);
+    const { range: _, ...cut } = rule_part(rule, r, part, block.sheet);
     parts.push({
       rule: cut,
       rows: [part.r0 - b.r0, part.r1 - b.r0],
@@ -111,7 +111,10 @@ export function copyConditionalFormats(sheet: Sheet, block: Range): CopiedCondit
  * Each copy of the block the paste writes: its top-left offset in the area.
  * A block repeats when the area is a whole multiple of it, as cells do.
  */
-function copiesOf(block: { rows: number; cols: number }, area: PasteArea): Array<[number, number]> {
+function copies_of(
+  block: { rows: number; cols: number },
+  area: PasteArea,
+): Array<[number, number]> {
   const rows = area.transpose ? block.cols : block.rows;
   const cols = area.transpose ? block.rows : block.cols;
   const repeat = area.rows % rows === 0 && area.cols % cols === 0;
@@ -147,7 +150,7 @@ export function notePastePatches(
 ): DocumentOp[] {
   const patches: DocumentOp[] = [];
   const added = new Set<string>();
-  for (const copy of copiesOf(block, area)) {
+  for (const copy of copies_of(block, area)) {
     for (const note of notes) {
       const at = placed([note.row, note.row], [note.col, note.col], area, copy);
       added.add(`${at.r0}:${at.c0}`);
@@ -195,12 +198,12 @@ export function conditionalFormatPastePatches(
       continue;
     }
     // The rest of the range around the hole, as validation rules split.
-    const from = boundsOf(rule.range);
+    const from = bounds_of(rule.range);
     for (const piece of subtractRanges(rule.range, [hole])) {
-      rules.push(rulePart(rule, from, boundsOf(piece), area.sheet));
+      rules.push(rule_part(rule, from, bounds_of(piece), area.sheet));
     }
   }
-  for (const copy of copiesOf(block, area)) {
+  for (const copy of copies_of(block, area)) {
     for (const part of parts) {
       const at = placed(part.rows, part.cols, area, copy);
       rules.push({

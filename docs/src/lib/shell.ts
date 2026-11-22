@@ -24,27 +24,27 @@ const PAGE_END_SLACK_PX = 2;
 
 type Theme = "light" | "dark";
 
-function currentTheme(): Theme {
+function current_theme(): Theme {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
 /** The toggle offers the other theme: its label and icon follow the current one. */
-function showTheme(button: HTMLElement, theme: Theme): void {
+function show_theme(button: HTMLElement, theme: Theme): void {
   const label = `Use ${theme === "dark" ? "light" : "dark"} theme`;
   button.setAttribute("aria-label", label);
   button.title = label;
   button.querySelector("use")?.setAttribute("href", iconHref(theme === "dark" ? "sun" : "moon"));
 }
 
-function installThemeToggle(): void {
+function install_theme_toggle(): void {
   for (const button of document.querySelectorAll<HTMLElement>("[data-theme-toggle]")) {
     // The page was rendered for the dark theme; the head script may have chosen light.
-    showTheme(button, currentTheme());
+    show_theme(button, current_theme());
     button.addEventListener("click", () => {
-      const next = currentTheme() === "dark" ? "light" : "dark";
+      const next = current_theme() === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       writePreference("sheetwrite-theme", next);
-      showTheme(button, next);
+      show_theme(button, next);
     });
   }
 }
@@ -54,7 +54,7 @@ function installThemeToggle(): void {
  * which brings the focus trap, Escape and focus restore; the backdrop and the
  * close button close it, and so does the viewport growing to fit the sidebar.
  */
-function installNavigationMenu(): void {
+function install_navigation_menu(): void {
   const dialog = document.getElementById(NAVIGATION_DIALOG_ID);
   const toggle = document.querySelector<HTMLElement>(`[aria-controls="${NAVIGATION_DIALOG_ID}"]`);
   if (!(dialog instanceof HTMLDialogElement) || toggle === null) return;
@@ -85,13 +85,13 @@ function installNavigationMenu(): void {
 const RAIL_ENTRY_MARGIN_PX = 24;
 
 /** Scrolls the outline rail, never the page, so `link` is in view with some room around it. */
-function scrollRailTo(rail: HTMLElement, link: HTMLElement): void {
-  const railBox = rail.getBoundingClientRect();
-  const linkBox = link.getBoundingClientRect();
-  if (linkBox.top < railBox.top + RAIL_ENTRY_MARGIN_PX) {
-    rail.scrollTop -= railBox.top + RAIL_ENTRY_MARGIN_PX - linkBox.top;
-  } else if (linkBox.bottom > railBox.bottom - RAIL_ENTRY_MARGIN_PX) {
-    rail.scrollTop += linkBox.bottom - railBox.bottom + RAIL_ENTRY_MARGIN_PX;
+function scroll_rail_to(rail: HTMLElement, link: HTMLElement): void {
+  const rail_box = rail.getBoundingClientRect();
+  const link_box = link.getBoundingClientRect();
+  if (link_box.top < rail_box.top + RAIL_ENTRY_MARGIN_PX) {
+    rail.scrollTop -= rail_box.top + RAIL_ENTRY_MARGIN_PX - link_box.top;
+  } else if (link_box.bottom > rail_box.bottom - RAIL_ENTRY_MARGIN_PX) {
+    rail.scrollTop += link_box.bottom - rail_box.bottom + RAIL_ENTRY_MARGIN_PX;
   }
 }
 
@@ -99,7 +99,7 @@ function scrollRailTo(rail: HTMLElement, link: HTMLElement): void {
  * Marks which ends of the rail hide entries (`data-more="start end"`), so the
  * stylesheet fades that edge: overlay scroll bars show no sign of the rest.
  */
-function markRailEdges(rail: HTMLElement): void {
+function mark_rail_edges(rail: HTMLElement): void {
   const hidden = [
     rail.scrollTop > 1 ? "start" : "",
     rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1 ? "end" : "",
@@ -113,7 +113,7 @@ function markRailEdges(rail: HTMLElement): void {
  * reading line, or at the page's end the last on screen), and lists only
  * entries whose heading is shown: the symbol filter hides groups.
  */
-function installOutline(): void {
+function install_outline(): void {
   const outlines = Array.from(document.querySelectorAll<HTMLElement>(".sw-toc, .sw-toc-inline"));
   // Every entry each outline was rendered with, so a group the filter shows again comes back.
   const lists = outlines.flatMap((outline) => {
@@ -121,17 +121,17 @@ function installOutline(): void {
     return list === null ? [] : [{ list, entries: Array.from(list.children) }];
   });
   if (lists.length === 0) return;
-  const targetOf = (link: HTMLAnchorElement) =>
+  const target_of = (link: HTMLAnchorElement) =>
     document.getElementById(decodeURIComponent(link.hash.slice(1)));
-  const isShown = (entry: Element): boolean => {
+  const is_shown = (entry: Element): boolean => {
     const link = entry.querySelector("a");
-    const target = link === null ? null : targetOf(link);
+    const target = link === null ? null : target_of(link);
     return target !== null && target.closest("[hidden]") === null;
   };
 
-  const showVisibleEntries = (): void => {
+  const show_visible_entries = (): void => {
     for (const { list, entries } of lists) {
-      const shown = entries.filter(isShown);
+      const shown = entries.filter(is_shown);
       const unchanged =
         shown.length === list.children.length &&
         shown.every((entry, index) => list.children[index] === entry);
@@ -141,62 +141,62 @@ function installOutline(): void {
 
   const rail = outlines.find((outline) => outline.matches(".sw-toc"));
   let frame = 0;
-  let shownCurrent: HTMLAnchorElement | undefined;
-  const markCurrent = (): void => {
+  let shown_current: HTMLAnchorElement | undefined;
+  const mark_current = (): void => {
     frame = 0;
-    const { scrollHeight } = document.documentElement;
-    const atEnd = window.scrollY + window.innerHeight >= scrollHeight - PAGE_END_SLACK_PX;
-    const line = atEnd ? window.innerHeight : READING_LINE_PX;
-    const railLinks = Array.from(rail?.querySelectorAll<HTMLAnchorElement>("li a") ?? []);
-    let current = railLinks[0];
-    for (const link of railLinks) {
-      const target = targetOf(link);
+    const { scrollHeight: scroll_height } = document.documentElement;
+    const at_end = window.scrollY + window.innerHeight >= scroll_height - PAGE_END_SLACK_PX;
+    const line = at_end ? window.innerHeight : READING_LINE_PX;
+    const rail_links = Array.from(rail?.querySelectorAll<HTMLAnchorElement>("li a") ?? []);
+    let current = rail_links[0];
+    for (const link of rail_links) {
+      const target = target_of(link);
       if (target === null || target.getBoundingClientRect().top > line) break;
       current = link;
     }
-    for (const link of railLinks) {
+    for (const link of rail_links) {
       if (link === current) link.setAttribute("aria-current", "location");
       else link.removeAttribute("aria-current");
     }
     // A long outline scrolls inside its sticky column: the entry being read
     // stays in view there. Only a change of entry moves the rail, so a reader
     // who scrolls the rail to look ahead keeps their place.
-    if (rail !== undefined && current !== undefined && current !== shownCurrent) {
-      shownCurrent = current;
-      scrollRailTo(rail, current);
+    if (rail !== undefined && current !== undefined && current !== shown_current) {
+      shown_current = current;
+      scroll_rail_to(rail, current);
     }
   };
   const schedule = (): void => {
-    if (frame === 0) frame = requestAnimationFrame(markCurrent);
+    if (frame === 0) frame = requestAnimationFrame(mark_current);
   };
 
-  showVisibleEntries();
-  markCurrent();
+  show_visible_entries();
+  mark_current();
   window.addEventListener("scroll", schedule, { passive: true });
   if (rail !== undefined) {
-    const markEdges = (): void => markRailEdges(rail);
-    markEdges();
-    rail.addEventListener("scroll", markEdges, { passive: true });
+    const mark_edges = (): void => mark_rail_edges(rail);
+    mark_edges();
+    rail.addEventListener("scroll", mark_edges, { passive: true });
     // The rail's height (viewport) and its list's height (filtered entries) both move the edges.
-    const edges = new ResizeObserver(markEdges);
+    const edges = new ResizeObserver(mark_edges);
     edges.observe(rail);
-    const railList = rail.querySelector("ul");
-    if (railList !== null) edges.observe(railList);
+    const rail_list = rail.querySelector("ul");
+    if (rail_list !== null) edges.observe(rail_list);
   }
   const article = document.querySelector("#main-content article.sw-prose");
   if (article !== null) {
     new MutationObserver(() => {
-      showVisibleEntries();
+      show_visible_entries();
       schedule();
     }).observe(article, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
   }
 }
 
 export function installDocsShell(): void {
-  installThemeToggle();
+  install_theme_toggle();
   // Only pages with the search control (docs pages and the 404 page) load its opener.
   if (document.querySelector("[data-search-open]") !== null) void import("./search-opener.js");
   if (document.querySelector(".sw-docs") === null) return;
-  installNavigationMenu();
-  installOutline();
+  install_navigation_menu();
+  install_outline();
 }

@@ -52,7 +52,7 @@ const INSTALL_COMMAND = /^(?:npm install|npm i|pnpm add|yarn add|bun add)\s+((?:
  * offers npm, pnpm, Yarn, and Bun from the same Markdown. Runs before
  * Expressive Code, which would otherwise render the fence as plain code.
  */
-function installCommandsAsTerminals() {
+function install_commands_as_terminals() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       // Text nodes have no children key; writing one breaks later plugins.
@@ -62,11 +62,11 @@ function installCommandsAsTerminals() {
         const language = [code?.properties?.className ?? []].flat().map(String);
         const match =
           code?.tagName === "code" && language.includes("language-sh")
-            ? INSTALL_COMMAND.exec(textOf(code).trim())
+            ? INSTALL_COMMAND.exec(text_of(code).trim())
             : null;
         if (match?.[1] === undefined) {
           // A CodeGroup already spells out each package manager.
-          if (!isCodeGroup(child)) visit(child);
+          if (!is_code_group(child)) visit(child);
           return child;
         }
         return {
@@ -86,7 +86,7 @@ function installCommandsAsTerminals() {
  * static HTML, before Expressive Code would render it as plain code. The raw
  * HTML is parsed with the page's other raw HTML.
  */
-function releaseLaneFences() {
+function release_lane_fences() {
   return (tree: HastNode): void => {
     let figures = 0;
     const visit = (node: HastNode): void => {
@@ -101,7 +101,7 @@ function releaseLaneFences() {
         figures += 1;
         const figure = parseReleaseLanes(
           code.data?.meta ?? "",
-          textOf(code),
+          text_of(code),
           `perf-lanes-${figures}`,
         );
         return { type: "raw", value: renderReleaseLanes(figure, (name) => inlineIcon(name)) };
@@ -112,7 +112,7 @@ function releaseLaneFences() {
 }
 
 /** A `<CodeGroup>`, which contentComponents has already turned into code tabs. */
-function isCodeGroup(node: HastNode): boolean {
+function is_code_group(node: HastNode): boolean {
   return (
     node.name === "Tabs" &&
     node.attributes?.some(
@@ -136,12 +136,12 @@ const ALERT_MARKER = /^\s*\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*/;
  * becomes the same static callout as `<Note>`, `<Tip>`, `<Warning>` and
  * `<Danger>`, so `.md` pages have callouts too and add no JavaScript.
  */
-function markdownAlertsAsCallouts() {
+function markdown_alerts_as_callouts() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.children === undefined) return;
       node.children = node.children.map((child) => {
-        const found = child.tagName === "blockquote" ? alertCallout(child) : undefined;
+        const found = child.tagName === "blockquote" ? alert_callout(child) : undefined;
         visit(found ?? child);
         return found ?? child;
       });
@@ -150,22 +150,22 @@ function markdownAlertsAsCallouts() {
   };
 }
 
-function alertCallout(blockquote: HastNode): HastNode | undefined {
+function alert_callout(blockquote: HastNode): HastNode | undefined {
   const children = blockquote.children ?? [];
-  const firstParagraph = children.find((child) => child.type === "element");
-  const firstText = firstParagraph?.tagName === "p" ? firstParagraph.children?.[0] : undefined;
-  const marker = firstText?.type === "text" ? ALERT_MARKER.exec(firstText.value ?? "") : null;
+  const first_paragraph = children.find((child) => child.type === "element");
+  const first_text = first_paragraph?.tagName === "p" ? first_paragraph.children?.[0] : undefined;
+  const marker = first_text?.type === "text" ? ALERT_MARKER.exec(first_text.value ?? "") : null;
   const tone =
     marker?.[1] === undefined
       ? undefined
       : ALERT_CALLOUTS[marker[1] as keyof typeof ALERT_CALLOUTS];
-  if (firstParagraph === undefined || firstText === undefined || tone === undefined) {
+  if (first_paragraph === undefined || first_text === undefined || tone === undefined) {
     return undefined;
   }
-  firstText.value = (firstText.value ?? "").slice(marker?.[0].length ?? 0);
+  first_text.value = (first_text.value ?? "").slice(marker?.[0].length ?? 0);
   const body =
-    textOf(firstParagraph).trim().length === 0
-      ? children.filter((child) => child !== firstParagraph)
+    text_of(first_paragraph).trim().length === 0
+      ? children.filter((child) => child !== first_paragraph)
       : children;
   return callout(tone, body);
 }
@@ -174,7 +174,7 @@ function alertCallout(blockquote: HastNode): HastNode | undefined {
  * A family page's `<FormulaReference family>` becomes the filter component;
  * the family's table is static HTML outside the page (see formula-tables.ts).
  */
-function hydrateFormulaReference() {
+function hydrate_formula_reference() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.tagName === "formulareference") {
@@ -196,7 +196,7 @@ function hydrateFormulaReference() {
  * A Performance page's `<PerfFigure name>` becomes the figure component; the
  * figure is static HTML outside the page (see perf-figure-markup.ts).
  */
-function hydratePerfFigure() {
+function hydrate_perf_figure() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (node.tagName === "perffigure") {
@@ -220,7 +220,7 @@ function hydratePerfFigure() {
  * the Performance pages draw the same figure, and `<version-compare>` the
  * release comparison drawn from the committed version-comparison reports.
  */
-function renderPerfCompares() {
+function render_perf_compares() {
   return (tree: HastNode): void => {
     let figures = 0;
     const visit = (node: HastNode): void => {
@@ -246,12 +246,12 @@ function renderPerfCompares() {
 }
 
 /** Removes copy controls from API signatures and lets code keep hydration-safe markup. */
-function markResponsiveCodeBlocks() {
+function mark_responsive_code_blocks() {
   return (tree: HastNode): void => {
-    const visit = (node: HastNode, insideApiSignature = false): void => {
+    const visit = (node: HastNode, inside_api_signature = false): void => {
       const classes = String(node.properties?.className ?? "").split(/[ ,]+/);
-      const apiSignature =
-        insideApiSignature ||
+      const api_signature =
+        inside_api_signature ||
         classes.some((name) =>
           ["api-member", "api-declaration", "api-declaration-open", "api-variant"].includes(name),
         );
@@ -265,13 +265,13 @@ function markResponsiveCodeBlocks() {
         node.children = node.children.filter(
           (child) =>
             !(
-              apiSignature &&
+              api_signature &&
               String(child.properties?.className ?? "")
                 .split(/[ ,]+/)
                 .includes("copy")
             ),
         );
-        for (const child of node.children) visit(child, apiSignature);
+        for (const child of node.children) visit(child, api_signature);
       }
     };
     visit(tree);
@@ -279,36 +279,36 @@ function markResponsiveCodeBlocks() {
 }
 
 /** Visible text of a hast subtree. */
-function textOf(node: HastNode): string {
+function text_of(node: HastNode): string {
   if (node.type === "text") return node.value ?? "";
-  return (node.children ?? []).map(textOf).join("");
+  return (node.children ?? []).map(text_of).join("");
 }
 
 /** Cells shorter than this read as one token (a name, value or range). */
 const SHORT_CELL_LENGTH = 28;
 
 /** Gives short table cells a class, so a value never breaks over lines. */
-function markShortCells(node: HastNode): void {
+function mark_short_cells(node: HastNode): void {
   for (const child of node.children ?? []) {
     if (
       (child.tagName === "td" || child.tagName === "th") &&
-      textOf(child).trim().length < SHORT_CELL_LENGTH
+      text_of(child).trim().length < SHORT_CELL_LENGTH
     ) {
       child.properties = { ...child.properties, className: ["sw-cell-short"] };
     }
-    markShortCells(child);
+    mark_short_cells(child);
   }
 }
 
-/** The children of `node` that are `tagName` elements. */
-function childElements(node: HastNode | undefined, tagName: string): HastNode[] {
-  return (node?.children ?? []).filter((child) => child.tagName === tagName);
+/** The children of `node` that are `tag_name` elements. */
+function child_elements(node: HastNode | undefined, tag_name: string): HastNode[] {
+  return (node?.children ?? []).filter((child) => child.tagName === tag_name);
 }
 
 /** The rows of a table, its heading row first. */
-function tableRows(table: HastNode): HastNode[] {
+function table_rows(table: HastNode): HastNode[] {
   return ["thead", "tbody"].flatMap((part) =>
-    childElements(table, part).flatMap((section) => childElements(section, "tr")),
+    child_elements(table, part).flatMap((section) => child_elements(section, "tr")),
   );
 }
 
@@ -323,21 +323,21 @@ const PHONE_ROW_CHARACTERS = 36;
  * longest cells, side by side, would not fit a phone row; a short one, such as
  * a few rows of data, stays a grid.
  */
-function stackOnPhones(table: HastNode): boolean {
-  const [heading, ...body] = tableRows(table);
-  const labels = childElements(heading, "th").map((cell) => textOf(cell).trim());
+function stack_on_phones(table: HastNode): boolean {
+  const [heading, ...body] = table_rows(table);
+  const labels = child_elements(heading, "th").map((cell) => text_of(cell).trim());
   const widest = labels.map((label, column) =>
     Math.max(
       label.length,
       ...body.map(
-        (row) => textOf(childElements(row, "td")[column] ?? { type: "text" }).trim().length,
+        (row) => text_of(child_elements(row, "td")[column] ?? { type: "text" }).trim().length,
       ),
     ),
   );
   const fits = widest.reduce((sum, length) => sum + length, 0) <= PHONE_ROW_CHARACTERS;
   if (labels.length < 2 || labels.length > 3 || (labels.length === 3 && fits)) return false;
   for (const row of body) {
-    for (const [index, cell] of childElements(row, "td").entries()) {
+    for (const [index, cell] of child_elements(row, "td").entries()) {
       cell.properties = { ...cell.properties, dataLabel: labels[index] };
     }
   }
@@ -351,7 +351,7 @@ function stackOnPhones(table: HastNode): boolean {
  * rows on a phone instead, so no column is out of view.
  * Tables with their own class are designed layouts and keep their markup.
  */
-function wrapProseTables() {
+function wrap_prose_tables() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       if (!node.children) return;
@@ -359,14 +359,14 @@ function wrapProseTables() {
       for (const child of node.children) if (child.tagName !== "table") visit(child);
       node.children = node.children.map((child) => {
         if (child.tagName !== "table" || child.properties?.className) return child;
-        markShortCells(child);
-        breakCodeAtWords(child);
-        const className = ["sw-table-frame"];
-        if (stackOnPhones(child)) className.push("sw-table-frame--stack");
+        mark_short_cells(child);
+        break_code_at_words(child);
+        const class_name = ["sw-table-frame"];
+        if (stack_on_phones(child)) class_name.push("sw-table-frame--stack");
         return {
           type: "element",
           tagName: "div",
-          properties: { className, tabIndex: 0 },
+          properties: { className: class_name, tabIndex: 0 },
           children: [child],
         };
       });
@@ -380,17 +380,17 @@ function wrapProseTables() {
  * `<wbr>` between the words of a name, so a long name in a narrow column
  * breaks between its words (`Storage|Error`) or at a space, and nowhere else.
  */
-function breakCodeAtWords(node: HastNode, inCode = false): void {
+function break_code_at_words(node: HastNode, in_code = false): void {
   if (!node.children) return;
   node.children = node.children.flatMap((child): HastNode[] => {
-    if (inCode && child.type === "text") return codeWordNodes(child.value ?? "");
-    if (child.tagName !== "pre") breakCodeAtWords(child, inCode || child.tagName === "code");
+    if (in_code && child.type === "text") return code_word_nodes(child.value ?? "");
+    if (child.tagName !== "pre") break_code_at_words(child, in_code || child.tagName === "code");
     return [child];
   });
 }
 
 /** Code text as unbreakable words with a `<wbr>` between the words of a name; spaces stay text. */
-function codeWordNodes(text: string): HastNode[] {
+function code_word_nodes(text: string): HastNode[] {
   return text.split(/(\s+)/).flatMap((run): HastNode[] => {
     if (run === "") return [];
     if (/^\s/.test(run)) return [{ type: "text", value: run }];
@@ -407,14 +407,14 @@ function codeWordNodes(text: string): HastNode[] {
 }
 
 /** Gives short inline code a class, so an identifier reads as one token. */
-function markShortInlineCode() {
+function mark_short_inline_code() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       for (const child of node.children ?? []) {
         if (child.tagName === "pre") continue;
-        if (child.tagName === "code" && textOf(child).length <= SHORT_CODE_LENGTH) {
-          const className = [child.properties?.className ?? []].flat().map(String);
-          child.properties = { ...child.properties, className: [...className, SHORT_CODE_CLASS] };
+        if (child.tagName === "code" && text_of(child).length <= SHORT_CODE_LENGTH) {
+          const class_name = [child.properties?.className ?? []].flat().map(String);
+          child.properties = { ...child.properties, className: [...class_name, SHORT_CODE_CLASS] };
         }
         visit(child);
       }
@@ -428,7 +428,7 @@ function markShortInlineCode() {
  * next-step lists, "Read the notes") is a control of its own, not a link in
  * running text; the class gives it a 44 px row on phones.
  */
-function markLinkRows() {
+function mark_link_rows() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
       for (const child of node.children ?? []) {
@@ -439,8 +439,8 @@ function markLinkRows() {
           );
           const link = content[0];
           if (content.length === 1 && link?.tagName === "a") {
-            const className = [link.properties?.className ?? []].flat().map(String);
-            link.properties = { ...link.properties, className: [...className, "sw-link-row"] };
+            const class_name = [link.properties?.className ?? []].flat().map(String);
+            link.properties = { ...link.properties, className: [...class_name, "sw-link-row"] };
           }
         }
         visit(child);
@@ -450,7 +450,7 @@ function markLinkRows() {
   };
 }
 
-const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
+const expressive_code_options: RehypeExpressiveCodeOptions = {
   // One frame style for every fence: shell commands use the same code frame as
   // other languages. Long lines wrap on wide screens, so no line is cut at the
   // frame edge; below 48rem the code panel scrolls instead (base.css), so no
@@ -508,15 +508,15 @@ const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
     sheetwriteCodeHovers({
       // The docs package: the samples resolve its packages and its tsconfig.
       cwd: new URL("../..", import.meta.url).pathname,
-      shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
+      shouldTransform: (code_block) => !/\bgenerated\b/.test(code_block.meta),
     }),
   ],
 };
 
-let expressiveCodeRenderer: Promise<RehypeExpressiveCodeRenderer> | undefined;
-function sharedExpressiveCodeRenderer(): Promise<RehypeExpressiveCodeRenderer> {
-  expressiveCodeRenderer ??= createRenderer(expressiveCodeOptions);
-  return expressiveCodeRenderer;
+let expressive_code_renderer: Promise<RehypeExpressiveCodeRenderer> | undefined;
+function shared_expressive_code_renderer(): Promise<RehypeExpressiveCodeRenderer> {
+  expressive_code_renderer ??= createRenderer(expressive_code_options);
+  return expressive_code_renderer;
 }
 
 const EXPRESSIVE_CODE_STYLES_ID = "virtual:expressive-code.css";
@@ -548,12 +548,13 @@ export function expressiveCodeAssets(): Plugin {
     },
     async load(id) {
       if (id === RESOLVED_EXPRESSIVE_CODE_STYLES_ID) {
-        const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
-        return `${scopeCopyButtonStates(baseStyles)}\n${themeStyles}`;
+        const { baseStyles: base_styles, themeStyles: theme_styles } =
+          await shared_expressive_code_renderer();
+        return `${scopeCopyButtonStates(base_styles)}\n${theme_styles}`;
       }
       if (id !== RESOLVED_EXPRESSIVE_CODE_SCRIPTS_ID) return undefined;
-      const { jsModules } = await sharedExpressiveCodeRenderer();
-      const modules = jsModules.filter((code) => !code.includes(OWNED_BY_SITE_MODULE));
+      const { jsModules: js_modules } = await shared_expressive_code_renderer();
+      const modules = js_modules.filter((code) => !code.includes(OWNED_BY_SITE_MODULE));
       return [
         "let installed = false;",
         "export function installExpressiveCodeScripts() {",
@@ -578,38 +579,38 @@ export const DOCS_MDX_OPTIONS = {
     // First: Steps, Cards, callouts and the figures become static HTML, and
     // CodeGroup becomes Tabs, before fences are highlighted.
     contentComponents,
-    installCommandsAsTerminals,
-    releaseLaneFences,
-    markdownAlertsAsCallouts,
+    install_commands_as_terminals,
+    release_lane_fences,
+    markdown_alerts_as_callouts,
     runnableCodeBlocks,
     [
       rehypeExpressiveCode,
       {
-        ...expressiveCodeOptions,
+        ...expressive_code_options,
         customCreateRenderer: async () => ({
-          ...(await sharedExpressiveCodeRenderer()),
+          ...(await shared_expressive_code_renderer()),
           baseStyles: "",
           themeStyles: "",
           jsModules: [],
         }),
       },
     ],
-    renderPerfCompares,
+    render_perf_compares,
     // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
     [rehypeRaw, { passThrough: nodeTypes }],
     renderGridResults,
     [renderSectionCards, { contentRoot: new URL("../content/docs/", import.meta.url).pathname }],
-    hydrateFormulaReference,
-    hydratePerfFigure,
+    hydrate_formula_reference,
+    hydrate_perf_figure,
     dedupeCodePopovers,
     rovingCodeFocus,
     // Prerendered heading ids: fragment links must resolve before hydration.
     rehypeSlug,
     // After the ids exist: the server render shows the outline from these.
     exportOutline,
-    markResponsiveCodeBlocks,
-    wrapProseTables,
-    markShortInlineCode,
-    markLinkRows,
+    mark_responsive_code_blocks,
+    wrap_prose_tables,
+    mark_short_inline_code,
+    mark_link_rows,
   ],
 } satisfies MdxOptions;

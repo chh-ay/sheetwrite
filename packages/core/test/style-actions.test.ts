@@ -12,32 +12,32 @@ import {
   mountHost,
 } from "./fixtures.js";
 
-let restoreCanvasStubs: () => void;
+let restore_canvas_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreCanvasStubs = installCanvasTestStubs();
+  restore_canvas_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreCanvasStubs();
+  restore_canvas_stubs();
   document.body.innerHTML = "";
 });
 
-function makeGrid(rowCount = 10, host = mountHost()): Grid {
+function make_grid(row_count = 10, host = mountHost()): Grid {
   return createGrid(host, {
-    workbook: makeWorkbook(rowCount),
-    data: makeColumnarData(rowCount),
+    workbook: makeWorkbook(row_count),
+    data: makeColumnarData(row_count),
     config: { toolbar: false, find: false, contextMenu: false },
   });
 }
 
 describe("StyleActions merge policy", () => {
   it("restores formula and reference sources and styles when undoing a merge", () => {
-    const grid = makeGrid(4);
+    const grid = make_grid(4);
     const anchor = { sheet: "s1", row: 1, col: 0 };
     const covered = { ...anchor, row: 2, col: 1 };
     const target = { ...anchor, row: 0, col: 1 };
@@ -71,7 +71,7 @@ describe("StyleActions merge policy", () => {
   });
 
   it("styles distinct merge anchors and adjacent formulas without styling covered cells", () => {
-    const grid = makeGrid(4);
+    const grid = make_grid(4);
     const anchor = { sheet: "s1", row: 0, col: 0 };
     const adjacent = { ...anchor, col: 2 };
     const child = { ...anchor, col: 1 };
@@ -87,7 +87,7 @@ describe("StyleActions merge policy", () => {
         { op: "addMerge", sheet: "s1", merge: { r0: 0, r1: 0, c0: 0, c1: 1 } },
       ],
     });
-    const childBefore = grid.store.getCell(child);
+    const child_before = grid.store.getCell(child);
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 2 } },
@@ -98,7 +98,7 @@ describe("StyleActions merge policy", () => {
     grid.actions.toggleUnderline();
     expect(grid.store.getCell(anchor).style).toEqual({ italic: true, underline: true });
     expect(grid.store.getCell(adjacent).style.underline).toBe(true);
-    expect(grid.store.getCell(child)).toEqual(childBefore);
+    expect(grid.store.getCell(child)).toEqual(child_before);
     expect(grid.store.getFormula(anchor)).toBe("=2+3");
     expect(grid.store.getFormula(adjacent)).toBe("=A1*2");
     expect(grid.store.getCell({ ...anchor, row: 2, col: 1 }).style.underline).toBe(true);
@@ -125,12 +125,12 @@ describe("StyleActions merge policy", () => {
     expect(effects[1]?.map(({ addr }) => addr)).toEqual(addresses);
     grid.actions.redo();
     expect(grid.store.getCell(adjacent).resolved).toBe(10);
-    expect(grid.store.getCell(child)).toEqual(childBefore);
+    expect(grid.store.getCell(child)).toEqual(child_before);
 
     grid.actions.clearFormat();
     expect(grid.store.getCell(anchor).style).toEqual({});
     expect(grid.store.getCell(adjacent).style).toEqual({});
-    expect(grid.store.getCell(child)).toEqual(childBefore);
+    expect(grid.store.getCell(child)).toEqual(child_before);
     expect(grid.store.getFormula(adjacent)).toBe("=A1*2");
     grid.actions.undo();
     expect(grid.store.getCell(anchor).style).toEqual({ italic: true, underline: true });
@@ -143,9 +143,9 @@ describe("StyleActions merge policy", () => {
     const b6 = { sheet: "s1", row: 5, col: 1 };
 
     /** A grid with `m1` in A6 and `m2` in B6, and A6:B6 selected. */
-    function twoValues(): { host: HTMLDivElement; grid: Grid } {
+    function two_values(): { host: HTMLDivElement; grid: Grid } {
       const host = mountHost();
-      const grid = makeGrid(10, host);
+      const grid = make_grid(10, host);
       grid.applyTransaction({
         patches: [
           { op: "set", addr: a6, value: { kind: "literal", value: "m1" } },
@@ -159,7 +159,7 @@ describe("StyleActions merge policy", () => {
     const merges = (grid: Grid) => grid.store.getWorkbook().sheets[0]!.merges ?? [];
 
     it("asks first with `ask`, in a labelled alert dialog, and merges after OK", async () => {
-      const { host, grid } = twoValues();
+      const { host, grid } = two_values();
       grid.actions.mergeAndCenter({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
 
@@ -189,12 +189,12 @@ describe("StyleActions merge policy", () => {
 
     it("names the values it would discard and their cells: the first five, then a count", async () => {
       const host = mountHost();
-      const grid = makeGrid(10, host);
-      const longName = "A very long customer name indeed";
+      const grid = make_grid(10, host);
+      const long_name = "A very long customer name indeed";
       const patches: DocumentOp[] = [];
       for (let row = 0; row < 5; row++) {
         for (let col = 0; col < 3; col++) {
-          const value = row === 0 ? ["North", 0.5, longName][col]! : row * 3 + col;
+          const value = row === 0 ? ["North", 0.5, long_name][col]! : row * 3 + col;
           patches.push({
             op: "set",
             addr: { sheet: "s1", row, col },
@@ -225,7 +225,7 @@ describe("StyleActions merge policy", () => {
     });
 
     it("keeps every value on Cancel, and keeps grid keys out", async () => {
-      const { host, grid } = twoValues();
+      const { host, grid } = two_values();
       grid.actions.merge({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       // Delete would clear the selection if it reached the grid.

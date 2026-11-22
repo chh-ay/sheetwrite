@@ -24,7 +24,7 @@ const workbook: Workbook = {
   ],
 };
 
-async function assertFailure(run: () => unknown, code: string, operation: string): Promise<void> {
+async function assert_failure(run: () => unknown, code: string, operation: string): Promise<void> {
   await assert.rejects(
     async () => run(),
     (error) => {
@@ -38,23 +38,23 @@ async function assertFailure(run: () => unknown, code: string, operation: string
 
 if (process.argv[2] === "retry") {
   const broken = { source: "https://example.invalid/broken.wasm" };
-  await assertFailure(() => initSheetwrite(broken), "initialization-failed", "initialize");
+  await assert_failure(() => initSheetwrite(broken), "initialization-failed", "initialize");
   assert.equal(isSheetwriteReady(), false);
   // The rejected init cleared the in-flight cache: a corrected call succeeds.
   await initSheetwrite();
   assert.equal(isSheetwriteReady(), true);
 } else {
   assert.equal(isSheetwriteReady(), false);
-  await assertFailure(() => new SheetwriteStore(workbook), "initialization-required", "store");
+  await assert_failure(() => new SheetwriteStore(workbook), "initialization-required", "store");
   // While the first call is in flight, a same-source call shares it and a different source rejects.
   const first = initSheetwrite();
-  const sameSource = initSheetwrite();
-  const otherSource = assertFailure(
+  const same_source = initSheetwrite();
+  const other_source = assert_failure(
     () => initSheetwrite({ source: "https://example.invalid/x.wasm" }),
     "initialization-failed",
     "initialize",
   );
-  await Promise.all([first, sameSource, otherSource]);
+  await Promise.all([first, same_source, other_source]);
   assert.equal(isSheetwriteReady(), true);
   // After success, repeats and a different source (which only warns) fulfill.
   await Promise.all([initSheetwrite(), initSheetwrite()]);

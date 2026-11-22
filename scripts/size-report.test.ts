@@ -190,13 +190,13 @@ interface FirstPaintFixture {
 
 const steady = (ms: number): number[] => new Array(10).fill(ms);
 
-function timing(samplesMs: number[]): FirstPaintTiming {
-  const sorted = [...samplesMs].sort((left, right) => left - right);
+function timing(samples_ms: number[]): FirstPaintTiming {
+  const sorted = [...samples_ms].sort((left, right) => left - right);
   const rank = (fraction: number) => sorted[Math.ceil(sorted.length * fraction) - 1] ?? Number.NaN;
-  return { samplesMs, medianMs: rank(0.5), p95Ms: rank(0.95) };
+  return { samplesMs: samples_ms, medianMs: rank(0.5), p95Ms: rank(0.95) };
 }
 
-function firstPaintEvidence() {
+function first_paint_evidence() {
   const fixture = (bundler: "next" | "vite") => ({
     bundler,
     version: MINIFIERS[bundler].version,
@@ -246,7 +246,7 @@ function firstPaintEvidence() {
 
 describe("first-paint counterfactual evidence", () => {
   it("admits complete comparable evidence only when both size and timing gates pass", () => {
-    const evidence = firstPaintEvidence();
+    const evidence = first_paint_evidence();
     expect(validateFirstPaintEvidence(evidence).fixtures).toHaveLength(2);
     expect(firstPaintGate(evidence)).toEqual({ admitted: true, reasons: [] });
   });
@@ -269,7 +269,7 @@ describe("first-paint counterfactual evidence", () => {
       "recorded size delta is inconsistent",
     ],
   ])("rejects an incomparable %s", (_label, mutate, message) => {
-    const evidence = firstPaintEvidence();
+    const evidence = first_paint_evidence();
     mutate(evidence.fixtures[0]);
     expect(() => validateFirstPaintEvidence(evidence)).toThrow(message);
   });
@@ -286,7 +286,7 @@ describe("first-paint counterfactual evidence", () => {
     ],
     [/^vite candidate p95 first paint is slower$/, { candidateMs: [...steady(19).slice(1), 25] }],
   ] as const)("blocks admission when only the gate %p fails", (reason, change) => {
-    const evidence = firstPaintEvidence();
+    const evidence = first_paint_evidence();
     const vite = evidence.fixtures[1];
     if ("baselineBrotli" in change)
       vite.baseline.initialJavaScript.brotliBytes = change.baselineBrotli;
@@ -294,10 +294,10 @@ describe("first-paint counterfactual evidence", () => {
       vite.candidate.initialJavaScript.brotliBytes = change.candidateBrotli;
     if ("baselineMs" in change) vite.baseline.timing = timing([...change.baselineMs]);
     if ("candidateMs" in change) vite.candidate.timing = timing([...change.candidateMs]);
-    const baselineBytes = vite.baseline.initialJavaScript.brotliBytes;
-    const reduction = baselineBytes - vite.candidate.initialJavaScript.brotliBytes;
+    const baseline_bytes = vite.baseline.initialJavaScript.brotliBytes;
+    const reduction = baseline_bytes - vite.candidate.initialJavaScript.brotliBytes;
     vite.delta.brotliBytes = reduction;
-    vite.delta.brotliPercent = (reduction / baselineBytes) * 100;
+    vite.delta.brotliPercent = (reduction / baseline_bytes) * 100;
 
     expect(firstPaintGate(evidence)).toEqual({
       admitted: false,

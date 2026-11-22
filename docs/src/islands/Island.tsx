@@ -53,22 +53,22 @@ export function Island<Props extends object>(props: IslandProps<Props>): JSX.Ele
   if (context === undefined || context === null) throw new Error("Islands render on the server");
   // Read first, under the page's NoHydration: Solid passes JSX props as getters,
   // and props that render page markup (StaticMarkup) must not take island ids.
-  const componentProps = props.props;
+  const component_props = props.props;
   const id = sharedConfig.getNextContextId();
   // The server context also carries `noHydrate` (set by NoHydration), which Solid's type omits.
   sharedConfig.context = Object.assign({}, context, { count: 0, id, noHydrate: false });
-  const content = createComponent(props.component, componentProps);
+  const content = createComponent(props.component, component_props);
   sharedConfig.context = context;
   const omitted = props.omitFromPage ?? [];
-  const pageProps = Object.fromEntries(
-    Object.entries(componentProps).filter(([key]) => !omitted.some((name) => name === key)),
+  const page_props = Object.fromEntries(
+    Object.entries(component_props).filter(([key]) => !omitted.some((name) => name === key)),
   );
   return (
     <div
       data-island={props.name}
       data-island-hydrate={props.hydrate === "load" ? undefined : props.hydrate}
       data-island-id={id}
-      data-props={Object.keys(pageProps).length === 0 ? undefined : JSON.stringify(pageProps)}
+      data-props={Object.keys(page_props).length === 0 ? undefined : JSON.stringify(page_props)}
       style={{ display: "contents" }}
     >
       {content}

@@ -209,7 +209,7 @@ const LEVEL_INDENT = 16;
 /** Row counts read with thousands separators: "1,204". */
 const ROW_COUNT_FORMAT = "#,##0";
 
-let nextId = 0;
+let next_id = 0;
 
 /** The open dropdown's state; built per opening and dropped when it closes. */
 interface Session {
@@ -270,8 +270,8 @@ export class AutoFilterMenu {
 
   open(request: AutoFilterMenuRequest): void {
     this.dismiss();
-    const idPrefix = `sheetwrite-autofilter-${nextId++}`;
-    const values = [...request.values].sort(blanksLast);
+    const id_prefix = `sheetwrite-autofilter-${next_id++}`;
+    const values = [...request.values].sort(blanks_last);
     const counts = new Map<CellScalar, number>();
     for (const [index, value] of request.values.entries()) {
       counts.set(value, request.counts[index] ?? 0);
@@ -286,24 +286,24 @@ export class AutoFilterMenu {
     const main = document.createElement("div");
     main.className = "sheetwrite-autofilter-main";
     const [ascending, descending] = SORT_LABELS[request.kind];
-    const sortUp = this.command(ascending, () => this.run(() => request.sort(true)));
-    const sortDown = this.command(descending, () => this.run(() => request.sort(false)));
-    sortUp.disabled = sortDown.disabled = !request.canSort;
+    const sort_up = this.command(ascending, () => this.run(() => request.sort(true)));
+    const sort_down = this.command(descending, () => this.run(() => request.sort(false)));
+    sort_up.disabled = sort_down.disabled = !request.canSort;
     const clear = this.command(`Clear Filter From "${request.header}"`, () =>
       this.run(() => request.apply(null)),
     );
     clear.disabled = request.filter === undefined;
 
-    const presetButton = this.command(FILTERS_LABEL[request.kind], () => this.togglePresets());
-    presetButton.setAttribute("aria-haspopup", "menu");
-    presetButton.setAttribute("aria-expanded", "false");
+    const preset_button = this.command(FILTERS_LABEL[request.kind], () => this.toggle_presets());
+    preset_button.setAttribute("aria-haspopup", "menu");
+    preset_button.setAttribute("aria-expanded", "false");
     const presets = document.createElement("div");
     presets.className = "sheetwrite-autofilter-presets";
     presets.setAttribute("role", "menu");
     presets.setAttribute("aria-label", FILTERS_LABEL[request.kind]);
     presets.hidden = true;
-    presets.id = `${idPrefix}-presets`;
-    presetButton.setAttribute("aria-controls", presets.id);
+    presets.id = `${id_prefix}-presets`;
+    preset_button.setAttribute("aria-controls", presets.id);
 
     const search = document.createElement("input");
     search.type = "search";
@@ -313,7 +313,7 @@ export class AutoFilterMenu {
 
     const list = document.createElement("div");
     list.className = "sheetwrite-autofilter-list";
-    list.id = `${idPrefix}-list`;
+    list.id = `${id_prefix}-list`;
     list.tabIndex = 0;
     list.setAttribute("role", request.kind === "date" ? "tree" : "listbox");
     list.setAttribute("aria-multiselectable", "true");
@@ -326,7 +326,7 @@ export class AutoFilterMenu {
 
     const footer = document.createElement("div");
     footer.className = "sheetwrite-autofilter-footer";
-    const ok = this.command("OK", () => this.applyValues());
+    const ok = this.command("OK", () => this.apply_values());
     ok.classList.add("sheetwrite-autofilter-ok");
     // The button is named OK; its live row count is its description.
     ok.setAttribute("aria-label", "OK");
@@ -334,11 +334,11 @@ export class AutoFilterMenu {
     footer.append(ok, cancel);
 
     main.append(
-      sortUp,
-      sortDown,
+      sort_up,
+      sort_down,
       this.separator(),
       clear,
-      presetButton,
+      preset_button,
       presets,
       search,
       list,
@@ -355,7 +355,7 @@ export class AutoFilterMenu {
       search,
       ok,
       presets,
-      presetButton,
+      presetButton: preset_button,
       values,
       dated: request.kind === "date",
       counts,
@@ -368,24 +368,24 @@ export class AutoFilterMenu {
       items: [],
       active: 0,
       form: null,
-      idPrefix,
+      idPrefix: id_prefix,
     };
     this.session = session;
     const forms = PRESETS[request.kind];
-    for (const preset of forms.slice(0, -1)) presets.appendChild(this.presetItem(preset));
+    for (const preset of forms.slice(0, -1)) presets.appendChild(this.preset_item(preset));
     if (request.kind === "date") {
       const apply = (type: DynamicDateFilter) => () =>
         this.run(() => request.apply({ kind: "dynamic", type }));
       for (const group of DATE_SPANS) {
         presets.appendChild(this.separator());
-        for (const [type, label] of group) presets.appendChild(this.menuItem(label, apply(type)));
+        for (const [type, label] of group) presets.appendChild(this.menu_item(label, apply(type)));
       }
-      presets.append(...this.periodMenu(apply));
+      presets.append(...this.period_menu(apply));
       presets.appendChild(this.separator());
     }
     // Custom Filter… comes last, as in Excel.
     const custom = forms.at(-1);
-    if (custom) presets.appendChild(this.presetItem(custom));
+    if (custom) presets.appendChild(this.preset_item(custom));
 
     search.addEventListener("input", () => this.refilter());
     search.addEventListener("keydown", (event) => {
@@ -394,17 +394,17 @@ export class AutoFilterMenu {
         list.focus();
       } else if (event.key === "Enter") {
         event.preventDefault();
-        this.applyValues();
+        this.apply_values();
       }
     });
-    list.addEventListener("keydown", this.onListKey);
-    list.addEventListener("scroll", () => this.renderRows());
+    list.addEventListener("keydown", this.on_list_key);
+    list.addEventListener("scroll", () => this.render_rows());
     // Focus only marks the active row: redrawing the rows here would replace
     // the row under a pointer that is pressing it, and its click would be lost.
-    list.addEventListener("focus", () => this.markActive());
-    list.addEventListener("click", this.onListClick);
-    root.addEventListener("keydown", this.onRootKey);
-    document.addEventListener("pointerdown", this.onOutsidePointer, true);
+    list.addEventListener("focus", () => this.mark_active());
+    list.addEventListener("click", this.on_list_click);
+    root.addEventListener("keydown", this.on_root_key);
+    document.addEventListener("pointerdown", this.on_outside_pointer, true);
 
     this.host.appendChild(root);
     checkStylePart(root, "context-menu", "The filter dropdown");
@@ -413,7 +413,7 @@ export class AutoFilterMenu {
     const position = popupPosition(request.anchor, size, { side: "below", gap: 2 });
     root.style.left = `${position.left}px`;
     root.style.top = `${position.top}px`;
-    (sortUp.disabled ? search : sortUp).focus();
+    (sort_up.disabled ? search : sort_up).focus();
   }
 
   /** Close without applying, and give the grid its focus back. */
@@ -432,7 +432,7 @@ export class AutoFilterMenu {
     const session = this.session;
     if (!session) return;
     this.session = null;
-    document.removeEventListener("pointerdown", this.onOutsidePointer, true);
+    document.removeEventListener("pointerdown", this.on_outside_pointer, true);
     session.root.remove();
   }
 
@@ -460,11 +460,11 @@ export class AutoFilterMenu {
     return line;
   }
 
-  private presetItem(preset: Preset): HTMLButtonElement {
-    return this.menuItem(preset.label, () => this.openForm(preset));
+  private preset_item(preset: Preset): HTMLButtonElement {
+    return this.menu_item(preset.label, () => this.open_form(preset));
   }
 
-  private menuItem(label: string, run: () => void): HTMLButtonElement {
+  private menu_item(label: string, run: () => void): HTMLButtonElement {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "sheetwrite-autofilter-command";
@@ -479,19 +479,19 @@ export class AutoFilterMenu {
    * Date Filters › All Dates in the Period: a submenu of the quarters and
    * months. Right Arrow or a click opens it; Left Arrow or Escape closes it.
    */
-  private periodMenu(apply: (type: DynamicDateFilter) => () => void): HTMLElement[] {
+  private period_menu(apply: (type: DynamicDateFilter) => () => void): HTMLElement[] {
     const menu = document.createElement("div");
     menu.className = "sheetwrite-autofilter-presets";
     menu.setAttribute("role", "menu");
     menu.setAttribute("aria-label", "All Dates in the Period");
     menu.hidden = true;
-    for (const [type, label] of DATE_PERIODS) menu.appendChild(this.menuItem(label, apply(type)));
+    for (const [type, label] of DATE_PERIODS) menu.appendChild(this.menu_item(label, apply(type)));
     const show = (open: boolean): void => {
       menu.hidden = !open;
       parent.setAttribute("aria-expanded", String(open));
       (open ? menu.querySelector<HTMLElement>('[role="menuitem"]') : parent)?.focus();
     };
-    const parent = this.menuItem("All Dates in the Period", () =>
+    const parent = this.menu_item("All Dates in the Period", () =>
       show(parent.getAttribute("aria-expanded") !== "true"),
     );
     parent.setAttribute("aria-haspopup", "menu");
@@ -510,7 +510,7 @@ export class AutoFilterMenu {
     return [parent, menu];
   }
 
-  private togglePresets(open?: boolean): void {
+  private toggle_presets(open?: boolean): void {
     const session = this.session;
     if (!session) return;
     const show = open ?? session.presets.hidden;
@@ -521,7 +521,7 @@ export class AutoFilterMenu {
   }
 
   /** The Custom AutoFilter dialog: two conditions joined by And or Or. */
-  private openForm(preset: Preset): void {
+  private open_form(preset: Preset): void {
     const session = this.session;
     if (!session) return;
     const { request } = session;
@@ -536,13 +536,13 @@ export class AutoFilterMenu {
     heading.textContent = `Show rows where ${request.header}:`;
 
     const current = request.filter?.kind === "custom" ? request.filter : undefined;
-    const first = this.conditionRow(
+    const first = this.condition_row(
       1,
       current?.conditions[0]?.op ?? preset.first,
       false,
       current?.conditions[0],
     );
-    const second = this.conditionRow(
+    const second = this.condition_row(
       2,
       current?.conditions[1]?.op ?? preset.second ?? null,
       true,
@@ -570,7 +570,7 @@ export class AutoFilterMenu {
     ok.type = "submit";
     ok.className = "sheetwrite-autofilter-command sheetwrite-autofilter-ok";
     ok.textContent = "OK";
-    const cancel = this.command("Cancel", () => this.closeForm());
+    const cancel = this.command("Cancel", () => this.close_form());
     footer.append(ok, cancel);
     form.append(heading, first.row, join, second.row, footer);
     form.addEventListener("submit", (event) => {
@@ -579,7 +579,7 @@ export class AutoFilterMenu {
       for (const row of [first, second]) {
         const op = row.op.value;
         if (op === "") continue;
-        conditions.push({ op: op as Op, value: this.conditionValue(op as Op, row.value.value) });
+        conditions.push({ op: op as Op, value: this.condition_value(op as Op, row.value.value) });
       }
       const [one, two] = conditions;
       if (!one) return;
@@ -593,7 +593,7 @@ export class AutoFilterMenu {
     first.value.focus();
   }
 
-  private closeForm(): void {
+  private close_form(): void {
     const session = this.session;
     if (!session?.form) return;
     session.form.remove();
@@ -602,7 +602,7 @@ export class AutoFilterMenu {
     session.presetButton.focus();
   }
 
-  private conditionValue(op: Op, text: string): number | string {
+  private condition_value(op: Op, text: string): number | string {
     const session = this.session;
     if (!session) return text;
     // Text comparisons keep the text as typed; the others read a number or date.
@@ -612,7 +612,7 @@ export class AutoFilterMenu {
     return session.request.parse(text);
   }
 
-  private conditionRow(
+  private condition_row(
     index: number,
     op: Op | null,
     optional: boolean,
@@ -682,20 +682,20 @@ export class AutoFilterMenu {
     session.items = [
       { kind: "all" },
       ...(session.query === "" ? [] : [{ kind: "add" } as const]),
-      ...this.dateGroups(session, dates),
+      ...this.date_groups(session, dates),
       ...others,
     ];
     session.active = Math.min(session.active, session.items.length - 1);
     session.spacer.style.height = `${session.items.length * ROW_HEIGHT}px`;
-    this.renderRows();
-    this.updateOk();
+    this.render_rows();
+    this.update_ok();
   }
 
   /**
    * Ascending dates as Excel's list groups them: each year, its months when
    * it is open, and their days when a month is open. A search opens them all.
    */
-  private dateGroups(session: Session, dates: readonly number[]): ListItem[] {
+  private date_groups(session: Session, dates: readonly number[]): ListItem[] {
     interface DateGroup {
       readonly key: string;
       readonly label: string;
@@ -744,20 +744,20 @@ export class AutoFilterMenu {
   }
 
   /** The checks the list shows: the search results' while searching, else the whole list's. */
-  private shownChecks(session: Session): Set<CellScalar> {
+  private shown_checks(session: Session): Set<CellScalar> {
     return session.query === "" ? session.checked : session.found;
   }
 
   /** Whether the list shows all, none or some of `values` checked. */
-  private stateOf(session: Session, values: readonly CellScalar[]): "true" | "false" | "mixed" {
-    const checks = this.shownChecks(session);
+  private state_of(session: Session, values: readonly CellScalar[]): "true" | "false" | "mixed" {
+    const checks = this.shown_checks(session);
     let checked = 0;
     for (const value of values) if (checks.has(value)) checked++;
     return checked === 0 ? "false" : checked === values.length ? "true" : "mixed";
   }
 
   /** Draw the rows in view, plus a few around them; the rest are spacer. */
-  private renderRows(): void {
+  private render_rows(): void {
     const session = this.session;
     if (!session) return;
     const { list, items } = session;
@@ -787,10 +787,10 @@ export class AutoFilterMenu {
     option.style.top = `${index * ROW_HEIGHT}px`;
     option.style.height = `${ROW_HEIGHT}px`;
     let state: "true" | "false" | "mixed";
-    if (item.kind === "all") state = this.stateOf(session, session.shown);
-    else if (item.kind === "group") state = this.stateOf(session, item.values);
+    if (item.kind === "all") state = this.state_of(session, session.shown);
+    else if (item.kind === "group") state = this.state_of(session, item.values);
     else if (item.kind === "add") state = session.addCurrent ? "true" : "false";
-    else state = this.shownChecks(session).has(item.value) ? "true" : "false";
+    else state = this.shown_checks(session).has(item.value) ? "true" : "false";
     option.setAttribute("aria-selected", String(state === "true"));
     if (state === "mixed") option.setAttribute("aria-checked", "mixed");
     option.classList.toggle("sheetwrite-autofilter-active", index === session.active);
@@ -840,7 +840,7 @@ export class AutoFilterMenu {
     return option;
   }
 
-  private markActive(): void {
+  private mark_active(): void {
     const session = this.session;
     if (!session) return;
     session.list.setAttribute(
@@ -861,7 +861,7 @@ export class AutoFilterMenu {
     const session = this.session;
     const item = session?.items[index];
     if (!session || !item) return;
-    const checks = this.shownChecks(session);
+    const checks = this.shown_checks(session);
     if (item.kind === "add") {
       session.addCurrent = !session.addCurrent;
     } else if (item.kind === "value") {
@@ -871,18 +871,18 @@ export class AutoFilterMenu {
       // (Select All), or a year, month or day: check all of it, or uncheck it
       // when all of it is checked.
       const values = item.kind === "all" ? session.shown : item.values;
-      const check = this.stateOf(session, values) !== "true";
+      const check = this.state_of(session, values) !== "true";
       for (const value of values) {
         if (check) checks.add(value);
         else checks.delete(value);
       }
     }
-    this.renderRows();
-    this.updateOk();
+    this.render_rows();
+    this.update_ok();
   }
 
   /** Open or close the year or month at `index`, and make it the active row. */
-  private setOpen(index: number, open: boolean): void {
+  private set_open(index: number, open: boolean): void {
     const session = this.session;
     const item = session?.items[index];
     if (!session || item?.kind !== "group" || item.level === DAY_LEVEL) return;
@@ -892,7 +892,7 @@ export class AutoFilterMenu {
     this.relist();
   }
 
-  private moveActive(index: number): void {
+  private move_active(index: number): void {
     const session = this.session;
     if (!session) return;
     session.active = Math.max(0, Math.min(session.items.length - 1, index));
@@ -902,17 +902,17 @@ export class AutoFilterMenu {
     else if (top + ROW_HEIGHT > list.scrollTop + list.clientHeight) {
       list.scrollTop = top + ROW_HEIGHT - list.clientHeight;
     }
-    this.renderRows();
+    this.render_rows();
   }
 
   /**
    * Excel disables OK while it would keep nothing. OK also counts the rows
    * the choice keeps, live: "OK (12 of 48 rows)".
    */
-  private updateOk(): void {
+  private update_ok(): void {
     const session = this.session;
     if (!session) return;
-    const keep = this.keptValues(session);
+    const keep = this.kept_values(session);
     // Every value keeps every row the other filters keep, listed or not.
     let rows = session.request.rows;
     if (keep.length < session.values.length) {
@@ -930,7 +930,7 @@ export class AutoFilterMenu {
    * checked results, and with Add current selection to filter also the
    * values the whole list has checked.
    */
-  private keptValues(session: Session): CellScalar[] {
+  private kept_values(session: Session): CellScalar[] {
     if (session.query === "") {
       return session.values.filter((value) => session.checked.has(value));
     }
@@ -940,65 +940,65 @@ export class AutoFilterMenu {
     });
   }
 
-  /** OK: keep the values {@link keptValues} lists; all of them clear the filter. */
-  private applyValues(): void {
+  /** OK: keep the values {@link kept_values} lists; all of them clear the filter. */
+  private apply_values(): void {
     const session = this.session;
     if (!session || session.ok.disabled) return;
-    const keep = this.keptValues(session);
+    const keep = this.kept_values(session);
     const everything = keep.length === session.values.length;
     const { request } = session;
     this.run(() => request.apply(everything ? null : { kind: "values", values: keep }));
   }
 
-  private readonly onListClick = (event: MouseEvent): void => {
+  private readonly on_list_click = (event: MouseEvent): void => {
     const target = event.target as Element;
     const option = target.closest<HTMLElement>(".sheetwrite-autofilter-option");
     if (!option) return;
     const index = Number(option.dataset.index);
     const item = this.session?.items[index];
     if (item?.kind === "group" && target.closest("[data-open]")) {
-      this.setOpen(index, !item.open);
+      this.set_open(index, !item.open);
       return;
     }
     if (this.session) this.session.active = index;
     this.toggle(index);
   };
 
-  private readonly onListKey = (event: KeyboardEvent): void => {
+  private readonly on_list_key = (event: KeyboardEvent): void => {
     const session = this.session;
     if (!session) return;
     const page = LIST_ROWS - 1;
     const item = session.items[session.active];
     switch (event.key) {
       case "ArrowDown":
-        this.moveActive(session.active + 1);
+        this.move_active(session.active + 1);
         break;
       case "ArrowUp":
         if (session.active === 0) session.search.focus();
-        else this.moveActive(session.active - 1);
+        else this.move_active(session.active - 1);
         break;
       case "PageDown":
-        this.moveActive(session.active + page);
+        this.move_active(session.active + page);
         break;
       case "PageUp":
-        this.moveActive(session.active - page);
+        this.move_active(session.active - page);
         break;
       case "Home":
-        this.moveActive(0);
+        this.move_active(0);
         break;
       case "End":
-        this.moveActive(session.items.length - 1);
+        this.move_active(session.items.length - 1);
         break;
       // A date list opens a year or month with Right and closes it, or moves
       // to the group it is in, with Left.
       case "ArrowRight":
         if (item?.kind !== "group" || item.level === DAY_LEVEL) return;
-        if (item.open) this.moveActive(session.active + 1);
-        else this.setOpen(session.active, true);
+        if (item.open) this.move_active(session.active + 1);
+        else this.set_open(session.active, true);
         break;
       case "ArrowLeft":
         if (item?.kind !== "group") return;
-        if (item.open) this.setOpen(session.active, false);
+        if (item.open) this.set_open(session.active, false);
         else {
           // The group it is in is the nearest group above at the level above.
           let parent = session.active - 1;
@@ -1006,14 +1006,14 @@ export class AutoFilterMenu {
             const candidate = session.items[parent];
             if (candidate?.kind === "group" && candidate.level === item.level - 1) break;
           }
-          if (parent >= 0) this.moveActive(parent);
+          if (parent >= 0) this.move_active(parent);
         }
         break;
       case " ":
         this.toggle(session.active);
         break;
       case "Enter":
-        this.applyValues();
+        this.apply_values();
         break;
       default:
         return;
@@ -1021,7 +1021,7 @@ export class AutoFilterMenu {
     event.preventDefault();
   };
 
-  private readonly onRootKey = (event: KeyboardEvent): void => {
+  private readonly on_root_key = (event: KeyboardEvent): void => {
     // The dropdown's keys stay inside it, also the Enter or Escape that just
     // closed it: the grid behind must not start an edit or move.
     event.stopPropagation();
@@ -1029,15 +1029,15 @@ export class AutoFilterMenu {
     if (!session) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      if (!session.presets.hidden) this.togglePresets(false);
-      else if (session.form) this.closeForm();
+      if (!session.presets.hidden) this.toggle_presets(false);
+      else if (session.form) this.close_form();
       else this.close();
       return;
     }
 
     if (!session.presets.hidden && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
       const items = [...session.presets.querySelectorAll<HTMLElement>('[role="menuitem"]')].filter(
-        (menuItem) => !menuItem.closest("[hidden]"),
+        (menu_item) => !menu_item.closest("[hidden]"),
       );
       const at = items.indexOf(document.activeElement as HTMLElement);
       const next = (at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
@@ -1064,17 +1064,17 @@ export class AutoFilterMenu {
     }
   };
 
-  private readonly onOutsidePointer = (event: PointerEvent): void => {
+  private readonly on_outside_pointer = (event: PointerEvent): void => {
     const session = this.session;
     if (session && !session.root.contains(event.target as Node)) this.close();
   };
 }
 
 /** Excel's list order: numbers, text, logicals, then (Blanks) last. */
-function blanksLast(a: CellScalar, b: CellScalar): number {
-  const blankA = a === null || a === "";
-  const blankB = b === null || b === "";
-  if (blankA || blankB) return Number(blankA) - Number(blankB);
+function blanks_last(a: CellScalar, b: CellScalar): number {
+  const blank_a = a === null || a === "";
+  const blank_b = b === null || b === "";
+  if (blank_a || blank_b) return Number(blank_a) - Number(blank_b);
   return compareScalars(a, b);
 }
 

@@ -37,19 +37,19 @@ import {
 } from "./state.js";
 
 /** Milliseconds as a short duration: sub-second stays in ms, longer reads in s. */
-function formatDuration(ms: number): string {
+function format_duration(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms.toFixed(0)} ms`;
 }
 
 /** Ana and Bram, in client order. */
 export type Actors = readonly [ShowcaseActor, ShowcaseActor];
 
-const actorOf = (actors: Actors, key: ClientKey): ShowcaseActor =>
+const actor_of = (actors: Actors, key: ClientKey): ShowcaseActor =>
   key === "a" ? actors[0] : actors[1];
 
 type ChallengePhase = "initial" | "offline" | "queued" | "reconnecting" | "resolved";
 
-function challengePhase(): ChallengePhase {
+function challenge_phase(): ChallengePhase {
   const bram = views.b;
   const pending = bram.syncState?.pendingCount ?? 0;
   if (!bram.online) return pending === 0 ? "offline" : "queued";
@@ -57,7 +57,7 @@ function challengePhase(): ChallengePhase {
   return serverVersion() > 0 ? "resolved" : "initial";
 }
 
-function challengeCopy(phase: ChallengePhase): readonly [string, string] {
+function challenge_copy(phase: ChallengePhase): readonly [string, string] {
   const pending = views.b.syncState?.pendingCount ?? 0;
   switch (phase) {
     case "initial":
@@ -108,7 +108,7 @@ function BatchReportView(props: Readonly<{ report: BatchReport }>) {
             label: "Bram's billable units",
             value: props.report.peerTotal.toLocaleString("en-US"),
           },
-          { label: "Took", value: formatDuration(props.report.ms) },
+          { label: "Took", value: format_duration(props.report.ms) },
         ]}
       />
     </div>
@@ -117,12 +117,12 @@ function BatchReportView(props: Readonly<{ report: BatchReport }>) {
 
 /** Where each client is against the server head. */
 function ConvergenceReadout(props: Readonly<{ actors: Actors }>) {
-  const clientsAtHead = () => CLIENT_KEYS.filter(atHead).length;
+  const clients_at_head = () => CLIENT_KEYS.filter(atHead).length;
   return (
     <ShowcaseReadout
       items={[
         ...CLIENT_KEYS.map((key) => ({
-          label: actorOf(props.actors, key).displayName,
+          label: actor_of(props.actors, key).displayName,
           get value() {
             const pending = views[key].syncState?.pendingCount ?? 0;
             const version = views[key].syncState?.serverVersion ?? 0;
@@ -134,9 +134,9 @@ function ConvergenceReadout(props: Readonly<{ actors: Actors }>) {
         {
           label: "Server head",
           value: (
-            <span aria-live="polite" data-state={clientsAtHead() === 2 ? "current" : "waiting"}>
+            <span aria-live="polite" data-state={clients_at_head() === 2 ? "current" : "waiting"}>
               <span data-testid="clb-server-version">v{serverVersion()}</span>
-              {clientsAtHead() === 2 ? " · both caught up" : " · waiting for clients"}
+              {clients_at_head() === 2 ? " · both caught up" : " · waiting for clients"}
             </span>
           ),
         },
@@ -147,9 +147,9 @@ function ConvergenceReadout(props: Readonly<{ actors: Actors }>) {
 
 /** The side panel: stress drills, the offline reconnect, convergence and the server log. */
 function ProtocolControls(props: Readonly<{ actors: Actors }>) {
-  const stormBusy = () => chaos()?.phase === "storm" || chaos()?.phase === "settling";
+  const storm_busy = () => chaos()?.phase === "storm" || chaos()?.phase === "settling";
   const ready = () => status() === "ready";
-  const phase = challengePhase;
+  const phase = challenge_phase;
 
   return (
     <>
@@ -161,7 +161,7 @@ function ProtocolControls(props: Readonly<{ actors: Actors }>) {
           <Button
             data-testid="clb-chaos"
             {...pendingProps(chaosPending())}
-            disabled={chaosPending() || !ready() || stormBusy() || restoreRunning()}
+            disabled={chaosPending() || !ready() || storm_busy() || restoreRunning()}
             onClick={() => {
               const current = engine();
               if (current) {
@@ -180,7 +180,7 @@ function ProtocolControls(props: Readonly<{ actors: Actors }>) {
         </div>
         <Button
           data-testid="clb-restore"
-          disabled={!ready() || restoreRunning() || stormBusy()}
+          disabled={!ready() || restoreRunning() || storm_busy()}
           onClick={() => engine()?.restoreUsage()}
         >
           <Icon name="undo" />
@@ -204,7 +204,7 @@ function ProtocolControls(props: Readonly<{ actors: Actors }>) {
         </output>
         <Show when={batchReport()}>{(report) => <BatchReportView report={report()} />}</Show>
       </ShowcaseControlGroup>
-      <ShowcaseControlGroup description={challengeCopy(phase())[1]} title="Reconnect offline">
+      <ShowcaseControlGroup description={challenge_copy(phase())[1]} title="Reconnect offline">
         <ol
           aria-label="Offline reconnect sequence"
           class="sw-clb__steps"
@@ -376,14 +376,16 @@ export function CollaborationStage(props: CollaborationStageProps) {
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(hosts.a, () => {
-      void import("./engine.js").then(({ createCollaborationEngine }) => {
-        if (!disposed) setEngine(createCollaborationEngine(hosts));
-      });
+    const stop_waiting = whenNearViewport(hosts.a, () => {
+      void import("./engine.js").then(
+        ({ createCollaborationEngine: create_collaboration_engine }) => {
+          if (!disposed) setEngine(create_collaboration_engine(hosts));
+        },
+      );
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       engine()?.dispose();
       setEngine(null);
     });
@@ -398,9 +400,9 @@ export function CollaborationStage(props: CollaborationStageProps) {
           <div class="sw-clb__workbench">
             <For each={CLIENT_KEYS}>
               {(key) => (
-                <ClientPanel actor={actorOf(props.actors, key)} slug={key} view={views[key]}>
+                <ClientPanel actor={actor_of(props.actors, key)} slug={key} view={views[key]}>
                   <div
-                    aria-label={`${actorOf(props.actors, key).displayName}'s workbook`}
+                    aria-label={`${actor_of(props.actors, key).displayName}'s workbook`}
                     class="sw-clb__grid"
                     data-testid={`clb-${key}-grid`}
                     ref={(element) => {

@@ -28,7 +28,7 @@ export interface DataValidationHost {
 const MAX_MAPPED_ROWS = 65_536;
 
 /** The selected cells as data ranges; rows a filter or sort view reorders split into runs. */
-function selectedAreas(deps: StyleActionsDeps): Range[] {
+function selected_areas(deps: StyleActionsDeps): Range[] {
   const sheet = deps.activeSheet();
   const areas: Range[] = [];
   deps.selection().forEachRect((rect) => {
@@ -41,29 +41,29 @@ function selectedAreas(deps: StyleActionsDeps): Range[] {
       areas.push(area(deps.toDataRow(rect.r0), deps.toDataRow(rect.r1)));
       return;
     }
-    let runStart = deps.toDataRow(rect.r0);
-    let runEnd = runStart;
+    let run_start = deps.toDataRow(rect.r0);
+    let run_end = run_start;
     for (let row = rect.r0 + 1; row <= rect.r1; row++) {
-      const dataRow = deps.toDataRow(row);
-      if (dataRow === runEnd + 1) {
-        runEnd = dataRow;
+      const data_row = deps.toDataRow(row);
+      if (data_row === run_end + 1) {
+        run_end = data_row;
         continue;
       }
-      areas.push(area(Math.min(runStart, runEnd), Math.max(runStart, runEnd)));
-      runStart = runEnd = dataRow;
+      areas.push(area(Math.min(run_start, run_end), Math.max(run_start, run_end)));
+      run_start = run_end = data_row;
     }
-    areas.push(area(runStart, runEnd));
+    areas.push(area(run_start, run_end));
   });
   return areas;
 }
 
 /** A rule's settings as text, so rules with the same settings compare equal. */
-function settingsKey(rule: DataValidationRule): string {
+function settings_key(rule: DataValidationRule): string {
   return JSON.stringify({ ...rule, id: "", range: null });
 }
 
 /** Ask a Yes or No question in an alert, as Excel's Data Validation does before it opens. */
-async function askYesNo(dialogs: DialogHost, message: string): Promise<boolean> {
+async function ask_yes_no(dialogs: DialogHost, message: string): Promise<boolean> {
   const dialog = openDialog(dialogs, {
     title: "Data Validation",
     role: "alertdialog",
@@ -92,7 +92,7 @@ export function validationPatches(
   everywhere: DataValidationRule | undefined,
 ): DocumentOp[] {
   const patches: DocumentOp[] = [];
-  const newId = validationIdSource(rules);
+  const new_id = validationIdSource(rules);
   let targets = areas;
   if (everywhere) {
     patches.push(
@@ -111,12 +111,12 @@ export function validationPatches(
       sheet,
       rules.filter((rule) => rule !== everywhere),
       targets,
-      newId,
+      new_id,
     ),
   );
   if (settings) {
     for (const range of targets) {
-      patches.push({ op: "setValidationRule", sheet, rule: { ...settings, id: newId(), range } });
+      patches.push({ op: "setValidationRule", sheet, rule: { ...settings, id: new_id(), range } });
     }
   }
   return patches;
@@ -127,13 +127,13 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
   const deps = host.style;
   if (deps.readOnly() || deps.selection().focusCell === null) return;
   const sheet = deps.activeSheet();
-  const areas = selectedAreas(deps);
+  const areas = selected_areas(deps);
   const rules = deps.sheet().validationRules ?? [];
   const touching = rules.filter((rule) => areas.some((area) => rangesIntersect(rule.range, area)));
 
   let rule: DataValidationRule | undefined = touching[0];
-  if (new Set(touching.map(settingsKey)).size > 1) {
-    const erase = await askYesNo(
+  if (new Set(touching.map(settings_key)).size > 1) {
+    const erase = await ask_yes_no(
       host.dialogs,
       "The selection contains more than one type of validation. Erase current settings and continue?",
     );
@@ -149,18 +149,18 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
         ).length > 0,
     )
   ) {
-    const extend = await askYesNo(
+    const extend = await ask_yes_no(
       host.dialogs,
       "The selection contains some cells without Data Validation settings. Do you want to extend Data Validation to these cells?",
     );
     if (!extend) rule = undefined;
   }
 
-  const canApplyToAll =
+  const can_apply_to_all =
     rule !== undefined && touching.length === 1 && subtractRanges(rule.range, areas).length > 0;
   const change = await dataValidationDialog(host.dialogs, {
     settings: rule ?? null,
-    canApplyToAll,
+    canApplyToAll: can_apply_to_all,
   }).result;
   if (!change || deps.readOnly()) return;
 
@@ -169,7 +169,7 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
     rules,
     areas,
     change.settings,
-    change.applyToAll && canApplyToAll ? rule : undefined,
+    change.applyToAll && can_apply_to_all ? rule : undefined,
   );
   if (patches.length > 0) deps.commit(patches);
 }

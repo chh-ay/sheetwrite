@@ -32,7 +32,7 @@ const CELLS: CellScalar[][] = [
   ["Feb", 3, 4],
 ];
 
-async function setup(readOnly = false) {
+async function setup(read_only = false) {
   const columns = ["a", "b", "c", "d", "e", "f"].map((key) => ({
     key,
     header: key.toUpperCase(),
@@ -60,14 +60,14 @@ async function setup(readOnly = false) {
     })),
   );
   expect(grid.applyTransaction({ patches }).status).toBe("applied");
-  if (readOnly) grid.setReadOnly(true);
+  if (read_only) grid.setReadOnly(true);
 
   // Count the grid operations each panel action makes.
-  const setChart = grid.setChart.bind(grid);
-  const chartOps: ChartDefinition[] = [];
+  const set_chart = grid.setChart.bind(grid);
+  const chart_ops: ChartDefinition[] = [];
   grid.setChart = (chart, sheet) => {
-    chartOps.push(structuredClone(chart));
-    return setChart(chart, sheet);
+    chart_ops.push(structuredClone(chart));
+    return set_chart(chart, sheet);
   };
 
   const scope = ".sheetwrite-ribbon-panel:not([hidden])";
@@ -76,7 +76,7 @@ async function setup(readOnly = false) {
     if (element === null) throw new Error(`no ribbon control "${label}"`);
     return element;
   };
-  const openTab = (name: string): void => {
+  const open_tab = (name: string): void => {
     const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
       (candidate) => candidate.textContent === name,
     );
@@ -99,12 +99,23 @@ async function setup(readOnly = false) {
     );
   const press = (target: Element) =>
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-  const selectRange = (r0: number, c0: number, r1: number, c1: number) =>
+  const select_range = (r0: number, c0: number, r1: number, c1: number) =>
     grid.setSelection({
       kind: "range",
       range: { sheet: "s1", start: { row: r0, col: c0 }, end: { row: r1, col: c1 } },
     });
-  return { grid, host, chartOps, control, openTab, panel, field, key, press, selectRange };
+  return {
+    grid,
+    host,
+    chartOps: chart_ops,
+    control,
+    openTab: open_tab,
+    panel,
+    field,
+    key,
+    press,
+    selectRange: select_range,
+  };
 }
 
 const range = (r0: number, c0: number, r1: number, c1: number) => ({
@@ -114,7 +125,7 @@ const range = (r0: number, c0: number, r1: number, c1: number) => ({
 });
 
 /** Insert › Chart over A1:C3, which has text headers on both edges. */
-async function insertedChart() {
+async function inserted_chart() {
   const context = await setup();
   context.openTab("Insert");
   context.selectRange(0, 0, 2, 2);
@@ -125,8 +136,8 @@ async function insertedChart() {
   return context;
 }
 it("manages formula names through undo and remote changes", async () => {
-  const { grid, host, control, openTab, field, press } = await setup();
-  openTab("Formulas");
+  const { grid, host, control, openTab: open_tab, field, press } = await setup();
+  open_tab("Formulas");
   press(control("Name Manager"));
   await loadPanels(grid);
   await Promise.resolve();
@@ -141,9 +152,9 @@ it("manages formula names through undo and remote changes", async () => {
   if (edit === null) throw new Error("missing name edit button");
   press(edit);
   field("Refers to").value = "=0.3";
-  const editSave = host.querySelector<HTMLButtonElement>('[data-focus-key="save-name"]');
-  if (editSave === null) throw new Error("missing edit save button");
-  press(editSave);
+  const edit_save = host.querySelector<HTMLButtonElement>('[data-focus-key="save-name"]');
+  if (edit_save === null) throw new Error("missing edit save button");
+  press(edit_save);
   expect(grid.store.getWorkbook().namedRanges?.[0]?.formula).toBe("=0.3");
   grid.undo();
   expect(grid.store.getWorkbook().namedRanges?.[0]?.formula).toBe("=0.2");
@@ -163,9 +174,17 @@ it("manages formula names through undo and remote changes", async () => {
 });
 
 it("lists the seven chart kinds under Insert › Chart and inserts the picked kind in one step", async () => {
-  const { grid, host, chartOps, control, openTab, press, selectRange } = await setup();
-  openTab("Insert");
-  selectRange(0, 0, 2, 2);
+  const {
+    grid,
+    host,
+    chartOps: chart_ops,
+    control,
+    openTab: open_tab,
+    press,
+    selectRange: select_range,
+  } = await setup();
+  open_tab("Insert");
+  select_range(0, 0, 2, 2);
 
   press(control("Chart options"));
   const items = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")];
@@ -196,48 +215,48 @@ it("lists the seven chart kinds under Insert › Chart and inserts the picked ki
   await loadPanels(grid);
   await Promise.resolve();
 
-  expect(chartOps.map((chart) => chart.kind)).toEqual(["line"]);
+  expect(chart_ops.map((chart) => chart.kind)).toEqual(["line"]);
   expect(grid.getCharts("s1").map((chart) => chart.kind)).toEqual(["line"]);
   grid.undo();
   expect(grid.getCharts("s1")).toEqual([]);
 });
 
 it("commits each chart kind, title and legend change as one setChart", async () => {
-  const { grid, chartOps, host, field, key, press } = await insertedChart();
-  chartOps.length = 0;
+  const { grid, chartOps: chart_ops, host, field, key, press } = await inserted_chart();
+  chart_ops.length = 0;
 
   const bar = host.querySelector<HTMLElement>('[role="radio"][data-kind="bar"]');
   if (bar === null) throw new Error("no Bar kind");
   press(bar);
-  expect(chartOps.map((chart) => chart.kind)).toEqual(["bar"]);
+  expect(chart_ops.map((chart) => chart.kind)).toEqual(["bar"]);
   expect(bar.getAttribute("aria-checked")).toBe("true");
 
   // Arrow keys move through the radio group and select as they go.
   key(bar, "ArrowRight");
-  expect(chartOps.map((chart) => chart.kind)).toEqual(["bar", "line"]);
+  expect(chart_ops.map((chart) => chart.kind)).toEqual(["bar", "line"]);
   expect((document.activeElement as HTMLElement).dataset.kind).toBe("line");
 
   const title = field("Chart title");
   title.focus();
   title.value = "Sales";
   key(title, "Enter");
-  expect(chartOps).toHaveLength(3);
-  expect(chartOps.at(-1)?.title).toBe("Sales");
+  expect(chart_ops).toHaveLength(3);
+  expect(chart_ops.at(-1)?.title).toBe("Sales");
   // Blur after Enter commits nothing new: the value did not change.
   title.blur();
-  expect(chartOps).toHaveLength(3);
+  expect(chart_ops).toHaveLength(3);
 
-  const yTitle = field("Vertical axis title");
-  yTitle.focus();
-  yTitle.value = "Units";
-  yTitle.blur();
-  expect(chartOps).toHaveLength(4);
-  expect(chartOps.at(-1)?.axes).toEqual({ yTitle: "Units" });
+  const y_title = field("Vertical axis title");
+  y_title.focus();
+  y_title.value = "Units";
+  y_title.blur();
+  expect(chart_ops).toHaveLength(4);
+  expect(chart_ops.at(-1)?.axes).toEqual({ yTitle: "Units" });
 
   const legend = field("Legend position") as unknown as HTMLSelectElement;
   legend.value = "bottom";
   legend.dispatchEvent(new Event("change", { bubbles: true }));
-  expect(chartOps).toHaveLength(5);
+  expect(chart_ops).toHaveLength(5);
   expect(grid.getCharts("s1")[0]?.legend).toBe("bottom");
 
   legend.value = "";
@@ -246,8 +265,8 @@ it("commits each chart kind, title and legend change as one setChart", async () 
 });
 
 it("validates series ranges as A1 text and shows the error inline", async () => {
-  const { grid, chartOps, host, key } = await insertedChart();
-  chartOps.length = 0;
+  const { grid, chartOps: chart_ops, host, key } = await inserted_chart();
+  chart_ops.length = 0;
   const values = host.querySelectorAll<HTMLInputElement>(".sheetwrite-panel-series input")[1];
   if (values === undefined) throw new Error("no series Values field");
   expect(values.value).toBe("B2:B3");
@@ -255,14 +274,14 @@ it("validates series ranges as A1 text and shows the error inline", async () => 
   values.focus();
   values.value = "B2:B";
   key(values, "Enter");
-  expect(chartOps).toHaveLength(0);
+  expect(chart_ops).toHaveLength(0);
   expect(values.getAttribute("aria-invalid")).toBe("true");
   const error = host.querySelector(`#${values.getAttribute("aria-describedby")}`);
   expect(error?.textContent).toContain("Enter a cell or range");
 
   values.value = "Sheet1!B1:B3";
   key(values, "Enter");
-  expect(chartOps).toHaveLength(1);
+  expect(chart_ops).toHaveLength(1);
   expect(values.hasAttribute("aria-invalid")).toBe(false);
   expect(grid.getCharts("s1")[0]?.series[0]?.values).toEqual(range(0, 1, 2, 1));
 
@@ -273,9 +292,16 @@ it("validates series ranges as A1 text and shows the error inline", async () => 
 });
 
 it("inserts nothing when the grid is destroyed while the panel chunk loads", async () => {
-  const { grid, chartOps, control, openTab, press, selectRange } = await setup();
-  openTab("Insert");
-  selectRange(0, 0, 2, 2);
+  const {
+    grid,
+    chartOps: chart_ops,
+    control,
+    openTab: open_tab,
+    press,
+    selectRange: select_range,
+  } = await setup();
+  open_tab("Insert");
+  select_range(0, 0, 2, 2);
 
   press(control("Chart"));
   const loading = loadPanels(grid);
@@ -283,11 +309,11 @@ it("inserts nothing when the grid is destroyed while the panel chunk loads", asy
 
   // The grid's abort reason: command runners treat it as cancellation.
   await expect(loading).rejects.toMatchObject({ name: "AbortError" });
-  expect(chartOps).toEqual([]);
+  expect(chart_ops).toEqual([]);
 });
 
 it("keeps a draft on the first Escape and closes on the second", async () => {
-  const { panel, field, key } = await insertedChart();
+  const { panel, field, key } = await inserted_chart();
   const title = field("Chart title");
   title.focus();
   title.value = "Draft";
@@ -300,21 +326,21 @@ it("keeps a draft on the first Escape and closes on the second", async () => {
 });
 
 it("disables Insert › Chart without a selection and on a read-only grid", async () => {
-  const { grid, control, openTab, selectRange } = await setup();
-  openTab("Insert");
+  const { grid, control, openTab: open_tab, selectRange: select_range } = await setup();
+  open_tab("Insert");
   grid.setSelection(null);
   expect(control("Chart").disabled).toBe(true);
-  selectRange(0, 0, 1, 1);
+  select_range(0, 0, 1, 1);
   expect(control("Chart").disabled).toBe(false);
   grid.setReadOnly(true);
   expect(control("Chart").disabled).toBe(true);
 });
 
 it("disables Insert › PivotTable on the default engine and says why", async () => {
-  const { grid, control, openTab, selectRange } = await setup();
+  const { grid, control, openTab: open_tab, selectRange: select_range } = await setup();
   expect(storeEngine(grid.store)?.computesPivots).toBe(false);
-  openTab("Insert");
-  selectRange(0, 0, 2, 2);
+  open_tab("Insert");
+  select_range(0, 0, 2, 2);
 
   const pivot = control("PivotTable");
   expect(pivot.disabled).toBe(true);
@@ -323,7 +349,7 @@ it("disables Insert › PivotTable on the default engine and says why", async ()
 });
 
 it("explains the formula in the focus cell from metadata and follows the selection", async () => {
-  const { grid, control, openTab, panel, press } = await setup();
+  const { grid, control, openTab: open_tab, panel, press } = await setup();
   const formula = "=ROUND(SUM(B2:C3), 1)+NOPE(B2)";
   grid.applyTransaction({
     patches: [
@@ -335,7 +361,7 @@ it("explains the formula in the focus cell from metadata and follows the selecti
     ],
   });
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 3 } });
-  openTab("Formulas");
+  open_tab("Formulas");
   press(control("Explain Formula"));
   await loadPanels(grid);
   // The panel reads the function list on open; this awaits the same table load.
@@ -370,10 +396,10 @@ it.each([
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [exitCode, stdout, stderr] = await Promise.all([
+  const [exit_code, stdout, stderr] = await Promise.all([
     probe.exited,
     new Response(probe.stdout).text(),
     new Response(probe.stderr).text(),
   ]);
-  expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+  expect({ exitCode: exit_code, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
 });

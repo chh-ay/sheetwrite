@@ -62,7 +62,7 @@ export interface ImportedExternalLinks {
 }
 
 /** The file name in a link target such as `file:///C:\Reports\Budget.xlsx`. */
-function bookName(target: string): string {
+function book_name(target: string): string {
   const name = target.slice(Math.max(target.lastIndexOf("/"), target.lastIndexOf("\\")) + 1);
   try {
     return decodeURIComponent(name);
@@ -71,7 +71,7 @@ function bookName(target: string): string {
   }
 }
 
-function linkValue(cell: XmlElement): ExternalLinkValue | undefined {
+function link_value(cell: XmlElement): ExternalLinkValue | undefined {
   const text = xmlChild(cell, "v")?.text;
   if (text === undefined) return undefined;
 
@@ -92,17 +92,17 @@ function linkValue(cell: XmlElement): ExternalLinkValue | undefined {
 }
 
 /** The link in one `externalLink` part, or undefined when it is not a workbook link. */
-function readLink(
-  packageFile: OpcPackage,
+function read_link(
+  package_file: OpcPackage,
   part: string,
   budget: { cells: number },
   context: XlsxCodecContext,
 ): ExternalLink | undefined {
-  const book = xmlChild(packageFile.readXml(part), "externalBook");
-  const relationshipId = book && xmlAttribute(book, "id");
-  const target = packageFile
+  const book = xmlChild(package_file.readXml(part), "externalBook");
+  const relationship_id = book && xmlAttribute(book, "id");
+  const target = package_file
     .relationships(part)
-    .find((relationship) => relationship.id === relationshipId)?.target;
+    .find((relationship) => relationship.id === relationship_id)?.target;
   if (!book || !target) return undefined;
 
   const sheets = xmlChildren(xmlChild(book, "sheetNames") ?? book, "sheetName").map((sheet) => ({
@@ -114,7 +114,7 @@ function readLink(
     for (const row of sheet ? xmlChildren(data, "row") : []) {
       for (const cell of xmlChildren(row, "cell")) {
         const address = parseCellReference(xmlAttribute(cell, "r") ?? "");
-        const value = linkValue(cell);
+        const value = link_value(cell);
         if (!address || value === undefined) continue;
         if (budget.cells >= MAX_LINK_CELLS) {
           emitWarning(context, {
@@ -147,16 +147,18 @@ function readLink(
   }
   // A name's `sheetId` is the index of its sheet in `sheetNames`.
   const names = xmlChildren(xmlChild(book, "definedNames") ?? book, "definedName").flatMap(
-    (definedName) => {
-      const name = decodeXstring(xmlAttribute(definedName, "name") ?? "");
-      const refersTo = decodeXstring(xmlAttribute(definedName, "refersTo") ?? "");
-      const sheetId = xmlAttribute(definedName, "sheetId");
-      const sheet = sheetId === undefined ? undefined : sheets[Number(sheetId)]?.name;
-      return name && refersTo ? [sheet ? { name, refersTo, sheet } : { name, refersTo }] : [];
+    (defined_name) => {
+      const name = decodeXstring(xmlAttribute(defined_name, "name") ?? "");
+      const refers_to = decodeXstring(xmlAttribute(defined_name, "refersTo") ?? "");
+      const sheet_id = xmlAttribute(defined_name, "sheetId");
+      const sheet = sheet_id === undefined ? undefined : sheets[Number(sheet_id)]?.name;
+      return name && refers_to
+        ? [sheet ? { name, refersTo: refers_to, sheet } : { name, refersTo: refers_to }]
+        : [];
     },
   );
   return {
-    book: bookName(target),
+    book: book_name(target),
     target,
     sheets: sheets.filter((sheet) => sheet.name),
     ...(names.length > 0 ? { names } : {}),
@@ -182,7 +184,7 @@ export async function readExternalLinks(
     let link: ExternalLink | undefined;
     if (relationship && !relationship.external) {
       await packageFile.load([relationship.target]);
-      link = readLink(packageFile, relationship.target, budget, context);
+      link = read_link(packageFile, relationship.target, budget, context);
       packageFile.release([relationship.target]);
     }
 
@@ -262,42 +264,43 @@ export class ExternalLinkExport {
 
 /** The `externalLink` part of one link, and its relationships part. */
 export function externalLinkPartXml(link: ExternalLink): { part: string; relationships: string } {
-  let sheetData = "";
-  link.sheets.forEach((sheet, sheetId) => {
+  let sheet_data = "";
+  link.sheets.forEach((sheet, sheet_id) => {
     const rows = new Map<number, typeof sheet.cells>();
     for (const cell of sheet.cells) rows.set(cell.row, [...(rows.get(cell.row) ?? []), cell]);
     if (rows.size === 0) return;
 
-    sheetData += `<sheetData sheetId="${sheetId}">`;
+    sheet_data += `<sheetData sheetId="${sheet_id}">`;
     for (const row of [...rows.keys()].sort((left, right) => left - right)) {
-      sheetData += `<row r="${row + 1}">`;
+      sheet_data += `<row r="${row + 1}">`;
       const cells = rows.get(row) ?? [];
       for (const { col, value } of cells.sort((left, right) => left.col - right.col)) {
         const reference = cellA1(row, col);
-        if (typeof value === "number") sheetData += `<cell r="${reference}"><v>${value}</v></cell>`;
+        if (typeof value === "number")
+          sheet_data += `<cell r="${reference}"><v>${value}</v></cell>`;
         else if (typeof value === "boolean") {
-          sheetData += `<cell r="${reference}" t="b"><v>${value ? 1 : 0}</v></cell>`;
+          sheet_data += `<cell r="${reference}" t="b"><v>${value ? 1 : 0}</v></cell>`;
         } else if (typeof value === "string") {
-          sheetData += `<cell r="${reference}" t="str"><v>${escapeXml(encodeXstring(value))}</v></cell>`;
+          sheet_data += `<cell r="${reference}" t="str"><v>${escapeXml(encodeXstring(value))}</v></cell>`;
         } else {
-          sheetData += `<cell r="${reference}" t="e"><v>${escapeXml(value.error)}</v></cell>`;
+          sheet_data += `<cell r="${reference}" t="e"><v>${escapeXml(value.error)}</v></cell>`;
         }
       }
-      sheetData += "</row>";
+      sheet_data += "</row>";
     }
-    sheetData += "</sheetData>";
+    sheet_data += "</sheetData>";
   });
 
-  const sheetNames = link.sheets
+  const sheet_names = link.sheets
     .map((sheet) => `<sheetName val="${escapeXml(encodeXstring(sheet.name))}"/>`)
     .join("");
-  const definedNames = (link.names ?? [])
-    .map(({ name, refersTo, sheet }) => {
-      const sheetId =
+  const defined_names = (link.names ?? [])
+    .map(({ name, refersTo: refers_to, sheet }) => {
+      const sheet_id =
         sheet === undefined ? -1 : link.sheets.findIndex((candidate) => candidate.name === sheet);
       return (
-        `<definedName name="${escapeXml(encodeXstring(name))}" refersTo="${escapeXml(encodeXstring(refersTo))}"` +
-        (sheetId >= 0 ? ` sheetId="${sheetId}"/>` : "/>")
+        `<definedName name="${escapeXml(encodeXstring(name))}" refersTo="${escapeXml(encodeXstring(refers_to))}"` +
+        (sheet_id >= 0 ? ` sheetId="${sheet_id}"/>` : "/>")
       );
     })
     .join("");
@@ -305,9 +308,9 @@ export function externalLinkPartXml(link: ExternalLink): { part: string; relatio
     part:
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<externalLink xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><externalBook r:id="rId1">` +
-      `<sheetNames>${sheetNames}</sheetNames>` +
-      (definedNames ? `<definedNames>${definedNames}</definedNames>` : "") +
-      (sheetData ? `<sheetDataSet>${sheetData}</sheetDataSet>` : "") +
+      `<sheetNames>${sheet_names}</sheetNames>` +
+      (defined_names ? `<definedNames>${defined_names}</definedNames>` : "") +
+      (sheet_data ? `<sheetDataSet>${sheet_data}</sheetDataSet>` : "") +
       `</externalBook></externalLink>`,
     relationships:
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +

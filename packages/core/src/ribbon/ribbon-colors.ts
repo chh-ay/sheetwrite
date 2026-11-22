@@ -39,7 +39,7 @@ const HEX_RADIX = 16;
  * Lighten (positive) or darken (negative) a `#rrggbb` color by a fraction,
  * moving each channel toward white or black as Excel's tints and shades do.
  */
-function tintColor(hex: string, amount: number): string {
+function tint_color(hex: string, amount: number): string {
   let result = "#";
   for (let offset = 1; offset < hex.length; offset += 2) {
     const channel = Number.parseInt(hex.slice(offset, offset + 2), HEX_RADIX);
@@ -52,5 +52,5 @@ function tintColor(hex: string, amount: number): string {
 /** Theme colors as rows: the base row first, then each tint/shade row. */
 export const THEME_COLOR_ROWS: readonly (readonly string[])[] = [
   THEME_BASE,
-  ...THEME_VARIANTS.map((amount) => THEME_BASE.map((base) => tintColor(base, amount))),
+  ...THEME_VARIANTS.map((amount) => THEME_BASE.map((base) => tint_color(base, amount))),
 ];

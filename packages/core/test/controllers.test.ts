@@ -10,7 +10,7 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-function controllerFor(
+function controller_for(
   store: SheetwriteStore,
   options: Partial<DocumentControllerOptions> = {},
 ): DocumentController {
@@ -29,7 +29,7 @@ function controllerFor(
 describe("DocumentController", () => {
   it("keeps an out-of-range sparse write a no-op without adding history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
-    const controller = controllerFor(store);
+    const controller = controller_for(store);
 
     expect(
       controller.commit(
@@ -73,7 +73,7 @@ describe("DocumentController", () => {
           },
         ],
       });
-      const controller = controllerFor(store);
+      const controller = controller_for(store);
 
       expect(
         controller.commit(
@@ -110,22 +110,25 @@ describe("DocumentController", () => {
 
   it.each([8 * 1024 * 1024, 1200])(
     "replays range undo identically on another peer under a %i-byte ceiling",
-    (maxEncodedBytes) => {
-      const rowCount = 128;
-      const transactionResourceLimits = { maxEncodedBytes, maxOperations: 10_000 };
-      const store = new SheetwriteStore(makeWorkbook(rowCount), undefined, {
-        transactionResourceLimits,
+    (max_encoded_bytes) => {
+      const row_count = 128;
+      const transaction_resource_limits = {
+        maxEncodedBytes: max_encoded_bytes,
+        maxOperations: 10_000,
+      };
+      const store = new SheetwriteStore(makeWorkbook(row_count), undefined, {
+        transactionResourceLimits: transaction_resource_limits,
       });
-      const peer = new SheetwriteStore(makeWorkbook(rowCount), undefined, {
-        transactionResourceLimits,
+      const peer = new SheetwriteStore(makeWorkbook(row_count), undefined, {
+        transactionResourceLimits: transaction_resource_limits,
       });
       const formula = { sheet: "s1", row: 0, col: 0 };
       const reference = { sheet: "s1", row: 0, col: 1 };
-      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 2 } };
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: row_count - 1, col: 2 } };
       // Repeated text makes the plain restore exceed the small ceiling while
       // keeping its compressed replay within one server version.
       for (const target of [store, peer]) {
-        for (let row = 0; row < rowCount; row++) {
+        for (let row = 0; row < row_count; row++) {
           expect(
             target.applyTransaction({
               patches: [
@@ -154,10 +157,10 @@ describe("DocumentController", () => {
         ).toBe("applied");
       }
       const expected = structuredClone(
-        store.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values,
+        store.getVisibleWindow("s1", { start: 0, end: row_count }, [0, 1, 2]).values,
       );
-      const controller = controllerFor(store, {
-        transactionResourceLimits,
+      const controller = controller_for(store, {
+        transactionResourceLimits: transaction_resource_limits,
         trustedResourceCallbacks: true,
         onMutationRejected: (issues) => {
           throw new Error(JSON.stringify(issues));
@@ -172,7 +175,7 @@ describe("DocumentController", () => {
         controller.undo();
         for (const target of [store, peer]) {
           expect(
-            target.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values,
+            target.getVisibleWindow("s1", { start: 0, end: row_count }, [0, 1, 2]).values,
           ).toEqual(expected);
           expect(target.getFormula(formula)).toBe("=SEQUENCE(3)");
           expect(target.getRefTarget(reference)).toEqual(formula);
@@ -182,7 +185,7 @@ describe("DocumentController", () => {
         controller.redo();
         expect(peer.getCell(formula).resolved).toBeNull();
         controller.undo();
-        expect(peer.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values).toEqual(
+        expect(peer.getVisibleWindow("s1", { start: 0, end: row_count }, [0, 1, 2]).values).toEqual(
           expected,
         );
       } finally {
@@ -195,25 +198,27 @@ describe("DocumentController", () => {
   );
 
   it("rejects nested payload growth from callbacks that retain operation identity", () => {
-    const maxEncodedBytes = 256;
-    const oversizedValue = "x".repeat(maxEncodedBytes * 2);
-    for (const mutationBoundary of ["materialization", "admission"] as const) {
-      const transactionResourceLimits = { maxEncodedBytes, maxOperations: 1 };
-      const store = new SheetwriteStore(makeWorkbook(4), undefined, { transactionResourceLimits });
-      const mutatePayload = (patches: readonly import("../src/types.js").DocumentOp[]) => {
+    const max_encoded_bytes = 256;
+    const oversized_value = "x".repeat(max_encoded_bytes * 2);
+    for (const mutation_boundary of ["materialization", "admission"] as const) {
+      const transaction_resource_limits = { maxEncodedBytes: max_encoded_bytes, maxOperations: 1 };
+      const store = new SheetwriteStore(makeWorkbook(4), undefined, {
+        transactionResourceLimits: transaction_resource_limits,
+      });
+      const mutate_payload = (patches: readonly import("../src/types.js").DocumentOp[]) => {
         const patch = patches[0];
         if (patch?.op === "set" && patch.value.kind === "literal") {
-          patch.value.value = oversizedValue;
+          patch.value.value = oversized_value;
         }
       };
-      const controller = controllerFor(store, {
-        transactionResourceLimits,
+      const controller = controller_for(store, {
+        transactionResourceLimits: transaction_resource_limits,
         materializeVirtualColumns: (patches) => {
-          if (mutationBoundary === "materialization") mutatePayload(patches);
+          if (mutation_boundary === "materialization") mutate_payload(patches);
           return patches;
         },
         admitTransaction: (patches) => {
-          if (mutationBoundary === "admission") mutatePayload(patches);
+          if (mutation_boundary === "admission") mutate_payload(patches);
           return { ok: true, reservation: { cancel() {}, finish() {} } };
         },
       });
@@ -250,7 +255,7 @@ describe("DocumentController", () => {
         },
       ],
     });
-    const controller = controllerFor(store, {
+    const controller = controller_for(store, {
       // A custom Store has no compact SheetwriteStore range snapshots. The
       // controller must still construct complete serializable inverses.
       loadable: null,
@@ -288,25 +293,27 @@ describe("DocumentController", () => {
     expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("row-one");
     expect(store.getFormula({ sheet: "s1", row: 2, col: 1 })).toBe("=A2");
 
-    const namedRange = {
+    const named_range = {
       name: "Selection",
       scope: "s1",
       range: { ...range, start: range.end, end: range.start },
     };
-    expect(controller.commit([{ op: "setNamedRange", namedRange }], "api").status).toBe("applied");
+    expect(
+      controller.commit([{ op: "setNamedRange", namedRange: named_range }], "api").status,
+    ).toBe("applied");
     expect(
       controller.commit(
-        [{ op: "setNamedRange", namedRange: { ...namedRange, name: "selection" } }],
+        [{ op: "setNamedRange", namedRange: { ...named_range, name: "selection" } }],
         "api",
       ).status,
     ).toBe("applied");
     controller.undo();
-    expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
+    expect(store.getWorkbook().namedRanges).toEqual([named_range]);
     expect(
       controller.commit([{ op: "removeNamedRange", name: "SELECTION", scope: "s1" }], "api").status,
     ).toBe("applied");
     controller.undo();
-    expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
+    expect(store.getWorkbook().namedRanges).toEqual([named_range]);
 
     const iterative = { iterate: true, maxIterations: 50, maxChange: 0.01 };
     const tighter = { iterate: true, maxIterations: 500, maxChange: 0 };
@@ -324,10 +331,10 @@ describe("DocumentController", () => {
     controller.redo();
     expect(store.getWorkbook().calculation).toEqual(iterative);
 
-    const spillRange = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } };
+    const spill_range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } };
     store.applyTransaction({
       patches: [
-        { op: "clearRange", range: spillRange },
+        { op: "clearRange", range: spill_range },
         {
           op: "set",
           addr: { sheet: "s1", row: 0, col: 1 },
@@ -335,7 +342,7 @@ describe("DocumentController", () => {
         },
       ],
     });
-    expect(controller.commit([{ op: "clearRange", range: spillRange }], "api").status).toBe(
+    expect(controller.commit([{ op: "clearRange", range: spill_range }], "api").status).toBe(
       "applied",
     );
     controller.undo();
@@ -357,7 +364,7 @@ describe("DocumentController", () => {
     store.applyTransaction({
       patches: [{ op: "set", addr: a1, value: { kind: "formula", src: "=A1/2+1" } }],
     });
-    const controller = controllerFor(store);
+    const controller = controller_for(store);
 
     expect(store.getCell(a1).resolved).toBe("#CYCLE!");
 

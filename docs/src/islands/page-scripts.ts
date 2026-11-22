@@ -82,35 +82,35 @@ const HREF = /\bhref="([^"]+)"/;
 const CLASS_ATTRIBUTE = /\bclass="([^"]*)"/g;
 
 /** A chunk and every chunk it imports, in load order. */
-function chunkClosure(manifest: Manifest, key: string, seen = new Set<string>()): ManifestChunk[] {
+function chunk_closure(manifest: Manifest, key: string, seen = new Set<string>()): ManifestChunk[] {
   if (seen.has(key)) return [];
   seen.add(key);
   const chunk = manifest[key];
   if (chunk === undefined) throw new Error(`${key} is missing from ${ISLANDS_MANIFEST}`);
   return [
     chunk,
-    ...(chunk.imports ?? []).flatMap((imported) => chunkClosure(manifest, imported, seen)),
+    ...(chunk.imports ?? []).flatMap((imported) => chunk_closure(manifest, imported, seen)),
   ];
 }
 
-function chunkFiles(manifest: Manifest, key: string): string[] {
-  return chunkClosure(manifest, key).map((chunk) => chunk.file);
+function chunk_files(manifest: Manifest, key: string): string[] {
+  return chunk_closure(manifest, key).map((chunk) => chunk.file);
 }
 
-function chunkStylesheets(manifest: Manifest, key: string): string[] {
-  return chunkClosure(manifest, key).flatMap((chunk) => chunk.css ?? []);
+function chunk_stylesheets(manifest: Manifest, key: string): string[] {
+  return chunk_closure(manifest, key).flatMap((chunk) => chunk.css ?? []);
 }
 
-function isOnDemandIsland(name: string): name is IslandName {
+function is_on_demand_island(name: string): name is IslandName {
   return Object.hasOwn(ON_DEMAND_ISLANDS, name);
 }
 
 /** The islands client's script tag, preloads and island stylesheets for one page. */
-function pageScripts(manifest: Manifest, html: string): string {
+function page_scripts(manifest: Manifest, html: string): string {
   const entry = manifest[ISLANDS_ENTRY];
   if (entry === undefined) throw new Error(`${ISLANDS_ENTRY} is missing from ${ISLANDS_MANIFEST}`);
   const islands = Array.from(html.matchAll(ISLAND_MARKER)).flatMap(([tag, name]) =>
-    name !== undefined && isOnDemandIsland(name)
+    name !== undefined && is_on_demand_island(name)
       ? [{ source: ON_DEMAND_ISLANDS[name], deferred: DEFERRED.test(tag) }]
       : [],
   );
@@ -118,17 +118,17 @@ function pageScripts(manifest: Manifest, html: string): string {
   // (islands/client.tsx); preloading it would cost every visit. Their markup is
   // in the page, so their stylesheets are linked like every other island's.
   const preloads = new Set([
-    ...chunkFiles(manifest, ISLANDS_ENTRY),
-    ...(SEARCH_BUTTON.test(html) ? chunkFiles(manifest, SEARCH_OPENER) : []),
+    ...chunk_files(manifest, ISLANDS_ENTRY),
+    ...(SEARCH_BUTTON.test(html) ? chunk_files(manifest, SEARCH_OPENER) : []),
     ...islands
       .filter((island) => !island.deferred)
-      .flatMap((island) => chunkFiles(manifest, island.source)),
+      .flatMap((island) => chunk_files(manifest, island.source)),
   ]);
   // The script tag loads the entry itself.
   preloads.delete(entry.file);
   const stylesheets = new Set([
-    ...chunkStylesheets(manifest, ISLANDS_ENTRY),
-    ...islands.flatMap((island) => chunkStylesheets(manifest, island.source)),
+    ...chunk_stylesheets(manifest, ISLANDS_ENTRY),
+    ...islands.flatMap((island) => chunk_stylesheets(manifest, island.source)),
   ]);
   return [
     ...Array.from(stylesheets, (file) => `<link rel="stylesheet" href="/${file}"/>`),
@@ -142,12 +142,12 @@ function pageScripts(manifest: Manifest, html: string): string {
  * minus what the entry already loads, so the client can fetch them at low
  * priority once the island is on screen and the page is idle.
  */
-function withIslandCode(manifest: Manifest, html: string): string {
-  const entryFiles = new Set(chunkFiles(manifest, ISLANDS_ENTRY));
+function with_island_code(manifest: Manifest, html: string): string {
+  const entry_files = new Set(chunk_files(manifest, ISLANDS_ENTRY));
   return html.replace(ISLAND_MARKER, (tag: string, name: string) => {
-    if (!ON_INTERACTION.test(tag) || !isOnDemandIsland(name)) return tag;
-    const code = chunkFiles(manifest, ON_DEMAND_ISLANDS[name])
-      .filter((file) => !entryFiles.has(file))
+    if (!ON_INTERACTION.test(tag) || !is_on_demand_island(name)) return tag;
+    const code = chunk_files(manifest, ON_DEMAND_ISLANDS[name])
+      .filter((file) => !entry_files.has(file))
       .map((file) => `/${file}`)
       .join(" ");
     return tag.replace(/>$/, ` data-island-code="${code}">`);
@@ -160,7 +160,7 @@ function withIslandCode(manifest: Manifest, html: string): string {
  * out: they are conditions, not requirements. Selectors naming no class are
  * left out too.
  */
-function selectorClassSets(css: string): string[][] {
+function selector_class_sets(css: string): string[][] {
   const text = css
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/url\([^)]*\)/g, "")
@@ -181,12 +181,12 @@ function selectorClassSets(css: string): string[][] {
   return sets;
 }
 
-const selectorCache = new Map<string, string[][]>();
-async function selectorsOf(href: string): Promise<string[][]> {
-  let sets = selectorCache.get(href);
+const selector_cache = new Map<string, string[][]>();
+async function selectors_of(href: string): Promise<string[][]> {
+  let sets = selector_cache.get(href);
   if (sets === undefined) {
-    sets = selectorClassSets(await readFile(join(CLIENT_OUTPUT, href), "utf8"));
-    selectorCache.set(href, sets);
+    sets = selector_class_sets(await readFile(join(CLIENT_OUTPUT, href), "utf8"));
+    selector_cache.set(href, sets);
   }
   return sets;
 }
@@ -196,14 +196,14 @@ async function selectorsOf(href: string): Promise<string[][]> {
  * when one of its selectors names only classes the page's markup uses (or
  * when it has no selector that names a class).
  */
-async function withUsedFeatureStylesheets(html: string): Promise<string> {
+async function with_used_feature_stylesheets(html: string): Promise<string> {
   const used = new Set(
     Array.from(html.matchAll(CLASS_ATTRIBUTE), ([, value]) => (value ?? "").split(/\s+/)).flat(),
   );
   let result = html;
   for (const [tag] of html.matchAll(STYLESHEET_LINK)) {
     if (!FEATURE_ATTRIBUTE.test(tag)) continue;
-    const sets = await selectorsOf(HREF.exec(tag)?.[1] ?? "");
+    const sets = await selectors_of(HREF.exec(tag)?.[1] ?? "");
     const keep = sets.length === 0 || sets.some((set) => set.every((name) => used.has(name)));
     result = result.replace(tag, keep ? tag.replace(FEATURE_ATTRIBUTE, "") : "");
   }
@@ -220,9 +220,9 @@ async function withUsedFeatureStylesheets(html: string): Promise<string> {
  */
 const INLINED_STYLESHEET_PAGES = new Set(["index.html"]);
 
-async function withInlinedStylesheets(html: string): Promise<string> {
-  const headEnd = html.indexOf("</head>");
-  const head = html.slice(0, headEnd);
+async function with_inlined_stylesheets(html: string): Promise<string> {
+  const head_end = html.indexOf("</head>");
+  const head = html.slice(0, head_end);
   const links = Array.from(head.matchAll(STYLESHEET_LINK), ([tag]) => tag);
   const [first] = links;
   if (first === undefined) return html;
@@ -237,26 +237,26 @@ async function withInlinedStylesheets(html: string): Promise<string> {
     (markup, tag) => markup.replace(tag, tag === first ? `<style>${css}</style>` : ""),
     head,
   );
-  return `${inlined}${html.slice(headEnd)}`;
+  return `${inlined}${html.slice(head_end)}`;
 }
 
-const manifestPath = join(CLIENT_OUTPUT, ISLANDS_MANIFEST);
-const manifest: Manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-let rewrittenPages = 0;
+const manifest_path = join(CLIENT_OUTPUT, ISLANDS_MANIFEST);
+const manifest: Manifest = JSON.parse(await readFile(manifest_path, "utf8"));
+let rewritten_pages = 0;
 for await (const page of new Bun.Glob("**/*.html").scan(CLIENT_OUTPUT)) {
   const path = join(CLIENT_OUTPUT, page);
   const html = await readFile(path, "utf8");
   // Pages without content islands still load the client: it runs the page-wide
   // enhancements (code copy and popovers) and marks the page hydrated.
-  const withoutRouter = ROUTER_TAGS.reduce((markup, tag) => markup.replace(tag, ""), html);
-  const withScripts = withoutRouter.replace("</head>", `${pageScripts(manifest, html)}</head>`);
-  const styled = await withUsedFeatureStylesheets(withIslandCode(manifest, withScripts));
+  const without_router = ROUTER_TAGS.reduce((markup, tag) => markup.replace(tag, ""), html);
+  const with_scripts = without_router.replace("</head>", `${page_scripts(manifest, html)}</head>`);
+  const styled = await with_used_feature_stylesheets(with_island_code(manifest, with_scripts));
   await writeFile(
     path,
-    INLINED_STYLESHEET_PAGES.has(page) ? await withInlinedStylesheets(styled) : styled,
+    INLINED_STYLESHEET_PAGES.has(page) ? await with_inlined_stylesheets(styled) : styled,
   );
-  rewrittenPages += 1;
+  rewritten_pages += 1;
 }
 // The manifest is a build input, not a page asset.
-await rm(manifestPath);
-console.info(`Islands: ${rewrittenPages} static docs pages link the islands client.`);
+await rm(manifest_path);
+console.info(`Islands: ${rewritten_pages} static docs pages link the islands client.`);

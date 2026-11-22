@@ -60,7 +60,7 @@ function batch(rows: number): QueryBatch {
   };
 }
 
-function numericColumn(output: QueryBatch, index: number): Float64Array {
+function numeric_column(output: QueryBatch, index: number): Float64Array {
   const column = output.columns[index];
   if (column?.type !== "number") throw new Error("Expected numeric benchmark output");
 
@@ -81,7 +81,7 @@ const right: QueryBatch = {
 const records: { workload: string; rows: number; iterations: number; milliseconds: number }[] = [];
 
 collect();
-const memoryBefore = process.memoryUsage();
+const memory_before = process.memoryUsage();
 
 for (const rows of ROW_COUNTS) {
   const source = batch(rows);
@@ -121,13 +121,13 @@ for (const rows of ROW_COUNTS) {
     assert.equal(output.rowCount, workload.expectedRows);
 
     if (workload.name === "filter") {
-      assert.equal(numericColumn(output, 1)[0], rows / 2);
+      assert.equal(numeric_column(output, 1)[0], rows / 2);
     } else if (workload.name === "join") {
-      assert.equal(numericColumn(output, 2)[0], 0);
-      assert.equal(numericColumn(output, 2)[rows - 1], KEY_COUNT - 1);
+      assert.equal(numeric_column(output, 2)[0], 0);
+      assert.equal(numeric_column(output, 2)[rows - 1], KEY_COUNT - 1);
     } else {
-      const perKey = rows / KEY_COUNT;
-      assert.equal(numericColumn(output, 1)[0], (KEY_COUNT * perKey * (perKey - 1)) / 2);
+      const per_key = rows / KEY_COUNT;
+      assert.equal(numeric_column(output, 1)[0], (KEY_COUNT * per_key * (per_key - 1)) / 2);
     }
 
     for (let warmup = 0; warmup < WARMUP_COUNT; warmup += 1) run();
@@ -147,7 +147,7 @@ for (const rows of ROW_COUNTS) {
 }
 
 collect();
-const memoryAfter = process.memoryUsage();
+const memory_after = process.memoryUsage();
 const artifact = await readFile(new URL("./pkg/sheetwrite_queries_bg.wasm", import.meta.url));
 // The generated loader is already initialized by the public interface; this reads
 // its existing memory capacity, not a second engine or a test-only production hook.
@@ -161,8 +161,8 @@ process.stdout.write(
       versions: process.versions,
       method: "host transfer plus Rust execution plus output transfer; warmups excluded",
       records,
-      memoryBefore,
-      memoryAfter,
+      memoryBefore: memory_before,
+      memoryAfter: memory_after,
       wasmCapacityBytes: initialized.memory.buffer.byteLength,
     },
     null,

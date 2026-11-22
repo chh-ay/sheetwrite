@@ -43,7 +43,7 @@ const REGISTRY_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_REGISTRY_ATTEMPTS = 181;
 const MAX_REGISTRY_ATTEMPTS = 721;
 
-function registryAttempts(): number {
+function registry_attempts(): number {
   const attempts = Number(process.env.NPM_VERIFY_ATTEMPTS ?? DEFAULT_REGISTRY_ATTEMPTS);
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_REGISTRY_ATTEMPTS) {
     throw new Error(`NPM_VERIFY_ATTEMPTS must be an integer from 1 to ${MAX_REGISTRY_ATTEMPTS}`);
@@ -53,8 +53,8 @@ function registryAttempts(): number {
 
 async function command(command: readonly [string, ...string[]]): Promise<string> {
   const stdout = await captureProcess(command, {
-    failure: ({ stdout, stderr, exitCode }) =>
-      `${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`,
+    failure: ({ stdout, stderr, exitCode: exit_code }) =>
+      `${command.join(" ")} failed (${exit_code}): ${stderr || stdout}`,
   });
   return stdout.trim();
 }
@@ -106,7 +106,7 @@ export async function publishArtifact(
   return { ...published, integrity: artifact.integrity };
 }
 
-async function queryRegistry(identity: PackageIdentity): Promise<RegistryPackage> {
+async function query_registry(identity: PackageIdentity): Promise<RegistryPackage> {
   return JSON.parse(
     await command([
       "npm",
@@ -120,20 +120,20 @@ async function queryRegistry(identity: PackageIdentity): Promise<RegistryPackage
   ) as RegistryPackage;
 }
 
-async function queryExistingRegistry(
+async function query_existing_registry(
   identity: PackageIdentity,
 ): Promise<RegistryPackage | "pending" | undefined> {
   try {
-    return await queryRegistry(identity);
+    return await query_registry(identity);
   } catch (error) {
     if (!String(error).includes("E404")) throw error;
   }
 
   try {
-    const publicationTimes = JSON.parse(
+    const publication_times = JSON.parse(
       await command(["npm", "view", identity.name, "time", "--json"]),
     ) as Record<string, unknown> | null;
-    if (typeof publicationTimes?.[identity.version] === "string") return "pending";
+    if (typeof publication_times?.[identity.version] === "string") return "pending";
     return undefined;
   } catch (error) {
     if (String(error).includes("E404")) return undefined;
@@ -141,7 +141,7 @@ async function queryExistingRegistry(
   }
 }
 
-async function queryLatest(name: string): Promise<string> {
+async function query_latest(name: string): Promise<string> {
   const value = JSON.parse(
     await command(["npm", "view", name, "dist-tags.latest", "--json"]),
   ) as unknown;
@@ -149,7 +149,7 @@ async function queryLatest(name: string): Promise<string> {
   return value;
 }
 
-function assertRegistryIdentity(identity: PackageIdentity, registry: RegistryPackage): void {
+function assert_registry_identity(identity: PackageIdentity, registry: RegistryPackage): void {
   if (registry.name !== identity.name || registry.version !== identity.version) {
     throw new Error(
       `Registry returned ${String(registry.name)}@${String(registry.version)}, expected ${identity.name}@${identity.version}`,
@@ -161,7 +161,7 @@ export function assertRegistryArtifact(
   artifact: ReleasePackageArtifact,
   registry: RegistryPackage,
 ): void {
-  assertRegistryIdentity(artifact, registry);
+  assert_registry_identity(artifact, registry);
   if (registry.dist?.integrity !== artifact.integrity) {
     throw new Error(
       `${artifact.name}@${artifact.version} registry integrity does not match the canonical tarball`,
@@ -172,36 +172,36 @@ export function assertRegistryArtifact(
 export async function publishArtifactsIdempotently(
   artifactRoot: string,
   artifacts: readonly ReleasePackageArtifact[],
-  existing: ExistingQuery = queryExistingRegistry,
+  existing: ExistingQuery = query_existing_registry,
   publish: PublishArtifact = publishArtifact,
 ): Promise<PublicationResult> {
-  const packagedNames = new Set<string>();
-  for (const artifact of artifacts) packagedNames.add(artifact.name);
-  const verifiedIndependentDependencies = new Set<string>();
+  const packaged_names = new Set<string>();
+  for (const artifact of artifacts) packaged_names.add(artifact.name);
+  const verified_independent_dependencies = new Set<string>();
   for (const artifact of artifacts) {
     for (const [name, version] of Object.entries(artifact.internalDependencies)) {
-      if (packagedNames.has(name)) continue;
-      const dependencyKey = `${name}@${version}`;
-      if (verifiedIndependentDependencies.has(dependencyKey)) continue;
+      if (packaged_names.has(name)) continue;
+      const dependency_key = `${name}@${version}`;
+      if (verified_independent_dependencies.has(dependency_key)) continue;
       const identity = { name, version };
       const registry = await existing(identity);
       if (registry === undefined || registry === "pending") {
         throw new Error(
-          `${artifact.name}@${artifact.version} requires unpublished internal dependency ${dependencyKey}`,
+          `${artifact.name}@${artifact.version} requires unpublished internal dependency ${dependency_key}`,
         );
       }
-      assertRegistryIdentity(identity, registry);
-      verifiedIndependentDependencies.add(dependencyKey);
+      assert_registry_identity(identity, registry);
+      verified_independent_dependencies.add(dependency_key);
     }
   }
 
-  const verifiedPackages: PublishedPackage[] = [];
-  const newlyPublishedPackages: PublishedPackage[] = [];
+  const verified_packages: PublishedPackage[] = [];
+  const newly_published_packages: PublishedPackage[] = [];
   for (const artifact of artifacts) {
     const registry = await existing(artifact);
     if (registry !== undefined && registry !== "pending") {
       assertRegistryArtifact(artifact, registry);
-      verifiedPackages.push({
+      verified_packages.push({
         name: artifact.name,
         version: artifact.version,
         integrity: artifact.integrity,
@@ -214,26 +214,26 @@ export async function publishArtifactsIdempotently(
       integrity: artifact.integrity,
     };
     if (registry === "pending") {
-      verifiedPackages.push(identity);
+      verified_packages.push(identity);
       continue;
     }
 
     try {
       const published = await publish(artifactRoot, artifact);
-      verifiedPackages.push(published);
-      newlyPublishedPackages.push(published);
+      verified_packages.push(published);
+      newly_published_packages.push(published);
     } catch (error) {
       // npm can hide accepted versions from both version reads and publication times.
       const message = String(error);
-      const isPublishConflict =
+      const is_publish_conflict =
         /EPUBLISHCONFLICT/.test(message) ||
         (/E403/.test(message) &&
           /(?:cannot publish over|previously published|pre-existing version)/i.test(message));
-      if (!isPublishConflict) throw error;
-      verifiedPackages.push(identity);
+      if (!is_publish_conflict) throw error;
+      verified_packages.push(identity);
     }
   }
-  return { verifiedPackages, newlyPublishedPackages };
+  return { verifiedPackages: verified_packages, newlyPublishedPackages: newly_published_packages };
 }
 
 export function assertRegistryPackage(
@@ -249,9 +249,9 @@ export function assertRegistryPackage(
 
 export async function verifyPublishedArtifacts(
   artifacts: readonly ReleasePackageArtifact[],
-  query: RegistryQuery = queryRegistry,
-  latest: LatestQuery = queryLatest,
-  attempts = registryAttempts(),
+  query: RegistryQuery = query_registry,
+  latest: LatestQuery = query_latest,
+  attempts = registry_attempts(),
   pause: (milliseconds: number) => Promise<unknown> = Bun.sleep,
   accepted: readonly PackageIdentity[] = [],
 ): Promise<"verified" | "pending"> {
@@ -259,57 +259,57 @@ export async function verifyPublishedArtifacts(
     throw new Error(`Registry attempts must be an integer from 1 to ${MAX_REGISTRY_ATTEMPTS}`);
   }
 
-  const acceptedVersions = new Set(accepted.map(({ name, version }) => `${name}@${version}`));
+  const accepted_versions = new Set(accepted.map(({ name, version }) => `${name}@${version}`));
   // A long validation wait polls many times; confirmed packages are not read again.
-  const confirmedVersions = new Set<string>();
-  let lastError: unknown;
-  let pendingVersions: string[] = [];
+  const confirmed_versions = new Set<string>();
+  let last_error: unknown;
+  let pending_versions: string[] = [];
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    pendingVersions = [];
-    let hasUnconfirmedFailure = false;
+    pending_versions = [];
+    let has_unconfirmed_failure = false;
     for (const artifact of artifacts) {
       const identity = `${artifact.name}@${artifact.version}`;
-      if (confirmedVersions.has(identity)) continue;
+      if (confirmed_versions.has(identity)) continue;
       let registry: RegistryPackage;
       try {
         registry = await query(artifact);
       } catch (error) {
-        lastError = error;
-        if (String(error).includes("E404") && acceptedVersions.has(identity)) {
-          pendingVersions.push(identity);
+        last_error = error;
+        if (String(error).includes("E404") && accepted_versions.has(identity)) {
+          pending_versions.push(identity);
         } else {
-          hasUnconfirmedFailure = true;
+          has_unconfirmed_failure = true;
         }
         continue;
       }
 
       assertRegistryArtifact(artifact, registry);
       try {
-        const registryLatest = await latest(artifact.name);
-        if (registryLatest !== artifact.version) {
+        const registry_latest = await latest(artifact.name);
+        if (registry_latest !== artifact.version) {
           throw new Error(
-            `${artifact.name} latest is ${registryLatest}, expected ${artifact.version}`,
+            `${artifact.name} latest is ${registry_latest}, expected ${artifact.version}`,
           );
         }
-        confirmedVersions.add(identity);
+        confirmed_versions.add(identity);
       } catch (error) {
-        lastError = error;
-        hasUnconfirmedFailure = true;
+        last_error = error;
+        has_unconfirmed_failure = true;
       }
     }
 
-    if (!hasUnconfirmedFailure && pendingVersions.length === 0) return "verified";
+    if (!has_unconfirmed_failure && pending_versions.length === 0) return "verified";
     if (attempt < attempts) await pause(REGISTRY_POLL_INTERVAL_MS);
-    else if (!hasUnconfirmedFailure && pendingVersions.length > 0) {
+    else if (!has_unconfirmed_failure && pending_versions.length > 0) {
       console.warn(
-        `::warning::${pendingVersions.join(", ")} still validating on npm after ${attempts} checks. Rerun this release job after validation finishes.`,
+        `::warning::${pending_versions.join(", ")} still validating on npm after ${attempts} checks. Rerun this release job after validation finishes.`,
       );
       return "pending";
     }
   }
   throw new Error(
-    `Published package registry verification failed after ${attempts} checks (${((attempts - 1) * REGISTRY_POLL_INTERVAL_MS) / 1_000}s wait): ${String(lastError)}. Check npm publication status and rerun the release job.`,
-    { cause: lastError },
+    `Published package registry verification failed after ${attempts} checks (${((attempts - 1) * REGISTRY_POLL_INTERVAL_MS) / 1_000}s wait): ${String(last_error)}. Check npm publication status and rerun the release job.`,
+    { cause: last_error },
   );
 }
 
@@ -333,29 +333,29 @@ export async function publishCanonicalArtifacts(
   const result = await publishArtifactsIdempotently(artifactRoot, manifest.packages);
   const verification = await verifyPublishedArtifacts(
     manifest.packages,
-    queryRegistry,
-    queryLatest,
-    registryAttempts(),
+    query_registry,
+    query_latest,
+    registry_attempts(),
     Bun.sleep,
     result.verifiedPackages,
   );
-  const pendingValidation = verification === "pending";
+  const pending_validation = verification === "pending";
   return {
     ...result,
-    verifiedPackages: pendingValidation ? [] : result.verifiedPackages,
-    pendingValidation,
+    verifiedPackages: pending_validation ? [] : result.verifiedPackages,
+    pendingValidation: pending_validation,
   };
 }
 
 if (import.meta.main) {
-  const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");
-  const expectedCommit = process.env.EXPECTED_SHA;
-  if (!expectedCommit || !/^[0-9a-f]{40}$/.test(expectedCommit)) {
+  const artifact_root = resolve(process.argv[2] ?? "test-results/release-artifacts");
+  const expected_commit = process.env.EXPECTED_SHA;
+  if (!expected_commit || !/^[0-9a-f]{40}$/.test(expected_commit)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
-  const result = await publishCanonicalArtifacts(artifactRoot, expectedCommit);
-  const outputPath = process.env.GITHUB_OUTPUT;
-  if (outputPath) {
+  const result = await publishCanonicalArtifacts(artifact_root, expected_commit);
+  const output_path = process.env.GITHUB_OUTPUT;
+  if (output_path) {
     const verified = result.verifiedPackages.map(({ name, version }) => ({
       name,
       version,
@@ -365,7 +365,7 @@ if (import.meta.main) {
       version,
     }));
     await appendFile(
-      outputPath,
+      output_path,
       `verified=${JSON.stringify(verified)}\n` +
         `published=${JSON.stringify(published)}\n` +
         `pending=${result.pendingValidation}\n`,

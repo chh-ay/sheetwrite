@@ -32,12 +32,12 @@ beforeAll(async () => {
 });
 
 /** Two sheets with every workbook feature the codec writes natively. */
-function roundTripWorkbook(): WorkbookSnapshot {
+function round_trip_workbook(): WorkbookSnapshot {
   const amounts = range("inputs", 0, 1, 1, 1);
   const inputs = block([[45_000, 4], [45_001.5, 6], ["Merged note"]]);
-  const styledCell = inputs.cells[1];
-  if (styledCell) {
-    styledCell.style = {
+  const styled_cell = inputs.cells[1];
+  if (styled_cell) {
+    styled_cell.style = {
       bold: true,
       color: "#112233",
       backgroundColor: "#DDEEFF",
@@ -120,8 +120,10 @@ function roundTripWorkbook(): WorkbookSnapshot {
 
 describe("independent XLSX corpus", () => {
   it("imports LibreOffice-native formulas, styles, validations, comments, merges, and views", async () => {
-    const { warnings, onWarning } = collectWarnings();
-    const imported = await fromXlsxWorkbook(await fixture("libreoffice-rich.xlsx"), { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const imported = await fromXlsxWorkbook(await fixture("libreoffice-rich.xlsx"), {
+      onWarning: on_warning,
+    });
     expect(warnings).toContainEqual(
       expect.objectContaining({
         code: "rich-text",
@@ -210,25 +212,25 @@ describe("table XLSX interchange", () => {
 
 describe("workbook OOXML fidelity", () => {
   it("is byte-deterministic and preserves supported workbook semantics", async () => {
-    const source = roundTripWorkbook();
-    const { warnings, onWarning } = collectWarnings();
-    const first = await toXlsxWorkbook(source, { onWarning });
+    const source = round_trip_workbook();
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const first = await toXlsxWorkbook(source, { onWarning: on_warning });
     expect(first).toEqual(await toXlsxWorkbook(source));
     expect(warnings.map((warning) => warning.code)).toEqual([
       "unsupported-feature",
       "unsupported-feature",
     ]);
-    const workbookXml = partText(first, "xl/workbook.xml");
-    expect(workbookXml).toContain('fullCalcOnLoad="1"');
-    expect(workbookXml).toContain('name="InputAmounts"');
-    const inputsXml = partText(first, "xl/worksheets/sheet1.xml");
+    const workbook_xml = partText(first, "xl/workbook.xml");
+    expect(workbook_xml).toContain('fullCalcOnLoad="1"');
+    expect(workbook_xml).toContain('name="InputAmounts"');
+    const inputs_xml = partText(first, "xl/worksheets/sheet1.xml");
     for (const fragment of [
       '<mergeCell ref="A3:B3"/>',
       'state="frozen"',
       'type="decimal"',
       "<conditionalFormatting",
     ]) {
-      expect(inputsXml).toContain(fragment);
+      expect(inputs_xml).toContain(fragment);
     }
     expect(partText(first, "xl/styles.xml")).toContain("<dxfs count=");
     expect(partText(first, "xl/comments1.xml")).toContain("Imported source date");
@@ -281,7 +283,7 @@ describe("workbook OOXML fidelity", () => {
         '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
       ),
     );
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await fromXlsxWorkbook(
       rawXlsx({
         styles,
@@ -293,7 +295,7 @@ describe("workbook OOXML fidelity", () => {
           },
         ],
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(styleAt(imported, 0, 0)).toEqual({ bold: true, verticalAlign: "bottom" });
     // Rows read before the late styles are styled again without reporting their warnings twice.
@@ -328,15 +330,15 @@ describe("bounded and corrupt XLSX inputs", () => {
 
   it("validates the shared table/workbook resource contract before codec allocation", async () => {
     const positive = await fixture("sheetwrite-libreoffice-positive.xlsx");
-    const tooLarge = {
+    const too_large = {
       code: "xlsx-resource-limit",
       resource: "maxInputBytes",
       actual: positive.byteLength,
       limit: 16,
     };
-    const inputLimit = { resourceLimits: { maxInputBytes: 16 } };
-    await expect(fromXlsxWorkbook(positive, inputLimit)).rejects.toMatchObject(tooLarge);
-    await expect(fromXlsxTable(positive, inputLimit)).rejects.toMatchObject(tooLarge);
+    const input_limit = { resourceLimits: { maxInputBytes: 16 } };
+    await expect(fromXlsxWorkbook(positive, input_limit)).rejects.toMatchObject(too_large);
+    await expect(fromXlsxTable(positive, input_limit)).rejects.toMatchObject(too_large);
     for (const [resource, options] of [
       ["maxCells", { maxCells: 0 }],
       ["maxXmlDepth", { resourceLimits: { maxXmlDepth: 1.5 } }],
@@ -358,7 +360,7 @@ describe("bounded and corrupt XLSX inputs", () => {
       code: "xlsx-import-failed",
       message: expect.stringMatching(/A1:B2:C3/),
     });
-    await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toMatchObject({
+    await expect(toXlsxWorkbook(round_trip_workbook(), { maxCells: 1 })).rejects.toMatchObject({
       code: "xlsx-resource-limit",
     });
     const controller = new AbortController();

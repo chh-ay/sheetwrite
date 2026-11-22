@@ -39,7 +39,7 @@ async function compile(code: string): Promise<string> {
 }
 
 /** The package specifiers compiled code requires, in order, once each. */
-function requiredSpecifiers(compiled: string): string[] {
+function required_specifiers(compiled: string): string[] {
   const specifiers = [...compiled.matchAll(/\brequire\((['"])([^'"]+)\1\)/g)].map(
     (match) => match[2] ?? "",
   );
@@ -47,7 +47,7 @@ function requiredSpecifiers(compiled: string): string[] {
 }
 
 /** A compile error: Sucrase ends its message with the position, as `(line:column)`. */
-function compileError(reason: unknown): ExampleError {
+function compile_error(reason: unknown): ExampleError {
   const message = reason instanceof Error ? reason.message : String(reason);
   const position = /\s*\((\d+):\d+\)\s*$/.exec(message);
   return {
@@ -71,28 +71,28 @@ export function frameDocument(): string {
  * A global of the frame's realm. The frame's `Function`, `console` and
  * observers belong to the frame, so code made with them runs there.
  */
-function frameGlobal<Value>(view: Window, name: PropertyKey): Value {
+function frame_global<Value>(view: Window, name: PropertyKey): Value {
   return Reflect.get(view, name) as Value;
 }
 
 /** The runtime in the frame's realm, imported by the frame's own `import()`. */
-async function frameRuntime(view: Window): Promise<PlaygroundRuntime> {
-  const FrameFunction = frameGlobal<FunctionConstructor>(view, "Function");
-  const importInFrame = new FrameFunction("url", "return import(url)") as (
+async function frame_runtime(view: Window): Promise<PlaygroundRuntime> {
+  const FrameFunction = frame_global<FunctionConstructor>(view, "Function");
+  const import_in_frame = new FrameFunction("url", "return import(url)") as (
     url: string,
   ) => Promise<unknown>;
-  await importInFrame(new URL(runtimeUrl, location.href).href);
-  const runtime = frameGlobal<PlaygroundRuntime | undefined>(view, RUNTIME_KEY);
+  await import_in_frame(new URL(runtimeUrl, location.href).href);
+  const runtime = frame_global<PlaygroundRuntime | undefined>(view, RUNTIME_KEY);
   if (runtime === undefined) throw new Error("The playground runtime did not start in the frame");
   return runtime;
 }
 
 /** Reports the frame's console calls and uncaught errors to the page. */
-function watchFrame(view: Window, report: ExampleReporter): void {
-  const frameConsole = frameGlobal<Console>(view, "console");
+function watch_frame(view: Window, report: ExampleReporter): void {
+  const frame_console = frame_global<Console>(view, "console");
   for (const level of CONSOLE_LEVELS) {
-    const original = frameConsole[level].bind(frameConsole);
-    frameConsole[level] = (...values: unknown[]) => {
+    const original = frame_console[level].bind(frame_console);
+    frame_console[level] = (...values: unknown[]) => {
       original(...values);
       report.console({ level, text: values.map((value) => formatValue(value)).join(" ") });
     };
@@ -114,21 +114,21 @@ export async function runExample(
 ): Promise<boolean> {
   const view = frame.contentWindow;
   if (view === null) throw new Error("The example frame has no window");
-  watchFrame(view, report);
+  watch_frame(view, report);
 
   let compiled: string;
   try {
     compiled = await compile(code);
   } catch (error) {
-    report.error(compileError(error));
+    report.error(compile_error(error));
     return false;
   }
 
   try {
-    const runtime = await frameRuntime(view);
-    const packages = await runtime.loadPackages(requiredSpecifiers(compiled));
+    const runtime = await frame_runtime(view);
+    const packages = await runtime.loadPackages(required_specifiers(compiled));
     const require = (specifier: string) => packages.get(specifier);
-    const FrameFunction = frameGlobal<FunctionConstructor>(view, "Function");
+    const FrameFunction = frame_global<FunctionConstructor>(view, "Function");
     const example = new FrameFunction(
       "require",
       "exports",
@@ -153,7 +153,7 @@ export function watchFrameHeight(
   const view = frame.contentWindow;
   if (view === null) return;
   const body = view.document.body;
-  const FrameResizeObserver = frameGlobal<typeof ResizeObserver>(view, "ResizeObserver");
+  const FrameResizeObserver = frame_global<typeof ResizeObserver>(view, "ResizeObserver");
   new FrameResizeObserver(() => observe(body.scrollHeight)).observe(body);
 }
 
@@ -163,5 +163,5 @@ export async function followSiteTheme(frame: HTMLIFrameElement): Promise<void> {
   const theme = document.documentElement.dataset.theme ?? "light";
   view.document.documentElement.dataset.theme = theme;
   view.document.documentElement.style.colorScheme = theme;
-  (await frameRuntime(view)).applySiteTheme();
+  (await frame_runtime(view)).applySiteTheme();
 }

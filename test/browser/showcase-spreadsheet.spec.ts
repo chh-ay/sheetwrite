@@ -23,16 +23,16 @@ async function open(page: Page, width = 1_600, height = 900): Promise<void> {
 }
 
 async function select(page: Page, reference: string): Promise<void> {
-  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  await nameBox.fill(reference);
-  await nameBox.press("Enter");
+  const name_box = page.getByRole("textbox", { name: "Cell reference" });
+  await name_box.fill(reference);
+  await name_box.press("Enter");
 }
 
 function cell(page: Page, sheet: string, row: number, col: number) {
   return page.evaluate(
-    ([sheetId, r, c]) => {
+    ([sheet_id, r, c]) => {
       const stored = window.__sheetwriteSpreadsheetGrid?.store.getCell({
-        sheet: sheetId,
+        sheet: sheet_id,
         row: r,
         col: c,
       });
@@ -43,17 +43,17 @@ function cell(page: Page, sheet: string, row: number, col: number) {
 }
 
 /** Select `r0..r1` × `c0..c1` (data rows) on the active sheet and give the grid focus. */
-async function selectRange(page: Page, r0: number, c0: number, r1 = r0, c1 = c0): Promise<void> {
+async function select_range(page: Page, r0: number, c0: number, r1 = r0, c1 = c0): Promise<void> {
   await page.evaluate(
-    ([startRow, startCol, endRow, endCol]) => {
+    ([start_row, start_col, end_row, end_col]) => {
       const grid = window.__sheetwriteSpreadsheetGrid;
       if (!grid) throw new Error("The spreadsheet showcase has not published its grid");
       grid.setSelection({
         kind: "range",
         range: {
           sheet: grid.getActiveSheet(),
-          start: { row: startRow, col: startCol },
-          end: { row: endRow, col: endCol },
+          start: { row: start_row, col: start_col },
+          end: { row: end_row, col: end_col },
         },
       });
     },
@@ -69,7 +69,7 @@ async function selectRange(page: Page, r0: number, c0: number, r1 = r0, c1 = c0)
  * DOM measure reports, so the centre may be up to half a scrollbar (8 px)
  * off. A dialog in the corner is hundreds of pixels off.
  */
-async function expectCentred(page: Page, dialog: Locator): Promise<void> {
+async function expect_centred(page: Page, dialog: Locator): Promise<void> {
   const box = await dialog.boundingBox();
   if (!box) throw new Error("The dialog must have a box");
   const viewport = page.viewportSize();
@@ -79,7 +79,7 @@ async function expectCentred(page: Page, dialog: Locator): Promise<void> {
 }
 
 /** Give B2:B50 a list rule with `fields`, select B10, which shows on screen, and focus the grid. */
-async function regionRule(page: Page, fields: Record<string, unknown>): Promise<void> {
+async function region_rule(page: Page, fields: Record<string, unknown>): Promise<void> {
   await page.evaluate((extra) => {
     const grid = window.__sheetwriteSpreadsheetGrid;
     if (!grid) throw new Error("The spreadsheet showcase has not published its grid");
@@ -97,7 +97,7 @@ async function regionRule(page: Page, fields: Record<string, unknown>): Promise<
 }
 
 /** The box of `locator` once two frames in a row show it in the same place. */
-async function settledBox(page: Page, locator: Locator) {
+async function settled_box(page: Page, locator: Locator) {
   let box = await locator.boundingBox();
   for (;;) {
     await nextFrames(page);
@@ -107,7 +107,7 @@ async function settledBox(page: Page, locator: Locator) {
   }
 }
 
-function regionAtB10(page: Page): Promise<unknown> {
+function region_at_b10(page: Page): Promise<unknown> {
   return page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid;
     return grid?.store.getCell({ sheet: grid.getActiveSheet(), row: 9, col: 1 }).resolved;
@@ -123,13 +123,13 @@ test("Tab stays in the sheet and F6 cycles the shell's parts; the ribbon layout 
   // Tab moves between cells inside the grid, as in Excel, so the grid needs a
   // way out for the keyboard: F6 and Shift+F6, as Excel's F6 moves between
   // the parts of its window, and Escape then Tab.
-  const shellGrid = ".sheetwrite-shell-grid";
+  const shell_grid = ".sheetwrite-shell-grid";
   await select(page, "B2");
-  await expect.poll(() => focusAt(page, shellGrid)).toBe("grid");
+  await expect.poll(() => focusAt(page, shell_grid)).toBe("grid");
   // The grid names its way out in its description.
-  await expect(page.locator(shellGrid)).toHaveAttribute("aria-description", /F6/);
+  await expect(page.locator(shell_grid)).toHaveAttribute("aria-description", /F6/);
   for (let press = 0; press < 3; press++) await page.keyboard.press("Tab");
-  expect(await focusAt(page, shellGrid)).toBe("grid");
+  expect(await focusAt(page, shell_grid)).toBe("grid");
   for (const part of [
     ".sheetwrite-shell-tabs",
     ".sheetwrite-shell-status",
@@ -137,28 +137,28 @@ test("Tab stays in the sheet and F6 cycles the shell's parts; the ribbon layout 
     ".sheetwrite-shell-formula",
   ]) {
     await page.keyboard.press("F6");
-    expect(await focusAt(page, shellGrid, part)).toBe("part");
+    expect(await focusAt(page, shell_grid, part)).toBe("part");
   }
   await page.keyboard.press("F6");
-  expect(await focusAt(page, shellGrid)).toBe("grid");
+  expect(await focusAt(page, shell_grid)).toBe("grid");
   await page.keyboard.press("Shift+F6");
-  expect(await focusAt(page, shellGrid, ".sheetwrite-shell-formula")).toBe("part");
-  await page.locator(shellGrid).focus();
+  expect(await focusAt(page, shell_grid, ".sheetwrite-shell-formula")).toBe("part");
+  await page.locator(shell_grid).focus();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Tab");
-  expect(await focusAt(page, shellGrid)).not.toMatch(/^(grid|inside)$/);
+  expect(await focusAt(page, shell_grid)).not.toMatch(/^(grid|inside)$/);
 
   const ribbon = page.getByRole("region", { name: "Ribbon" });
   await expect(ribbon).toHaveAttribute("data-mode", "full");
   const editing = page.locator('.sheetwrite-ribbon-group[aria-label="Editing"]');
   await expect(editing).toHaveAttribute("data-size", "large");
   const panel = ribbon.getByRole("tabpanel");
-  const fullHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+  const full_height = await panel.evaluate((element) => element.getBoundingClientRect().height);
 
   await page.getByRole("button", { name: "Narrow" }).click();
   await expect(ribbon).toHaveAttribute("data-mode", "compact");
   expect(await panel.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(
-    fullHeight,
+    full_height,
   );
   // At this width groups fold into dropdowns, and all those shown stay on one
   // row (any that still do not fit fold into More).
@@ -243,14 +243,14 @@ test("the Data tab's large Sort labels break between whole phrases @portability"
       const text = element.firstChild;
       const content = text?.textContent ?? "";
       const range = document.createRange();
-      const byTop = new Map<number, string>();
+      const by_top = new Map<number, string>();
       for (let index = 0; index < content.length && text !== null; index += 1) {
         range.setStart(text, index);
         range.setEnd(text, index + 1);
         const top = Math.round(range.getBoundingClientRect().top);
-        byTop.set(top, (byTop.get(top) ?? "") + (content[index] ?? ""));
+        by_top.set(top, (by_top.get(top) ?? "") + (content[index] ?? ""));
       }
-      return [...byTop.values()].map((line) => line.replaceAll("\u00a0", " ").trim());
+      return [...by_top.values()].map((line) => line.replaceAll("\u00a0", " ").trim());
     });
     expect(lines).toEqual(["Sort", name.slice("Sort ".length)]);
   }
@@ -295,12 +295,12 @@ test("on a narrow phone the tabs scroll beside the layout buttons, and the full 
       const captions = [...panel.querySelectorAll(".sheetwrite-ribbon-group-label")].filter(shown);
       const found: string[] = [];
       if (folded.length === 0) found.push("no folded group");
-      for (const groupButton of folded) {
+      for (const group_button of folded) {
         const name =
-          groupButton.getAttribute("aria-label") ??
-          groupButton.parentElement?.getAttribute("aria-label") ??
+          group_button.getAttribute("aria-label") ??
+          group_button.parentElement?.getAttribute("aria-label") ??
           "";
-        const label = groupButton.querySelector(".sheetwrite-ribbon-label")?.firstChild;
+        const label = group_button.querySelector(".sheetwrite-ribbon-label")?.firstChild;
         const range = document.createRange();
         const tops = new Set<number>();
         const text = label?.textContent ?? "";
@@ -311,7 +311,7 @@ test("on a narrow phone the tabs scroll beside the layout buttons, and the full 
           tops.add(Math.round(range.getBoundingClientRect().top));
         }
         if (tops.size > 2) found.push(`${name}: ${tops.size} lines`);
-        const box = groupButton.getBoundingClientRect();
+        const box = group_button.getBoundingClientRect();
         for (const caption of captions) {
           const other = caption.getBoundingClientRect();
           const overlap =
@@ -319,7 +319,7 @@ test("on a narrow phone the tabs scroll beside the layout buttons, and the full 
             Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 0.5;
           if (overlap) found.push(`${name} overlaps the caption ${caption.textContent}`);
         }
-        const group = groupButton.parentElement?.querySelector(".sheetwrite-ribbon-group-label");
+        const group = group_button.parentElement?.querySelector(".sheetwrite-ribbon-group-label");
         if (group && shown(group)) found.push(`${name} still shows its caption`);
         if (box.bottom > panel.getBoundingClientRect().bottom + 0.5)
           found.push(`${name} runs past the panel`);
@@ -402,7 +402,7 @@ test("the Data tab creates a list rule from another sheet and runs the query com
 }) => {
   await open(page);
   const ribbon = page.getByRole("region", { name: "Ribbon" });
-  await selectRange(page, 1, 1, 49, 1);
+  await select_range(page, 1, 1, 49, 1);
   await ribbon.getByRole("tab", { name: "Data", exact: true }).click();
   await page.getByRole("button", { name: "Data Validation" }).click();
   const dialog = page.getByRole("dialog", { name: "Data Validation" });
@@ -428,7 +428,7 @@ test("the Data tab creates a list rule from another sheet and runs the query com
       inputTitle: "Region",
     }),
   ]);
-  await selectRange(page, 1, 1);
+  await select_range(page, 1, 1);
   await page.keyboard.press("Alt+ArrowDown");
   await expect(page.getByRole("listbox").getByRole("option")).toHaveText([
     "North",
@@ -441,9 +441,9 @@ test("the Data tab creates a list rule from another sheet and runs the query com
   // The session connects after the shell is shown and loads the saved query's table.
   await expect.poll(async () => (await cell(page, "targets", 1, 0)).resolved).toBe("North");
   expect((await cell(page, "targets", 4, 0)).resolved).toBeNull();
-  const refreshAll = ribbon.getByRole("button", { name: "Refresh All", exact: true });
-  await refreshAll.focus();
-  await refreshAll.press("Enter");
+  const refresh_all = ribbon.getByRole("button", { name: "Refresh All", exact: true });
+  await refresh_all.focus();
+  await refresh_all.press("Enter");
   const status = page.locator(".sheetwrite-action-status");
   await expect(status).toHaveText("Queries refreshed.");
   const queries = ribbon.getByRole("button", { name: "Queries & Connections", exact: true });
@@ -456,7 +456,7 @@ test("the Data tab creates a list rule from another sheet and runs the query com
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toBeFocused();
   // A read-only grid keeps the commands, and the refresh reports the rejected write.
   await page.evaluate(() => window.__sheetwriteSpreadsheetGrid?.setReadOnly(true));
-  await refreshAll.click();
+  await refresh_all.click();
   await expect(status).not.toHaveText(/Queries refreshed\.|Refreshing queries/u);
 });
 
@@ -464,8 +464,8 @@ test("sheet keys after a tab click, the name box on a filtered row, and Shift+F1
   page,
 }) => {
   await open(page);
-  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  const formulaBar = page.getByRole("textbox", { name: "Formula bar" });
+  const name_box = page.getByRole("textbox", { name: "Cell reference" });
+  const formula_bar = page.getByRole("textbox", { name: "Formula bar" });
   const shown = () =>
     page.evaluate(() => {
       const grid = window.__sheetwriteSpreadsheetGrid;
@@ -484,14 +484,14 @@ test("sheet keys after a tab click, the name box on a filtered row, and Shift+F1
   // The clicked sheet shows A1 and takes the keys; undo and redo show the
   // sheet they change, as in Excel.
   await page.getByRole("tab", { name: "Summary sheet" }).click();
-  await expect(nameBox).toHaveValue("A1");
+  await expect(name_box).toHaveValue("A1");
   await page.keyboard.press("Control+Z");
   await expect.poll(shown).toEqual({ sheet: "Sales", c5: "Devon" });
-  await expect(nameBox).toHaveValue("C5");
+  await expect(name_box).toHaveValue("C5");
   await page.getByRole("tab", { name: "Summary sheet" }).click();
   await page.keyboard.press("Control+Y");
   await expect.poll(shown).toEqual({ sheet: "Sales", c5: "Zed" });
-  await expect(nameBox).toHaveValue("C5");
+  await expect(name_box).toHaveValue("C5");
 
   // Keep only the orders of 1/2/2026: sheet rows 3 to 49 hide. The name box
   // still goes to C5, and typing edits the hidden cell in the formula bar.
@@ -501,17 +501,17 @@ test("sheet keys after a tab click, the name box on a filtered row, and Shift+F1
     window.__sheetwriteSpreadsheetGrid?.setColumnFilter(0, { kind: "values", values: [46024] });
   });
   await select(page, "C5");
-  await expect(nameBox).not.toHaveAttribute("aria-invalid", "true");
-  await expect(nameBox).toHaveValue("C5");
-  await expect(formulaBar).toHaveValue("Zed");
+  await expect(name_box).not.toHaveAttribute("aria-invalid", "true");
+  await expect(name_box).toHaveValue("C5");
+  await expect(formula_bar).toHaveValue("Zed");
   await page.keyboard.type("Zoe");
-  await expect(formulaBar).toBeFocused();
+  await expect(formula_bar).toBeFocused();
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await shown()).c5).toBe("Zoe");
   // Down goes to the next row that shows: the empty row below the orders.
   await select(page, "C5");
   await page.keyboard.press("ArrowDown");
-  await expect(nameBox).toHaveValue("C50");
+  await expect(name_box).toHaveValue("C50");
 
   // Shift+F11 inserts Excel's SheetN before the active sheet, the add button after it.
   const sheets = () =>
@@ -532,7 +532,7 @@ test("sheet keys after a tab click, the name box on a filtered row, and Shift+F1
     .toEqual({ names: ["Sheet4", "Sheet5", "Sales", "Summary", "Targets"], active: "Sheet5" });
   // An empty sheet with columns A to Z: the name box takes Z1.
   await select(page, "Z1");
-  await expect(nameBox).not.toHaveAttribute("aria-invalid", "true");
+  await expect(name_box).not.toHaveAttribute("aria-invalid", "true");
 });
 
 test("the cell editor and the formula bar: result preview, one shared draft, multi-line source, AutoComplete and validation lists, validation alerts @portability", async ({
@@ -540,8 +540,8 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
 }) => {
   await open(page);
   const bar = page.getByRole("textbox", { name: "Formula bar" });
-  const cellEditor = page.locator("textarea.sheetwrite-editor");
-  const formulaInG3 = () =>
+  const cell_editor = page.locator("textarea.sheetwrite-editor");
+  const formula_in_g3 = () =>
     page.evaluate(() =>
       window.__sheetwriteSpreadsheetGrid?.store.getFormula({ sheet: "sales", row: 2, col: 6 }),
     );
@@ -549,30 +549,30 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   // Formula help previews the result while typing and leaves the cell
   // unchanged. G3 holds =E3*F3; typing replaces it in the editor only.
   await select(page, "G3");
-  const storedFormula = await formulaInG3();
+  const stored_formula = await formula_in_g3();
   await page.keyboard.type("=E3*F3+0");
   const preview = page.locator(".sheetwrite-formula-preview");
   await expect(preview).toHaveText("= 719.91");
-  await expect(cellEditor).toHaveAttribute(
+  await expect(cell_editor).toHaveAttribute(
     "aria-describedby",
     new RegExp(`\\b${(await preview.getAttribute("id")) ?? "missing"}\\b`),
   );
   // An unfinished formula has no preview; its error waits in the guide.
-  await cellEditor.fill("=ROUND(E3*F3,");
+  await cell_editor.fill("=ROUND(E3*F3,");
   await expect(preview).toHaveText("");
-  await cellEditor.fill("=SEQUENCE(2,3,5)");
+  await cell_editor.fill("=SEQUENCE(2,3,5)");
   await expect(preview).toHaveText("= 5 … (2 × 3 array)");
-  await cellEditor.fill("=E3*RAND()");
+  await cell_editor.fill("=E3*RAND()");
   await expect(preview).toHaveText(/^No preview/u);
-  await cellEditor.press("Escape");
-  await expect(cellEditor).toHaveCount(0);
-  expect(await formulaInG3()).toBe(storedFormula);
+  await cell_editor.press("Escape");
+  await expect(cell_editor).toHaveCount(0);
+  expect(await formula_in_g3()).toBe(stored_formula);
 
   // The formula bar follows every keystroke in the cell editor, and Escape restores both.
   await select(page, "G3");
-  const storedText = await bar.inputValue();
+  const stored_text = await bar.inputValue();
   await page.keyboard.type("=SU");
-  await expect(cellEditor).toBeFocused();
+  await expect(cell_editor).toBeFocused();
   await expect(bar).toHaveValue("=SU");
   await page.keyboard.type("M(1,");
   await expect(bar).toHaveValue("=SUM(1,");
@@ -582,8 +582,8 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await page.keyboard.press("Backspace");
   await expect(bar).toHaveValue("=SUM(1,\n2");
   await page.keyboard.press("Escape");
-  await expect(cellEditor).toHaveCount(0);
-  await expect(bar).toHaveValue(storedText);
+  await expect(cell_editor).toHaveCount(0);
+  await expect(bar).toHaveValue(stored_text);
 
   // The cell shows every keystroke typed in the formula bar; moving into the
   // cell editor keeps the edit, and Enter in the bar commits it.
@@ -591,72 +591,72 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await bar.click();
   await bar.press("ControlOrMeta+a");
   await page.keyboard.type("Draft");
-  await expect(cellEditor).toHaveValue("Draft");
+  await expect(cell_editor).toHaveValue("Draft");
   await expect(bar).toBeFocused();
   await page.keyboard.type(" text");
-  await expect(cellEditor).toHaveValue("Draft text");
-  await cellEditor.click();
-  await expect(cellEditor).toBeFocused();
+  await expect(cell_editor).toHaveValue("Draft text");
+  await cell_editor.click();
+  await expect(cell_editor).toBeFocused();
   await page.keyboard.press("End");
   await page.keyboard.type("!");
   await expect(bar).toHaveValue("Draft text!");
   await bar.click();
   await page.keyboard.press("Enter");
-  await expect(cellEditor).toHaveCount(0);
+  await expect(cell_editor).toHaveCount(0);
   await expect(bar).toHaveValue("Draft text!");
 
   // Formula help: the function list, the argument guide and the coloured layer.
   const source = "=ROUND(\nSUM(A1:A3),\n2)";
   const guide = page.getByRole("status").filter({ hasText: "ROUND(" });
-  const formulaList = page.getByRole("listbox", { name: "Formula AutoComplete" });
+  const formula_list = page.getByRole("listbox", { name: "Formula AutoComplete" });
   const mirror = page.locator(".sheetwrite-formula-mirror");
 
   // The cell editor lists functions; a real Enter picks one without a line
   // break, and the help follows the arguments.
   await select(page, "G3");
   await page.keyboard.type("=ROU");
-  await expect(formulaList.getByRole("option", { name: "ROUND", exact: true })).toBeVisible();
-  await expect(cellEditor).toHaveAttribute(
+  await expect(formula_list.getByRole("option", { name: "ROUND", exact: true })).toBeVisible();
+  await expect(cell_editor).toHaveAttribute(
     "aria-controls",
-    (await formulaList.getAttribute("id")) ?? "",
+    (await formula_list.getAttribute("id")) ?? "",
   );
   await page.keyboard.press("Enter");
-  await expect(cellEditor).toHaveValue("=ROUND(");
-  await expect(formulaList).toHaveCount(0);
+  await expect(cell_editor).toHaveValue("=ROUND(");
+  await expect(formula_list).toHaveCount(0);
   await expect(guide.locator("strong")).toHaveText("number");
   await page.keyboard.type("A1:A3, ");
   await expect(guide.locator("strong")).toHaveText("num_digits");
   await page.keyboard.type("2");
   await page.keyboard.press("Enter");
-  await expect(cellEditor).toHaveCount(0);
+  await expect(cell_editor).toHaveCount(0);
 
   // Each formula editor inserts lines, keeps its help and coloured layer
   // aligned, and commits the multi-line source.
   for (const [kind, editor] of [
-    ["cell", cellEditor],
+    ["cell", cell_editor],
     ["bar", bar],
   ] as const) {
     // F2 opens Edit mode, where arrow keys move the caret instead of committing.
     await select(page, "G3");
     if (kind === "cell") await page.keyboard.press("F2");
     await editor.fill("=ROUND(");
-    const initialHeight = await editor.evaluate((field) => field.getBoundingClientRect().height);
+    const initial_height = await editor.evaluate((field) => field.getBoundingClientRect().height);
     await expect(guide.locator("strong")).toHaveText("number");
     await editor.press("Alt+Enter");
     await expect(editor).toHaveValue("=ROUND(\n");
     await expect(editor).toBeFocused();
     await expect(editor).toHaveAttribute("aria-multiline", "true");
     expect(await editor.evaluate((field) => field.getBoundingClientRect().height)).toBeGreaterThan(
-      initialHeight,
+      initial_height,
     );
     expect(await editor.getAttribute("role")).not.toBe("combobox");
     await page.keyboard.type("SUM");
-    await expect(formulaList.getByRole("option", { name: "SUM", exact: true })).toBeVisible();
+    await expect(formula_list.getByRole("option", { name: "SUM", exact: true })).toBeVisible();
     // Alt+Enter must not accept the open completion.
     await editor.press("Alt+Enter");
     await expect(editor).toHaveValue("=ROUND(\nSUM\n");
     await page.keyboard.press("Backspace");
-    await expect(formulaList.getByRole("option", { name: "SUM", exact: true })).toBeVisible();
+    await expect(formula_list.getByRole("option", { name: "SUM", exact: true })).toBeVisible();
     await editor.press("Tab");
     await expect(editor).toHaveValue("=ROUND(\nSUM(");
     await page.keyboard.type("A1:A3),");
@@ -668,15 +668,15 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
     const geometry = await editor.evaluate((field) => {
       const layer = document.querySelector(".sheetwrite-formula-mirror");
       if (!layer) throw new Error("Formula text mirror is missing");
-      const editorBox = field.getBoundingClientRect();
-      const layerBox = layer.getBoundingClientRect();
+      const editor_box = field.getBoundingClientRect();
+      const layer_box = layer.getBoundingClientRect();
       const reference = [...layer.querySelectorAll("span")].find(
         (span) => span.textContent === "A1:A3",
       );
       if (!reference) throw new Error("Coloured reference is missing");
       return {
-        editor: [editorBox.x, editorBox.y, editorBox.width, editorBox.height],
-        mirror: [layerBox.x, layerBox.y, layerBox.width, layerBox.height],
+        editor: [editor_box.x, editor_box.y, editor_box.width, editor_box.height],
+        mirror: [layer_box.x, layer_box.y, layer_box.width, layer_box.height],
         lineHeight: getComputedStyle(field).lineHeight,
         mirrorLineHeight: getComputedStyle(layer).lineHeight,
         referenceY: reference.getBoundingClientRect().y,
@@ -688,7 +688,7 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
     expect(geometry.referenceY).toBeGreaterThan(geometry.editor[1] ?? 0);
     expect(geometry.referenceColor).not.toBe("");
     await editor.press("Enter");
-    await expect.poll(formulaInG3).toBe(source);
+    await expect.poll(formula_in_g3).toBe(source);
     // Reopening retains line breaks; removing them shrinks the editor again.
     await select(page, "G3");
     if (kind === "cell") await page.keyboard.press("F2");
@@ -718,10 +718,10 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
       .toBe(true);
     await editor.fill("=42");
     expect(await editor.evaluate((field) => field.getBoundingClientRect().height)).toBe(
-      initialHeight,
+      initial_height,
     );
     await editor.press("Escape");
-    expect(await formulaInG3()).toBe(source);
+    expect(await formula_in_g3()).toBe(source);
   }
 
   // Pick From Drop-down List under the Region column, with the real Alt (Option
@@ -743,7 +743,7 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await page.keyboard.type("Nor");
   const listed = page.getByRole("listbox", { name: "AutoComplete" });
   await expect(listed.getByRole("option")).toHaveText(["North", "Northeast"]);
-  await expect(cellEditor).toHaveValue("Nor");
+  await expect(cell_editor).toHaveValue("Nor");
   await page.keyboard.press("Alt+ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
@@ -751,14 +751,14 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
 
   // Data validation: Excel's error alerts and a list cell's dropdown, with
   // each engine's real focus order, give the grid its focus back.
-  const gridHost = page.locator(".sheetwrite").first();
+  const grid_host = page.locator(".sheetwrite").first();
   // The name box scrolls B10 back on screen, where its input message shows.
   await select(page, "B10");
   // Stop: Retry is focused, Tab and Shift+Tab move inside the alert, Enter
   // retries in the cell editor, and Escape cancels the entry.
-  await regionRule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
+  await region_rule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
   await expect(page.locator(".sheetwrite-input-message")).toHaveText("RegionPick a sales region.");
-  const before = await regionAtB10(page);
+  const before = await region_at_b10(page);
   await page.keyboard.type('="Nowhere"');
   await page.keyboard.press("Enter");
   const stop = page.getByRole("alertdialog", { name: "Data Validation" });
@@ -771,17 +771,17 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Enter");
   await expect(stop).toHaveCount(0);
-  await expect(cellEditor).toBeFocused();
-  await expect(cellEditor).toHaveValue('="Nowhere"');
+  await expect(cell_editor).toBeFocused();
+  await expect(cell_editor).toHaveValue('="Nowhere"');
   await page.keyboard.press("Enter");
   await expect(stop).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(stop).toHaveCount(0);
-  await expect(gridHost).toBeFocused();
-  expect(await regionAtB10(page)).toEqual(before);
+  await expect(grid_host).toBeFocused();
+  expect(await region_at_b10(page)).toEqual(before);
 
   // Warning: No is focused, and Yes keeps the entry; Information: OK keeps it.
-  await regionRule(page, { policy: "warn", errorTitle: "Region", helpText: "Not a region." });
+  await region_rule(page, { policy: "warn", errorTitle: "Region", helpText: "Not a region." });
   await page.keyboard.type("Nowhere");
   await page.keyboard.press("Enter");
   const warning = page.getByRole("alertdialog", { name: "Region" });
@@ -789,19 +789,19 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await expect(warning.getByRole("button", { name: "No" })).toBeFocused();
   await warning.getByRole("button", { name: "Yes" }).click();
   await expect(warning).toHaveCount(0);
-  expect(await regionAtB10(page)).toBe("Nowhere");
-  await regionRule(page, { policy: "warn", errorStyle: "information" });
+  expect(await region_at_b10(page)).toBe("Nowhere");
+  await region_rule(page, { policy: "warn", errorStyle: "information" });
   await page.keyboard.type("Elsewhere");
   await page.keyboard.press("Enter");
   const information = page.getByRole("alertdialog", { name: "Data Validation" });
   await expect(information.getByRole("button", { name: "OK" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(information).toHaveCount(0);
-  expect(await regionAtB10(page)).toBe("Elsewhere");
+  expect(await region_at_b10(page)).toBe("Elsewhere");
 
   // A list cell: a pointer press on its arrow opens the list, Escape closes
   // it, typing filters it, and Alt+Down then Tab opens and closes it.
-  await regionRule(page, {
+  await region_rule(page, {
     condition: {
       kind: "list",
       values: ["North", "South", "East", "West", "North-East", "South-West"],
@@ -811,14 +811,14 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await expect(arrow).toBeVisible();
   // The overlay paints the arrow on the next frames after the selection moved;
   // read its box once two frames show it in the same place.
-  const arrowBox = await settledBox(page, arrow);
-  if (!arrowBox) throw new Error("expected the dropdown arrow");
-  await page.mouse.click(arrowBox.x + arrowBox.width / 2, arrowBox.y + arrowBox.height / 2);
+  const arrow_box = await settled_box(page, arrow);
+  if (!arrow_box) throw new Error("expected the dropdown arrow");
+  await page.mouse.click(arrow_box.x + arrow_box.width / 2, arrow_box.y + arrow_box.height / 2);
   const choices = page.getByRole("listbox");
   await expect(choices.getByRole("option")).toHaveCount(6);
   await page.keyboard.press("Escape");
   await expect(choices).toHaveCount(0);
-  await expect(gridHost).toBeFocused();
+  await expect(grid_host).toBeFocused();
   await page.keyboard.type("we");
   const combobox = page.locator(".sheetwrite-validation-input");
   await expect(combobox).toBeFocused();
@@ -828,7 +828,7 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(choices).toHaveCount(0);
-  expect(await regionAtB10(page)).toBe("South-West");
+  expect(await region_at_b10(page)).toBe("South-West");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Alt+ArrowDown");
   await expect(choices.getByRole("option")).toHaveCount(6);
@@ -838,7 +838,7 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
 
 test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide, merge, Paste Special, Find, shortcuts @portability", async ({
   page,
-  browserName,
+  browserName: browser_name,
 }) => {
   // Playwright grants Chromium both clipboard permissions and WebKit the read
   // one; Firefox lets a page use the clipboard after a key press.
@@ -846,11 +846,11 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     chromium: ["clipboard-read", "clipboard-write"],
     webkit: ["clipboard-read"],
   };
-  await page.context().grantPermissions(permissions[browserName] ?? []);
+  await page.context().grantPermissions(permissions[browser_name] ?? []);
   await open(page);
   const grid = page.locator(".sheetwrite").first();
   /** The workbook state each step checks, on the active sheet. */
-  const sheetState = () =>
+  const sheet_state = () =>
     page.evaluate(() => {
       const shown = window.__sheetwriteSpreadsheetGrid;
       if (!shown) throw new Error("The spreadsheet showcase has not published its grid");
@@ -895,17 +895,17 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
   // #921: cut and paste moves the cells and the references to them in every
   // engine; Firefox and WebKit keep only plain text and HTML on the clipboard.
   // https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e
-  await selectRange(page, 2, 0, 3, 0);
+  await select_range(page, 2, 0, 3, 0);
   await page.keyboard.press("ControlOrMeta+x");
   await expect(page.locator("[data-sheetwrite-cut]").first()).toBeVisible();
-  expect((await sheetState()).moved.source).toEqual([10, 20]);
-  await selectRange(page, 2, 3);
+  expect((await sheet_state()).moved.source).toEqual([10, 20]);
+  await select_range(page, 2, 3);
   await page.keyboard.press("ControlOrMeta+v");
   await expect
     .poll(
       async () => {
-        const { moved, movedFormula } = await sheetState();
-        return { ...moved, movedFormula };
+        const { moved, movedFormula: moved_formula } = await sheet_state();
+        return { ...moved, movedFormula: moved_formula };
       },
       { timeout: 15_000 },
     )
@@ -913,22 +913,22 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
   await expect(page.locator("[data-sheetwrite-cut]")).toHaveCount(0);
 
   // Format, hide and unhide keys.
-  await selectRange(page, 5, 0);
+  await select_range(page, 5, 0);
   await page.keyboard.press("Control+Shift+Digit4");
-  await expect.poll(async () => (await sheetState()).format).toBe("$#,##0.00_);($#,##0.00)");
+  await expect.poll(async () => (await sheet_state()).format).toBe("$#,##0.00_);($#,##0.00)");
   await page.keyboard.press("Control+Shift+Backquote");
-  await expect.poll(async () => (await sheetState()).format).toBe("General");
+  await expect.poll(async () => (await sheet_state()).format).toBe("General");
   await page.keyboard.press("Control+Digit9");
-  await expect.poll(async () => (await sheetState()).rows).toEqual([5]);
-  await selectRange(page, 4, 0, 6, 0);
+  await expect.poll(async () => (await sheet_state()).rows).toEqual([5]);
+  await select_range(page, 4, 0, 6, 0);
   await page.keyboard.press("Control+Shift+Digit9");
-  await expect.poll(async () => (await sheetState()).rows).toEqual([]);
-  await selectRange(page, 5, 1);
+  await expect.poll(async () => (await sheet_state()).rows).toEqual([]);
+  await select_range(page, 5, 1);
   await page.keyboard.press("Control+Digit0");
-  await expect.poll(async () => (await sheetState()).columns).toEqual([1]);
-  await selectRange(page, 5, 0, 5, 2);
+  await expect.poll(async () => (await sheet_state()).columns).toEqual([1]);
+  await select_range(page, 5, 0, 5, 2);
   await page.keyboard.press("Control+Shift+Digit0");
-  await expect.poll(async () => (await sheetState()).columns).toEqual([]);
+  await expect.poll(async () => (await sheet_state()).columns).toEqual([]);
 
   // Insert, Delete and Format Cells open centred and give the grid its focus back.
   for (const [key, name] of [
@@ -936,11 +936,11 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     ["Control+Minus", "Delete"],
     ["Control+Digit1", "Format Cells"],
   ] as const) {
-    await selectRange(page, 5, 0, 5, 1);
+    await select_range(page, 5, 0, 5, 1);
     await page.keyboard.press(key);
     const dialog = page.getByRole("dialog", { name, exact: true });
     await expect(dialog).toBeVisible();
-    await expectCentred(page, dialog);
+    await expect_centred(page, dialog);
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(grid).toBeFocused();
@@ -948,12 +948,12 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
 
   // Merging cells that hold two values warns first: OK is focused, Tab
   // cycles inside the alert, Escape cancels and Enter merges.
-  await selectRange(page, 5, 0, 5, 1);
+  await select_range(page, 5, 0, 5, 1);
   await page.evaluate(() =>
     window.__sheetwriteSpreadsheetGrid?.actions.mergeAndCenter({ ask: true }),
   );
   const warning = page.getByRole("alertdialog", { name: "Merge Cells" });
-  await expectCentred(page, warning);
+  await expect_centred(page, warning);
   await expect(warning).toContainText(
     "Merging cells only keeps the upper-left value and discards other values. This value will be discarded: B6: 'm2'.",
   );
@@ -969,38 +969,38 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
   await page.keyboard.press("Escape");
   await expect(warning).toHaveCount(0);
   await expect(grid).toBeFocused();
-  expect(await sheetState()).toMatchObject({ merges: 0, covered: "m2" });
+  expect(await sheet_state()).toMatchObject({ merges: 0, covered: "m2" });
   await page.evaluate(() =>
     window.__sheetwriteSpreadsheetGrid?.actions.mergeAndCenter({ ask: true }),
   );
   await expect(ok).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(warning).toHaveCount(0);
-  await expect.poll(async () => (await sheetState()).merges).toBe(1);
-  expect((await sheetState()).covered).toBeNull();
+  await expect.poll(async () => (await sheet_state()).merges).toBe(1);
+  expect((await sheet_state()).covered).toBeNull();
 
   // Ctrl+Alt+V opens Paste Special, whose letter keys choose.
   // https://support.microsoft.com/en-us/excel/paste-options
-  await selectRange(page, 39, 0, 40, 0);
+  await select_range(page, 39, 0, 40, 0);
   await page.keyboard.press("Control+Alt+KeyV");
-  const pasteSpecial = page.getByRole("dialog", { name: "Paste Special" });
-  const all = pasteSpecial.getByRole("radio", { name: "All", exact: true });
+  const paste_special = page.getByRole("dialog", { name: "Paste Special" });
+  const all = paste_special.getByRole("radio", { name: "All", exact: true });
   await expect(all).toBeFocused();
   await expect(all).toBeChecked();
   await page.keyboard.press("v");
-  await expect(pasteSpecial.getByRole("radio", { name: "Values", exact: true })).toBeChecked();
+  await expect(paste_special.getByRole("radio", { name: "Values", exact: true })).toBeChecked();
   await page.keyboard.press("d");
-  await expect(pasteSpecial.getByRole("radio", { name: "Add", exact: true })).toBeChecked();
+  await expect(paste_special.getByRole("radio", { name: "Add", exact: true })).toBeChecked();
   await page.keyboard.press("e");
-  await expect(pasteSpecial.getByRole("checkbox", { name: "Transpose" })).toBeChecked();
+  await expect(paste_special.getByRole("checkbox", { name: "Transpose" })).toBeChecked();
   // Formats has no operation, as in Excel.
   await page.keyboard.press("t");
-  await expect(pasteSpecial.getByRole("radio", { name: "Formats", exact: true })).toBeChecked();
-  await expect(pasteSpecial.getByRole("radio", { name: "Add", exact: true })).toBeDisabled();
-  await expect(pasteSpecial.getByRole("radio", { name: "None", exact: true })).toBeChecked();
-  await expect(pasteSpecial.getByRole("button", { name: "Paste Link" })).toBeDisabled();
+  await expect(paste_special.getByRole("radio", { name: "Formats", exact: true })).toBeChecked();
+  await expect(paste_special.getByRole("radio", { name: "Add", exact: true })).toBeDisabled();
+  await expect(paste_special.getByRole("radio", { name: "None", exact: true })).toBeChecked();
+  await expect(paste_special.getByRole("button", { name: "Paste Link" })).toBeDisabled();
   await page.keyboard.press("Escape");
-  await expect(pasteSpecial).toHaveCount(0);
+  await expect(paste_special).toHaveCount(0);
   await expect(grid).toBeFocused();
 
   // The context menu's Paste Options row: Up and Down treat the row as one
@@ -1009,40 +1009,40 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
   if (!scroller) throw new Error("Missing grid scroller");
   await page.mouse.click(scroller.x + 120, scroller.y + 120, { button: "right" });
   const menu = page.locator(".sheetwrite-context-menu").first();
-  const pasteOptions = menu.getByRole("group", { name: "Paste Options" });
+  const paste_options = menu.getByRole("group", { name: "Paste Options" });
   for (const name of ["Paste", "Values", "Formulas", "Transpose", "Formatting", "Paste Link"]) {
-    await expect(pasteOptions.getByRole("menuitem", { name, exact: true })).toBeVisible();
+    await expect(paste_options.getByRole("menuitem", { name, exact: true })).toBeVisible();
   }
   await menu.getByRole("menuitem", { name: "Copy" }).focus();
   await page.keyboard.press("ArrowDown");
-  await expect(pasteOptions.getByRole("menuitem", { name: "Paste", exact: true })).toBeFocused();
+  await expect(paste_options.getByRole("menuitem", { name: "Paste", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowRight");
-  await expect(pasteOptions.getByRole("menuitem", { name: "Values", exact: true })).toBeFocused();
+  await expect(paste_options.getByRole("menuitem", { name: "Values", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(menu.getByRole("menuitem", { name: /^Paste Special…/ })).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(pasteSpecial).toBeVisible();
+  await expect(paste_special).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(pasteSpecial).toHaveCount(0);
+  await expect(paste_special).toHaveCount(0);
 
   // Paste Special adds the copied values, read from the real clipboard after
   // OK. Only Chromium grants this page clipboard read without a gesture.
-  if (browserName === "chromium") {
-    await selectRange(page, 39, 0, 40, 0);
+  if (browser_name === "chromium") {
+    await select_range(page, 39, 0, 40, 0);
     await page.keyboard.press("Control+c");
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 15_000 })
       .toContain("10");
-    await selectRange(page, 39, 2);
+    await select_range(page, 39, 2);
     await page.keyboard.press("Control+Alt+KeyV");
-    await expect(pasteSpecial).toBeVisible();
+    await expect(paste_special).toBeVisible();
     await page.keyboard.press("v");
     await page.keyboard.press("d");
-    await expect(pasteSpecial.getByRole("radio", { name: "Add", exact: true })).toBeChecked();
-    await pasteSpecial.getByRole("button", { name: "OK" }).click();
-    await expect(pasteSpecial).toHaveCount(0);
+    await expect(paste_special.getByRole("radio", { name: "Add", exact: true })).toBeChecked();
+    await paste_special.getByRole("button", { name: "OK" }).click();
+    await expect(paste_special).toHaveCount(0);
     await expect
-      .poll(async () => (await sheetState()).added, { timeout: 15_000 })
+      .poll(async () => (await sheet_state()).added, { timeout: 15_000 })
       .toEqual([11, 22]);
   }
 
@@ -1053,11 +1053,11 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     { width: 1_280, height: 400 },
   ]) {
     await page.setViewportSize(viewport);
-    await selectRange(page, 1, 6);
+    await select_range(page, 1, 6);
     await page.keyboard.press("Control+Digit1");
     const dialog = page.getByRole("dialog", { name: "Format Cells", exact: true });
     await expect(dialog).toBeVisible();
-    await expectCentred(page, dialog);
+    await expect_centred(page, dialog);
     const box = await dialog.boundingBox();
     if (!box) throw new Error("Format Cells must have a box");
     expect(box.x).toBeGreaterThanOrEqual(0);
@@ -1067,9 +1067,9 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     for (const name of ["OK", "Cancel"]) {
       const button = dialog.getByRole("button", { name, exact: true });
       await expect(button).toBeInViewport({ ratio: 1 });
-      const buttonBox = await button.boundingBox();
-      if (!buttonBox) throw new Error(`${name} must have a box`);
-      expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(box.y + box.height);
+      const button_box = await button.boundingBox();
+      if (!button_box) throw new Error(`${name} must have a box`);
+      expect(button_box.y + button_box.height).toBeLessThanOrEqual(box.y + box.height);
     }
     await dialog.getByRole("button", { name: "OK", exact: true }).click();
     await expect(dialog).toHaveCount(0);
@@ -1160,10 +1160,10 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
   await expect(panel.locator("tr[data-action]:visible")).toHaveCount(1);
   await expect(panel.locator('tr[data-action="toggleFilter"]')).toBeVisible();
   await search.fill("bold");
-  const boldLabel = await page.evaluate(() =>
+  const bold_label = await page.evaluate(() =>
     window.__sheetwriteSpreadsheetGrid?.getShortcutLabel("bold"),
   );
-  await panel.getByRole("button", { name: `Change ${boldLabel} for Bold` }).click();
+  await panel.getByRole("button", { name: `Change ${bold_label} for Bold` }).click();
   await expect(panel.getByRole("status")).toHaveText(
     "Recording keys for Bold. Press the new keys, or Escape to cancel.",
   );

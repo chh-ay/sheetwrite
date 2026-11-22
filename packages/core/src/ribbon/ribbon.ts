@@ -72,7 +72,7 @@ interface PanelView {
   readonly more: HTMLButtonElement;
 }
 
-let ribbonSerial = 0;
+let ribbon_serial = 0;
 
 export class Ribbon {
   readonly element: HTMLDivElement;
@@ -82,33 +82,33 @@ export class Ribbon {
   private readonly context: RibbonContext;
   private readonly popup: RibbonPopup;
   private readonly tabs: HTMLButtonElement[] = [];
-  private readonly tabSpecs: readonly RibbonTabSpec[];
+  private readonly tab_specs: readonly RibbonTabSpec[];
   private readonly panels: (PanelView | undefined)[] = [];
-  private readonly tabList: HTMLDivElement;
+  private readonly tab_list: HTMLDivElement;
   /** Opens a menu of the tabs that do not fit in the tab row; hidden while they all fit. */
-  private readonly moreTabsButton: HTMLButtonElement;
-  private readonly minimizeButton: HTMLButtonElement;
-  private readonly modeButton: HTMLButtonElement;
+  private readonly more_tabs_button: HTMLButtonElement;
+  private readonly minimize_button: HTMLButtonElement;
+  private readonly mode_button: HTMLButtonElement;
   /** The compact ribbon's gear, which opens the Keyboard shortcuts panel; only with `keyboardSettings`. */
-  private readonly settingsButton: HTMLButtonElement | null = null;
+  private readonly settings_button: HTMLButtonElement | null = null;
   private readonly id: number;
   /** The ribbon's listeners, observer and pending fit frame; `destroy` closes it. */
   private readonly lifetime = new Scope();
-  private activeTab = 0;
+  private active_tab = 0;
   private minimized = false;
   private mode: RibbonMode;
   private compact = false;
-  private fitFrame = 0;
-  private fittedWidth = -1;
+  private fit_frame = 0;
+  private fitted_width = -1;
 
   constructor(host: HTMLElement, grid: Grid, options: RibbonMountOptions) {
-    ribbonSerial += 1;
-    this.id = ribbonSerial;
+    ribbon_serial += 1;
+    this.id = ribbon_serial;
     this.grid = grid;
     this.options = options;
     assertRibbonConfig(options);
     this.mode = options.mode ?? "full";
-    this.tabSpecs = shownTabs(RIBBON_TABS, options.flags ?? {});
+    this.tab_specs = shownTabs(RIBBON_TABS, options.flags ?? {});
 
     this.popup = new RibbonPopup(host);
     this.context = createCommandContext({
@@ -126,46 +126,48 @@ export class Ribbon {
 
     // The tab row holds the tablist and, beside it, the layout buttons: a
     // tablist may own only tabs, or screen readers miscount the tabs.
-    const tabRow = document.createElement("div");
-    tabRow.className = "sheetwrite-ribbon-tabs";
-    this.tabList = document.createElement("div");
-    this.tabList.className = "sheetwrite-ribbon-tablist";
-    this.tabList.setAttribute("role", "tablist");
-    this.tabList.setAttribute("aria-label", "Ribbon tabs");
-    this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
+    const tab_row = document.createElement("div");
+    tab_row.className = "sheetwrite-ribbon-tabs";
+    this.tab_list = document.createElement("div");
+    this.tab_list.className = "sheetwrite-ribbon-tablist";
+    this.tab_list.setAttribute("role", "tablist");
+    this.tab_list.setAttribute("aria-label", "Ribbon tabs");
+    this.tab_specs.forEach((tab, index) => this.tab_list.appendChild(this.create_tab(tab, index)));
 
-    this.moreTabsButton = document.createElement("button");
-    this.moreTabsButton.type = "button";
-    this.moreTabsButton.className = "sheetwrite-ribbon-more-tabs";
-    this.moreTabsButton.title = "More tabs";
-    this.moreTabsButton.setAttribute("aria-label", "More tabs");
-    this.moreTabsButton.setAttribute("aria-haspopup", "menu");
-    this.moreTabsButton.setAttribute("aria-expanded", "false");
-    this.moreTabsButton.hidden = true;
-    const moreCaret = document.createElement("span");
-    moreCaret.className = "sheetwrite-ribbon-caret";
-    moreCaret.setAttribute("aria-hidden", "true");
-    this.moreTabsButton.appendChild(moreCaret);
-    this.moreTabsButton.addEventListener("mousedown", (event) => event.preventDefault());
-    this.moreTabsButton.addEventListener("click", (event) => this.openMoreTabs(event.detail === 0));
+    this.more_tabs_button = document.createElement("button");
+    this.more_tabs_button.type = "button";
+    this.more_tabs_button.className = "sheetwrite-ribbon-more-tabs";
+    this.more_tabs_button.title = "More tabs";
+    this.more_tabs_button.setAttribute("aria-label", "More tabs");
+    this.more_tabs_button.setAttribute("aria-haspopup", "menu");
+    this.more_tabs_button.setAttribute("aria-expanded", "false");
+    this.more_tabs_button.hidden = true;
+    const more_caret = document.createElement("span");
+    more_caret.className = "sheetwrite-ribbon-caret";
+    more_caret.setAttribute("aria-hidden", "true");
+    this.more_tabs_button.appendChild(more_caret);
+    this.more_tabs_button.addEventListener("mousedown", (event) => event.preventDefault());
+    this.more_tabs_button.addEventListener("click", (event) =>
+      this.open_more_tabs(event.detail === 0),
+    );
 
-    this.modeButton = document.createElement("button");
-    this.modeButton.type = "button";
-    this.modeButton.className = "sheetwrite-ribbon-mode";
-    this.modeButton.textContent = "Compact";
-    this.modeButton.setAttribute("aria-label", "Compact ribbon");
-    this.modeButton.title = "Switch between the full and compact ribbon";
-    this.modeButton.addEventListener("mousedown", (event) => event.preventDefault());
-    this.modeButton.addEventListener("click", () => {
+    this.mode_button = document.createElement("button");
+    this.mode_button.type = "button";
+    this.mode_button.className = "sheetwrite-ribbon-mode";
+    this.mode_button.textContent = "Compact";
+    this.mode_button.setAttribute("aria-label", "Compact ribbon");
+    this.mode_button.title = "Switch between the full and compact ribbon";
+    this.mode_button.addEventListener("mousedown", (event) => event.preventDefault());
+    this.mode_button.addEventListener("click", () => {
       this.mode = this.compact ? "full" : "compact";
       this.fit();
     });
 
-    this.minimizeButton = document.createElement("button");
-    this.minimizeButton.type = "button";
-    this.minimizeButton.className = "sheetwrite-ribbon-minimize";
-    this.minimizeButton.addEventListener("mousedown", (event) => event.preventDefault());
-    this.minimizeButton.addEventListener("click", () => this.setMinimized(!this.minimized));
+    this.minimize_button = document.createElement("button");
+    this.minimize_button.type = "button";
+    this.minimize_button.className = "sheetwrite-ribbon-minimize";
+    this.minimize_button.addEventListener("mousedown", (event) => event.preventDefault());
+    this.minimize_button.addEventListener("click", () => this.set_minimized(!this.minimized));
 
     // A one-row ribbon has no room for File › Options, so a gear opens the
     // Keyboard shortcuts panel there.
@@ -183,17 +185,17 @@ export class Ribbon {
       settings.append(iconNode("settings", options.icons), name);
       settings.addEventListener("mousedown", (event) => event.preventDefault());
       settings.addEventListener("click", () => grid.openKeyboardSettings());
-      this.settingsButton = settings;
+      this.settings_button = settings;
     }
 
-    tabRow.append(
-      this.tabList,
-      this.moreTabsButton,
-      ...(this.settingsButton ? [this.settingsButton] : []),
+    tab_row.append(
+      this.tab_list,
+      this.more_tabs_button,
+      ...(this.settings_button ? [this.settings_button] : []),
     );
-    tabRow.append(this.modeButton, this.minimizeButton);
-    this.element.appendChild(tabRow);
-    this.element.addEventListener("keydown", this.onKeydown);
+    tab_row.append(this.mode_button, this.minimize_button);
+    this.element.appendChild(tab_row);
+    this.element.addEventListener("keydown", this.on_keydown);
     host.appendChild(this.element);
     checkStylePart(this.element, "ribbon", "The ribbon");
     this.lifetime.add(() => this.element.remove());
@@ -207,32 +209,32 @@ export class Ribbon {
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
     // Some commands depend on the document, such as Edit Links on its links.
-    this.lifetime.add(grid.on("change", () => this.updateAvailability()));
+    this.lifetime.add(grid.on("change", () => this.update_availability()));
     // Absent in some test environments; the ribbon then never shrinks groups.
     if (typeof ResizeObserver === "function") {
-      const resizeObserver = new ResizeObserver(() => this.scheduleFit());
-      resizeObserver.observe(this.element);
-      this.lifetime.add(() => resizeObserver.disconnect());
+      const resize_observer = new ResizeObserver(() => this.schedule_fit());
+      resize_observer.observe(this.element);
+      this.lifetime.add(() => resize_observer.disconnect());
     }
-    this.lifetime.add(() => cancelAnimationFrame(this.fitFrame));
+    this.lifetime.add(() => cancelAnimationFrame(this.fit_frame));
 
-    this.updateMinimizeButton();
-    this.updateLayout();
-    this.updateAvailability();
-    this.selectTab(this.openingTab(), false);
+    this.update_minimize_button();
+    this.update_layout();
+    this.update_availability();
+    this.select_tab(this.opening_tab(), false);
   }
 
   /** Height the owner reserves above the grid. */
   get height(): number {
-    const panelHeight = this.compact ? RIBBON_COMPACT_PANEL_HEIGHT : RIBBON_PANEL_HEIGHT;
-    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : panelHeight);
+    const panel_height = this.compact ? RIBBON_COMPACT_PANEL_HEIGHT : RIBBON_PANEL_HEIGHT;
+    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : panel_height);
   }
 
   destroy(): void {
     this.lifetime.close();
   }
 
-  private createTab(spec: RibbonTabSpec, index: number): HTMLButtonElement {
+  private create_tab(spec: RibbonTabSpec, index: number): HTMLButtonElement {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "sheetwrite-ribbon-tab";
@@ -241,31 +243,31 @@ export class Ribbon {
     tab.setAttribute("role", "tab");
     tab.addEventListener("mousedown", (event) => event.preventDefault());
     tab.addEventListener("click", () => {
-      if (this.minimized) this.setMinimized(false);
-      this.selectTab(index, false);
+      if (this.minimized) this.set_minimized(false);
+      this.select_tab(index, false);
     });
     // Excel's shortcut for hiding the panel: double-click any tab.
-    tab.addEventListener("dblclick", () => this.setMinimized(!this.minimized));
+    tab.addEventListener("dblclick", () => this.set_minimized(!this.minimized));
     this.tabs.push(tab);
     return tab;
   }
 
-  private selectTab(index: number, focus: boolean): void {
+  private select_tab(index: number, focus: boolean): void {
     this.popup.closeAll(false);
-    this.activeTab = index;
-    this.tabs.forEach((tab, tabIndex) => {
-      const selected = tabIndex === index;
+    this.active_tab = index;
+    this.tabs.forEach((tab, tab_index) => {
+      const selected = tab_index === index;
       tab.setAttribute("aria-selected", String(selected));
       // Roving tabindex: Tab reaches the tab row once, arrows move within it.
       tab.tabIndex = selected ? 0 : -1;
     });
 
-    const panel = this.panelAt(index);
-    for (const [panelIndex, view] of this.panels.entries()) {
-      if (view !== undefined) view.element.hidden = panelIndex !== index || this.minimized;
+    const panel = this.panel_at(index);
+    for (const [panel_index, view] of this.panels.entries()) {
+      if (view !== undefined) view.element.hidden = panel_index !== index || this.minimized;
     }
-    this.refreshPanel(panel, (command) => this.grid.getCommandState(command));
-    this.fittedWidth = -1;
+    this.refresh_panel(panel, (command) => this.grid.getCommandState(command));
+    this.fitted_width = -1;
     // A following key can open a menu before the next animation frame.
     this.fit();
     // After the fit, which shows the selected tab if it was in the More tabs menu.
@@ -273,11 +275,11 @@ export class Ribbon {
   }
 
   /** Build a tab's panel on first use; most sessions never open most tabs. */
-  private panelAt(index: number): PanelView {
+  private panel_at(index: number): PanelView {
     const existing = this.panels[index];
     if (existing !== undefined) return existing;
 
-    const spec = this.tabSpecs[index];
+    const spec = this.tab_specs[index];
     if (spec === undefined) throw new RangeError(`No ribbon tab ${index}`);
     const element = document.createElement("div");
     element.className = "sheetwrite-ribbon-panel";
@@ -289,16 +291,16 @@ export class Ribbon {
     const groups = new Map<string, GroupView>();
     const controls: RibbonControlView[] = [];
     for (const group of spec.groups) {
-      const view = this.createGroup(group, controls);
+      const view = this.create_group(group, controls);
       groups.set(group.id, view);
       element.appendChild(view.element);
     }
-    for (const group of groups.values()) this.showAvailable(group);
+    for (const group of groups.values()) this.show_available(group);
 
-    const reduceOrder: RibbonFitGroup[] = [];
+    const reduce_order: RibbonFitGroup[] = [];
     for (const id of spec.reduceOrder) {
       const group = groups.get(id);
-      if (group !== undefined) reduceOrder.push({ id, shrinks: group.spec.layout === "flow" });
+      if (group !== undefined) reduce_order.push({ id, shrinks: group.spec.layout === "flow" });
     }
 
     // When even the collapsed groups do not fit, the last ones fold into one
@@ -312,26 +314,26 @@ export class Ribbon {
     more.setAttribute("aria-haspopup", "true");
     more.setAttribute("aria-expanded", "false");
     more.hidden = true;
-    const moreText = document.createElement("span");
-    moreText.className = "sheetwrite-ribbon-label";
-    moreText.textContent = "More";
-    const moreCaret = document.createElement("span");
-    moreCaret.className = "sheetwrite-ribbon-caret";
-    moreCaret.setAttribute("aria-hidden", "true");
-    more.append(moreText, moreCaret);
+    const more_text = document.createElement("span");
+    more_text.className = "sheetwrite-ribbon-label";
+    more_text.textContent = "More";
+    const more_caret = document.createElement("span");
+    more_caret.className = "sheetwrite-ribbon-caret";
+    more_caret.setAttribute("aria-hidden", "true");
+    more.append(more_text, more_caret);
     more.addEventListener("mousedown", (event) => event.preventDefault());
     element.appendChild(more);
 
-    const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduceOrder), more };
-    more.addEventListener("click", (event) => this.openMoreGroups(panel, event.detail === 0));
+    const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduce_order), more };
+    more.addEventListener("click", (event) => this.open_more_groups(panel, event.detail === 0));
     this.panels[index] = panel;
     this.element.appendChild(element);
     checkIconStyles(element, "The ribbon");
     return panel;
   }
 
-  private createGroup(spec: RibbonGroupSpec, controls: RibbonControlView[]): GroupView {
-    const groupControls: { spec: RibbonControlSpec; view: RibbonControlView }[] = [];
+  private create_group(spec: RibbonGroupSpec, controls: RibbonControlView[]): GroupView {
+    const group_controls: { spec: RibbonControlSpec; view: RibbonControlView }[] = [];
     const element = document.createElement("div");
     element.className = "sheetwrite-ribbon-group";
     element.dataset.size = "large";
@@ -351,7 +353,7 @@ export class Ribbon {
       for (const control of row) {
         const view = renderControl(control, this.context);
         controls.push(view);
-        groupControls.push({ spec: control, view });
+        group_controls.push({ spec: control, view });
         line.appendChild(view.element);
       }
     }
@@ -378,7 +380,7 @@ export class Ribbon {
     collapsed.append(glyph, text, caret);
     collapsed.addEventListener("mousedown", (event) => event.preventDefault());
     collapsed.addEventListener("click", (event) =>
-      this.openCollapsed(collapsed, body, spec, event.detail === 0),
+      this.open_collapsed(collapsed, body, spec, event.detail === 0),
     );
 
     const label = document.createElement("div");
@@ -387,11 +389,11 @@ export class Ribbon {
     label.setAttribute("aria-hidden", "true");
 
     element.append(body, collapsed, label);
-    return { spec, element, body, controls: groupControls };
+    return { spec, element, body, controls: group_controls };
   }
 
   /** Lend the group's live controls to a popup, then put them back. */
-  private openCollapsed(
+  private open_collapsed(
     trigger: HTMLButtonElement,
     body: HTMLElement,
     spec: RibbonGroupSpec,
@@ -413,9 +415,9 @@ export class Ribbon {
   }
 
   private refresh(states: RibbonCommandStates): void {
-    this.updateAvailability();
-    const panel = this.panels[this.activeTab];
-    if (panel !== undefined && !this.minimized) this.refreshPanel(panel, states);
+    this.update_availability();
+    const panel = this.panels[this.active_tab];
+    if (panel !== undefined && !this.minimized) this.refresh_panel(panel, states);
   }
 
   /**
@@ -423,9 +425,9 @@ export class Ribbon {
    * groups and tabs they leave empty. A tab that disappears while selected
    * hands the selection to the first tab still shown.
    */
-  private updateAvailability(): void {
+  private update_availability(): void {
     let changed = false;
-    this.tabSpecs.forEach((spec, index) => {
+    this.tab_specs.forEach((spec, index) => {
       const tab = this.tabs[index];
       const hidden = !tabAvailable(spec, this.grid);
       if (tab === undefined || tab.hidden === hidden) return;
@@ -434,17 +436,17 @@ export class Ribbon {
     });
     for (const panel of this.panels) {
       for (const group of panel?.groups.values() ?? [])
-        changed = this.showAvailable(group) || changed;
+        changed = this.show_available(group) || changed;
     }
     if (!changed) return;
 
-    if (this.tabs[this.activeTab]?.hidden === true) this.selectTab(this.openingTab(), false);
-    this.fittedWidth = -1;
-    this.scheduleFit();
+    if (this.tabs[this.active_tab]?.hidden === true) this.select_tab(this.opening_tab(), false);
+    this.fitted_width = -1;
+    this.schedule_fit();
   }
 
   /** Show a group's available controls, and the group while it has any; true on change. */
-  private showAvailable(group: GroupView): boolean {
+  private show_available(group: GroupView): boolean {
     let changed = false;
     let shown = 0;
     for (const { spec, view } of group.controls) {
@@ -463,9 +465,11 @@ export class Ribbon {
   }
 
   /** Home while it shows, as in Excel, where File comes first but the ribbon opens on Home; else the first tab shown. */
-  private openingTab(): number {
+  private opening_tab(): number {
     const shown = (index: number) => this.tabs[index]?.hidden === false;
-    const home = this.tabSpecs.findIndex((spec, index) => spec.opensFirst === true && shown(index));
+    const home = this.tab_specs.findIndex(
+      (spec, index) => spec.opensFirst === true && shown(index),
+    );
     if (home !== -1) return home;
     return Math.max(
       0,
@@ -473,31 +477,31 @@ export class Ribbon {
     );
   }
 
-  private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
+  private refresh_panel(panel: PanelView, state: RibbonCommandStates): void {
     refreshControls(panel.controls, this.grid, state);
   }
 
-  private setMinimized(minimized: boolean): void {
+  private set_minimized(minimized: boolean): void {
     if (minimized === this.minimized) return;
     this.minimized = minimized;
     this.element.dataset.minimized = String(minimized);
-    this.updateMinimizeButton();
-    this.selectTab(this.activeTab, false);
+    this.update_minimize_button();
+    this.select_tab(this.active_tab, false);
     this.options.onHeightChange(this.height);
   }
 
-  private updateMinimizeButton(): void {
+  private update_minimize_button(): void {
     const label = this.minimized ? "Pin the ribbon" : "Collapse the ribbon";
-    this.minimizeButton.title = label;
-    this.minimizeButton.setAttribute("aria-label", label);
-    this.minimizeButton.setAttribute("aria-expanded", String(!this.minimized));
+    this.minimize_button.title = label;
+    this.minimize_button.setAttribute("aria-label", label);
+    this.minimize_button.setAttribute("aria-expanded", String(!this.minimized));
   }
 
   /** Resize bursts arrive many times a frame; fit at most once per frame. */
-  private scheduleFit(): void {
-    if (this.fitFrame !== 0 || this.lifetime.closed) return;
-    this.fitFrame = requestAnimationFrame(() => {
-      this.fitFrame = 0;
+  private schedule_fit(): void {
+    if (this.fit_frame !== 0 || this.lifetime.closed) return;
+    this.fit_frame = requestAnimationFrame(() => {
+      this.fit_frame = 0;
       this.fit();
     });
   }
@@ -506,21 +510,21 @@ export class Ribbon {
    * Move the tabs that do not fit, last first, into the More tabs menu, so no
    * tab label is cut off. The selected tab always stays in the row.
    */
-  private fitTabs(): void {
-    const list = this.tabList;
+  private fit_tabs(): void {
+    const list = this.tab_list;
     for (const tab of this.tabs) delete tab.dataset.overflow;
     // Both widths round to whole pixels, so fractional tab widths can differ by one.
     const overflows = (): boolean => list.scrollWidth > list.clientWidth + 1;
-    this.moreTabsButton.hidden = !overflows();
+    this.more_tabs_button.hidden = !overflows();
     for (let index = this.tabs.length - 1; index >= 0 && overflows(); index -= 1) {
       const tab = this.tabs[index];
-      if (tab !== undefined && index !== this.activeTab && !tab.hidden) tab.dataset.overflow = "";
+      if (tab !== undefined && index !== this.active_tab && !tab.hidden) tab.dataset.overflow = "";
     }
   }
 
   /** List the tabs that did not fit; picking one selects it, which brings it into the row. */
-  private openMoreTabs(keyboard: boolean): void {
-    const trigger = this.moreTabsButton;
+  private open_more_tabs(keyboard: boolean): void {
+    const trigger = this.more_tabs_button;
     if (this.popup.isOpen(trigger)) {
       this.popup.closeFrom(trigger, keyboard);
       return;
@@ -538,37 +542,37 @@ export class Ribbon {
       item.addEventListener("mousedown", (event) => event.preventDefault());
       item.addEventListener("click", (event) => {
         this.popup.closeAll(false);
-        if (this.minimized) this.setMinimized(false);
-        this.selectTab(index, event.detail === 0);
+        if (this.minimized) this.set_minimized(false);
+        this.select_tab(index, event.detail === 0);
       });
       menu.appendChild(item);
     });
     this.popup.open(trigger, menu, { role: "menu", label: "More tabs", focus: keyboard });
   }
 
-  private updateLayout(): void {
+  private update_layout(): void {
     const compact = ribbonIsCompact(this.element.clientWidth, this.mode, this.options.compactWidth);
-    this.modeButton.setAttribute("aria-pressed", String(compact));
-    if (this.settingsButton !== null) this.settingsButton.hidden = !compact;
+    this.mode_button.setAttribute("aria-pressed", String(compact));
+    if (this.settings_button !== null) this.settings_button.hidden = !compact;
     this.element.dataset.mode = compact ? "compact" : "full";
     if (compact === this.compact) return;
 
     this.popup.closeAll(false);
     this.compact = compact;
-    this.fittedWidth = -1;
+    this.fitted_width = -1;
     this.options.onHeightChange(this.height);
-    this.scheduleFit();
+    this.schedule_fit();
   }
 
   private fit(): void {
-    this.updateLayout();
+    this.update_layout();
     // The settings button shows only in the compact layout, so fit the tabs after it.
-    this.fitTabs();
-    const panel = this.panels[this.activeTab];
+    this.fit_tabs();
+    const panel = this.panels[this.active_tab];
     if (panel === undefined || this.minimized) return;
     const width = panel.element.clientWidth;
-    if (width === this.fittedWidth) return;
-    this.fittedWidth = width;
+    if (width === this.fitted_width) return;
+    this.fitted_width = width;
 
     // Sizes are about to change, and a collapsed group's body may be on loan.
     this.popup.closeAll(false);
@@ -585,14 +589,14 @@ export class Ribbon {
       },
       () => panel.element.scrollWidth <= panel.element.clientWidth,
     );
-    this.foldIntoMore(panel);
+    this.fold_into_more(panel);
   }
 
   /**
    * When even every group collapsed does not fit, fold the last groups into
    * the panel's labelled "More" button, so no group or label is cut at an edge.
    */
-  private foldIntoMore(panel: PanelView): void {
+  private fold_into_more(panel: PanelView): void {
     const fits = () => panel.element.scrollWidth <= panel.element.clientWidth;
     if (fits()) return;
     panel.more.hidden = false;
@@ -605,7 +609,7 @@ export class Ribbon {
   }
 
   /** The groups folded into More, each under its name, with their labelled commands. */
-  private openMoreGroups(panel: PanelView, keyboard: boolean): void {
+  private open_more_groups(panel: PanelView, keyboard: boolean): void {
     const trigger = panel.more;
     if (this.popup.isOpen(trigger)) {
       this.popup.closeFrom(trigger, keyboard);
@@ -638,7 +642,7 @@ export class Ribbon {
     });
   }
 
-  private readonly onKeydown = (event: KeyboardEvent): void => {
+  private readonly on_keydown = (event: KeyboardEvent): void => {
     // The ribbon sits inside the grid host, whose handler treats Enter, Space
     // and arrows as cell navigation. Keep plain keys here; Ctrl/Cmd shortcuts
     // (undo, copy) still reach the grid, as they do from Excel's ribbon.
@@ -651,7 +655,7 @@ export class Ribbon {
     const index = this.tabs.findIndex((tab) => tab === event.target);
     if (index === -1) return;
     // Arrows and Home/End move among the tabs shown now, wrapping at the ends.
-    const shown = this.tabs.flatMap((tab, tabIndex) => (tab.hidden ? [] : [tabIndex]));
+    const shown = this.tabs.flatMap((tab, tab_index) => (tab.hidden ? [] : [tab_index]));
     const position = shown.indexOf(index);
     const count = shown.length;
     const targets: Record<string, number | undefined> = {
@@ -663,6 +667,6 @@ export class Ribbon {
     const next = targets[event.key];
     if (next === undefined) return;
     event.preventDefault();
-    this.selectTab(next, true);
+    this.select_tab(next, true);
   };
 }

@@ -16,7 +16,7 @@ export interface HostEntity extends Record<string, string | number | boolean | n
 }
 
 /** The record the host creates for a row inserted in the Grid. */
-function newAccount(id: string): HostEntity {
+function new_account(id: string): HostEntity {
   return {
     id,
     name: "New account",
@@ -28,7 +28,7 @@ function newAccount(id: string): HostEntity {
 }
 
 /** The cells of a delta that carry row values, whatever edit produced them. */
-function deltaCells(delta: RowBridgeDelta<string>): readonly RowBridgeCell<string>[] {
+function delta_cells(delta: RowBridgeDelta<string>): readonly RowBridgeCell<string>[] {
   switch (delta.kind) {
     case "cell":
       return [delta.cell];
@@ -42,9 +42,12 @@ function deltaCells(delta: RowBridgeDelta<string>): readonly RowBridgeCell<strin
   }
 }
 
-function isTextField(columnKey: string): columnKey is "name" | "region" | "owner" | "stage" {
+function is_text_field(column_key: string): column_key is "name" | "region" | "owner" | "stage" {
   return (
-    columnKey === "name" || columnKey === "region" || columnKey === "owner" || columnKey === "stage"
+    column_key === "name" ||
+    column_key === "region" ||
+    column_key === "owner" ||
+    column_key === "stage"
   );
 }
 
@@ -54,20 +57,20 @@ function isTextField(columnKey: string): columnKey is "name" | "region" | "owner
  * value (a format-only clear) or with a formula gives the host no value, and the
  * ARR total holds only numbers, so these values do not change the record.
  */
-function withCell(
+function with_cell(
   row: HostEntity,
-  columnKey: string,
+  column_key: string,
   value: CellValue | undefined,
 ): HostEntity | null {
   if (value?.kind !== "literal") return null;
 
   const scalar = value.value;
-  if (columnKey === "amount") {
+  if (column_key === "amount") {
     if (scalar === null) return { ...row, amount: 0 };
     return typeof scalar === "number" ? { ...row, amount: scalar } : null;
   }
-  if (isTextField(columnKey)) {
-    return { ...row, [columnKey]: scalar === null ? "" : String(scalar) };
+  if (is_text_field(column_key)) {
+    return { ...row, [column_key]: scalar === null ? "" : String(scalar) };
   }
   return null;
 }
@@ -86,18 +89,19 @@ export function applyHostProjection(
   for (const delta of projection.deltas) {
     if (delta.kind === "row-structure") {
       if (delta.action === "insert") {
-        for (const rowId of delta.inserted) if (rowId !== null) next.set(rowId, newAccount(rowId));
+        for (const row_id of delta.inserted)
+          if (row_id !== null) next.set(row_id, new_account(row_id));
       } else if (delta.action === "delete") {
-        for (const rowId of delta.removed) if (rowId !== null) next.delete(rowId);
+        for (const row_id of delta.removed) if (row_id !== null) next.delete(row_id);
       }
       continue;
     }
 
-    for (const cell of deltaCells(delta)) {
+    for (const cell of delta_cells(delta)) {
       const row = cell.rowId === null ? undefined : next.get(cell.rowId);
       if (!row || cell.columnKey === null) continue;
 
-      const updated = withCell(row, cell.columnKey, cell.next);
+      const updated = with_cell(row, cell.columnKey, cell.next);
       if (updated) next.set(row.id, updated);
     }
   }

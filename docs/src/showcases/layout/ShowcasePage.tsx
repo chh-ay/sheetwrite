@@ -139,7 +139,7 @@ function CodeFactValue(props: { readonly value: string }) {
 const FOLDED_LINES = 34;
 
 /** The fenced code of a snippet file, without the fences. */
-function fencedCode(source: string): string {
+function fenced_code(source: string): string {
   const fence = source.match(/^(`{3,}|~{3,}).*\n([\s\S]*?)^\1\s*$/m);
   return fence?.[2] ?? source;
 }
@@ -153,14 +153,14 @@ export function ShowcaseCodeBlock(props: {
   readonly guide: ShowcaseGuide | undefined;
 }) {
   const Snippet = props.code.Snippet;
-  const code = fencedCode(props.code.source);
+  const code = fenced_code(props.code.source);
   const lines = code.trimEnd().split("\n").length;
   // The client build compiles route modules too; the guard keeps the API
   // manifest out of it.
   const calls = import.meta.env.SSR ? showcaseCalls(code, props.code.notes) : [];
-  const hasFigure = "figure" in props.code;
+  const has_figure = "figure" in props.code;
   return (
-    <div class="sw-showcase__code-row" data-figure={hasFigure ? "" : undefined}>
+    <div class="sw-showcase__code-row" data-figure={has_figure ? "" : undefined}>
       <section aria-labelledby="showcase-code-title" class="sw-showcase__code">
         <header class="sw-showcase__section-header">
           <h2 class="sw-showcase__section-title" id="showcase-code-title">
@@ -190,10 +190,10 @@ export function ShowcaseCodeBlock(props: {
                 <For each={calls}>{(call) => <ShowcaseCallRow call={call} />}</For>
               </ul>
               {/* Pointing at or focusing a call tints the code lines that use it. */}
-              <style>{callHighlightRules(calls)}</style>
+              <style>{call_highlight_rules(calls)}</style>
             </>
           }
-          when={hasFigure}
+          when={has_figure}
         >
           {props.code.figure}
         </Show>
@@ -237,7 +237,7 @@ function ShowcaseCallRow(props: { readonly call: ShowcaseCall }) {
 }
 
 /** One rule per listed call: its row, pointed at or focused, tints the code lines naming it. */
-function callHighlightRules(calls: readonly ShowcaseCall[]): string {
+function call_highlight_rules(calls: readonly ShowcaseCall[]): string {
   const selectors = calls.map(
     ({ symbol }) =>
       `.sw-showcase__code-row:has([data-symbol="${symbol}"]:is(:hover, :focus-within)) .ec-line:has([data-sw-symbol="${symbol}"])`,

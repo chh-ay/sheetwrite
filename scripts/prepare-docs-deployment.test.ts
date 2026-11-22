@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
-const fixtureRoots: string[] = [];
-const builtFiles = {
+const fixture_roots: string[] = [];
+const built_files = {
   "index.html": "<h1>Home</h1>",
   "404.html": "<h1>Page not found</h1>",
   "docs/index.html": "<h1>Docs</h1>",
@@ -26,8 +26,8 @@ async function put(root: string, path: string, contents: string | Uint8Array): P
 
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-docs-deployment-"));
-  fixtureRoots.push(root);
-  for (const [path, contents] of Object.entries(builtFiles)) {
+  fixture_roots.push(root);
+  for (const [path, contents] of Object.entries(built_files)) {
     await put(root, `docs/dist/client/${path}`, contents);
   }
   await put(root, ".vercel/output/static/old.html", "previous deployment");
@@ -36,7 +36,7 @@ async function fixture(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    fixtureRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+    fixture_roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
   );
 });
 
@@ -52,23 +52,23 @@ interface PackagedResponse {
   status: number;
 }
 
-async function requestPackagedFile(
+async function request_packaged_file(
   root: string,
   pathname: string,
 ): Promise<PackagedResponse | null> {
-  const outputRoot = join(root, ".vercel/output");
+  const output_root = join(root, ".vercel/output");
   const config: { routes: OutputRoute[] } = JSON.parse(
-    await readFile(join(outputRoot, "config.json"), "utf8"),
+    await readFile(join(output_root, "config.json"), "utf8"),
   );
-  const readStatic = async (path: string): Promise<Buffer | null> => {
-    const file = Bun.file(join(outputRoot, "static", path));
+  const read_static = async (path: string): Promise<Buffer | null> => {
+    const file = Bun.file(join(output_root, "static", path));
     return (await file.exists()) ? Buffer.from(await file.arrayBuffer()) : null;
   };
   const headers: Record<string, string> = {};
   // Exercise route matching against the emitted files, not just the JSON shape.
   for (const route of config.routes) {
     if ("handle" in route) {
-      const contents = await readStatic(pathname);
+      const contents = await read_static(pathname);
       if (contents !== null) return { body: contents, headers, status: 200 };
     } else if ("headers" in route && !("continue" in route)) {
       const match = new RegExp(route.src).exec(pathname);
@@ -88,7 +88,7 @@ async function requestPackagedFile(
     } else {
       const pattern = new RegExp(route.src);
       if (pattern.test(pathname)) {
-        const contents = await readStatic(pathname.replace(pattern, route.dest));
+        const contents = await read_static(pathname.replace(pattern, route.dest));
         return contents === null ? null : { body: contents, headers, status: route.status ?? 200 };
       }
     }
@@ -108,11 +108,11 @@ describe("prebuilt docs deployment", () => {
 
     await prepareDocsDeployment(root);
 
-    const outputRoot = join(root, ".vercel/output");
-    expect((await readdir(outputRoot)).sort()).toEqual(["config.json", "static"]);
-    expect((await readdir(join(outputRoot, "static"), { recursive: true })).sort()).toEqual(
+    const output_root = join(root, ".vercel/output");
+    expect((await readdir(output_root)).sort()).toEqual(["config.json", "static"]);
+    expect((await readdir(join(output_root, "static"), { recursive: true })).sort()).toEqual(
       [
-        ...Object.keys(builtFiles),
+        ...Object.keys(built_files),
         "assets",
         "docs",
         "docs/start",
@@ -121,8 +121,8 @@ describe("prebuilt docs deployment", () => {
         "pagefind/fragment",
       ].sort(),
     );
-    for (const [path, contents] of Object.entries(builtFiles)) {
-      expect(await readFile(join(outputRoot, "static", path))).toEqual(Buffer.from(contents));
+    for (const [path, contents] of Object.entries(built_files)) {
+      expect(await readFile(join(output_root, "static", path))).toEqual(Buffer.from(contents));
     }
     expect(await readFile(join(root, ".vercel/project.json"), "utf8")).toBe(
       '{"projectId":"keep-me"}',
@@ -166,15 +166,15 @@ describe("prebuilt docs deployment", () => {
     await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
     await prepareDocsDeployment(root);
     for (const [url, contents] of [
-      ["/", builtFiles["index.html"]],
-      ["/docs/", builtFiles["docs/index.html"]],
-      ["/docs/start/installation/", builtFiles["docs/start/installation/index.html"]],
-      ["/docs/index.html", builtFiles["docs/index.html"]],
-      ["/assets/client.wasm", builtFiles["assets/client.wasm"]],
-      ["/sitemap.xml", builtFiles["sitemap.xml"]],
-      ["/pagefind/pagefind-entry.json", builtFiles["pagefind/pagefind-entry.json"]],
+      ["/", built_files["index.html"]],
+      ["/docs/", built_files["docs/index.html"]],
+      ["/docs/start/installation/", built_files["docs/start/installation/index.html"]],
+      ["/docs/index.html", built_files["docs/index.html"]],
+      ["/assets/client.wasm", built_files["assets/client.wasm"]],
+      ["/sitemap.xml", built_files["sitemap.xml"]],
+      ["/pagefind/pagefind-entry.json", built_files["pagefind/pagefind-entry.json"]],
     ] as const) {
-      const response = await requestPackagedFile(root, url);
+      const response = await request_packaged_file(root, url);
       expect(response?.body).toEqual(Buffer.from(contents));
       // Stable URLs must revalidate, or a deployment would serve stale pages and search entries.
       const hashed = url === "/assets/client.wasm";
@@ -187,21 +187,21 @@ describe("prebuilt docs deployment", () => {
       "/pagefind/fragment/en_020da39.pf_fragment",
       "/pagefind/pagefind.en_6e131784e9.pf_meta",
     ]) {
-      expect((await requestPackagedFile(root, url))?.headers["cache-control"]).toBe(
+      expect((await request_packaged_file(root, url))?.headers["cache-control"]).toBe(
         "public, max-age=31536000, immutable",
       );
     }
-    const feed = await requestPackagedFile(root, "/changelog/rss.xml");
+    const feed = await request_packaged_file(root, "/changelog/rss.xml");
     expect(feed?.body).toEqual(Buffer.from('<rss version="2.0" />'));
     expect(feed?.headers["content-type"]).toBe("application/rss+xml; charset=utf-8");
     for (const url of ["/docs", "/docs/start/installation"]) {
-      const response = await requestPackagedFile(root, url);
+      const response = await request_packaged_file(root, url);
       expect(response?.status).toBe(308);
       expect(response?.headers.Location).toBe(`${url}/`);
     }
     for (const url of ["/missing", "/docs/missing/", "/assets/missing.js"]) {
-      const response = await requestPackagedFile(root, url);
-      expect(response?.body).toEqual(Buffer.from(builtFiles["404.html"]));
+      const response = await request_packaged_file(root, url);
+      expect(response?.body).toEqual(Buffer.from(built_files["404.html"]));
       expect(response?.status).toBe(404);
     }
     // Every old page, merged showcase and removed API page, with or without its trailing slash.
@@ -213,7 +213,7 @@ describe("prebuilt docs deployment", () => {
       expect(redirects.length).toBeGreaterThan(0);
       for (const [from, to] of redirects) {
         for (const pathname of [from, from.slice(0, -1)]) {
-          const response = await requestPackagedFile(root, pathname);
+          const response = await request_packaged_file(root, pathname);
           expect(response?.status).toBe(308);
           expect(response?.headers.Location).toBe(to);
         }

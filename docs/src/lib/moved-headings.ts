@@ -32,8 +32,8 @@ export function forwardedHeading(
 ): string | undefined {
   const anchor = fragmentId(hash);
   if (anchor.length === 0) return undefined;
-  const movedHeading = MOVED_HEADINGS[href]?.[anchor];
-  if (movedHeading !== undefined) return movedHeading;
+  const moved_heading = MOVED_HEADINGS[href]?.[anchor];
+  if (moved_heading !== undefined) return moved_heading;
   for (const page of Object.values(movedPages)) {
     if (page.to !== href) continue;
     const target = page.anchors[anchor];

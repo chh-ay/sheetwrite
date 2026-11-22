@@ -31,29 +31,29 @@ const AA_SPREAD = [
   1.02, 1.03, 1.03, 1.04, 1.05, 1.05,
 ];
 
-function run(medianSampleMs: number, digest = BASE_DIGEST): ReaderRunResult[] {
+function run(median_sample_ms: number, digest = BASE_DIGEST): ReaderRunResult[] {
   return READER_CASE_NAMES.map((name) => ({
     name,
     group: "query",
     fixture: "fixture",
     iterations: 1,
-    sampleMs: [medianSampleMs],
-    medianSampleMs: name === READER ? medianSampleMs : 1,
+    sampleMs: [median_sample_ms],
+    medianSampleMs: name === READER ? median_sample_ms : 1,
     digest: name === READER ? digest : BASE_DIGEST,
   }));
 }
 
 /** Each pair runs at its own machine speed; only READER's paired ratio is set. */
-function pairs(ratios: readonly number[], candidateDigest = BASE_DIGEST): ReaderGatePair[] {
+function pairs(ratios: readonly number[], candidate_digest = BASE_DIGEST): ReaderGatePair[] {
   return ratios.map((ratio, index) => ({
     order: index % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"],
     base: run(index + 1),
-    candidate: run((index + 1) * ratio, candidateDigest),
+    candidate: run((index + 1) * ratio, candidate_digest),
   }));
 }
 
 /** An A/A report as the gate's `--output` writes it. */
-function aaReport(meta: Record<string, unknown> = {}, verdict: unknown = null): unknown {
+function aa_report(meta: Record<string, unknown> = {}, verdict: unknown = null): unknown {
   return {
     meta: {
       measuredAt: "2026-10-27T00:00:00.000Z",
@@ -70,10 +70,10 @@ function aaReport(meta: Record<string, unknown> = {}, verdict: unknown = null): 
 }
 
 /** Resampling 20,000 medians per reader takes about a second; the fixed seed makes one floor enough. */
-const FLOOR = noiseFloorFromAaResults(aaReport(), AA_PATH);
+const FLOOR = noiseFloorFromAaResults(aa_report(), AA_PATH);
 
-function verdict(ratios: readonly number[], candidateDigest = BASE_DIGEST): boolean | undefined {
-  const summary = summarizeReaderPairs(READER_CASE_NAMES, pairs(ratios, candidateDigest));
+function verdict(ratios: readonly number[], candidate_digest = BASE_DIGEST): boolean | undefined {
+  const summary = summarizeReaderPairs(READER_CASE_NAMES, pairs(ratios, candidate_digest));
   return judgeReaderRows(summary, FLOOR).rows.find((row) => row.name === READER)?.passed;
 }
 
@@ -101,10 +101,10 @@ it("fails a reader whose result differs and rejects runs with too few pairs", ()
 
 it("writes a floor only from an A/A report of one engine", () => {
   for (const report of [
-    aaReport({ candidateSha: "f61edeaa23167fc79616bdb85cf19092de318523" }),
-    aaReport({ engineSha256: { base: AA_ENGINE, candidate: "b".repeat(64) } }),
-    aaReport({}, { passed: true, rows: [] }),
-    aaReport({ readerFilter: "^aggregate" }),
+    aa_report({ candidateSha: "f61edeaa23167fc79616bdb85cf19092de318523" }),
+    aa_report({ engineSha256: { base: AA_ENGINE, candidate: "b".repeat(64) } }),
+    aa_report({}, { passed: true, rows: [] }),
+    aa_report({ readerFilter: "^aggregate" }),
   ]) {
     expect(() => noiseFloorFromAaResults(report, AA_PATH)).toThrow();
   }

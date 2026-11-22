@@ -12,14 +12,14 @@ const HASH = {
 } as const;
 const COMMIT = "1".repeat(40);
 
-function gate(wasmSha256: string, commands: string[][]) {
+function gate(wasm_sha256: string, commands: string[][]) {
   return {
     status: "passed",
     commands,
     exitCode: 0,
-    artifactPath: `bench/results/candidate-${wasmSha256.slice(0, 8)}.json`,
-    evidenceSha256: wasmSha256,
-    wasmSha256,
+    artifactPath: `bench/results/candidate-${wasm_sha256.slice(0, 8)}.json`,
+    evidenceSha256: wasm_sha256,
+    wasmSha256: wasm_sha256,
     commit: COMMIT,
     runnerFingerprint: HASH.runner,
   };
@@ -30,12 +30,12 @@ function fixture() {
     ["-O3", 1_000, 500, 400, "2"],
     ["-Os", 950, 480, 390, "3"],
     ["-Oz", 900, 470, 380, "4"],
-  ].map(([wasmOpt, rawBytes, gzipBytes, brotliBytes, hash]) => {
+  ].map(([wasm_opt, raw_bytes, gzip_bytes, brotli_bytes, hash]) => {
     const sha256 = String(hash).repeat(64);
     return {
-      wasmOpt: String(wasmOpt),
+      wasmOpt: String(wasm_opt),
       inputWasmSha256: HASH.input,
-      artifact: { rawBytes, gzipBytes, brotliBytes, sha256 },
+      artifact: { rawBytes: raw_bytes, gzipBytes: gzip_bytes, brotliBytes: brotli_bytes, sha256 },
       formulaGate: gate(sha256, [["bun", "run", "bench:formula"]]),
       renderGate: gate(sha256, [
         ["bun", "run", "bench:render"],

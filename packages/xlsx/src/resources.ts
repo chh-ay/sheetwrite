@@ -47,21 +47,21 @@ const ERROR_TEXT_ENCODER = new TextEncoder();
 
 const RESOURCE_KEYS = Object.keys(DEFAULT_XLSX_RESOURCE_LIMITS) as (keyof XlsxResourceLimits)[];
 
-function positiveLimit(
+function positive_limit(
   operation: "import" | "export",
   name: keyof XlsxResourceLimits,
   value: number,
 ): number {
-  const integerOnly = name !== "maxCompressionRatio";
+  const integer_only = name !== "maxCompressionRatio";
   if (
     !Number.isFinite(value) ||
     value <= 0 ||
-    (integerOnly ? !Number.isSafeInteger(value) : false)
+    (integer_only ? !Number.isSafeInteger(value) : false)
   ) {
     throw new SheetwriteError(
       "xlsx-invalid-options",
       `xlsx-${operation}`,
-      `Sheetwrite: XLSX ${name} must be ${integerOnly ? "a positive integer" : "positive"}`,
+      `Sheetwrite: XLSX ${name} must be ${integer_only ? "a positive integer" : "positive"}`,
       { context: { format: "xlsx", resource: name } },
     );
   }
@@ -91,10 +91,10 @@ export function createCodecContext(
   for (const key of RESOURCE_KEYS) {
     if (key === "maxCells") continue;
     const value = overrides?.[key];
-    if (value !== undefined) limits[key] = positiveLimit(operation, key, value);
+    if (value !== undefined) limits[key] = positive_limit(operation, key, value);
   }
   if (options?.maxCells !== undefined) {
-    limits.maxCells = positiveLimit(operation, "maxCells", options.maxCells);
+    limits.maxCells = positive_limit(operation, "maxCells", options.maxCells);
   }
   const context = { operation, limits: Object.freeze(limits), options, warningCount: 0 };
   checkAbort(context);
@@ -115,10 +115,10 @@ export function boundedErrorText(text: string): string {
 
   const head = ERROR_TEXT_ENCODER.encodeInto(text, new Uint8Array(KEPT_END_BYTES));
   // Each tail unit encodes to at most three bytes, so the tail fits in its half.
-  let tailStart = text.length - Math.floor(KEPT_END_BYTES / MAX_UTF8_BYTES_PER_UNIT);
-  const first = text.charCodeAt(tailStart);
-  if (first >= LOW_SURROGATE_MIN && first <= LOW_SURROGATE_MAX) tailStart += 1;
-  return `${text.slice(0, head.read)}${ELLIPSIS}${text.slice(tailStart)}`;
+  let tail_start = text.length - Math.floor(KEPT_END_BYTES / MAX_UTF8_BYTES_PER_UNIT);
+  const first = text.charCodeAt(tail_start);
+  if (first >= LOW_SURROGATE_MIN && first <= LOW_SURROGATE_MAX) tail_start += 1;
+  return `${text.slice(0, head.read)}${ELLIPSIS}${text.slice(tail_start)}`;
 }
 
 /**
@@ -179,7 +179,7 @@ export function assertResource(
 }
 
 /** The snapshot options of the codec: its own limits, without live dense-store allocation ceilings. */
-function codecSnapshotOptions(context: XlsxCodecContext): SnapshotValidationOptions {
+function codec_snapshot_options(context: XlsxCodecContext): SnapshotValidationOptions {
   return {
     storage: "paged",
     resourceLimits: {
@@ -196,7 +196,7 @@ function codecSnapshotOptions(context: XlsxCodecContext): SnapshotValidationOpti
 
 /** Validate a sparse codec snapshot from outside the codec, such as one passed to export. */
 export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext) {
-  return validateWorkbookSnapshot(input, codecSnapshotOptions(context));
+  return validateWorkbookSnapshot(input, codec_snapshot_options(context));
 }
 
 /**
@@ -204,7 +204,7 @@ export function validateCodecSnapshot(input: unknown, context: XlsxCodecContext)
  * XML, which no other code has reached: the same checks, with direct reads.
  */
 export function validateReadSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext) {
-  return validateBuiltWorkbookSnapshot(snapshot, codecSnapshotOptions(context));
+  return validateBuiltWorkbookSnapshot(snapshot, codec_snapshot_options(context));
 }
 
 /** Report a fidelity warning. Warnings after the first `MAX_WARNINGS` are not reported. */

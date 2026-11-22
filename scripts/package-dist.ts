@@ -46,16 +46,16 @@ interface DeclarationGraph {
   readonly missing: readonly string[];
 }
 
-function isDeclarationFile(path: string): boolean {
+function is_declaration_file(path: string): boolean {
   return DECLARATION_FILE.test(path);
 }
 
 /** Every path a consumer's TypeScript can open first: `types` conditions and the `types` field. */
-function typeEntryPoints(manifest: TypedManifest): string[] {
+function type_entry_points(manifest: TypedManifest): string[] {
   const entries = new Set<string>();
-  const visit = (value: unknown, isTypesCondition: boolean): void => {
+  const visit = (value: unknown, is_types_condition: boolean): void => {
     if (typeof value === "string") {
-      if (isTypesCondition || isDeclarationFile(value)) entries.add(value.replace(/^\.\//, ""));
+      if (is_types_condition || is_declaration_file(value)) entries.add(value.replace(/^\.\//, ""));
       return;
     }
     if (value === null || typeof value !== "object") return;
@@ -68,15 +68,15 @@ function typeEntryPoints(manifest: TypedManifest): string[] {
   return [...entries];
 }
 
-function declarationCandidates(target: string): string[] {
-  if (isDeclarationFile(target)) return [target];
+function declaration_candidates(target: string): string[] {
+  if (is_declaration_file(target)) return [target];
   for (const [runtime, declaration] of DECLARATION_FOR_RUNTIME) {
     if (target.endsWith(runtime)) return [`${target.slice(0, -runtime.length)}${declaration}`];
   }
   return [`${target}.d.ts`, `${target}/index.d.ts`];
 }
 
-async function firstExisting(candidates: readonly string[]): Promise<string | undefined> {
+async function first_existing(candidates: readonly string[]): Promise<string | undefined> {
   for (const candidate of candidates) {
     if (await Bun.file(candidate).exists()) return candidate;
   }
@@ -89,12 +89,12 @@ async function firstExisting(candidates: readonly string[]): Promise<string | un
  * augmentations and `/// <reference path>`. Comments and string types are not
  * module references, so they never keep a file alive.
  */
-function referencedSpecifiers(sourceFile: SourceFile): string[] {
-  const literalText = (node: Node): string[] => (isStringLiteral(node) ? [node.text] : []);
+function referenced_specifiers(source_file: SourceFile): string[] {
+  const literal_text = (node: Node): string[] => (isStringLiteral(node) ? [node.text] : []);
   return [
-    ...sourceFile.imports.flatMap(literalText),
-    ...sourceFile.moduleAugmentations.flatMap(literalText),
-    ...sourceFile.referencedFiles.map((reference) => reference.fileName),
+    ...source_file.imports.flatMap(literal_text),
+    ...source_file.moduleAugmentations.flatMap(literal_text),
+    ...source_file.referencedFiles.map((reference) => reference.fileName),
   ];
 }
 
@@ -102,11 +102,11 @@ function referencedSpecifiers(sourceFile: SourceFile): string[] {
  * Follow the type entries through the declaration files they reference.
  * Bare specifiers belong to other packages and end the walk.
  */
-async function declarationGraph(
-  packageRoot: string,
+async function declaration_graph(
+  package_root: string,
   entries: readonly string[],
 ): Promise<DeclarationGraph> {
-  const root = resolve(packageRoot);
+  const root = resolve(package_root);
   const reachable = new Set<string>();
   const missing: string[] = [];
   const pending: string[] = [];
@@ -131,17 +131,17 @@ async function declarationGraph(
       }
 
       const walk = async (path: string, project: Project): Promise<void> => {
-        const packagePath = relative(root, path).split(sep).join("/");
-        if (reachable.has(packagePath)) return;
-        reachable.add(packagePath);
+        const package_path = relative(root, path).split(sep).join("/");
+        if (reachable.has(package_path)) return;
+        reachable.add(package_path);
 
-        const sourceFile = await project.program.getSourceFile(path);
-        if (sourceFile === undefined) throw new Error(`TypeScript did not load ${packagePath}`);
-        for (const specifier of referencedSpecifiers(sourceFile)) {
+        const source_file = await project.program.getSourceFile(path);
+        if (source_file === undefined) throw new Error(`TypeScript did not load ${package_path}`);
+        for (const specifier of referenced_specifiers(source_file)) {
           if (!specifier.startsWith("./") && !specifier.startsWith("../")) continue;
           const target = resolve(dirname(path), specifier);
-          const declaration = await firstExisting(declarationCandidates(target));
-          if (declaration === undefined) missing.push(`${packagePath} -> ${specifier}`);
+          const declaration = await first_existing(declaration_candidates(target));
+          if (declaration === undefined) missing.push(`${package_path} -> ${specifier}`);
           else await walk(declaration, project);
         }
       };
@@ -166,12 +166,12 @@ export async function assertPublishedDeclarations(
   publishedFiles: readonly string[],
 ): Promise<void> {
   const manifest = await readJson<TypedManifest>(resolve(packageRoot, "package.json"));
-  const entries = typeEntryPoints(manifest);
-  if (entries.length === 0 || !entries.every(isDeclarationFile)) return;
+  const entries = type_entry_points(manifest);
+  if (entries.length === 0 || !entries.every(is_declaration_file)) return;
 
-  const graph = await declarationGraph(packageRoot, entries);
+  const graph = await declaration_graph(packageRoot, entries);
   const unreachable = publishedFiles.filter(
-    (file) => isDeclarationFile(file) && !graph.reachable.has(file),
+    (file) => is_declaration_file(file) && !graph.reachable.has(file),
   );
   const problems = [
     ...graph.missing.map((edge) => `missing ${edge}`),
@@ -187,15 +187,15 @@ export async function assertPublishedDeclarations(
 /** Delete built declarations no type entry reaches; fail if a reached one was never built. */
 export async function pruneUnreachableDeclarations(packageRoot: string): Promise<string[]> {
   const manifest = await readJson<TypedManifest>(resolve(packageRoot, "package.json"));
-  const entries = typeEntryPoints(manifest);
+  const entries = type_entry_points(manifest);
   // Without declaration entries the walk reaches nothing and would delete every
   // built declaration; the packed check skips such packages, so fail here.
-  if (entries.length === 0 || !entries.every(isDeclarationFile)) {
+  if (entries.length === 0 || !entries.every(is_declaration_file)) {
     throw new Error(
       `${manifest.name ?? packageRoot} has no declaration-file types entries to prune from`,
     );
   }
-  const graph = await declarationGraph(packageRoot, entries);
+  const graph = await declaration_graph(packageRoot, entries);
   if (graph.missing.length > 0) {
     throw new Error(
       `${manifest.name ?? packageRoot} type entries reference declarations that were not built:\n  ${graph.missing.join("\n  ")}`,
@@ -212,7 +212,7 @@ export async function pruneUnreachableDeclarations(packageRoot: string): Promise
  * Whitespace-insensitive print of the module. Formatting may only move
  * whitespace and syntax-neutral tokens, so both sides must print the same.
  */
-const semanticPrinter = new Bun.Transpiler({
+const semantic_printer = new Bun.Transpiler({
   loader: "js",
   minifyWhitespace: true,
   trimUnusedImports: false,
@@ -229,13 +229,13 @@ export async function formatBuiltJavaScript(packageRoot: string): Promise<void> 
         ["bun", "fmt", ...PUBLISHED_JAVASCRIPT_FORMAT, `--stdin-filepath=${path}`],
         { stdin: new TextEncoder().encode(source), stdout: "pipe", stderr: "pipe" },
       );
-      const [code, errors, exitCode] = await Promise.all([
+      const [code, errors, exit_code] = await Promise.all([
         new Response(formatter.stdout).text(),
         new Response(formatter.stderr).text(),
         formatter.exited,
       ]);
-      if (exitCode !== 0) throw new Error(`Cannot format ${file}: ${errors}`);
-      if (semanticPrinter.transformSync(code) !== semanticPrinter.transformSync(source)) {
+      if (exit_code !== 0) throw new Error(`Cannot format ${file}: ${errors}`);
+      if (semantic_printer.transformSync(code) !== semantic_printer.transformSync(source)) {
         throw new Error(`Formatting changed the program in ${file}`);
       }
       await writeFile(path, code);
@@ -244,9 +244,9 @@ export async function formatBuiltJavaScript(packageRoot: string): Promise<void> 
 }
 
 if (import.meta.main) {
-  const packageRoot = process.argv[2];
-  if (packageRoot === undefined) throw new Error("Expected a package directory");
+  const package_root = process.argv[2];
+  if (package_root === undefined) throw new Error("Expected a package directory");
 
-  await formatBuiltJavaScript(packageRoot);
-  await pruneUnreachableDeclarations(packageRoot);
+  await formatBuiltJavaScript(package_root);
+  await pruneUnreachableDeclarations(package_root);
 }

@@ -10,7 +10,7 @@ import type { GridPanel } from "./types/grid.js";
 const FOCUSABLE =
   'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]';
 
-let panelSerial = 0;
+let panel_serial = 0;
 
 /**
  * Build the panel inside `host` and render its body. Unless the panel asks
@@ -24,27 +24,27 @@ export function mountSidePanel(
   content: GridPanel,
   close: () => void,
 ): () => void {
-  panelSerial += 1;
-  const titleId = `sheetwrite-panel-${panelSerial}-title`;
+  panel_serial += 1;
+  const title_id = `sheetwrite-panel-${panel_serial}-title`;
 
   const panel = document.createElement("section");
   panel.className = "sheetwrite-panel";
   panel.setAttribute("role", "complementary");
-  panel.setAttribute("aria-labelledby", titleId);
+  panel.setAttribute("aria-labelledby", title_id);
 
   const header = document.createElement("div");
   header.className = "sheetwrite-panel-header";
   const title = document.createElement("h2");
   title.className = "sheetwrite-panel-title";
-  title.id = titleId;
+  title.id = title_id;
   title.textContent = content.title;
-  const closeButton = document.createElement("button");
-  closeButton.type = "button";
-  closeButton.className = "sheetwrite-panel-close";
-  closeButton.title = "Close";
-  closeButton.setAttribute("aria-label", `Close ${content.title}`);
-  closeButton.addEventListener("click", () => close());
-  header.append(title, closeButton);
+  const close_button = document.createElement("button");
+  close_button.type = "button";
+  close_button.className = "sheetwrite-panel-close";
+  close_button.title = "Close";
+  close_button.setAttribute("aria-label", `Close ${content.title}`);
+  close_button.addEventListener("click", () => close());
+  header.append(title, close_button);
 
   const body = document.createElement("div");
   body.className = "sheetwrite-panel-body";
@@ -53,26 +53,26 @@ export function mountSidePanel(
   // The panel sits inside the grid host, whose handler treats plain keys as
   // cell navigation and typing. Keep them here; Ctrl/Cmd shortcuts (undo)
   // still reach the grid, as they do from the ribbon.
-  const onKeydown = (event: KeyboardEvent): void => {
+  const on_keydown = (event: KeyboardEvent): void => {
     if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
     if (event.key !== "Escape" || event.defaultPrevented) return;
     event.preventDefault();
     close();
   };
-  panel.addEventListener("keydown", onKeydown);
+  panel.addEventListener("keydown", on_keydown);
 
   host.appendChild(panel);
   const cleanup = content.render(body);
   checkStylePart(panel, "panels", `The ${content.title} panel`);
   checkIconStyles(panel, `The ${content.title} panel`);
-  if (content.focus !== false) (body.querySelector<HTMLElement>(FOCUSABLE) ?? closeButton).focus();
+  if (content.focus !== false) (body.querySelector<HTMLElement>(FOCUSABLE) ?? close_button).focus();
 
   let disposed = false;
   return () => {
     if (disposed) return;
     disposed = true;
     cleanup();
-    panel.removeEventListener("keydown", onKeydown);
+    panel.removeEventListener("keydown", on_keydown);
     panel.remove();
   };
 }

@@ -38,21 +38,21 @@ const { version: TEST_RELEASE_VERSION } = JSON.parse(
   readFileSync(join(import.meta.dir, "../packages/core/package.json"), "utf8"),
 ) as { version: string };
 
-const temporaryRoots: string[] = [];
+const temporary_roots: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    temporaryRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
+    temporary_roots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
   );
 });
 
-async function temporaryDirectory(): Promise<string> {
+async function temporary_directory(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-artifact-test-"));
-  temporaryRoots.push(root);
+  temporary_roots.push(root);
   return root;
 }
 
-function tarballName(name: string): string {
+function tarball_name(name: string): string {
   return `${name.replace(/^@/, "").replaceAll("/", "-")}-${TEST_RELEASE_VERSION}.tgz`;
 }
 
@@ -77,7 +77,7 @@ function manifest(packages?: PackageArtifact[]): ReleaseArtifactManifest {
       PUBLISHABLE_PACKAGE_ORDER.map((name) => ({
         name,
         version: TEST_RELEASE_VERSION,
-        path: tarballName(name),
+        path: tarball_name(name),
         bytes: 1,
         unpackedBytes: 1,
         fileCount: 1,
@@ -96,29 +96,29 @@ interface TarballOptions {
   readonly maliciousPath?: boolean;
 }
 
-async function writeTarball(
+async function write_tarball(
   root: string,
-  artifactName: string,
+  artifact_name: string,
   options: TarballOptions = {},
 ): Promise<PackageArtifact> {
-  const stageRoot = join(root, `stage-${artifactName.replaceAll("/", "-")}`);
-  const packageRoot = join(stageRoot, "package");
-  await mkdir(packageRoot, { recursive: true });
-  const packedManifestValue: Record<string, unknown> = {
-    name: options.packedName ?? artifactName,
+  const stage_root = join(root, `stage-${artifact_name.replaceAll("/", "-")}`);
+  const package_root = join(stage_root, "package");
+  await mkdir(package_root, { recursive: true });
+  const packed_manifest_value: Record<string, unknown> = {
+    name: options.packedName ?? artifact_name,
     version: TEST_RELEASE_VERSION,
     ...options.manifest,
   };
-  const packedManifest = `${JSON.stringify(packedManifestValue)}\n`;
-  await writeFile(join(packageRoot, "package.json"), packedManifest);
-  const contentFiles = REQUIRED_PACKAGE_FILES[artifactName] ?? [];
-  for (const file of contentFiles) {
-    await mkdir(join(packageRoot, file, ".."), { recursive: true });
-    await writeFile(join(packageRoot, file), `${file}\n`);
+  const packed_manifest = `${JSON.stringify(packed_manifest_value)}\n`;
+  await writeFile(join(package_root, "package.json"), packed_manifest);
+  const content_files = REQUIRED_PACKAGE_FILES[artifact_name] ?? [];
+  for (const file of content_files) {
+    await mkdir(join(package_root, file, ".."), { recursive: true });
+    await writeFile(join(package_root, file), `${file}\n`);
   }
-  const files = ["package.json", ...contentFiles].sort();
+  const files = ["package.json", ...content_files].sort();
 
-  const path = tarballName(artifactName);
+  const path = tarball_name(artifact_name);
   const packed = Bun.spawnSync(
     [
       "tar",
@@ -126,23 +126,23 @@ async function writeTarball(
       join(root, path),
       ...(options.maliciousPath ? ["--transform=s#^package/README.md$#../escape#"] : []),
       "-C",
-      stageRoot,
+      stage_root,
       ...files.map((file) => `package/${file}`),
     ],
     { stdout: "pipe", stderr: "pipe" },
   );
-  await rm(stageRoot, { force: true, recursive: true });
+  await rm(stage_root, { force: true, recursive: true });
   if (packed.exitCode !== 0) throw new Error(packed.stderr.toString());
   const bytes = new Uint8Array(await readFile(join(root, path)));
-  const dependencies = (packedManifestValue.dependencies ?? {}) as Record<string, string>;
+  const dependencies = (packed_manifest_value.dependencies ?? {}) as Record<string, string>;
   return {
-    name: artifactName,
+    name: artifact_name,
     version: TEST_RELEASE_VERSION,
     path,
     bytes: bytes.byteLength,
     unpackedBytes:
-      Buffer.byteLength(packedManifest) +
-      contentFiles.reduce((sum, file) => sum + Buffer.byteLength(`${file}\n`), 0),
+      Buffer.byteLength(packed_manifest) +
+      content_files.reduce((sum, file) => sum + Buffer.byteLength(`${file}\n`), 0),
     fileCount: files.length,
     files,
     shasum: createHash("sha1").update(bytes).digest("hex"),
@@ -157,14 +157,14 @@ async function writeTarball(
 }
 
 /** Writes every publishable tarball, the first one with `first` options, and the manifest. */
-async function writeRelease(first: TarballOptions = {}): Promise<{
+async function write_release(first: TarballOptions = {}): Promise<{
   root: string;
   packages: PackageArtifact[];
 }> {
-  const root = await temporaryDirectory();
+  const root = await temporary_directory();
   const packages = await Promise.all(
     PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
-      writeTarball(root, name, index === 0 ? first : {}),
+      write_tarball(root, name, index === 0 ? first : {}),
     ),
   );
   await writeFile(
@@ -191,10 +191,10 @@ describe("canonical release artifacts", () => {
   });
 
   it("assembles built outputs into a real tarball using release manifest policy", async () => {
-    const root = await temporaryDirectory();
+    const root = await temporary_directory();
     const source = join(root, "source");
     await mkdir(join(source, "dist"), { recursive: true });
-    const sourceManifest = {
+    const source_manifest = {
       name: "@sheetwrite/core",
       version: "1.2.3",
       files: ["dist/*.js"],
@@ -203,7 +203,7 @@ describe("canonical release artifacts", () => {
       peerDependencies: { "@sheetwrite/core": "workspace:~" },
       scripts: { prepublishOnly: "exit 1", check: "exit 0" },
     };
-    await writeFile(join(source, "package.json"), JSON.stringify(sourceManifest));
+    await writeFile(join(source, "package.json"), JSON.stringify(source_manifest));
     await writeFile(join(source, "dist/index.js"), "export const answer = 42;\n");
     await writeFile(join(source, "dist/private.txt"), "not published");
     await writeFile(join(source, "README.md"), "Fixture readme\n");
@@ -223,7 +223,7 @@ describe("canonical release artifacts", () => {
       return result.stdout.toString();
     };
     expect(JSON.parse(extract("package.json"))).toEqual({
-      ...sourceManifest,
+      ...source_manifest,
       dependencies: { "@sheetwrite/core": "1.2.3", registry: "^9.0.0" },
       devDependencies: { "@sheetwrite/core": "1.2.3" },
       peerDependencies: { "@sheetwrite/core": "1.2.3" },
@@ -233,7 +233,10 @@ describe("canonical release artifacts", () => {
 
     await writeFile(
       join(source, "package.json"),
-      JSON.stringify({ ...sourceManifest, dependencies: { "@sheetwrite/missing": "workspace:*" } }),
+      JSON.stringify({
+        ...source_manifest,
+        dependencies: { "@sheetwrite/missing": "workspace:*" },
+      }),
     );
     await expect(packBuiltPackages(join(root, "missing"), [source])).rejects.toThrow(
       "No release version found for @sheetwrite/missing",
@@ -248,7 +251,7 @@ describe("canonical release artifacts", () => {
     expect(() => assertOutputDirectoryEmpty([])).not.toThrow();
     expect(() => assertOutputDirectoryEmpty(["stale.tgz"])).toThrow("not empty");
 
-    const root = await temporaryDirectory();
+    const root = await temporary_directory();
     const git = (...args: string[]) => {
       const result = Bun.spawnSync(["git", ...args], { cwd: root });
       if (result.exitCode !== 0) throw new Error(result.stderr.toString());
@@ -289,8 +292,8 @@ describe("canonical release artifacts", () => {
   });
 
   it("rejects an absent package dependency at the wrong source version", async () => {
-    const root = await temporaryDirectory();
-    const react = await writeTarball(root, "@sheetwrite/react", {
+    const root = await temporary_directory();
+    const react = await write_tarball(root, "@sheetwrite/react", {
       manifest: { dependencies: { "@sheetwrite/core": "0.1.0" } },
     });
     await writeFile(
@@ -303,24 +306,24 @@ describe("canonical release artifacts", () => {
   });
 
   it("round-trips tarballs and detects checksum and packed-identity tampering", async () => {
-    const { root, packages } = await writeRelease();
+    const { root, packages } = await write_release();
     expect(await verifyReleaseArtifacts(root)).toEqual(manifest(packages));
 
     const [first, ...rest] = packages;
     if (first === undefined) throw new Error("release has no packages");
-    const tarballPath = join(root, first.path);
-    const originalBytes = new Uint8Array(await readFile(tarballPath));
-    const tamperedBytes = originalBytes.slice();
-    tamperedBytes[tamperedBytes.length - 1] = (tamperedBytes.at(-1) ?? 0) ^ 1;
-    await writeFile(tarballPath, tamperedBytes);
+    const tarball_path = join(root, first.path);
+    const original_bytes = new Uint8Array(await readFile(tarball_path));
+    const tampered_bytes = original_bytes.slice();
+    tampered_bytes[tampered_bytes.length - 1] = (tampered_bytes.at(-1) ?? 0) ^ 1;
+    await writeFile(tarball_path, tampered_bytes);
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(`${first.name} shasum changed`);
 
-    const wrongIdentity = await writeTarball(root, first.name, {
+    const wrong_identity = await write_tarball(root, first.name, {
       packedName: "@sheetwrite/tampered",
     });
     await writeFile(
       join(root, RELEASE_ARTIFACT_MANIFEST),
-      serializeReleaseManifest(manifest([wrongIdentity, ...rest])),
+      serializeReleaseManifest(manifest([wrong_identity, ...rest])),
     );
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(
       `${first.name} packed manifest identity changed`,
@@ -346,12 +349,12 @@ describe("canonical release artifacts", () => {
     ],
     ["a malicious archive path", { maliciousPath: true }, "malicious archive path"],
   ])("rejects a tarball with %s", async (_label, first, message) => {
-    const { root } = await writeRelease(first);
+    const { root } = await write_release(first);
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(message);
   });
 
   it("rejects a manifest whose canonical tarballs are missing", async () => {
-    const root = await temporaryDirectory();
+    const root = await temporary_directory();
     await writeFile(join(root, RELEASE_ARTIFACT_MANIFEST), serializeReleaseManifest(manifest()));
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(
       "Release artifact directory must contain exactly",

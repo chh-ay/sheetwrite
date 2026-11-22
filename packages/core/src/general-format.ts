@@ -19,22 +19,22 @@ export function isGeneralCode(format: string | undefined): boolean {
 
 /** Each locale's decimal separator; a host uses a few locales, so the map stays small. */
 const DECIMAL_SEPARATOR_LIMIT = 32;
-const decimalSeparators = new Map<string, string>();
+const decimal_separators = new Map<string, string>();
 
-function decimalSeparator(locale: string): string {
-  let separator = decimalSeparators.get(locale);
+function decimal_separator(locale: string): string {
+  let separator = decimal_separators.get(locale);
   if (separator === undefined) {
     separator =
       new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === "decimal")
         ?.value ?? ".";
-    if (decimalSeparators.size >= DECIMAL_SEPARATOR_LIMIT) decimalSeparators.clear();
-    decimalSeparators.set(locale, separator);
+    if (decimal_separators.size >= DECIMAL_SEPARATOR_LIMIT) decimal_separators.clear();
+    decimal_separators.set(locale, separator);
   }
   return separator;
 }
 
 /** `digits` without the zeros that end its fraction, and without a bare decimal point. */
-function trimFraction(digits: string): string {
+function trim_fraction(digits: string): string {
   if (!digits.includes(".")) return digits;
   let end = digits.length;
   while (digits.charCodeAt(end - 1) === 48) end--;
@@ -47,12 +47,12 @@ function trimFraction(digits: string): string {
  * up to 5 decimals, trailing zeros dropped, and a two-digit exponent at least
  * (`1.23457E+11`, `1E-05`). Null when even `1E+11` does not fit.
  */
-function generalScientific(magnitude: number, width: number): string | null {
+function general_scientific(magnitude: number, width: number): string | null {
   for (let decimals = Math.min(5, Math.max(0, width - 6)); decimals >= 0; decimals--) {
     const exponential = magnitude.toExponential(decimals);
     const e = exponential.indexOf("e");
     const power = Number(exponential.slice(e + 1));
-    const text = `${trimFraction(exponential.slice(0, e))}E${power < 0 ? "-" : "+"}${String(Math.abs(power)).padStart(2, "0")}`;
+    const text = `${trim_fraction(exponential.slice(0, e))}E${power < 0 ? "-" : "+"}${String(Math.abs(power)).padStart(2, "0")}`;
     if (text.length <= width) return text;
   }
   return null;
@@ -83,12 +83,12 @@ export function formatGeneral(
   let text: string | null = null;
   if (exponent >= -4 && exponent < width) {
     // The whole part and the decimal point take their places first.
-    const fixed = trimFraction(magnitude.toFixed(Math.max(0, width - Math.max(exponent, 0) - 2)));
+    const fixed = trim_fraction(magnitude.toFixed(Math.max(0, width - Math.max(exponent, 0) - 2)));
     if (fixed.length <= width && fixed !== "0") text = fixed;
   }
-  text ??= generalScientific(magnitude, width);
+  text ??= general_scientific(magnitude, width);
   if (text === null) return null;
-  const separator = decimalSeparator(locale);
+  const separator = decimal_separator(locale);
   if (separator !== ".") text = text.replace(".", separator);
   return value < 0 ? `-${text}` : text;
 }

@@ -8,7 +8,7 @@ import { applyPlan, planRenames, toSnakeCase } from "./snake-case-internals.js";
 const FIXTURES = resolve(import.meta.dir, "fixtures/snake-case-internals");
 
 /** Copy the input fixture project so `apply` never touches the checked-in files. */
-function copyInput(): string {
+function copy_input(): string {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "snake-case-internals-")));
   cpSync(join(FIXTURES, "input"), directory, { recursive: true });
 
@@ -30,7 +30,7 @@ describe("toSnakeCase", () => {
 
 describe("snake-case-internals", () => {
   test("renames internal names and keeps exported, public, key and DOM names", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       applyPlan(await planRenames(join(directory, "tsconfig.json"), []));
@@ -60,7 +60,7 @@ describe("snake-case-internals", () => {
   });
 
   test("a picked name settles a conflict and is still checked against bound names", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       const tsconfig = join(directory, "tsconfig.json");
@@ -85,7 +85,7 @@ describe("snake-case-internals", () => {
   });
 
   test("skips files below a nested tsconfig.json", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       cpSync(join(FIXTURES, "input"), join(directory, "nested"), { recursive: true });
@@ -106,7 +106,7 @@ describe("snake-case-internals", () => {
   });
 
   test("skips generated .gen.ts files, which their generator rewrites", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       writeFileSync(
@@ -123,7 +123,7 @@ describe("snake-case-internals", () => {
   });
 
   test("a reflective call follows a private member of another project", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       writeFileSync(
@@ -142,7 +142,7 @@ describe("snake-case-internals", () => {
   });
 
   test("a key in a double cast's type follows a private member of another project", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       writeFileSync(
@@ -177,7 +177,7 @@ describe("snake-case-internals", () => {
   });
 
   test("a second run finds nothing to rename and changes no file", async () => {
-    const directory = copyInput();
+    const directory = copy_input();
 
     try {
       const tsconfig = join(directory, "tsconfig.json");

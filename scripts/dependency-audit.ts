@@ -57,11 +57,11 @@ const POLICY_DECLARATION_KEYS: Readonly<Record<string, true>> = {
 const POLICY_SEVERITIES = ["low", "moderate", "high", "critical"] as const;
 const POLICY_ALLOWANCE_FIELDS = ["advisory", "package", "owner", "rationale", "expires"] as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function is_record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function validateExactStringArray(
+function validate_exact_string_array(
   value: unknown,
   expected: readonly string[],
   label: string,
@@ -76,12 +76,12 @@ function validateExactStringArray(
 }
 
 export function parseAuditPolicyFile(raw: unknown): readonly unknown[] {
-  if (!isRecord(raw)) throw new Error("Audit policy must be an object");
+  if (!is_record(raw)) throw new Error("Audit policy must be an object");
   for (const key of Object.keys(raw)) {
     if (POLICY_FILE_KEYS[key] !== true)
       throw new Error(`Audit policy has an unknown field: ${key}`);
   }
-  if (!isRecord(raw.policy)) throw new Error("Audit policy declaration must be an object");
+  if (!is_record(raw.policy)) throw new Error("Audit policy declaration must be an object");
   for (const key of Object.keys(raw.policy)) {
     if (POLICY_DECLARATION_KEYS[key] !== true) {
       throw new Error(`Audit policy declaration has an unknown field: ${key}`);
@@ -90,12 +90,12 @@ export function parseAuditPolicyFile(raw: unknown): readonly unknown[] {
   if (typeof raw.policy.scope !== "string" || raw.policy.scope.trim() === "") {
     throw new Error("Audit policy scope must be non-empty");
   }
-  validateExactStringArray(
+  validate_exact_string_array(
     raw.policy.failSeverities,
     POLICY_SEVERITIES,
     "Audit policy failSeverities",
   );
-  validateExactStringArray(
+  validate_exact_string_array(
     raw.policy.allowanceRequirements,
     POLICY_ALLOWANCE_FIELDS,
     "Audit policy allowanceRequirements",
@@ -109,7 +109,7 @@ export function parseAuditPolicyFile(raw: unknown): readonly unknown[] {
   return raw.allowlist;
 }
 
-function advisoryIdentity(url: string, id: unknown): string {
+function advisory_identity(url: string, id: unknown): string {
   const slug = url.match(/\/(GHSA-[A-Za-z0-9-]+|CVE-[A-Za-z0-9-]+)$/i)?.[1];
   if (slug) return slug.toUpperCase();
   if (typeof id === "number" || typeof id === "string") return String(id);
@@ -125,16 +125,16 @@ export function parseAuditOutput(stdout: string): readonly AuditFinding[] {
       `Bun audit returned malformed JSON: ${error instanceof Error ? error.message : error}`,
     );
   }
-  if (!isRecord(parsed)) throw new Error("Bun audit JSON must be an object keyed by package");
+  if (!is_record(parsed)) throw new Error("Bun audit JSON must be an object keyed by package");
 
   const findings: AuditFinding[] = [];
-  for (const [packageName, advisories] of Object.entries(parsed)) {
+  for (const [package_name, advisories] of Object.entries(parsed)) {
     if (!Array.isArray(advisories)) {
-      throw new Error(`Bun audit entry for ${packageName} must be an array`);
+      throw new Error(`Bun audit entry for ${package_name} must be an array`);
     }
     for (const advisory of advisories) {
-      if (!isRecord(advisory))
-        throw new Error(`Bun audit advisory for ${packageName} must be an object`);
+      if (!is_record(advisory))
+        throw new Error(`Bun audit advisory for ${package_name} must be an object`);
       const severity = advisory.severity;
       const title = advisory.title;
       const url = advisory.url;
@@ -146,11 +146,11 @@ export function parseAuditOutput(stdout: string): readonly AuditFinding[] {
         typeof title !== "string" ||
         typeof url !== "string"
       ) {
-        throw new Error(`Bun audit advisory for ${packageName} has an invalid schema`);
+        throw new Error(`Bun audit advisory for ${package_name} has an invalid schema`);
       }
       findings.push({
-        package: packageName,
-        advisory: advisoryIdentity(url, advisory.id),
+        package: package_name,
+        advisory: advisory_identity(url, advisory.id),
         severity,
         title,
         url,
@@ -162,7 +162,7 @@ export function parseAuditOutput(stdout: string): readonly AuditFinding[] {
   );
 }
 
-function policyDate(value: string, label: string): number {
+function policy_date(value: string, label: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`${label} must use YYYY-MM-DD`);
   }
@@ -176,8 +176,8 @@ function policyDate(value: string, label: string): number {
   return milliseconds;
 }
 
-function validateAllowance(value: unknown, index: number, today: string): AuditAllowance {
-  if (!isRecord(value)) throw new Error(`Audit allowance ${index} must be an object`);
+function validate_allowance(value: unknown, index: number, today: string): AuditAllowance {
+  if (!is_record(value)) throw new Error(`Audit allowance ${index} must be an object`);
   for (const key of Object.keys(value)) {
     if (ALLOWANCE_KEYS[key] !== true) {
       throw new Error(`Audit allowance ${index} has an unknown field: ${key}`);
@@ -189,15 +189,15 @@ function validateAllowance(value: unknown, index: number, today: string): AuditA
     }
   }
   const allowance = value as unknown as AuditAllowance;
-  const todayMilliseconds = policyDate(today, "Audit policy date");
-  const expiryMilliseconds = policyDate(
+  const today_milliseconds = policy_date(today, "Audit policy date");
+  const expiry_milliseconds = policy_date(
     allowance.expires,
     `Audit allowance ${allowance.advisory} expiry`,
   );
-  if (expiryMilliseconds < todayMilliseconds) {
+  if (expiry_milliseconds < today_milliseconds) {
     throw new Error(`Audit allowance ${allowance.advisory} expired on ${allowance.expires}`);
   }
-  if (expiryMilliseconds - todayMilliseconds > AUDIT_ALLOWANCE_MAX_DAYS * DAY_MILLISECONDS) {
+  if (expiry_milliseconds - today_milliseconds > AUDIT_ALLOWANCE_MAX_DAYS * DAY_MILLISECONDS) {
     throw new Error(
       `Audit allowance ${allowance.advisory} expires more than ${AUDIT_ALLOWANCE_MAX_DAYS} days from review`,
     );
@@ -228,22 +228,22 @@ export function evaluateAuditPolicy(
     throw new Error(`Bun audit failed without findings: ${command.stderr.trim()}`);
   }
 
-  const allowanceByKey = new Map<string, AuditAllowance>();
+  const allowance_by_key = new Map<string, AuditAllowance>();
   for (const [index, value] of allowlist.entries()) {
-    const allowance = validateAllowance(value, index, today);
+    const allowance = validate_allowance(value, index, today);
     const key = `${allowance.package}:${allowance.advisory.toUpperCase()}`;
-    if (allowanceByKey.has(key)) throw new Error(`Duplicate audit allowance for ${key}`);
-    allowanceByKey.set(key, allowance);
+    if (allowance_by_key.has(key)) throw new Error(`Duplicate audit allowance for ${key}`);
+    allowance_by_key.set(key, allowance);
   }
 
   const reviewed: AuditFinding[] = [];
   const unreviewed: AuditFinding[] = [];
-  const matchedAllowanceKeys = new Set<string>();
+  const matched_allowance_keys = new Set<string>();
   for (const finding of findings) {
     const key = `${finding.package}:${finding.advisory}`;
-    if (allowanceByKey.has(key)) {
+    if (allowance_by_key.has(key)) {
       reviewed.push(finding);
-      matchedAllowanceKeys.add(key);
+      matched_allowance_keys.add(key);
     } else {
       unreviewed.push(finding);
     }
@@ -255,7 +255,7 @@ export function evaluateAuditPolicy(
         .join(", ")}`,
     );
   }
-  const stale = [...allowanceByKey.keys()].filter((key) => !matchedAllowanceKeys.has(key));
+  const stale = [...allowance_by_key.keys()].filter((key) => !matched_allowance_keys.has(key));
   if (stale.length > 0) {
     throw new Error(`Stale dependency audit allowances: ${stale.join(", ")}`);
   }
@@ -273,22 +273,22 @@ export async function runDependencyAudit(root = resolve(import.meta.dir, "..")):
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  const artifactRoot = resolve(root, "test-results/dependency-audit");
-  await mkdir(artifactRoot, { recursive: true });
-  await writeFile(resolve(artifactRoot, "bun-audit.json"), stdout);
-  await writeFile(resolve(artifactRoot, "bun-audit.stderr.txt"), stderr);
+  const artifact_root = resolve(root, "test-results/dependency-audit");
+  await mkdir(artifact_root, { recursive: true });
+  await writeFile(resolve(artifact_root, "bun-audit.json"), stdout);
+  await writeFile(resolve(artifact_root, "bun-audit.stderr.txt"), stderr);
 
-  const policyPath = resolve(root, "scripts/dependency-audit-allowlist.json");
-  const allowlist = parseAuditPolicyFile(JSON.parse(await readFile(policyPath, "utf8")));
-  const result = evaluateAuditPolicy({ stdout, stderr, exitCode }, allowlist);
-  const reportPath = resolve(artifactRoot, "policy-result.json");
-  await mkdir(dirname(reportPath), { recursive: true });
-  await writeFile(reportPath, `${JSON.stringify(result, null, 2)}\n`);
+  const policy_path = resolve(root, "scripts/dependency-audit-allowlist.json");
+  const allowlist = parseAuditPolicyFile(JSON.parse(await readFile(policy_path, "utf8")));
+  const result = evaluateAuditPolicy({ stdout, stderr, exitCode: exit_code }, allowlist);
+  const report_path = resolve(artifact_root, "policy-result.json");
+  await mkdir(dirname(report_path), { recursive: true });
+  await writeFile(report_path, `${JSON.stringify(result, null, 2)}\n`);
   console.log(
     `JavaScript dependency audit passed: ${result.findings.length} finding(s), ${result.findings.length} reviewed allowance(s)`,
   );

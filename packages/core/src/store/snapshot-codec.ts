@@ -61,11 +61,11 @@ export function decodeWorkbookSnapshot(
       ? cloneJsonValue(snapshot.workbook.externalLinks)
       : undefined,
     sheets: snapshot.sheets.map((source) => {
-      const rowHeights = new Map<number, number>();
-      const hiddenRows = new Set<number>();
+      const row_heights = new Map<number, number>();
+      const hidden_rows = new Set<number>();
       for (const [row, meta] of source.rowMeta ?? []) {
-        if (meta.height !== undefined) rowHeights.set(row, meta.height);
-        if (meta.hidden) hiddenRows.add(row);
+        if (meta.height !== undefined) row_heights.set(row, meta.height);
+        if (meta.hidden) hidden_rows.add(row);
       }
 
       return {
@@ -78,8 +78,8 @@ export function decodeWorkbookSnapshot(
         columns: cloneJsonValue(source.columns) ?? [],
         frozenRows: source.frozenRows,
         frozenCols: source.frozenCols,
-        rowHeights: rowHeights.size > 0 ? rowHeights : undefined,
-        hiddenRows: hiddenRows.size > 0 ? hiddenRows : undefined,
+        rowHeights: row_heights.size > 0 ? row_heights : undefined,
+        hiddenRows: hidden_rows.size > 0 ? hidden_rows : undefined,
         merges: cloneJsonValue(source.merges),
         conditionalFormats: cloneJsonValue(source.conditionalFormats),
         hyperlinks: cloneJsonValue(source.hyperlinks),
@@ -111,11 +111,11 @@ export class StoreSnapshotCodec {
 
   encode(documentId: string | undefined, documentVersion: number | undefined): WorkbookSnapshot {
     const sheets: SheetSnapshot[] = this.workbook.sheets.map((sheet, order) => {
-      const rowMetaRows = new Set<number>([
+      const row_meta_rows = new Set<number>([
         ...(sheet.rowHeights?.keys() ?? []),
         ...(sheet.hiddenRows?.values() ?? []),
       ]);
-      const rowMeta = [...rowMetaRows]
+      const row_meta = [...row_meta_rows]
         .sort((left, right) => left - right)
         .map(
           (row) =>
@@ -143,7 +143,7 @@ export class StoreSnapshotCodec {
         const formula = sources.formulaAt(index);
         const target = sources.referenceAt(index);
         const style = persisted.styles[index] ?? {};
-        const hasStyle = Object.keys(style).length > 0;
+        const has_style = Object.keys(style).length > 0;
         const value: CellValue = formula
           ? { kind: "formula", src: formula }
           : target
@@ -153,7 +153,7 @@ export class StoreSnapshotCodec {
           rowOffset: row,
           colOffset: col,
           value,
-          ...(hasStyle ? { style: cloneJsonValue(style) } : {}),
+          ...(has_style ? { style: cloneJsonValue(style) } : {}),
         });
       }
 
@@ -168,7 +168,7 @@ export class StoreSnapshotCodec {
         columns: cloneJsonValue(sheet.columns) ?? [],
         ...(sheet.frozenRows !== undefined ? { frozenRows: sheet.frozenRows } : {}),
         ...(sheet.frozenCols !== undefined ? { frozenCols: sheet.frozenCols } : {}),
-        ...(rowMeta.length > 0 ? { rowMeta: rowMeta.map(([row, meta]) => [row, meta]) } : {}),
+        ...(row_meta.length > 0 ? { rowMeta: row_meta.map(([row, meta]) => [row, meta]) } : {}),
         ...(sheet.merges?.length ? { merges: cloneJsonValue(sheet.merges) } : {}),
         ...(sheet.conditionalFormats?.length
           ? { conditionalFormats: cloneJsonValue(sheet.conditionalFormats) }

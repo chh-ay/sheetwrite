@@ -11,7 +11,7 @@ import { nf } from "./vault-data.js";
 const ROWS_SHOWN = 8;
 
 /** Where a warning applies: a cell, a sheet or a package part. */
-function warningPlace(warning: XlsxWorkbookWarning): string {
+function warning_place(warning: XlsxWorkbookWarning): string {
   if (warning.sheet !== undefined) {
     return warning.cell === undefined ? warning.sheet : `${warning.sheet}!${warning.cell}`;
   }
@@ -19,19 +19,19 @@ function warningPlace(warning: XlsxWorkbookWarning): string {
 }
 
 /** The warning codes in the log, each with how many times it occurs. */
-function codeCounts(warnings: readonly XlsxWorkbookWarning[]): [string, number][] {
+function code_counts(warnings: readonly XlsxWorkbookWarning[]): [string, number][] {
   const counts = new Map<string, number>();
   for (const warning of warnings) counts.set(warning.code, (counts.get(warning.code) ?? 0) + 1);
   return [...counts];
 }
 
 function WarningTable(props: Readonly<{ warnings: readonly XlsxWorkbookWarning[] }>) {
-  const [expanded, setExpanded] = createSignal(false);
+  const [expanded, set_expanded] = createSignal(false);
   const rows = () => (expanded() ? props.warnings : props.warnings.slice(0, ROWS_SHOWN));
   return (
     <>
       <ul aria-label="Warnings by code" class="sw-lab-chips sw-lab-chips--codes">
-        <For each={codeCounts(props.warnings)}>
+        <For each={code_counts(props.warnings)}>
           {([code, count]) => (
             <li>
               <code>{code}</code> × {nf(count)}
@@ -56,7 +56,7 @@ function WarningTable(props: Readonly<{ warnings: readonly XlsxWorkbookWarning[]
                   <code class="sw-si-warncode">{warning.code}</code>
                 </td>
                 <td>
-                  <code>{warningPlace(warning)}</code>
+                  <code>{warning_place(warning)}</code>
                 </td>
                 <td>{warning.message}</td>
               </tr>
@@ -65,7 +65,7 @@ function WarningTable(props: Readonly<{ warnings: readonly XlsxWorkbookWarning[]
         </tbody>
       </table>
       <Show when={props.warnings.length > ROWS_SHOWN && !expanded()}>
-        <button class="sw-lab-more" onClick={() => setExpanded(true)} type="button">
+        <button class="sw-lab-more" onClick={() => set_expanded(true)} type="button">
           Show all {nf(props.warnings.length)} warnings
         </button>
       </Show>
@@ -116,7 +116,7 @@ export function OperationEvidence() {
                 label={log().operation}
                 stats={
                   <span>
-                    <b>{nf(codeCounts(log().warnings).length)}</b> reason codes
+                    <b>{nf(code_counts(log().warnings).length)}</b> reason codes
                   </span>
                 }
                 testId="interop-warning-count"

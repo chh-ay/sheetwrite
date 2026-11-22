@@ -11,7 +11,7 @@ import {
   roundTripFormatting,
 } from "../src/showcases/scenarios/formatting.js";
 
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 let grid: Grid | null = null;
 let host: HTMLElement | null = null;
 
@@ -19,14 +19,14 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
 });
 afterEach(() => {
   grid?.destroy();
   host?.remove();
   grid = null;
   host = null;
-  restoreCanvas();
+  restore_canvas();
 });
 
 it("round-trips live edits rather than the seed, including General overriding the currency column", async () => {

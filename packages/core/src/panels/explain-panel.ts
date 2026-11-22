@@ -16,21 +16,21 @@ import { panelSection, rebuildPanel } from "./panel-dom.js";
 
 const NO_FORMULA = "Select a cell with a formula to explain it.";
 
-function paragraph(text: string, className = "sheetwrite-explain-text"): HTMLElement {
+function paragraph(text: string, class_name = "sheetwrite-explain-text"): HTMLElement {
   const element = document.createElement("p");
-  element.className = className;
+  element.className = class_name;
   element.textContent = text;
   return element;
 }
 
-function listOf(items: readonly HTMLElement[]): HTMLElement {
+function list_of(items: readonly HTMLElement[]): HTMLElement {
   const list = document.createElement("ul");
   list.className = "sheetwrite-explain-list";
   list.append(...items);
   return list;
 }
 
-function listItem(...parts: (string | Node)[]): HTMLElement {
+function list_item(...parts: (string | Node)[]): HTMLElement {
   const item = document.createElement("li");
   item.append(...parts);
   return item;
@@ -51,7 +51,7 @@ function strong(text: string): HTMLElement {
 }
 
 /** The formula text with each reference in its colour. */
-function formulaLine(text: string, references: readonly FormulaReference[]): HTMLElement {
+function formula_line(text: string, references: readonly FormulaReference[]): HTMLElement {
   const code = document.createElement("code");
   code.className = "sheetwrite-explain-formula";
 
@@ -66,12 +66,12 @@ function formulaLine(text: string, references: readonly FormulaReference[]): HTM
   return code;
 }
 
-/** The text of each argument of the call whose name token is `nameIndex`. */
-function callArguments(text: string, analysis: FormulaAnalysis, nameIndex: number): string[] {
+/** The text of each argument of the call whose name token is `name_index`. */
+function call_arguments(text: string, analysis: FormulaAnalysis, name_index: number): string[] {
   const args: string[] = [];
   let depth = 0;
   let start = -1;
-  for (const token of analysis.tokens.slice(nameIndex + 1)) {
+  for (const token of analysis.tokens.slice(name_index + 1)) {
     const char = text.charAt(token.from);
     if (token.kind === "paren" && (char === "(" || char === "{")) {
       depth += 1;
@@ -98,7 +98,7 @@ function callArguments(text: string, analysis: FormulaAnalysis, nameIndex: numbe
  * metadata (a LET or LAMBDA name, or any name before the list loads) shows
  * alone; the Problems section reports names the formula cannot call.
  */
-function functionItems(
+function function_items(
   text: string,
   analysis: FormulaAnalysis,
   functions: ReadonlyMap<string, FormulaFunctionMetadata>,
@@ -108,26 +108,26 @@ function functionItems(
 
     const name = text.slice(token.from, token.to).toUpperCase();
     const fn = functions.get(name);
-    if (fn === undefined) return [listItem(strong(name))];
+    if (fn === undefined) return [list_item(strong(name))];
 
-    const args = callArguments(text, analysis, index).map((argument, position) =>
-      listItem(
+    const args = call_arguments(text, analysis, index).map((argument, position) =>
+      list_item(
         strong(argumentOf(fn, position)?.name ?? `argument ${position + 1}`),
         `: ${argument}`,
       ),
     );
-    const item = listItem(strong(signature(fn)), `: ${fn.description}`);
-    if (args.length > 0) item.append(listOf(args));
+    const item = list_item(strong(signature(fn)), `: ${fn.description}`);
+    if (args.length > 0) item.append(list_of(args));
     return [item];
   });
 }
 
-function cellWord(count: number): string {
+function cell_word(count: number): string {
   return count === 1 ? "1 cell" : `${count} cells`;
 }
 
 /** One entry per distinct reference: its text, its sheet and its size. */
-function referenceItems(text: string, references: readonly FormulaReference[]): HTMLElement[] {
+function reference_items(text: string, references: readonly FormulaReference[]): HTMLElement[] {
   const seen = new Set<number>();
   return references.flatMap((reference) => {
     if (seen.has(reference.colorIndex)) return [];
@@ -137,11 +137,11 @@ function referenceItems(text: string, references: readonly FormulaReference[]): 
     const columns = reference.end.col - reference.start.col + 1;
     const where = reference.sheet === null ? "this sheet" : `sheet ${reference.sheet}`;
     const label = coloured(text.slice(reference.from, reference.to), reference);
-    return [listItem(label, `: ${cellWord(rows * columns)} on ${where}`)];
+    return [list_item(label, `: ${cell_word(rows * columns)} on ${where}`)];
   });
 }
 
-function buildExplanation(
+function build_explanation(
   body: HTMLElement,
   grid: Grid,
   functions: readonly FormulaFunctionMetadata[],
@@ -155,30 +155,30 @@ function buildExplanation(
   }
 
   const analysis = analyzeFormula(text, text.length, functions);
-  const byName = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
+  const by_name = new Map(functions.map((fn) => [fn.name.toUpperCase(), fn]));
   const cell = `${colToA1(input.address.col)}${input.address.row + 1}`;
 
   const formula = panelSection(`Formula in ${cell}`);
-  formula.append(formulaLine(text, analysis.references));
+  formula.append(formula_line(text, analysis.references));
   body.append(formula);
 
-  const calls = functionItems(text, analysis, byName);
+  const calls = function_items(text, analysis, by_name);
   if (calls.length > 0) {
     const section = panelSection("Functions");
-    section.append(listOf(calls));
+    section.append(list_of(calls));
     body.append(section);
   }
 
-  const references = referenceItems(text, analysis.references);
+  const references = reference_items(text, analysis.references);
   if (references.length > 0) {
     const section = panelSection("References");
-    section.append(listOf(references));
+    section.append(list_of(references));
     body.append(section);
   }
 
   if (analysis.diagnostics.length > 0) {
     const section = panelSection("Problems");
-    section.append(listOf(analysis.diagnostics.map((entry) => listItem(entry.message))));
+    section.append(list_of(analysis.diagnostics.map((entry) => list_item(entry.message))));
     body.append(section);
   }
 }
@@ -191,7 +191,7 @@ export function explainPanel(grid: Grid): GridPanel {
       let functions: readonly FormulaFunctionMetadata[] = [];
       let disposed = false;
       const draw = (): void =>
-        rebuildPanel(body, (target) => buildExplanation(target, grid, functions));
+        rebuildPanel(body, (target) => build_explanation(target, grid, functions));
 
       draw();
       storeFunctions(grid.store).then(

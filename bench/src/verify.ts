@@ -93,7 +93,7 @@ function record(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function validateViewIndexArtifact(value: unknown): void {
+function validate_view_index_artifact(value: unknown): void {
   const artifact = record(value, "view-index artifact");
   if (artifact.rows !== 1_000_000 || artifact.repeats !== 5) {
     throw new Error("view-index matrix identity changed");
@@ -105,11 +105,11 @@ function validateViewIndexArtifact(value: unknown): void {
     }
   }
   const gates = record(artifact.gates, "view-index gates");
-  const failedGates = Object.entries(gates)
+  const failed_gates = Object.entries(gates)
     .filter(([, passed]) => passed !== true)
     .map(([gate]) => gate);
-  if (Object.keys(gates).length === 0 || failedGates.length > 0) {
-    throw new Error(`view-index runtime gates failed: ${failedGates.join(", ") || "no gates"}`);
+  if (Object.keys(gates).length === 0 || failed_gates.length > 0) {
+    throw new Error(`view-index runtime gates failed: ${failed_gates.join(", ") || "no gates"}`);
   }
   for (const field of ["heapReduction", "lookupP95Regression"] as const) {
     if (typeof artifact[field] !== "number" || !Number.isFinite(artifact[field])) {
@@ -118,7 +118,7 @@ function validateViewIndexArtifact(value: unknown): void {
   }
 }
 
-function validateFamily(family: GateFamily, value: unknown): void {
+function validate_family(family: GateFamily, value: unknown): void {
   switch (family) {
     case "data":
       validateDataBenchmark(value as DataBenchmarkResult, "smoke");
@@ -139,7 +139,7 @@ function validateFamily(family: GateFamily, value: unknown): void {
       validateDatasourcePrefetchReport(value as PrefetchBenchmarkReport);
       break;
     case "view-index":
-      validateViewIndexArtifact(value);
+      validate_view_index_artifact(value);
       break;
     case "interaction":
       validateInteractionArtifact(value);
@@ -156,12 +156,14 @@ function validateFamily(family: GateFamily, value: unknown): void {
   }
 }
 
-function writeFailure(family: GateFamily, error: unknown): void {
+function write_failure(family: GateFamily, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`benchmark ${family} failed: ${message}\n`);
-  const artifactPath = resolve(ARTIFACT_ROOT, `${family}.json`);
-  if (existsSync(artifactPath)) {
-    process.stderr.write(`Failing ${family} measurements: ${readFileSync(artifactPath, "utf8")}\n`);
+  const artifact_path = resolve(ARTIFACT_ROOT, `${family}.json`);
+  if (existsSync(artifact_path)) {
+    process.stderr.write(
+      `Failing ${family} measurements: ${readFileSync(artifact_path, "utf8")}\n`,
+    );
   }
 
   writeFileSync(
@@ -170,7 +172,7 @@ function writeFailure(family: GateFamily, error: unknown): void {
   );
 }
 
-async function verifyCommandFamily(
+async function verify_command_family(
   family: Exclude<GateFamily, "render">,
   script: string,
 ): Promise<void> {
@@ -185,13 +187,13 @@ async function verifyCommandFamily(
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.stderr`), result.stderr);
   const value = commandArtifact(result, family);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.json`), `${JSON.stringify(value, null, 2)}\n`);
-  validateFamily(family, value);
+  validate_family(family, value);
   if (result.exitCode !== 0) throw new Error(`${family} smoke ${ending(result)}`);
 }
 
-async function verifyRender(): Promise<void> {
-  const jsonPath = resolve(ARTIFACT_ROOT, "render.json");
-  const markdownPath = resolve(ARTIFACT_ROOT, "render.md");
+async function verify_render(): Promise<void> {
+  const json_path = resolve(ARTIFACT_ROOT, "render.json");
+  const markdown_path = resolve(ARTIFACT_ROOT, "render.md");
   const result = await command([
     "bun",
     "run",
@@ -200,28 +202,28 @@ async function verifyRender(): Promise<void> {
     "--engine",
     "sheetwrite",
     "--output",
-    jsonPath,
+    json_path,
     "--markdown-output",
-    markdownPath,
+    markdown_path,
   ]);
   writeFileSync(resolve(ARTIFACT_ROOT, "render.stdout"), result.stdout);
   writeFileSync(resolve(ARTIFACT_ROOT, "render.stderr"), result.stderr);
-  if (!(await Bun.file(jsonPath).exists())) {
+  if (!(await Bun.file(json_path).exists())) {
     throw new Error(`render smoke ${ending(result)} without a structured artifact`);
   }
-  const raw = readFileSync(jsonPath, "utf8");
+  const raw = readFileSync(json_path, "utf8");
   const artifact = validateRenderGateArtifact(JSON.parse(raw) as unknown, "smoke", {
     nowMs: Date.now(),
     maxAgeMs: 60 * 60 * 1_000,
   });
-  const markdown = readFileSync(markdownPath, "utf8");
+  const markdown = readFileSync(markdown_path, "utf8");
   if (markdown !== renderBenchmarkMarkdown(artifact)) {
     throw new Error("render smoke Markdown is not the byte-stable view of its raw artifact");
   }
   if (result.exitCode !== 0) throw new Error(`render smoke ${ending(result)}`);
 }
 
-async function verifyFixture(specification: string): Promise<void> {
+async function verify_fixture(specification: string): Promise<void> {
   const separator = specification.indexOf(":");
   const family = specification.slice(0, separator) as GateFamily;
   const path = specification.slice(separator + 1);
@@ -230,26 +232,26 @@ async function verifyFixture(specification: string): Promise<void> {
   }
   const raw = readFileSync(resolve(path), "utf8");
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.json`), raw);
-  validateFamily(family, JSON.parse(raw) as unknown);
+  validate_family(family, JSON.parse(raw) as unknown);
 }
 
 export async function runVerification(args: readonly string[]): Promise<number> {
   rmSync(ARTIFACT_ROOT, { recursive: true, force: true });
   mkdirSync(ARTIFACT_ROOT, { recursive: true });
   if (args.includes("--report-only")) {
-    writeFailure("data", new Error("CI-facing verification rejects --report-only"));
+    write_failure("data", new Error("CI-facing verification rejects --report-only"));
     return 1;
   }
 
-  const fixtureIndex = args.indexOf("--fixture");
-  if (fixtureIndex >= 0) {
-    const specification = args[fixtureIndex + 1] ?? "";
+  const fixture_index = args.indexOf("--fixture");
+  if (fixture_index >= 0) {
+    const specification = args[fixture_index + 1] ?? "";
     const family = specification.slice(0, specification.indexOf(":")) as GateFamily;
     try {
-      await verifyFixture(specification);
+      await verify_fixture(specification);
       return 0;
     } catch (error) {
-      writeFailure(GATE_FAMILIES.includes(family) ? family : "data", error);
+      write_failure(GATE_FAMILIES.includes(family) ? family : "data", error);
       return 1;
     }
   }
@@ -266,16 +268,16 @@ export async function runVerification(args: readonly string[]): Promise<number> 
     ["interaction", "src/interaction-bench.ts"],
   ] as const) {
     try {
-      await verifyCommandFamily(family, script);
+      await verify_command_family(family, script);
     } catch (error) {
-      writeFailure(family, error);
+      write_failure(family, error);
       return 1;
     }
   }
   try {
-    await verifyRender();
+    await verify_render();
   } catch (error) {
-    writeFailure("render", error);
+    write_failure("render", error);
     return 1;
   }
   process.stderr.write(`benchmark smoke and safety checks passed; artifacts: ${ARTIFACT_ROOT}\n`);

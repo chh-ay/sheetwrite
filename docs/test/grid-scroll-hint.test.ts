@@ -6,15 +6,15 @@ import {
   RecordingResizeObserver,
 } from "./resize-observer-recorder.js";
 
-let restoreResizeObserver: () => void = () => {};
+let restore_resize_observer: () => void = () => {};
 
 beforeEach(() => {
-  restoreResizeObserver = installRecordingResizeObserver();
+  restore_resize_observer = installRecordingResizeObserver();
   document.body.replaceChildren();
 });
 
 afterEach(() => {
-  restoreResizeObserver();
+  restore_resize_observer();
   document.body.replaceChildren();
 });
 

@@ -91,8 +91,8 @@ export function FrameworkPage(props: FrameworkPageProps) {
     { label: "Owns", value: OWNS[props.framework] },
     { label: "Version", value: `Sheetwrite ${corePackage.version}` },
   ];
-  const detailsId = `${props.framework}-runtime-details`;
-  const panelsId = `${props.framework}-panels`;
+  const details_id = `${props.framework}-runtime-details`;
+  const panels_id = `${props.framework}-panels`;
 
   return (
     <div class="sw-showcase-frame sw-showcase-frame--workbench">
@@ -130,10 +130,10 @@ export function FrameworkPage(props: FrameworkPageProps) {
 
         <Show when={props.panels}>
           {(panels) => (
-            <section aria-labelledby={panelsId} class="sw-showcase-page__panels">
+            <section aria-labelledby={panels_id} class="sw-showcase-page__panels">
               <header>
                 <p class="sw-showcase-page__eyebrow">Inside the workbench</p>
-                <h2 id={panelsId}>What each panel does.</h2>
+                <h2 id={panels_id}>What each panel does.</h2>
                 <p>
                   The live example above has these panels. Their controls work through the adapter
                   and the public Grid API; the code below shows the calls.
@@ -173,10 +173,10 @@ export function FrameworkPage(props: FrameworkPageProps) {
           )}
         </Show>
 
-        <section aria-labelledby={detailsId} class="sw-showcase-page__proof">
+        <section aria-labelledby={details_id} class="sw-showcase-page__proof">
           <header>
             <p class="sw-showcase-page__eyebrow">Public API in use</p>
-            <h2 id={detailsId}>What this example demonstrates.</h2>
+            <h2 id={details_id}>What this example demonstrates.</h2>
             <p>
               No mock controls or copied state. Every interaction above crosses the public adapter
               and Grid APIs.

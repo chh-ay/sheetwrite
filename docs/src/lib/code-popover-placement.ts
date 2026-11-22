@@ -60,7 +60,7 @@ export interface PanelFrame {
 export function panelFrame(side: PanelSide, input: PlacementInput): PanelFrame {
   const { trigger, panel, viewport, gap } = input;
   const left = Math.max(viewport.left, Math.min(trigger.left, viewport.right - panel.width));
-  const maxHeight = Math.max(0, Math.min(panel.height, room(input)[side]));
-  const top = side === "below" ? trigger.bottom + gap : trigger.top - gap - maxHeight;
-  return { left, top, maxHeight };
+  const max_height = Math.max(0, Math.min(panel.height, room(input)[side]));
+  const top = side === "below" ? trigger.bottom + gap : trigger.top - gap - max_height;
+  return { left, top, maxHeight: max_height };
 }

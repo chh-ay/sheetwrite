@@ -2,15 +2,15 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "@playwright/test";
 
-const requestedSitePort = Number(process.env.SHEETWRITE_TEST_PORT ?? 4173);
+const requested_site_port = Number(process.env.SHEETWRITE_TEST_PORT ?? 4173);
 if (
-  !Number.isSafeInteger(requestedSitePort) ||
-  requestedSitePort < 1 ||
-  requestedSitePort > 65_535
+  !Number.isSafeInteger(requested_site_port) ||
+  requested_site_port < 1 ||
+  requested_site_port > 65_535
 ) {
   throw new Error(`Invalid SHEETWRITE_TEST_PORT: ${process.env.SHEETWRITE_TEST_PORT ?? ""}`);
 }
-const SITE_PORT = requestedSitePort;
+const SITE_PORT = requested_site_port;
 export function siteUrl(path = "/"): string {
   return `http://localhost:${SITE_PORT}${path.startsWith("/") ? path : `/${path}`}`;
 }

@@ -42,18 +42,18 @@ type Contradiction = "none" | "single" | "pair";
  * A number written in the formula itself, outside references: the `31` of
  * `=D11*31`. Neighbours copied across days or months often differ in it.
  */
-function hasLiteralNumber(formula: string): boolean {
+function has_literal_number(formula: string): boolean {
   const text = formula.replace(/"[^"]*"/g, '""');
   // One pass over runs of digits and dots, so a long run costs its length once (#219: a
   // backtracking pattern took quadratic time on a long digit run followed by a letter).
   let index = 0;
   while (index < text.length) {
-    if (!isDigit(text.charCodeAt(index))) {
+    if (!is_digit(text.charCodeAt(index))) {
       index++;
       continue;
     }
     const start = index;
-    while (index < text.length && isDigitOrDot(text.charCodeAt(index))) index++;
+    while (index < text.length && is_digit_or_dot(text.charCodeAt(index))) index++;
     // A run inside a reference (`D11`, `$D$11`, `1:3`) or followed by a letter or `(` (`1E5`,
     // a name) is not a number of the formula's own.
     if (
@@ -71,12 +71,12 @@ const NOT_BEFORE_NUMBER = /[A-Za-z$.:]/;
 /** Characters that make a preceding digit run part of a name or a number in E notation. */
 const NOT_AFTER_NUMBER = /[A-Za-z(]/;
 
-function isDigit(code: number): boolean {
+function is_digit(code: number): boolean {
   return code >= 48 && code <= 57;
 }
 
-function isDigitOrDot(code: number): boolean {
-  return isDigit(code) || code === 46;
+function is_digit_or_dot(code: number): boolean {
+  return is_digit(code) || code === 46;
 }
 
 /**
@@ -84,7 +84,7 @@ function isDigitOrDot(code: number): boolean {
  * gave it and whether both neighbours on a side did, what the other
  * neighbours said, and whether it holds numbers of its own.
  */
-function reasonOf(moved: Moved, contradiction: Contradiction): string {
+function reason_of(moved: Moved, contradiction: Contradiction): string {
   const { sides, formula } = moved;
   const on = (side: Side): number => sides.get(side) ?? 0;
   let reason: string;
@@ -97,11 +97,11 @@ function reasonOf(moved: Moved, contradiction: Contradiction): string {
   }
   if (contradiction === "single") reason += ", contradicted";
   if (contradiction === "pair") reason += ", contradicted by a pair";
-  return hasLiteralNumber(formula) ? `${reason}, with numbers` : reason;
+  return has_literal_number(formula) ? `${reason}, with numbers` : reason;
 }
 
 /** The formulas next to the edited cell, moved to it. */
-function neighbourProposals(edit: FormulaEdit): Proposal[] {
+function neighbour_proposals(edit: FormulaEdit): Proposal[] {
   const { cell, reads } = edit;
   const moved = new Map<string, Moved>();
   /** Whether the cell holds a formula; one that moves off the sheet is no proposal. */
@@ -119,13 +119,13 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
     return true;
   };
 
-  let aboveFound = false;
-  for (const { side, dRow, dCol } of NEIGHBOURS) {
-    const found = read(side, cell.row + dRow, cell.col + dCol);
-    if (side === "above") aboveFound ||= found;
+  let above_found = false;
+  for (const { side, dRow: d_row, dCol: d_col } of NEIGHBOURS) {
+    const found = read(side, cell.row + d_row, cell.col + d_col);
+    if (side === "above") above_found ||= found;
   }
-  for (let distance = 3; !aboveFound && distance <= SEARCH_ABOVE; distance++) {
-    aboveFound = read("furtherAbove", cell.row - distance, cell.col);
+  for (let distance = 3; !above_found && distance <= SEARCH_ABOVE; distance++) {
+    above_found = read("furtherAbove", cell.row - distance, cell.col);
   }
 
   const all = [...moved.values()];
@@ -138,7 +138,7 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
     return {
       formula: entry.formula,
       signal: "neighbours" as const,
-      reason: reasonOf(entry, contradiction),
+      reason: reason_of(entry, contradiction),
     };
   });
   // Only neighbours on both sides of the cell agreeing are strong enough to show (#801 decision):
@@ -148,6 +148,6 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
 
 /** Open the neighbouring-formulas signal of one edit; it reads the neighbours once. */
 export function openNeighbours(edit: FormulaEdit): Signal {
-  const proposals = neighbourProposals(edit);
+  const proposals = neighbour_proposals(edit);
   return { proposals: () => proposals };
 }

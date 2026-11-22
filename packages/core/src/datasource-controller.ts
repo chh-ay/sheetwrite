@@ -51,7 +51,7 @@ const LOGICAL_FRAME_MS = 16.7;
 const SLOW_SCROLL_ROWS_PER_MS = 0.1;
 const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
-let datasourceClockForTest: (() => number) | undefined;
+let datasource_clock_for_test: (() => number) | undefined;
 
 /**
  * Installs a deterministic monotonic clock through the public testing entrypoint.
@@ -60,10 +60,10 @@ let datasourceClockForTest: (() => number) | undefined;
  * @returns A function that puts the previous clock back.
  */
 export function installDatasourceClockForTest(now: () => number): () => void {
-  const previous = datasourceClockForTest;
-  datasourceClockForTest = now;
+  const previous = datasource_clock_for_test;
+  datasource_clock_for_test = now;
   return () => {
-    datasourceClockForTest = previous;
+    datasource_clock_for_test = previous;
   };
 }
 
@@ -185,7 +185,7 @@ interface MutableTelemetry {
   destroyAborts: number;
 }
 
-function emptyTelemetry(): MutableTelemetry {
+function empty_telemetry(): MutableTelemetry {
   return {
     measuredFrames: 0,
     residentFrames: 0,
@@ -205,14 +205,14 @@ function emptyTelemetry(): MutableTelemetry {
   };
 }
 
-function normalizeRowCount(rowCount: number): number {
-  if (!Number.isFinite(rowCount) || !Number.isSafeInteger(rowCount)) {
+function normalize_row_count(row_count: number): number {
+  if (!Number.isFinite(row_count) || !Number.isSafeInteger(row_count)) {
     throw datasourceFailure("Datasource row count must be a finite safe integer");
   }
-  return Math.max(0, rowCount);
+  return Math.max(0, row_count);
 }
 
-function normalizeBounds(start: number, end: number, rowCount: number): RowBand {
+function normalize_bounds(start: number, end: number, row_count: number): RowBand {
   if (
     !Number.isFinite(start) ||
     !Number.isFinite(end) ||
@@ -221,41 +221,41 @@ function normalizeBounds(start: number, end: number, rowCount: number): RowBand 
   ) {
     throw datasourceFailure("Datasource row bounds must be finite and safely representable");
   }
-  const normalizedStart = Math.min(rowCount, Math.max(0, Math.floor(start)));
-  const normalizedEnd = Math.min(rowCount, Math.max(normalizedStart, Math.ceil(end)));
-  return { start: normalizedStart, end: normalizedEnd };
+  const normalized_start = Math.min(row_count, Math.max(0, Math.floor(start)));
+  const normalized_end = Math.min(row_count, Math.max(normalized_start, Math.ceil(end)));
+  return { start: normalized_start, end: normalized_end };
 }
 
-function rowsIntersect(a: RowBand, b: RowBand): boolean {
+function rows_intersect(a: RowBand, b: RowBand): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
-function columnsIntersect(a: readonly number[], b: readonly number[]): boolean {
+function columns_intersect(a: readonly number[], b: readonly number[]): boolean {
   let left = 0;
   let right = 0;
   while (left < a.length && right < b.length) {
-    const leftColumn = a[left]!;
-    const rightColumn = b[right]!;
-    if (leftColumn === rightColumn) return true;
-    if (leftColumn < rightColumn) left += 1;
+    const left_column = a[left]!;
+    const right_column = b[right]!;
+    if (left_column === right_column) return true;
+    if (left_column < right_column) left += 1;
     else right += 1;
   }
   return false;
 }
 
 /** How many of the ascending `columns` the ascending `wanted` also holds. */
-function sharedColumns(columns: readonly number[], wanted: readonly number[]): number {
+function shared_columns(columns: readonly number[], wanted: readonly number[]): number {
   let shared = 0;
   let left = 0;
   let right = 0;
   while (left < columns.length && right < wanted.length) {
-    const leftColumn = columns[left] ?? 0;
-    const rightColumn = wanted[right] ?? 0;
-    if (leftColumn === rightColumn) {
+    const left_column = columns[left] ?? 0;
+    const right_column = wanted[right] ?? 0;
+    if (left_column === right_column) {
       shared += 1;
       left += 1;
       right += 1;
-    } else if (leftColumn < rightColumn) {
+    } else if (left_column < right_column) {
       left += 1;
     } else {
       right += 1;
@@ -264,7 +264,7 @@ function sharedColumns(columns: readonly number[], wanted: readonly number[]): n
   return shared;
 }
 
-function columnsSubset(columns: readonly number[], superset: readonly number[]): boolean {
+function columns_subset(columns: readonly number[], superset: readonly number[]): boolean {
   let candidate = 0;
   let available = 0;
   while (candidate < columns.length && available < superset.length) {
@@ -280,7 +280,7 @@ function columnsSubset(columns: readonly number[], superset: readonly number[]):
   return candidate === columns.length;
 }
 
-function requestWithoutSignal(request: ActiveRequest): Omit<DataSourceRequest, "signal"> {
+function request_without_signal(request: ActiveRequest): Omit<DataSourceRequest, "signal"> {
   return {
     protocol: 2,
     sheet: request.sheet,
@@ -315,7 +315,7 @@ interface SpeculativePlan {
  * aligned to `align` so successive updates request whole bands; the span stays
  * inside `[0, limit)`.
  */
-function lookaheadSpan(
+function lookahead_span(
   view: RowBand,
   direction: -1 | 1,
   travel: number,
@@ -323,21 +323,21 @@ function lookaheadSpan(
   align: number,
   limit: number,
 ): RowBand & { landing: boolean } {
-  const landingMargin = Math.ceil(margin * LANDING_FAR_MARGIN_SHARE);
+  const landing_margin = Math.ceil(margin * LANDING_FAR_MARGIN_SHARE);
   if (direction > 0) {
     const edge = Math.floor(view.end / align) * align;
-    const landingStart = Math.floor((view.start + travel - margin) / align) * align;
-    const landing = landingStart > edge;
-    const start = Math.min(limit, Math.max(edge, landingStart));
-    const far = view.end + travel + (landing ? landingMargin : margin);
+    const landing_start = Math.floor((view.start + travel - margin) / align) * align;
+    const landing = landing_start > edge;
+    const start = Math.min(limit, Math.max(edge, landing_start));
+    const far = view.end + travel + (landing ? landing_margin : margin);
     const end = Math.min(limit, Math.ceil(far / align) * align);
     return { start, end: Math.max(start, end), landing };
   }
   const edge = Math.min(limit, Math.ceil(view.start / align) * align);
-  const landingEnd = Math.ceil((view.end - travel + margin) / align) * align;
-  const landing = landingEnd < edge;
-  const end = Math.max(0, Math.min(edge, landingEnd));
-  const far = view.start - travel - (landing ? landingMargin : margin);
+  const landing_end = Math.ceil((view.end - travel + margin) / align) * align;
+  const landing = landing_end < edge;
+  const end = Math.max(0, Math.min(edge, landing_end));
+  const far = view.start - travel - (landing ? landing_margin : margin);
   const start = Math.max(0, Math.floor(far / align) * align);
   return { start: Math.min(start, end), end, landing };
 }
@@ -346,14 +346,14 @@ function lookaheadSpan(
  * The run of consecutive physical columns that ends at the view's last
  * column: the part that scrolls sideways, after any frozen columns.
  */
-function trailingColumnRun(columns: readonly number[]): RowBand {
+function trailing_column_run(columns: readonly number[]): RowBand {
   const last = columns.at(-1) ?? 0;
   let first = columns.length - 1;
   while (first > 0 && columns[first - 1] === last - (columns.length - first)) first -= 1;
   return { start: last - (columns.length - 1 - first), end: last + 1 };
 }
 
-function columnRange(start: number, end: number): readonly number[] {
+function column_range(start: number, end: number): readonly number[] {
   return Object.freeze(Array.from({ length: end - start }, (_, offset) => start + offset));
 }
 
@@ -361,57 +361,57 @@ function columnRange(start: number, end: number): readonly number[] {
 export class DatasourceController {
   private readonly loaded = new SparseColumnIntervals();
   private readonly owners = new SparseColumnOwners();
-  private readonly visibleWaitStarted = new SparseColumnVisibleWaits();
-  private readonly activeIds = new Map<number, ActiveRequest>();
+  private readonly visible_wait_started = new SparseColumnVisibleWaits();
+  private readonly active_ids = new Map<number, ActiveRequest>();
   private readonly requests = new Set<ActiveRequest>();
-  private readonly durableDemand = new SparseColumnIntervals();
-  private viewportDemand: PendingDemand | null = null;
-  private formulaReadDemand: PendingDemand[] = [];
-  private speculativeDemand: PendingDemand[] = [];
-  private retryDemand: PendingDemand[] = [];
-  private drainingDemand = false;
-  private rowCount: number;
-  private nextRequestId = 1;
+  private readonly durable_demand = new SparseColumnIntervals();
+  private viewport_demand: PendingDemand | null = null;
+  private formula_read_demand: PendingDemand[] = [];
+  private speculative_demand: PendingDemand[] = [];
+  private retry_demand: PendingDemand[] = [];
+  private draining_demand = false;
+  private row_count: number;
+  private next_request_id = 1;
   private generation = 0;
   private destroyed = false;
-  private readonly rowMotion = new ScrollAxisMotion();
-  private readonly columnMotion = new ScrollAxisMotion();
-  private readonly fetchTimes: number[] = [];
-  private fetchTimeCursor = 0;
-  private fetchTimeP90Ms = DATASOURCE_DEFAULT_FETCH_MS;
-  private rowsLanding = false;
-  private telemetry = emptyTelemetry();
+  private readonly row_motion = new ScrollAxisMotion();
+  private readonly column_motion = new ScrollAxisMotion();
+  private readonly fetch_times: number[] = [];
+  private fetch_time_cursor = 0;
+  private fetch_time_p90_ms = DATASOURCE_DEFAULT_FETCH_MS;
+  private rows_landing = false;
+  private telemetry = empty_telemetry();
 
-  private lastViewport: {
+  private last_viewport: {
     start: number;
     end: number;
     columns: readonly number[];
   } | null = null;
 
-  private readonly visibleWaitDurations: VisibleWaitSample[] = [];
-  private visibleWaitSampleCursor = 0;
-  private schemaCache: SchemaSnapshot | null = null;
-  private lastCanonicalColumns: readonly number[] | null = null;
+  private readonly visible_wait_durations: VisibleWaitSample[] = [];
+  private visible_wait_sample_cursor = 0;
+  private schema_cache: SchemaSnapshot | null = null;
+  private last_canonical_columns: readonly number[] | null = null;
 
   constructor(
     private readonly options: DatasourceControllerOptions,
     rowCount: number,
   ) {
-    this.rowCount = normalizeRowCount(rowCount);
+    this.row_count = normalize_row_count(rowCount);
   }
 
   /** Requests demand-critical rows for exact canonical physical column indices. */
   ensureLoaded(start: number, end: number, indices: readonly number[]): void {
     if (!this.options.datasource || !this.options.loadable || this.destroyed) return;
 
-    const bounds = normalizeBounds(start, end, this.rowCount);
+    const bounds = normalize_bounds(start, end, this.row_count);
     if (bounds.start === bounds.end || indices.length === 0) return;
 
-    const columns = this.requestColumns(indices);
+    const columns = this.request_columns(indices);
     if (columns.length === 0) return;
 
-    this.durableDemand.add(columns, bounds.start, bounds.end);
-    this.drainDemand();
+    this.durable_demand.add(columns, bounds.start, bounds.end);
+    this.drain_demand();
   }
 
   /**
@@ -426,64 +426,64 @@ export class DatasourceController {
   ): void {
     if (this.destroyed) return;
 
-    const bounds = normalizeBounds(start, end, this.rowCount);
+    const bounds = normalize_bounds(start, end, this.row_count);
     if (bounds.start === bounds.end || indices.length === 0) {
-      this.viewportDemand = null;
-      this.formulaReadDemand =
+      this.viewport_demand = null;
+      this.formula_read_demand =
         this.options.datasource && this.options.loadable
-          ? this.formulaReadDemands(formulaBands)
+          ? this.formula_read_demands(formulaBands)
           : [];
-      this.speculativeDemand.length = 0;
-      this.visibleWaitStarted.clear();
-      this.drainDemand();
+      this.speculative_demand.length = 0;
+      this.visible_wait_started.clear();
+      this.drain_demand();
       return;
     }
 
-    const columns = this.requestColumns(indices);
+    const columns = this.request_columns(indices);
     if (columns.length === 0) return;
 
     const now = this.now();
-    const visibleRows = bounds.end - bounds.start;
-    const rowMove = this.rowMotion.record(now, bounds.start, visibleRows);
-    const columnRun = trailingColumnRun(columns);
-    this.columnMotion.record(now, columnRun.start, columnRun.end - columnRun.start);
-    const effectiveDirection: -1 | 1 =
-      this.rowMotion.direction === 0 ? 1 : this.rowMotion.direction;
+    const visible_rows = bounds.end - bounds.start;
+    const row_move = this.row_motion.record(now, bounds.start, visible_rows);
+    const column_run = trailing_column_run(columns);
+    this.column_motion.record(now, column_run.start, column_run.end - column_run.start);
+    const effective_direction: -1 | 1 =
+      this.row_motion.direction === 0 ? 1 : this.row_motion.direction;
 
-    this.lastViewport = { ...bounds, columns };
-    const plan = this.speculativePlan(bounds, columns, columnRun, effectiveDirection);
-    this.rowsLanding = plan.landing;
-    const formulaReads = this.formulaReadDemands(formulaBands);
+    this.last_viewport = { ...bounds, columns };
+    const plan = this.speculative_plan(bounds, columns, column_run, effective_direction);
+    this.rows_landing = plan.landing;
+    const formula_reads = this.formula_read_demands(formulaBands);
 
-    this.cancelObsoleteSpeculation(
+    this.cancel_obsolete_speculation(
       { ...bounds, columns },
       plan.keep,
-      formulaReads,
-      rowMove.jump ? "jump" : rowMove.reversal ? "reversal" : "obsolete",
-      rowMove.reversal || rowMove.jump,
+      formula_reads,
+      row_move.jump ? "jump" : row_move.reversal ? "reversal" : "obsolete",
+      row_move.reversal || row_move.jump,
     );
 
-    this.refreshPagedResidency(this.options.loadable, bounds.start, bounds.end, columns);
-    this.visibleWaitStarted.retain(columns, bounds.start, bounds.end, this.owners);
+    this.refresh_paged_residency(this.options.loadable, bounds.start, bounds.end, columns);
+    this.visible_wait_started.retain(columns, bounds.start, bounds.end, this.owners);
 
     for (const column of columns) {
       const resident = this.loaded.rows(column);
 
       if (!resident) {
-        this.visibleWaitStarted.addMissing(column, bounds.start, bounds.end, now);
+        this.visible_wait_started.addMissing(column, bounds.start, bounds.end, now);
       } else {
-        resident.forEachGap(bounds.start, bounds.end, (gapStart, gapEnd) => {
-          this.visibleWaitStarted.addMissing(column, gapStart, gapEnd, now);
+        resident.forEachGap(bounds.start, bounds.end, (gap_start, gap_end) => {
+          this.visible_wait_started.addMissing(column, gap_start, gap_end, now);
         });
       }
     }
 
-    const fullyResident = this.loaded.covers(bounds.start, bounds.end, columns);
+    const fully_resident = this.loaded.covers(bounds.start, bounds.end, columns);
     this.telemetry.measuredFrames += 1;
-    if (fullyResident) this.telemetry.residentFrames += 1;
+    if (fully_resident) this.telemetry.residentFrames += 1;
 
     if (this.options.datasource && this.options.loadable) {
-      this.viewportDemand = {
+      this.viewport_demand = {
         ...bounds,
         columns,
         priority: "visible",
@@ -493,61 +493,61 @@ export class DatasourceController {
         formulaReadOrigin: false,
         attempt: 0,
       };
-      this.formulaReadDemand = formulaReads;
-      this.setSpeculativeDemand(plan.fetch, visibleRows, effectiveDirection);
-      this.drainDemand();
+      this.formula_read_demand = formula_reads;
+      this.set_speculative_demand(plan.fetch, visible_rows, effective_direction);
+      this.drain_demand();
     } else {
-      this.viewportDemand = null;
-      this.formulaReadDemand.length = 0;
-      this.speculativeDemand.length = 0;
+      this.viewport_demand = null;
+      this.formula_read_demand.length = 0;
+      this.speculative_demand.length = 0;
     }
   }
 
   getTelemetry(): DatasourcePrefetchTelemetry {
-    const waits = [...this.visibleWaitDurations].sort((a, b) => a.duration - b.duration);
-    let visibleWaitSamples = 0;
-    for (const wait of waits) visibleWaitSamples += wait.rows;
+    const waits = [...this.visible_wait_durations].sort((a, b) => a.duration - b.duration);
+    let visible_wait_samples = 0;
+    for (const wait of waits) visible_wait_samples += wait.rows;
 
-    const p95Rank = Math.max(1, Math.ceil(visibleWaitSamples * 0.95));
-    let p95VisibleWaitMs = 0;
-    let rankedRows = 0;
+    const p95_rank = Math.max(1, Math.ceil(visible_wait_samples * 0.95));
+    let p95_visible_wait_ms = 0;
+    let ranked_rows = 0;
 
     for (const wait of waits) {
-      rankedRows += wait.rows;
-      if (rankedRows < p95Rank) continue;
+      ranked_rows += wait.rows;
+      if (ranked_rows < p95_rank) continue;
 
-      p95VisibleWaitMs = wait.duration;
+      p95_visible_wait_ms = wait.duration;
       break;
     }
 
-    const speculativeRows = new SparseIntervals();
-    let activeSpeculativeRequests = 0;
+    const speculative_rows = new SparseIntervals();
+    let active_speculative_requests = 0;
 
     for (const request of this.requests) {
       if (!request.speculativeOrigin) continue;
 
-      activeSpeculativeRequests += 1;
-      speculativeRows.add(request.start, request.end);
+      active_speculative_requests += 1;
+      speculative_rows.add(request.start, request.end);
     }
 
     const loadable = this.options.loadable;
     const sheet = this.options.activeSheet();
     const cache = loadable?.isPaged(sheet) ? loadable.getPagedStats(sheet) : null;
-    const visibleWaiting = this.visibleWaitStarted.rowUnion();
+    const visible_waiting = this.visible_wait_started.rowUnion();
 
     return {
-      direction: this.rowMotion.direction,
-      velocityRowsPerMs: this.rowMotion.velocity,
-      velocityColumnsPerMs: this.columnMotion.velocity,
-      fetchTimeP90Ms: this.fetchTimeP90Ms,
+      direction: this.row_motion.direction,
+      velocityRowsPerMs: this.row_motion.velocity,
+      velocityColumnsPerMs: this.column_motion.velocity,
+      fetchTimeP90Ms: this.fetch_time_p90_ms,
       measuredFrames: this.telemetry.measuredFrames,
       residentFrames: this.telemetry.residentFrames,
       residencyRatio:
         this.telemetry.measuredFrames === 0
           ? 1
           : this.telemetry.residentFrames / this.telemetry.measuredFrames,
-      visibleWaitSamples,
-      p95VisibleWaitMs,
+      visibleWaitSamples: visible_wait_samples,
+      p95VisibleWaitMs: p95_visible_wait_ms,
       maxVisibleWaitMs: waits.at(-1)?.duration ?? 0,
       requests: this.telemetry.requests,
       visibleRequests: this.telemetry.visibleRequests,
@@ -563,152 +563,152 @@ export class DatasourceController {
       resetAborts: this.telemetry.resetAborts,
       destroyAborts: this.telemetry.destroyAborts,
       activeRequests: this.requests.size,
-      activeSpeculativeRequests,
-      activeSpeculativeRows: speculativeRows.length,
+      activeSpeculativeRequests: active_speculative_requests,
+      activeSpeculativeRows: speculative_rows.length,
       loadedBands: this.loaded.bandCount,
       ownedBands: this.owners.bandCount,
-      visibleWaitingRows: visibleWaiting.length,
-      visibleWaitingBands: visibleWaiting.bandCount,
+      visibleWaitingRows: visible_waiting.length,
+      visibleWaitingBands: visible_waiting.bandCount,
       cacheChunks: cache?.chunks ?? 0,
       cacheAllocatedBytes: cache?.allocatedBytes ?? 0,
     };
   }
 
   getResourceOwners(): ResourceOwnerBytes[] {
-    const queuedDemandEntries =
-      this.durableDemand.bandCount +
-      (this.viewportDemand?.columns.length ?? 0) +
-      this.formulaReadDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
-      this.speculativeDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
-      this.retryDemand.reduce((sum, demand) => sum + demand.columns.length, 0);
-    const tileEntries =
-      this.loaded.bandCount + this.owners.bandCount + this.visibleWaitStarted.bandCount;
-    const tileColumns =
-      this.loaded.columnCount + this.owners.columnCount + this.visibleWaitStarted.columnCount;
-    const tileBytes = tileEntries * 32 + tileColumns * 48;
+    const queued_demand_entries =
+      this.durable_demand.bandCount +
+      (this.viewport_demand?.columns.length ?? 0) +
+      this.formula_read_demand.reduce((sum, demand) => sum + demand.columns.length, 0) +
+      this.speculative_demand.reduce((sum, demand) => sum + demand.columns.length, 0) +
+      this.retry_demand.reduce((sum, demand) => sum + demand.columns.length, 0);
+    const tile_entries =
+      this.loaded.bandCount + this.owners.bandCount + this.visible_wait_started.bandCount;
+    const tile_columns =
+      this.loaded.columnCount + this.owners.columnCount + this.visible_wait_started.columnCount;
+    const tile_bytes = tile_entries * 32 + tile_columns * 48;
 
-    let pendingRequestBytes = 0;
+    let pending_request_bytes = 0;
 
     for (const request of this.requests) {
-      pendingRequestBytes +=
+      pending_request_bytes +=
         192 +
         request.columns.length * 8 +
         request.bands.reduce((bytes, band) => bytes + 32 + band.keys.length * 8, 0);
     }
 
-    const requestIndexBytes = this.activeIds.size * 48;
-    const queuedDemandBytes = queuedDemandEntries * 40;
-    const waitSampleBytes = this.visibleWaitDurations.length * 16;
-    const schemaBytes =
-      this.schemaCache?.keys.reduce((bytes, key) => bytes + 16 + key.length * 2, 0) ?? 0;
-    const schemaIndexBytes =
-      schemaBytes +
-      (this.schemaCache?.keys.length ?? 0) * 8 +
-      (this.schemaCache?.allIndices?.length ?? 0) * 8 +
-      (this.schemaCache?.singletonIndices.size ?? 0) * 16;
+    const request_index_bytes = this.active_ids.size * 48;
+    const queued_demand_bytes = queued_demand_entries * 40;
+    const wait_sample_bytes = this.visible_wait_durations.length * 16;
+    const schema_bytes =
+      this.schema_cache?.keys.reduce((bytes, key) => bytes + 16 + key.length * 2, 0) ?? 0;
+    const schema_index_bytes =
+      schema_bytes +
+      (this.schema_cache?.keys.length ?? 0) * 8 +
+      (this.schema_cache?.allIndices?.length ?? 0) * 8 +
+      (this.schema_cache?.singletonIndices.size ?? 0) * 16;
 
     return [
       {
         owner: "js.datasource.tile-state",
-        logicalBytes: tileBytes,
-        allocatedBytes: tileBytes,
-        entries: tileEntries,
+        logicalBytes: tile_bytes,
+        allocatedBytes: tile_bytes,
+        entries: tile_entries,
         measurement: "hash-capacity-v1",
       },
       {
         owner: "js.datasource.pending-requests",
-        logicalBytes: pendingRequestBytes,
-        allocatedBytes: pendingRequestBytes,
+        logicalBytes: pending_request_bytes,
+        allocatedBytes: pending_request_bytes,
         entries: this.requests.size,
         measurement: "hash-capacity-v1",
       },
       {
         owner: "js.datasource.request-index",
-        logicalBytes: requestIndexBytes,
-        allocatedBytes: requestIndexBytes,
-        entries: this.activeIds.size,
+        logicalBytes: request_index_bytes,
+        allocatedBytes: request_index_bytes,
+        entries: this.active_ids.size,
         measurement: "hash-capacity-v1",
       },
       {
         owner: "js.datasource.queued-demand",
-        logicalBytes: queuedDemandBytes,
-        allocatedBytes: queuedDemandBytes,
-        entries: queuedDemandEntries,
+        logicalBytes: queued_demand_bytes,
+        allocatedBytes: queued_demand_bytes,
+        entries: queued_demand_entries,
         measurement: "hash-capacity-v1",
       },
       {
         owner: "js.datasource.wait-samples",
-        logicalBytes: waitSampleBytes,
-        allocatedBytes: waitSampleBytes,
-        entries: this.visibleWaitDurations.length,
+        logicalBytes: wait_sample_bytes,
+        allocatedBytes: wait_sample_bytes,
+        entries: this.visible_wait_durations.length,
         measurement: "exact-capacity",
       },
       {
         owner: "js.datasource.schema-index",
-        logicalBytes: schemaIndexBytes,
-        allocatedBytes: schemaIndexBytes,
-        entries: this.schemaCache?.keys.length ?? 0,
+        logicalBytes: schema_index_bytes,
+        allocatedBytes: schema_index_bytes,
+        entries: this.schema_cache?.keys.length ?? 0,
         measurement: "utf16-upper-bound",
       },
     ];
   }
 
   resetTelemetry(): void {
-    this.telemetry = emptyTelemetry();
-    this.visibleWaitDurations.length = 0;
-    this.visibleWaitSampleCursor = 0;
-    this.visibleWaitStarted.clear();
+    this.telemetry = empty_telemetry();
+    this.visible_wait_durations.length = 0;
+    this.visible_wait_sample_cursor = 0;
+    this.visible_wait_started.clear();
   }
 
   resize(rowCount: number): void {
-    const normalized = normalizeRowCount(rowCount);
-    if (this.rowCount !== normalized) this.reset(normalized);
+    const normalized = normalize_row_count(rowCount);
+    if (this.row_count !== normalized) this.reset(normalized);
   }
 
   reset(rowCount: number): void {
-    const normalized = normalizeRowCount(rowCount);
+    const normalized = normalize_row_count(rowCount);
     this.generation += 1;
-    this.durableDemand.clear();
-    this.viewportDemand = null;
-    this.formulaReadDemand.length = 0;
-    this.speculativeDemand.length = 0;
-    this.retryDemand.length = 0;
-    for (const request of [...this.requests]) this.abortRequest(request, "reset");
-    this.rowCount = normalized;
+    this.durable_demand.clear();
+    this.viewport_demand = null;
+    this.formula_read_demand.length = 0;
+    this.speculative_demand.length = 0;
+    this.retry_demand.length = 0;
+    for (const request of [...this.requests]) this.abort_request(request, "reset");
+    this.row_count = normalized;
     this.loaded.clear();
     this.owners.clear();
-    this.visibleWaitStarted.clear();
-    this.lastViewport = null;
-    this.schemaCache = null;
-    this.lastCanonicalColumns = null;
-    this.rowMotion.reset();
-    this.columnMotion.reset();
-    this.rowsLanding = false;
+    this.visible_wait_started.clear();
+    this.last_viewport = null;
+    this.schema_cache = null;
+    this.last_canonical_columns = null;
+    this.row_motion.reset();
+    this.column_motion.reset();
+    this.rows_landing = false;
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.generation += 1;
-    this.durableDemand.clear();
-    this.viewportDemand = null;
-    this.formulaReadDemand.length = 0;
-    this.speculativeDemand.length = 0;
-    this.retryDemand.length = 0;
-    for (const request of [...this.requests]) this.abortRequest(request, "destroy");
+    this.durable_demand.clear();
+    this.viewport_demand = null;
+    this.formula_read_demand.length = 0;
+    this.speculative_demand.length = 0;
+    this.retry_demand.length = 0;
+    for (const request of [...this.requests]) this.abort_request(request, "destroy");
     this.loaded.clear();
     this.owners.clear();
-    this.visibleWaitStarted.clear();
-    this.visibleWaitDurations.length = 0;
-    this.lastViewport = null;
-    this.schemaCache = null;
-    this.lastCanonicalColumns = null;
+    this.visible_wait_started.clear();
+    this.visible_wait_durations.length = 0;
+    this.last_viewport = null;
+    this.schema_cache = null;
+    this.last_canonical_columns = null;
   }
 
   private schema(): SchemaSnapshot {
     const sheet = this.options.activeSheet();
     const source = this.options.columns(sheet);
-    const cached = this.schemaCache;
+    const cached = this.schema_cache;
     if (cached?.sheet === sheet && cached.keys.length === source.length) {
       let equal = true;
       for (let index = 0; index < source.length; index += 1) {
@@ -735,12 +735,12 @@ export class DatasourceController {
       keys: Object.freeze(keys),
       singletonIndices: new Map(),
     };
-    this.schemaCache = snapshot;
-    this.lastCanonicalColumns = null;
+    this.schema_cache = snapshot;
+    this.last_canonical_columns = null;
     return snapshot;
   }
 
-  private requestColumns(indices: readonly number[]): readonly number[] {
+  private request_columns(indices: readonly number[]): readonly number[] {
     const schema = this.schema();
     const normalized = [...indices].sort((a, b) => a - b);
     let write = 0;
@@ -758,13 +758,13 @@ export class DatasourceController {
       if (datasource.capabilities?.protocol !== 2) {
         throw datasourceFailure("Datasource must declare protocol 2 capabilities");
       }
-      if (datasource.capabilities.columns === "full-width") return this.allColumns(schema);
+      if (datasource.capabilities.columns === "full-width") return this.all_columns(schema);
       if (datasource.capabilities.columns !== "windowed") {
         throw datasourceFailure("Datasource column capability must be windowed or full-width");
       }
     }
 
-    const previous = this.lastCanonicalColumns;
+    const previous = this.last_canonical_columns;
     if (
       previous?.length === normalized.length &&
       previous.every((column, index) => column === normalized[index])
@@ -772,12 +772,12 @@ export class DatasourceController {
       return previous;
     }
     const stable = Object.freeze(normalized);
-    this.lastCanonicalColumns = stable;
+    this.last_canonical_columns = stable;
     return stable;
   }
 
   /** Full-width compatibility shares this engine but is horizontally non-scalable. */
-  private allColumns(schema: SchemaSnapshot): readonly number[] {
+  private all_columns(schema: SchemaSnapshot): readonly number[] {
     if (!schema.allIndices) {
       schema.allIndices = Object.freeze(
         Array.from({ length: schema.keys.length }, (_, index) => index),
@@ -791,37 +791,37 @@ export class DatasourceController {
    * Spill admission needs known-empty source cells as well as loaded inputs;
    * neither prerequisite is necessarily covered by the viewport request.
    */
-  private formulaReadDemands(bands: Uint32Array): PendingDemand[] {
+  private formula_read_demands(bands: Uint32Array): PendingDemand[] {
     if (bands.length === 0) return [];
     const datasource = this.options.datasource;
     const schema = this.schema();
     const demands: PendingDemand[] = [];
     for (let index = 0; index < bands.length; index += 4) {
-      const rowStart = bands[index];
-      const rowEnd = bands[index + 1];
-      const columnStart = bands[index + 2];
-      const columnEnd = bands[index + 3];
+      const row_start = bands[index];
+      const row_end = bands[index + 1];
+      const column_start = bands[index + 2];
+      const column_end = bands[index + 3];
       if (
-        rowStart === undefined ||
-        rowEnd === undefined ||
-        columnStart === undefined ||
-        columnEnd === undefined
+        row_start === undefined ||
+        row_end === undefined ||
+        column_start === undefined ||
+        column_end === undefined
       ) {
         throw new Error("Sheetwrite: formula read bands are not a quad sequence");
       }
 
-      const rows = normalizeBounds(rowStart, rowEnd, this.rowCount);
-      const schemaColumnEnd = Math.min(columnEnd, schema.keys.length);
-      if (rows.start === rows.end || columnStart >= schemaColumnEnd) continue;
+      const rows = normalize_bounds(row_start, row_end, this.row_count);
+      const schema_column_end = Math.min(column_end, schema.keys.length);
+      if (rows.start === rows.end || column_start >= schema_column_end) continue;
       demands.push({
         ...rows,
         columns:
           datasource?.capabilities.columns === "full-width"
-            ? this.allColumns(schema)
+            ? this.all_columns(schema)
             : Object.freeze(
                 Array.from(
-                  { length: schemaColumnEnd - columnStart },
-                  (_, offset) => columnStart + offset,
+                  { length: schema_column_end - column_start },
+                  (_, offset) => column_start + offset,
                 ),
               ),
         priority: "visible",
@@ -836,7 +836,7 @@ export class DatasourceController {
     return demands;
   }
 
-  private canonicalBands(
+  private canonical_bands(
     columns: readonly number[],
     schema: SchemaSnapshot,
   ): readonly DataSourceColumnBand[] {
@@ -844,13 +844,13 @@ export class DatasourceController {
       columns.length === schema.keys.length &&
       columns.every((column, index) => column === index)
     ) {
-      if (!schema.allBands) schema.allBands = this.buildBands(columns, schema);
+      if (!schema.allBands) schema.allBands = this.build_bands(columns, schema);
       return schema.allBands;
     }
-    return this.buildBands(columns, schema);
+    return this.build_bands(columns, schema);
   }
 
-  private buildBands(
+  private build_bands(
     columns: readonly number[],
     schema: SchemaSnapshot,
   ): readonly DataSourceColumnBand[] {
@@ -875,18 +875,18 @@ export class DatasourceController {
     return Object.freeze(bands);
   }
 
-  private setSpeculativeDemand(
+  private set_speculative_demand(
     rectangles: readonly ColumnRectangle[],
-    bandRows: number,
+    band_rows: number,
     direction: -1 | 1,
   ): void {
-    this.speculativeDemand.length = 0;
+    this.speculative_demand.length = 0;
 
     for (const { start, end, columns } of rectangles) {
-      for (let offset = 0; offset < end - start; offset += bandRows) {
-        this.speculativeDemand.push({
-          start: direction > 0 ? start + offset : Math.max(start, end - offset - bandRows),
-          end: direction > 0 ? Math.min(end, start + offset + bandRows) : end - offset,
+      for (let offset = 0; offset < end - start; offset += band_rows) {
+        this.speculative_demand.push({
+          start: direction > 0 ? start + offset : Math.max(start, end - offset - band_rows),
+          end: direction > 0 ? Math.min(end, start + offset + band_rows) : end - offset,
           columns,
           priority: "speculative",
           direction,
@@ -899,27 +899,27 @@ export class DatasourceController {
     }
   }
 
-  private drainDemand(): void {
+  private drain_demand(): void {
     const datasource = this.options.datasource;
     const loadable = this.options.loadable;
-    if (!datasource || !loadable || this.destroyed || this.drainingDemand) return;
-    this.drainingDemand = true;
+    if (!datasource || !loadable || this.destroyed || this.draining_demand) return;
+    this.draining_demand = true;
     try {
       for (;;) {
-        if (this.viewportDemand) {
-          if (!this.dispatchRange(datasource, loadable, this.viewportDemand)) return;
-          this.viewportDemand = null;
+        if (this.viewport_demand) {
+          if (!this.dispatch_range(datasource, loadable, this.viewport_demand)) return;
+          this.viewport_demand = null;
           continue;
         }
 
-        const retry = this.retryDemand[0];
+        const retry = this.retry_demand[0];
         if (retry) {
-          if (!this.dispatchRange(datasource, loadable, retry)) return;
-          this.retryDemand.shift();
+          if (!this.dispatch_range(datasource, loadable, retry)) return;
+          this.retry_demand.shift();
           continue;
         }
 
-        const durable = this.durableDemand.firstRectangle();
+        const durable = this.durable_demand.firstRectangle();
         if (durable) {
           const demand: PendingDemand = {
             ...durable,
@@ -930,51 +930,51 @@ export class DatasourceController {
             formulaReadOrigin: false,
             attempt: 0,
           };
-          if (!this.dispatchRange(datasource, loadable, demand)) return;
-          this.durableDemand.remove(durable.columns, durable.start, durable.end);
+          if (!this.dispatch_range(datasource, loadable, demand)) return;
+          this.durable_demand.remove(durable.columns, durable.start, durable.end);
           continue;
         }
 
-        const formulaRead = this.formulaReadDemand[0];
-        if (formulaRead) {
-          if (!this.dispatchRange(datasource, loadable, formulaRead)) return;
-          this.formulaReadDemand.shift();
+        const formula_read = this.formula_read_demand[0];
+        if (formula_read) {
+          if (!this.dispatch_range(datasource, loadable, formula_read)) return;
+          this.formula_read_demand.shift();
           continue;
         }
 
-        const speculative = this.speculativeDemand[0];
+        const speculative = this.speculative_demand[0];
         if (!speculative) return;
-        const availableRows = this.remainingSpeculativeRows(speculative.columns.length);
-        if (availableRows === 0) return;
-        const dispatchEnd = Math.min(speculative.end, speculative.start + availableRows);
-        const portion = { ...speculative, end: dispatchEnd };
-        if (!this.dispatchRange(datasource, loadable, portion)) return;
-        if (dispatchEnd === speculative.end) this.speculativeDemand.shift();
-        else speculative.start = dispatchEnd;
+        const available_rows = this.remaining_speculative_rows(speculative.columns.length);
+        if (available_rows === 0) return;
+        const dispatch_end = Math.min(speculative.end, speculative.start + available_rows);
+        const portion = { ...speculative, end: dispatch_end };
+        if (!this.dispatch_range(datasource, loadable, portion)) return;
+        if (dispatch_end === speculative.end) this.speculative_demand.shift();
+        else speculative.start = dispatch_end;
       }
     } finally {
-      this.drainingDemand = false;
+      this.draining_demand = false;
     }
   }
 
-  private dispatchRange(
+  private dispatch_range(
     datasource: DataSource,
     loadable: SheetwriteStore,
     demand: PendingDemand,
   ): boolean {
-    this.refreshPagedResidency(loadable, demand.start, demand.end, demand.columns);
+    this.refresh_paged_residency(loadable, demand.start, demand.end, demand.columns);
     for (const column of demand.columns) {
       let row = demand.start;
       while (row < demand.end) {
-        const loadedBand = this.loaded.rows(column)?.atOrAfter(row);
-        if (loadedBand && loadedBand.start <= row) {
-          row = Math.min(demand.end, loadedBand.end);
+        const loaded_band = this.loaded.rows(column)?.atOrAfter(row);
+        if (loaded_band && loaded_band.start <= row) {
+          row = Math.min(demand.end, loaded_band.end);
           continue;
         }
 
-        const ownerBand = this.owners.rows(column)?.atOrAfter(row);
-        if (ownerBand && ownerBand.start <= row) {
-          const request = this.activeIds.get(ownerBand.owner);
+        const owner_band = this.owners.rows(column)?.atOrAfter(row);
+        if (owner_band && owner_band.start <= row) {
+          const request = this.active_ids.get(owner_band.owner);
           if (request) {
             if (demand.durableOrigin) request.durableDemand = true;
             if (demand.priority === "visible" && request.priority === "speculative") {
@@ -983,7 +983,7 @@ export class DatasourceController {
               this.telemetry.promotions += 1;
             }
           }
-          row = Math.min(demand.end, ownerBand.end);
+          row = Math.min(demand.end, owner_band.end);
           continue;
         }
 
@@ -991,39 +991,39 @@ export class DatasourceController {
           // While flinging, the view's own rows pass before a fetch returns: they do not
           // displace the speculation at the landing point.
           const preempted =
-            this.rowsLanding && demand.viewportOrigin
+            this.rows_landing && demand.viewportOrigin
               ? undefined
-              : this.preemptionCandidate(demand);
+              : this.preemption_candidate(demand);
           if (preempted && demand.priority === "visible") {
-            this.abortRequest(preempted, "obsolete");
+            this.abort_request(preempted, "obsolete");
             continue;
           }
           return false;
         }
 
-        const requestEnd = Math.min(
+        const request_end = Math.min(
           demand.end,
-          loadedBand?.start ?? demand.end,
-          ownerBand?.start ?? demand.end,
+          loaded_band?.start ?? demand.end,
+          owner_band?.start ?? demand.end,
         );
-        const requestColumns = demand.columns.filter((candidate) =>
-          this.tileUncovered(candidate, row, requestEnd),
+        const request_columns = demand.columns.filter((candidate) =>
+          this.tile_uncovered(candidate, row, request_end),
         );
-        this.requestBand(datasource, loadable, demand, row, requestEnd, requestColumns);
-        row = requestEnd;
+        this.request_band(datasource, loadable, demand, row, request_end, request_columns);
+        row = request_end;
       }
     }
     return true;
   }
 
-  private tileUncovered(column: number, start: number, end: number): boolean {
+  private tile_uncovered(column: number, start: number, end: number): boolean {
     return (
       !this.loaded.rows(column)?.intersects(start, end) &&
       !this.owners.rows(column)?.intersects(start, end)
     );
   }
 
-  private preemptionCandidate(demand: PendingDemand): ActiveRequest | undefined {
+  private preemption_candidate(demand: PendingDemand): ActiveRequest | undefined {
     let candidate = [...this.requests].find(
       (request) => request.priority === "speculative" && !request.durableDemand,
     );
@@ -1031,13 +1031,13 @@ export class DatasourceController {
     candidate = [...this.requests].find(
       (request) =>
         request.durableDemand &&
-        (!rowsIntersect(request, demand) || !columnsIntersect(request.columns, demand.columns)),
+        (!rows_intersect(request, demand) || !columns_intersect(request.columns, demand.columns)),
     );
-    if (candidate) this.durableDemand.add(candidate.columns, candidate.start, candidate.end);
+    if (candidate) this.durable_demand.add(candidate.columns, candidate.start, candidate.end);
     return candidate;
   }
 
-  private requestBand(
+  private request_band(
     datasource: DataSource,
     loadable: SheetwriteStore,
     demand: PendingDemand,
@@ -1046,16 +1046,22 @@ export class DatasourceController {
     columns: readonly number[],
   ): void {
     if (columns.length === 0 || start >= end) return;
-    const { priority, direction, viewportOrigin, durableOrigin, formulaReadOrigin, attempt } =
-      demand;
+    const {
+      priority,
+      direction,
+      viewportOrigin: viewport_origin,
+      durableOrigin: durable_origin,
+      formulaReadOrigin: formula_read_origin,
+      attempt,
+    } = demand;
     const schema = this.schema();
-    const bands = this.canonicalBands(columns, schema);
-    const id = this.allocateRequestId();
+    const bands = this.canonical_bands(columns, schema);
+    const id = this.allocate_request_id();
     this.owners.add(columns, start, end, id);
 
     const revision = this.options.revision();
     const controller = new AbortController();
-    const activeRequest: ActiveRequest = {
+    const active_request: ActiveRequest = {
       id,
       sheet: schema.sheet,
       start,
@@ -1067,9 +1073,9 @@ export class DatasourceController {
       controller,
       releaseRevision: this.options.retainRevision(revision),
       speculativeOrigin: priority === "speculative",
-      viewportOrigin,
-      formulaReadOrigin,
-      durableDemand: durableOrigin,
+      viewportOrigin: viewport_origin,
+      formulaReadOrigin: formula_read_origin,
+      durableDemand: durable_origin,
       priority,
       direction,
       attempt,
@@ -1077,20 +1083,21 @@ export class DatasourceController {
       released: false,
     };
 
-    this.activeIds.set(id, activeRequest);
-    this.requests.add(activeRequest);
+    this.active_ids.set(id, active_request);
+    this.requests.add(active_request);
     storeEngine(loadable)?.beginPageRequest();
 
-    const requestedRows = end - start;
+    const requested_rows = end - start;
     this.telemetry.requests += 1;
-    this.telemetry.requestedRows += requestedRows;
-    this.telemetry.estimatedRequestedBytes += requestedRows * columns.length * ESTIMATED_CELL_BYTES;
+    this.telemetry.requestedRows += requested_rows;
+    this.telemetry.estimatedRequestedBytes +=
+      requested_rows * columns.length * ESTIMATED_CELL_BYTES;
     if (priority === "visible") {
       this.telemetry.visibleRequests += 1;
-      this.telemetry.visibleRequestedRows += requestedRows;
+      this.telemetry.visibleRequestedRows += requested_rows;
     } else {
       this.telemetry.speculativeRequests += 1;
-      this.telemetry.speculativeRequestedRows += requestedRows;
+      this.telemetry.speculativeRequestedRows += requested_rows;
     }
 
     const request: DataSourceRequest = {
@@ -1108,16 +1115,16 @@ export class DatasourceController {
     try {
       pending = datasource.getRows(request);
     } catch (error) {
-      this.clearOwned(activeRequest);
-      this.visibleWaitStarted.discard(
-        activeRequest.columns,
-        activeRequest.start,
-        activeRequest.end,
+      this.clear_owned(active_request);
+      this.visible_wait_started.discard(
+        active_request.columns,
+        active_request.start,
+        active_request.end,
       );
-      this.finishRequest(activeRequest);
+      this.finish_request(active_request);
       queueMicrotask(() => {
         if (this.destroyed || generation !== this.generation || controller.signal.aborted) return;
-        this.options.onError(requestWithoutSignal(activeRequest), error);
+        this.options.onError(request_without_signal(active_request), error);
       });
 
       return;
@@ -1125,49 +1132,49 @@ export class DatasourceController {
 
     Promise.resolve(pending)
       .then((page) => {
-        if (!this.canHydrate(activeRequest, generation)) return;
-        const responseColumns = this.validatePage(page, activeRequest);
-        if (!this.canHydrate(activeRequest, generation)) return;
-        const loadedEnd = page.start + page.rows.length;
-        const progressed = page.rows.length > 0 && responseColumns.length > 0;
+        if (!this.can_hydrate(active_request, generation)) return;
+        const response_columns = this.validate_page(page, active_request);
+        if (!this.can_hydrate(active_request, generation)) return;
+        const loaded_end = page.start + page.rows.length;
+        const progressed = page.rows.length > 0 && response_columns.length > 0;
         if (progressed) {
-          loadable.loadPage(activeRequest.sheet, page.start, page.columns, page.rows, (address) =>
+          loadable.loadPage(active_request.sheet, page.start, page.columns, page.rows, (address) =>
             this.options.isCellNewerThan(address, revision),
           );
-          if (!this.canHydrate(activeRequest, generation)) return;
-          this.loaded.add(responseColumns, page.start, loadedEnd);
-          this.recordCompletedWaits(responseColumns, page.start, loadedEnd);
-          this.recordFetchTime(this.now() - activeRequest.startedAt);
+          if (!this.can_hydrate(active_request, generation)) return;
+          this.loaded.add(response_columns, page.start, loaded_end);
+          this.record_completed_waits(response_columns, page.start, loaded_end);
+          this.record_fetch_time(this.now() - active_request.startedAt);
           this.options.onRowsLoaded();
         }
 
-        if (!this.loaded.covers(activeRequest.start, activeRequest.end, activeRequest.columns)) {
-          if (!progressed && activeRequest.attempt >= DATASOURCE_NO_PROGRESS_RETRIES) {
+        if (!this.loaded.covers(active_request.start, active_request.end, active_request.columns)) {
+          if (!progressed && active_request.attempt >= DATASOURCE_NO_PROGRESS_RETRIES) {
             throw datasourceFailure("Datasource page made no coverage progress");
           }
 
-          this.requeuePartial(activeRequest, progressed ? 0 : activeRequest.attempt + 1);
+          this.requeue_partial(active_request, progressed ? 0 : active_request.attempt + 1);
         }
 
-        this.clearOwned(activeRequest);
+        this.clear_owned(active_request);
       })
       .catch((error: unknown) => {
-        if (!this.canHydrate(activeRequest, generation)) return;
-        this.clearOwned(activeRequest);
-        this.visibleWaitStarted.discard(
-          activeRequest.columns,
-          activeRequest.start,
-          activeRequest.end,
+        if (!this.can_hydrate(active_request, generation)) return;
+        this.clear_owned(active_request);
+        this.visible_wait_started.discard(
+          active_request.columns,
+          active_request.start,
+          active_request.end,
         );
-        this.options.onError(requestWithoutSignal(activeRequest), error);
+        this.options.onError(request_without_signal(active_request), error);
       })
       .finally(() => {
-        this.finishRequest(activeRequest);
-        if (!this.destroyed && generation === this.generation) this.drainDemand();
+        this.finish_request(active_request);
+        if (!this.destroyed && generation === this.generation) this.drain_demand();
       });
   }
 
-  private validatePage(page: DataSourcePage, request: ActiveRequest): readonly number[] {
+  private validate_page(page: DataSourcePage, request: ActiveRequest): readonly number[] {
     if (page?.protocol !== 2 || !Array.isArray(page.rows) || !Array.isArray(page.columns)) {
       throw datasourceFailure("Datasource page must use protocol 2 arrays");
     }
@@ -1176,13 +1183,13 @@ export class DatasourceController {
       throw datasourceFailure("Datasource page start must be a safe integer");
     }
 
-    const loadedEnd = page.start + page.rows.length;
-    const currentRowCount = normalizeRowCount(this.options.rowCount(request.sheet));
+    const loaded_end = page.start + page.rows.length;
+    const current_row_count = normalize_row_count(this.options.rowCount(request.sheet));
     if (
-      !Number.isSafeInteger(loadedEnd) ||
+      !Number.isSafeInteger(loaded_end) ||
       page.start < request.start ||
-      loadedEnd > request.end ||
-      loadedEnd > currentRowCount
+      loaded_end > request.end ||
+      loaded_end > current_row_count
     ) {
       throw datasourceFailure("Datasource page rows exceed requested coverage");
     }
@@ -1191,10 +1198,10 @@ export class DatasourceController {
       throw datasourceFailure("Datasource schema changed while a page was pending");
     }
 
-    const responseColumns: number[] = [];
-    const declaredKeys: string[] = [];
-    let requestCursor = 0;
-    let previousEnd = -1;
+    const response_columns: number[] = [];
+    const declared_keys: string[] = [];
+    let request_cursor = 0;
+    let previous_end = -1;
     for (const band of page.columns) {
       if (
         !band ||
@@ -1205,20 +1212,20 @@ export class DatasourceController {
         band.end > request.schema.keys.length ||
         !Array.isArray(band.keys) ||
         band.keys.length !== band.end - band.start ||
-        band.start < previousEnd
+        band.start < previous_end
       ) {
         throw datasourceFailure("Datasource page contains malformed column bands");
       }
 
       while (
-        requestCursor < request.bands.length &&
-        request.bands[requestCursor]!.end <= band.start
+        request_cursor < request.bands.length &&
+        request.bands[request_cursor]!.end <= band.start
       ) {
-        requestCursor += 1;
+        request_cursor += 1;
       }
 
-      const requestedBand = request.bands[requestCursor];
-      if (!requestedBand || band.start < requestedBand.start || band.end > requestedBand.end) {
+      const requested_band = request.bands[request_cursor];
+      if (!requested_band || band.start < requested_band.start || band.end > requested_band.end) {
         throw datasourceFailure("Datasource page column coverage exceeds the request");
       }
 
@@ -1228,41 +1235,41 @@ export class DatasourceController {
           throw datasourceFailure("Datasource page column keys do not match the current schema");
         }
 
-        declaredKeys.push(expected);
-        responseColumns.push(band.start + offset);
+        declared_keys.push(expected);
+        response_columns.push(band.start + offset);
       }
 
-      previousEnd = band.end;
+      previous_end = band.end;
     }
 
-    const declared = new Set(declaredKeys);
+    const declared = new Set(declared_keys);
     for (const row of page.rows) {
       if (row === null || typeof row !== "object" || Array.isArray(row)) {
         throw datasourceFailure("Datasource page rows must be keyed objects");
       }
 
-      const ownKeys = Reflect.ownKeys(row);
-      if (ownKeys.length !== declaredKeys.length) {
+      const own_keys = Reflect.ownKeys(row);
+      if (own_keys.length !== declared_keys.length) {
         throw datasourceFailure("Datasource page row keys do not match declared coverage");
       }
 
-      for (const key of ownKeys) {
+      for (const key of own_keys) {
         if (typeof key !== "string" || !declared.has(key)) {
           throw datasourceFailure("Datasource page row contains an undeclared key");
         }
       }
 
-      for (const key of declaredKeys) {
+      for (const key of declared_keys) {
         if (!Object.hasOwn(row, key)) {
           throw datasourceFailure("Datasource page row is missing a declared key");
         }
       }
     }
 
-    return responseColumns;
+    return response_columns;
   }
 
-  private canHydrate(request: ActiveRequest, generation: number): boolean {
+  private can_hydrate(request: ActiveRequest, generation: number): boolean {
     return (
       !this.destroyed &&
       !request.released &&
@@ -1271,8 +1278,8 @@ export class DatasourceController {
     );
   }
 
-  private requeuePartial(request: ActiveRequest, attempt: number): void {
-    this.retryDemand.push({
+  private requeue_partial(request: ActiveRequest, attempt: number): void {
+    this.retry_demand.push({
       start: request.start,
       end: request.end,
       columns: request.columns,
@@ -1285,28 +1292,28 @@ export class DatasourceController {
     });
   }
 
-  private recordCompletedWaits(columns: readonly number[], start: number, end: number): void {
-    for (const sample of this.visibleWaitStarted.complete(columns, start, end, this.now())) {
-      if (this.visibleWaitDurations.length < DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT) {
-        this.visibleWaitDurations.push(sample);
+  private record_completed_waits(columns: readonly number[], start: number, end: number): void {
+    for (const sample of this.visible_wait_started.complete(columns, start, end, this.now())) {
+      if (this.visible_wait_durations.length < DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT) {
+        this.visible_wait_durations.push(sample);
       } else {
-        this.visibleWaitDurations[this.visibleWaitSampleCursor] = sample;
-        this.visibleWaitSampleCursor =
-          (this.visibleWaitSampleCursor + 1) % DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT;
+        this.visible_wait_durations[this.visible_wait_sample_cursor] = sample;
+        this.visible_wait_sample_cursor =
+          (this.visible_wait_sample_cursor + 1) % DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT;
       }
     }
   }
 
-  private recordFetchTime(durationMs: number): void {
-    if (this.fetchTimes.length < FETCH_TIME_SAMPLE_LIMIT) {
-      this.fetchTimes.push(durationMs);
+  private record_fetch_time(duration_ms: number): void {
+    if (this.fetch_times.length < FETCH_TIME_SAMPLE_LIMIT) {
+      this.fetch_times.push(duration_ms);
     } else {
-      this.fetchTimes[this.fetchTimeCursor] = durationMs;
-      this.fetchTimeCursor = (this.fetchTimeCursor + 1) % FETCH_TIME_SAMPLE_LIMIT;
+      this.fetch_times[this.fetch_time_cursor] = duration_ms;
+      this.fetch_time_cursor = (this.fetch_time_cursor + 1) % FETCH_TIME_SAMPLE_LIMIT;
     }
-    const sorted = [...this.fetchTimes].sort((a, b) => a - b);
+    const sorted = [...this.fetch_times].sort((a, b) => a - b);
     const rank = Math.max(0, Math.ceil(sorted.length * FETCH_TIME_PERCENTILE) - 1);
-    this.fetchTimeP90Ms = sorted[rank] ?? DATASOURCE_DEFAULT_FETCH_MS;
+    this.fetch_time_p90_ms = sorted[rank] ?? DATASOURCE_DEFAULT_FETCH_MS;
   }
 
   /**
@@ -1317,98 +1324,100 @@ export class DatasourceController {
    * of measured fetch times, bounded by where a slowing scroll comes to rest)
    * plus one view of margin, behind a short trailing band. Columns do the same
    * while the view moves mostly sideways. Both share the cell budget of
-   * {@link speculativeCellBudget}. In-flight speculation along the path from
+   * {@link speculative_cell_budget}. In-flight speculation along the path from
    * the trailing band to the end of the lookahead survives; a request the view
    * has passed, or one beyond a lookahead that shrank as the scroll slowed, is
    * cancelled.
    */
-  private speculativePlan(
+  private speculative_plan(
     view: RowBand,
     columns: readonly number[],
-    columnRun: RowBand,
+    column_run: RowBand,
     direction: -1 | 1,
   ): SpeculativePlan {
     const plan: SpeculativePlan = { fetch: [], keep: [], landing: false };
-    const cellBudget = this.speculativeCellBudget();
-    const rows = this.planRows(plan, view, columns, columnRun, direction, cellBudget);
-    this.planColumns(plan, view, rows.path, columnRun, cellBudget - rows.cells);
+    const cell_budget = this.speculative_cell_budget();
+    const rows = this.plan_rows(plan, view, columns, column_run, direction, cell_budget);
+    this.plan_columns(plan, view, rows.path, column_run, cell_budget - rows.cells);
     return plan;
   }
 
   /** Adds the rows ahead of and behind the view to `plan`; returns the cells they take. */
-  private planRows(
+  private plan_rows(
     plan: SpeculativePlan,
     view: RowBand,
     columns: readonly number[],
-    columnRun: RowBand,
+    column_run: RowBand,
     direction: -1 | 1,
-    cellBudget: number,
+    cell_budget: number,
   ): { cells: number; path: RowBand } {
-    const bandRows = view.end - view.start;
-    const horizonRows = Math.min(
+    const band_rows = view.end - view.start;
+    const horizon_rows = Math.min(
       DATASOURCE_PREFETCH_MAX_ROWS,
-      Math.floor(cellBudget / Math.max(1, columns.length)),
+      Math.floor(cell_budget / Math.max(1, columns.length)),
     );
-    if (horizonRows <= 0) return { cells: 0, path: view };
+    if (horizon_rows <= 0) return { cells: 0, path: view };
 
     // A view that moves more than its height per frame (a scrollbar drag) shows only a
     // sliver of the rows it crosses, so rows along the way are not worth a fetch: only the
     // predicted resting point is, once the scroll is slowing down.
-    const rowSpeed = Math.abs(this.rowMotion.velocity);
-    const skipping = rowSpeed * LOGICAL_FRAME_MS > bandRows;
+    const row_speed = Math.abs(this.row_motion.velocity);
+    const skipping = row_speed * LOGICAL_FRAME_MS > band_rows;
     const travel = skipping
-      ? this.rowMotion.restDistance()
-      : this.rowMotion.travel(this.fetchTimeP90Ms);
+      ? this.row_motion.restDistance()
+      : this.row_motion.travel(this.fetch_time_p90_ms);
     // Before any motion, the first view looks two views ahead.
-    const margin = this.rowMotion.direction === 0 ? 2 * bandRows : bandRows;
-    const ahead = lookaheadSpan(
+    const margin = this.row_motion.direction === 0 ? 2 * band_rows : band_rows;
+    const ahead = lookahead_span(
       view,
       direction,
       Number.isFinite(travel) ? travel : 0,
       margin,
-      bandRows,
-      this.rowCount,
+      band_rows,
+      this.row_count,
     );
     if (skipping && !Number.isFinite(travel)) ahead.end = ahead.start;
     // Slow, steady scrolling (a mouse wheel) reaches no further than the margin past the
     // view, as before speed-based lookahead: the extra rows would mostly go unseen.
-    if (!skipping && rowSpeed < SLOW_SCROLL_ROWS_PER_MS) {
+    if (!skipping && row_speed < SLOW_SCROLL_ROWS_PER_MS) {
       if (direction > 0) {
-        ahead.end = Math.min(ahead.end, Math.ceil((view.end + margin) / bandRows) * bandRows);
+        ahead.end = Math.min(ahead.end, Math.ceil((view.end + margin) / band_rows) * band_rows);
       } else {
         ahead.start = Math.max(
           ahead.start,
-          Math.floor((view.start - margin) / bandRows) * bandRows,
+          Math.floor((view.start - margin) / band_rows) * band_rows,
         );
       }
     }
     plan.landing = skipping || ahead.landing;
 
-    const behindRows = plan.landing
+    const behind_rows = plan.landing
       ? 0
-      : Math.min(Math.floor(horizonRows * BEHIND_SHARE), Math.max(1, Math.ceil(bandRows / 2)));
+      : Math.min(Math.floor(horizon_rows * BEHIND_SHARE), Math.max(1, Math.ceil(band_rows / 2)));
     let behind: RowBand;
     if (direction > 0) {
-      const behindEnd = Math.floor(view.start / bandRows) * bandRows;
-      behind = { start: Math.max(0, behindEnd - behindRows), end: behindEnd };
-      ahead.end = Math.min(ahead.end, ahead.start + horizonRows - (behind.end - behind.start));
+      const behind_end = Math.floor(view.start / band_rows) * band_rows;
+      behind = { start: Math.max(0, behind_end - behind_rows), end: behind_end };
+      ahead.end = Math.min(ahead.end, ahead.start + horizon_rows - (behind.end - behind.start));
     } else {
-      const behindStart = Math.min(this.rowCount, Math.ceil(view.end / bandRows) * bandRows);
-      behind = { start: behindStart, end: Math.min(this.rowCount, behindStart + behindRows) };
-      ahead.start = Math.max(ahead.start, ahead.end - horizonRows + (behind.end - behind.start));
+      const behind_start = Math.min(this.row_count, Math.ceil(view.end / band_rows) * band_rows);
+      behind = { start: behind_start, end: Math.min(this.row_count, behind_start + behind_rows) };
+      ahead.start = Math.max(ahead.start, ahead.end - horizon_rows + (behind.end - behind.start));
     }
 
     // On a diagonal scroll, each band of rows ahead is fetched for the columns the view will
     // show when that band comes into view.
-    for (let offset = 0; offset < ahead.end - ahead.start; offset += bandRows) {
+    for (let offset = 0; offset < ahead.end - ahead.start; offset += band_rows) {
       const start =
-        direction > 0 ? ahead.start + offset : Math.max(ahead.start, ahead.end - offset - bandRows);
-      const end = direction > 0 ? Math.min(ahead.end, start + bandRows) : ahead.end - offset;
+        direction > 0
+          ? ahead.start + offset
+          : Math.max(ahead.start, ahead.end - offset - band_rows);
+      const end = direction > 0 ? Math.min(ahead.end, start + band_rows) : ahead.end - offset;
       const distance = direction > 0 ? start - view.end : view.start - end;
-      const arrivesInMs = rowSpeed > 0 ? (Math.max(0, distance) + bandRows / 2) / rowSpeed : 0;
-      const bandColumns = this.columnsAfter(columns, columnRun, arrivesInMs);
-      plan.fetch.push({ start, end, columns: bandColumns });
-      if (bandColumns !== columns) plan.keep.push({ start, end, columns: bandColumns });
+      const arrives_in_ms = row_speed > 0 ? (Math.max(0, distance) + band_rows / 2) / row_speed : 0;
+      const band_columns = this.columns_after(columns, column_run, arrives_in_ms);
+      plan.fetch.push({ start, end, columns: band_columns });
+      if (band_columns !== columns) plan.keep.push({ start, end, columns: band_columns });
     }
     if (behind.start < behind.end) plan.fetch.push({ ...behind, columns });
     const path = {
@@ -1423,70 +1432,70 @@ export class DatasourceController {
 
   /**
    * Adds the columns ahead of a view that scrolls mostly sideways to `plan`,
-   * for the visible rows, within `cellBudget`. During a diagonal fling the
+   * for the visible rows, within `cell_budget`. During a diagonal fling the
    * visible rows leave before those columns arrive, so none are fetched. They
    * stay wanted while their rows are on the rows' `path`.
    */
-  private planColumns(
+  private plan_columns(
     plan: SpeculativePlan,
     view: RowBand,
     path: RowBand,
-    columnRun: RowBand,
-    cellBudget: number,
+    column_run: RowBand,
+    cell_budget: number,
   ): void {
-    const velocity = this.columnMotion.velocity;
-    const bandRows = view.end - view.start;
-    const columnExtent = columnRun.end - columnRun.start;
-    const columnCap = Math.floor(cellBudget / Math.max(1, bandRows));
+    const velocity = this.column_motion.velocity;
+    const band_rows = view.end - view.start;
+    const column_extent = column_run.end - column_run.start;
+    const column_cap = Math.floor(cell_budget / Math.max(1, band_rows));
     const sideways =
-      Math.abs(velocity) / Math.max(1, columnExtent) >
-      Math.abs(this.rowMotion.velocity) / Math.max(1, bandRows);
+      Math.abs(velocity) / Math.max(1, column_extent) >
+      Math.abs(this.row_motion.velocity) / Math.max(1, band_rows);
     if (
       this.options.datasource?.capabilities.columns !== "windowed" ||
       velocity === 0 ||
       !sideways ||
-      columnCap <= 0
+      column_cap <= 0
     ) {
       return;
     }
     const direction: -1 | 1 = velocity > 0 ? 1 : -1;
-    const ahead = lookaheadSpan(
-      columnRun,
+    const ahead = lookahead_span(
+      column_run,
       direction,
-      this.columnMotion.travel(this.fetchTimeP90Ms),
-      Math.ceil(columnExtent * COLUMN_MARGIN_SHARE),
+      this.column_motion.travel(this.fetch_time_p90_ms),
+      Math.ceil(column_extent * COLUMN_MARGIN_SHARE),
       1,
       this.schema().keys.length,
     );
-    if (direction > 0) ahead.end = Math.min(ahead.end, ahead.start + columnCap);
-    else ahead.start = Math.max(ahead.start, ahead.end - columnCap);
+    if (direction > 0) ahead.end = Math.min(ahead.end, ahead.start + column_cap);
+    else ahead.start = Math.max(ahead.start, ahead.end - column_cap);
     if (ahead.start >= ahead.end) return;
-    plan.fetch.push({ ...view, columns: columnRange(ahead.start, ahead.end) });
+    plan.fetch.push({ ...view, columns: column_range(ahead.start, ahead.end) });
     plan.keep.push({
       ...path,
-      columns: columnRange(
-        Math.min(columnRun.start, ahead.start),
-        Math.max(columnRun.end, ahead.end),
+      columns: column_range(
+        Math.min(column_run.start, ahead.start),
+        Math.max(column_run.end, ahead.end),
       ),
     });
   }
 
   /**
-   * The view's columns `durationMs` from now: the scrolling run moved by its
+   * The view's columns `duration_ms` from now: the scrolling run moved by its
    * sideways travel, frozen columns in place. The same array while the view
    * does not move sideways.
    */
-  private columnsAfter(
+  private columns_after(
     columns: readonly number[],
     run: RowBand,
-    durationMs: number,
+    duration_ms: number,
   ): readonly number[] {
-    const velocity = this.columnMotion.velocity;
+    const velocity = this.column_motion.velocity;
     if (velocity === 0 || this.options.datasource?.capabilities.columns !== "windowed") {
       return columns;
     }
     const extent = run.end - run.start;
-    const shift = Math.round(Math.sign(velocity) * this.columnMotion.travel(durationMs));
+    const shift = Math.round(Math.sign(velocity) * this.column_motion.travel(duration_ms));
     const width = this.schema().keys.length;
     const start = Math.min(Math.max(0, run.start + shift), Math.max(0, width - extent));
     if (start === run.start) return columns;
@@ -1499,28 +1508,28 @@ export class DatasourceController {
    * Cells speculation may hold: the prefetch byte bound, and on a paged sheet
    * no more than the clean-chunk cache budget leaves beside the view.
    */
-  private speculativeCellBudget(): number {
-    const byteBound = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / ESTIMATED_CELL_BYTES);
+  private speculative_cell_budget(): number {
+    const byte_bound = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / ESTIMATED_CELL_BYTES);
     const loadable = this.options.loadable;
-    if (!loadable?.isPaged(this.options.activeSheet())) return byteBound;
-    const cacheBytes = storeEngine(loadable)?.pagedCacheBytes();
-    if (cacheBytes === undefined) return byteBound;
-    const view = this.lastViewport;
-    const viewCells = view ? (view.end - view.start) * view.columns.length : 0;
-    const budgetCells = Math.floor(cacheBytes / ESTIMATED_CELL_BYTES) - viewCells;
-    return Math.max(0, Math.min(byteBound, budgetCells));
+    if (!loadable?.isPaged(this.options.activeSheet())) return byte_bound;
+    const cache_bytes = storeEngine(loadable)?.pagedCacheBytes();
+    if (cache_bytes === undefined) return byte_bound;
+    const view = this.last_viewport;
+    const view_cells = view ? (view.end - view.start) * view.columns.length : 0;
+    const budget_cells = Math.floor(cache_bytes / ESTIMATED_CELL_BYTES) - view_cells;
+    return Math.max(0, Math.min(byte_bound, budget_cells));
   }
 
-  private remainingSpeculativeRows(columnCount: number): number {
+  private remaining_speculative_rows(column_count: number): number {
     const active = new SparseIntervals();
     for (const request of this.requests) {
       if (request.speculativeOrigin) active.add(request.start, request.end);
     }
-    const horizonRows = Math.min(
+    const horizon_rows = Math.min(
       DATASOURCE_PREFETCH_MAX_ROWS,
-      Math.floor(this.speculativeCellBudget() / Math.max(1, columnCount)),
+      Math.floor(this.speculative_cell_budget() / Math.max(1, column_count)),
     );
-    return Math.max(0, horizonRows - active.length);
+    return Math.max(0, horizon_rows - active.length);
   }
 
   /**
@@ -1532,7 +1541,7 @@ export class DatasourceController {
    * that exposes no engine (a stand-in implementing the public surface only)
    * keeps the row-band probe.
    */
-  private refreshPagedResidency(
+  private refresh_paged_residency(
     loadable: SheetwriteStore | null,
     start: number,
     end: number,
@@ -1552,8 +1561,8 @@ export class DatasourceController {
       const spans = engine?.loadedSpans(sheet, start, end, column);
       for (const band of resident.intersections(start, end)) {
         if (spans === undefined)
-          this.probeLoadedResidency(loadable, sheet, column, band.start, band.end);
-        else this.retainLoadedRuns(column, band.start, band.end, spans);
+          this.probe_loaded_residency(loadable, sheet, column, band.start, band.end);
+        else this.retain_loaded_runs(column, band.start, band.end, spans);
       }
     }
   }
@@ -1562,24 +1571,24 @@ export class DatasourceController {
    * Drop the rows of `[start, end)` the store does not hold, by asking it about
    * one row band at a time. Used when no engine is registered.
    */
-  private probeLoadedResidency(
+  private probe_loaded_residency(
     loadable: SheetwriteStore,
     sheet: SheetId,
     column: number,
     start: number,
     end: number,
   ): void {
-    if (loadable.areColumnsFullyLoaded(sheet, start, end, this.singletonColumns(column))) return;
+    if (loadable.areColumnsFullyLoaded(sheet, start, end, this.singleton_columns(column))) return;
     if (end - start === 1) {
       this.loaded.removeColumn(column, start, end);
       return;
     }
     const middle = start + Math.floor((end - start) / 2);
-    this.probeLoadedResidency(loadable, sheet, column, start, middle);
-    this.probeLoadedResidency(loadable, sheet, column, middle, end);
+    this.probe_loaded_residency(loadable, sheet, column, start, middle);
+    this.probe_loaded_residency(loadable, sheet, column, middle, end);
   }
 
-  private singletonColumns(column: number): readonly number[] {
+  private singleton_columns(column: number): readonly number[] {
     const schema = this.schema();
     let singleton = schema.singletonIndices.get(column);
     if (!singleton) {
@@ -1590,86 +1599,88 @@ export class DatasourceController {
   }
 
   /** Drop every row of `[start, end)` that the ascending `spans` pairs miss. */
-  private retainLoadedRuns(column: number, start: number, end: number, spans: Uint32Array): void {
+  private retain_loaded_runs(column: number, start: number, end: number, spans: Uint32Array): void {
     let cursor = start;
     for (let index = 0; index < spans.length; index += 2) {
-      const spanStart = spans[index];
-      const spanEnd = spans[index + 1];
-      if (spanStart === undefined || spanEnd === undefined) {
+      const span_start = spans[index];
+      const span_end = spans[index + 1];
+      if (span_start === undefined || span_end === undefined) {
         throw new Error("Sheetwrite: loaded row spans are not a pair sequence");
       }
-      if (spanEnd <= cursor) continue;
-      if (spanStart >= end) break;
-      if (spanStart > cursor) this.loaded.removeColumn(column, cursor, Math.min(spanStart, end));
-      cursor = Math.min(spanEnd, end);
+      if (span_end <= cursor) continue;
+      if (span_start >= end) break;
+      if (span_start > cursor) this.loaded.removeColumn(column, cursor, Math.min(span_start, end));
+      cursor = Math.min(span_end, end);
       if (cursor >= end) return;
     }
     if (cursor < end) this.loaded.removeColumn(column, cursor, end);
   }
 
-  private cancelObsoleteSpeculation(
+  private cancel_obsolete_speculation(
     viewport: RowBand & { columns: readonly number[] },
     keep: readonly ColumnRectangle[],
-    formulaReads: readonly PendingDemand[],
+    formula_reads: readonly PendingDemand[],
     reason: "obsolete" | "reversal" | "jump",
-    cancelGeneration: boolean,
+    cancel_generation: boolean,
   ): void {
-    this.retryDemand = this.retryDemand.filter(
+    this.retry_demand = this.retry_demand.filter(
       (demand) =>
         demand.durableOrigin ||
         (demand.formulaReadOrigin &&
-          formulaReads.some(
-            (read) => rowsIntersect(demand, read) && columnsIntersect(demand.columns, read.columns),
+          formula_reads.some(
+            (read) =>
+              rows_intersect(demand, read) && columns_intersect(demand.columns, read.columns),
           )) ||
-        (rowsIntersect(demand, viewport) && columnsSubset(demand.columns, viewport.columns)),
+        (rows_intersect(demand, viewport) && columns_subset(demand.columns, viewport.columns)),
     );
     for (const request of [...this.requests]) {
       if (request.durableDemand) continue;
       if (request.formulaReadOrigin) {
-        const stillRead = formulaReads.some(
-          (read) => rowsIntersect(request, read) && columnsIntersect(request.columns, read.columns),
+        const still_read = formula_reads.some(
+          (read) =>
+            rows_intersect(request, read) && columns_intersect(request.columns, read.columns),
         );
-        if (!stillRead) this.abortRequest(request, reason);
+        if (!still_read) this.abort_request(request, reason);
         continue;
       }
 
-      const intersectsViewport =
-        rowsIntersect(request, viewport) && columnsSubset(request.columns, viewport.columns);
+      const intersects_viewport =
+        rows_intersect(request, viewport) && columns_subset(request.columns, viewport.columns);
       if (request.speculativeOrigin) {
-        if (intersectsViewport) continue;
-        const stillWanted = keep.some(
+        if (intersects_viewport) continue;
+        const still_wanted = keep.some(
           (rectangle) =>
             request.start >= rectangle.start &&
             request.end <= rectangle.end &&
-            sharedColumns(request.columns, rectangle.columns) >=
+            shared_columns(request.columns, rectangle.columns) >=
               KEEP_COLUMN_SHARE * request.columns.length,
         );
-        if (!cancelGeneration && stillWanted) {
+        if (!cancel_generation && still_wanted) {
           request.priority = "speculative";
           continue;
         }
 
-        this.abortRequest(request, reason);
+        this.abort_request(request, reason);
         continue;
       }
 
       if (request.viewportOrigin) {
-        const requestRows = request.end - request.start;
-        const currentRows = viewport.end - viewport.start;
+        const request_rows = request.end - request.start;
+        const current_rows = viewport.end - viewport.start;
         const oversized =
-          requestRows >
-          Math.max(DATASOURCE_PREFETCH_MAX_ROWS, currentRows * DATASOURCE_PREFETCH_MAX_BANDS);
-        if (!intersectsViewport || oversized) this.abortRequest(request, reason);
+          request_rows >
+          Math.max(DATASOURCE_PREFETCH_MAX_ROWS, current_rows * DATASOURCE_PREFETCH_MAX_BANDS);
+        if (!intersects_viewport || oversized) this.abort_request(request, reason);
       }
     }
   }
 
-  private abortRequest(request: ActiveRequest, reason: AbortReason): void {
+  private abort_request(request: ActiveRequest, reason: AbortReason): void {
     if (request.released) return;
     request.controller.abort();
-    this.clearOwned(request);
-    this.visibleWaitStarted.discard(request.columns, request.start, request.end);
-    this.finishRequest(request);
+    this.clear_owned(request);
+    this.visible_wait_started.discard(request.columns, request.start, request.end);
+    this.finish_request(request);
     this.telemetry.aborts += 1;
     if (reason === "reversal") this.telemetry.reversalAborts += 1;
     else if (reason === "jump") this.telemetry.jumpAborts += 1;
@@ -1677,31 +1688,31 @@ export class DatasourceController {
     else if (reason === "destroy") this.telemetry.destroyAborts += 1;
   }
 
-  private clearOwned(request: ActiveRequest): void {
+  private clear_owned(request: ActiveRequest): void {
     this.owners.remove(request.id, request.columns);
   }
 
-  private finishRequest(request: ActiveRequest): void {
+  private finish_request(request: ActiveRequest): void {
     if (request.released) return;
     request.released = true;
     this.requests.delete(request);
-    this.activeIds.delete(request.id);
+    this.active_ids.delete(request.id);
     if (this.options.loadable) storeEngine(this.options.loadable)?.endPageRequest();
     request.releaseRevision();
   }
 
-  private allocateRequestId(): number {
+  private allocate_request_id(): number {
     for (;;) {
-      const id = this.nextRequestId;
-      this.nextRequestId = id === 0xffff_ffff ? 1 : id + 1;
-      if (!this.activeIds.has(id)) return id;
+      const id = this.next_request_id;
+      this.next_request_id = id === 0xffff_ffff ? 1 : id + 1;
+      if (!this.active_ids.has(id)) return id;
     }
   }
 
   private now(): number {
     return (
       this.options.now?.() ??
-      datasourceClockForTest?.() ??
+      datasource_clock_for_test?.() ??
       globalThis.performance?.now() ??
       Date.now()
     );

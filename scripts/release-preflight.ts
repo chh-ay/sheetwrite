@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 
 import { captureProcess } from "./script-io.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
+const repository_root = resolve(import.meta.dir, "..");
 
 async function run(command: readonly string[]): Promise<string> {
   const stdout = await captureProcess(command, {
-    cwd: repositoryRoot,
-    failure: ({ stdout, stderr, exitCode }) =>
-      `${command.join(" ")} failed (${exitCode}): ${stderr || stdout}`,
+    cwd: repository_root,
+    failure: ({ stdout, stderr, exitCode: exit_code }) =>
+      `${command.join(" ")} failed (${exit_code}): ${stderr || stdout}`,
   });
   return stdout.trim();
 }
@@ -49,16 +49,16 @@ export function selectCiRun(runs: readonly CiRun[], sha: string, repository: str
 }
 
 async function main(): Promise<void> {
-  const expectedSha = process.env.EXPECTED_SHA;
-  if (!expectedSha || !/^[0-9a-f]{40}$/.test(expectedSha)) {
+  const expected_sha = process.env.EXPECTED_SHA;
+  if (!expected_sha || !/^[0-9a-f]{40}$/.test(expected_sha)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
 
-  const actualSha = await run(["git", "rev-parse", "HEAD"]);
-  if (actualSha !== expectedSha) {
-    throw new Error(`Checked out ${actualSha}, expected ${expectedSha}`);
+  const actual_sha = await run(["git", "rev-parse", "HEAD"]);
+  if (actual_sha !== expected_sha) {
+    throw new Error(`Checked out ${actual_sha}, expected ${expected_sha}`);
   }
-  await run(["git", "merge-base", "--is-ancestor", expectedSha, "origin/develop"]);
+  await run(["git", "merge-base", "--is-ancestor", expected_sha, "origin/develop"]);
   if ((await run(["git", "status", "--porcelain", "--untracked-files=all"])) !== "") {
     throw new Error("Release checkout is not clean");
   }
@@ -78,20 +78,20 @@ async function main(): Promise<void> {
     await run([
       "gh",
       "api",
-      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${expectedSha}&event=push&branch=develop&per_page=100`,
+      `repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${expected_sha}&event=push&branch=develop&per_page=100`,
       "--jq",
       ".workflow_runs",
     ]),
   ) as CiRun[];
-  const ciRunId = selectCiRun(runs, expectedSha, repository);
+  const ci_run_id = selectCiRun(runs, expected_sha, repository);
 
   await run(["npm", "ping", "--registry", "https://registry.npmjs.org"]);
 
-  const outputPath = process.env.GITHUB_OUTPUT;
-  if (!outputPath) throw new Error("GITHUB_OUTPUT is required");
-  await appendFile(outputPath, `commit=${expectedSha}\nci_run_id=${ciRunId}\n`, "utf8");
+  const output_path = process.env.GITHUB_OUTPUT;
+  if (!output_path) throw new Error("GITHUB_OUTPUT is required");
+  await appendFile(output_path, `commit=${expected_sha}\nci_run_id=${ci_run_id}\n`, "utf8");
 
-  console.log(`Release preflight passed for ${expectedSha} using CI run ${ciRunId}`);
+  console.log(`Release preflight passed for ${expected_sha} using CI run ${ci_run_id}`);
 }
 
 if (import.meta.main) await main();

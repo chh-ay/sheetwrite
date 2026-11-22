@@ -39,7 +39,7 @@ export async function readCaptureArtifacts(
   return artifacts;
 }
 
-function receiptObject(value: unknown): Record<string, unknown> {
+function receipt_object(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Capture receipt must contain an object");
   }
@@ -69,10 +69,10 @@ export function portableCommand(command: readonly string[], repositoryRoot: stri
  * `effectiveCpuAffinity` existed ran on their single reserved slot; a receipt
  * that marks an affinity override must state its mask explicitly.
  */
-function captureAffinity(capture: Record<string, unknown>): readonly [string, string] {
+function capture_affinity(capture: Record<string, unknown>): readonly [string, string] {
   const label = capture.label;
   if (typeof label !== "string") throw new Error("Capture affinity needs a suite label");
-  const metadata = receiptObject(capture.metadata);
+  const metadata = receipt_object(capture.metadata);
 
   const explicit = metadata.effectiveCpuAffinity;
   if (explicit !== undefined) {
@@ -100,20 +100,20 @@ export function matchingCaptureAffinities(
   baseline: readonly Record<string, unknown>[],
   candidate: readonly Record<string, unknown>[],
 ): Readonly<Record<string, string>> {
-  const candidateMasks = new Map(candidate.map(captureAffinity));
+  const candidate_masks = new Map(candidate.map(capture_affinity));
   for (const capture of baseline) {
-    const [label, before] = captureAffinity(capture);
-    const after = candidateMasks.get(label);
+    const [label, before] = capture_affinity(capture);
+    const after = candidate_masks.get(label);
     if (before !== after) {
       throw new Error(
         `Capture CPU affinities differ for ${label}: baseline ${before}, candidate ${after}`,
       );
     }
   }
-  return Object.fromEntries(candidateMasks);
+  return Object.fromEntries(candidate_masks);
 }
 
-function commandOutput(command: readonly string[]): string {
+function command_output(command: readonly string[]): string {
   const result = Bun.spawnSync([...command], { stdout: "pipe", stderr: "pipe" });
   if (result.exitCode !== 0) {
     throw new Error(`${command.join(" ")} failed: ${result.stderr.toString().trim()}`);
@@ -121,13 +121,13 @@ function commandOutput(command: readonly string[]): string {
   return result.stdout.toString().trim();
 }
 
-function highEvents(cgroup: string): number {
+function high_events(cgroup: string): number {
   const match = /^high (\d+)$/m.exec(readFileSync(`${CGROUP_ROOT}${cgroup}/memory.events`, "utf8"));
   if (match?.[1] === undefined) throw new Error(`No high counter in ${cgroup}`);
   return Number(match[1]);
 }
 
-function writeRecord(path: string, record: unknown): void {
+function write_record(path: string, record: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`);
@@ -156,24 +156,31 @@ async function main(): Promise<void> {
   }
 
   const requested = process.env.BENCH_MEMORY_MAX ?? "6G";
-  const requestedGiB = /^(\d+)G$/.exec(requested)?.[1];
-  if (requestedGiB === undefined)
+  const requested_gi_b = /^(\d+)G$/.exec(requested)?.[1];
+  if (requested_gi_b === undefined)
     throw new Error(`Expected a whole-GiB memory cap, got ${requested}`);
-  const expectedMemoryMaxBytes = Number(requestedGiB) * GIB_BYTES;
-  const processGroup = readFileSync("/proc/self/cgroup", "utf8").trim().split("::").at(-1);
-  const scope = processGroup?.split("/").at(-1);
+  const expected_memory_max_bytes = Number(requested_gi_b) * GIB_BYTES;
+  const process_group = readFileSync("/proc/self/cgroup", "utf8").trim().split("::").at(-1);
+  const scope = process_group?.split("/").at(-1);
   if (scope === undefined || !scope.endsWith(".scope")) {
     throw new Error("Capture must run inside bench-run's systemd scope");
   }
-  const memoryMaxProof = commandOutput(["systemctl", "--user", "show", scope, "-p", "MemoryMax"]);
-  const actualMemoryMaxBytes = Number(memoryMaxProof.replace(/^MemoryMax=/, ""));
-  if (actualMemoryMaxBytes !== expectedMemoryMaxBytes) {
+  const memory_max_proof = command_output([
+    "systemctl",
+    "--user",
+    "show",
+    scope,
+    "-p",
+    "MemoryMax",
+  ]);
+  const actual_memory_max_bytes = Number(memory_max_proof.replace(/^MemoryMax=/, ""));
+  if (actual_memory_max_bytes !== expected_memory_max_bytes) {
     throw new Error(
-      `Wrong capture cap: expected ${expectedMemoryMaxBytes}, MemoryMax=${actualMemoryMaxBytes}`,
+      `Wrong capture cap: expected ${expected_memory_max_bytes}, MemoryMax=${actual_memory_max_bytes}`,
     );
   }
 
-  const slice = commandOutput([
+  const slice = command_output([
     "systemctl",
     "--user",
     "show",
@@ -182,10 +189,10 @@ async function main(): Promise<void> {
     "ControlGroup",
     "--value",
   ]);
-  const beforeHigh = highEvents(slice);
-  const commit = commandOutput(["git", "rev-parse", "HEAD"]);
+  const before_high = high_events(slice);
+  const commit = command_output(["git", "rev-parse", "HEAD"]);
   const dirty =
-    commandOutput([
+    command_output([
       "git",
       "status",
       "--porcelain",
@@ -194,35 +201,35 @@ async function main(): Promise<void> {
       ":(top,exclude)bench/results",
     ]) !== "";
   if (dirty) throw new Error("Capture source tree must be clean");
-  const engineRoot = values["engine-root"] ?? process.cwd();
-  const engineCommit = commandOutput([
+  const engine_root = values["engine-root"] ?? process.cwd();
+  const engine_commit = command_output([
     "git",
     "-C",
-    engineRoot,
+    engine_root,
     "rev-parse",
     `${values["code-ref"]}^{commit}`,
   ]);
   if (
-    commandOutput([
+    command_output([
       "git",
       "-C",
-      engineRoot,
+      engine_root,
       "diff",
       "--name-only",
-      engineCommit,
+      engine_commit,
       "--",
       ":(top)packages",
     ]) !== ""
   ) {
     throw new Error("Capture code differs from its declared engine/core commit");
   }
-  const harnessRoot = values["harness-root"] ?? process.cwd();
-  const harnessCommit = commandOutput(["git", "-C", harnessRoot, "rev-parse", "HEAD"]);
+  const harness_root = values["harness-root"] ?? process.cwd();
+  const harness_commit = command_output(["git", "-C", harness_root, "rev-parse", "HEAD"]);
   if (
-    commandOutput([
+    command_output([
       "git",
       "-C",
-      harnessRoot,
+      harness_root,
       "status",
       "--porcelain",
       "--untracked-files=no",
@@ -232,91 +239,91 @@ async function main(): Promise<void> {
   ) {
     throw new Error("Capture harness tree must be clean");
   }
-  const harnessPatchSha256 =
+  const harness_patch_sha256 =
     values["harness-patch"] === undefined
       ? undefined
       : createHash("sha256").update(readFileSync(values["harness-patch"])).digest("hex");
 
   const output = resolve(values.output);
   // The benchmark child inherits this process's CPU mask, so record the mask actually in force.
-  const affinityProof = /^Cpus_allowed_list:\s*(\S+)$/mu.exec(
+  const affinity_proof = /^Cpus_allowed_list:\s*(\S+)$/mu.exec(
     readFileSync("/proc/self/status", "utf8"),
   );
-  if (affinityProof?.[1] === undefined) throw new Error("No effective CPU affinity proof");
+  if (affinity_proof?.[1] === undefined) throw new Error("No effective CPU affinity proof");
 
   const metadata = {
     commit,
     dirty,
-    engineCommit,
-    harnessCommit,
-    harnessPatchSha256,
+    engineCommit: engine_commit,
+    harnessCommit: harness_commit,
+    harnessPatchSha256: harness_patch_sha256,
     purpose: values.rehearsal ? "rehearsal" : "capture",
     timestamp: new Date().toISOString(),
     machine: hostname(),
     cpu: cpus()[0]?.model ?? "unknown",
     bun: Bun.version,
-    node: commandOutput(["node", "--version"]),
-    npm: commandOutput(["npm", "--version"]),
+    node: command_output(["node", "--version"]),
+    npm: command_output(["npm", "--version"]),
     bunNodeCompat: process.version,
     kernel: release(),
     cpuSlot: 4,
-    effectiveCpuAffinity: affinityProof[1],
-    affinityProof: affinityProof[0],
+    effectiveCpuAffinity: affinity_proof[1],
+    affinityProof: affinity_proof[0],
     cpuSlotMeaning: "Reserved entry slot; effectiveCpuAffinity records the actual mask.",
     memoryMax: requested,
-    effectiveMemoryMaxBytes: actualMemoryMaxBytes,
-    memoryMaxProof,
+    effectiveMemoryMaxBytes: actual_memory_max_bytes,
+    memoryMaxProof: memory_max_proof,
     scope,
     slice,
-    sliceHighBefore: beforeHigh,
+    sliceHighBefore: before_high,
     command: portableCommand(
       positionals,
-      commandOutput(["git", "-C", harnessRoot, "rev-parse", "--show-toplevel"]),
+      command_output(["git", "-C", harness_root, "rev-parse", "--show-toplevel"]),
     ),
   };
-  writeRecord(output, {
+  write_record(output, {
     protocol: "sheetwrite-capture-scope-v1",
     label: values.label,
     metadata,
     status: "running",
   });
-  process.stderr.write(`${values.label}: ${metadata.memoryMaxProof}; slice high=${beforeHigh}\n`);
+  process.stderr.write(`${values.label}: ${metadata.memoryMaxProof}; slice high=${before_high}\n`);
 
   const child = Bun.spawn(positionals, { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
-  const exitCode = await child.exited;
-  const afterHigh = highEvents(slice);
-  const peakBytes = Number(
-    readFileSync(`${CGROUP_ROOT}${processGroup}/memory.peak`, "utf8").trim(),
+  const exit_code = await child.exited;
+  const after_high = high_events(slice);
+  const peak_bytes = Number(
+    readFileSync(`${CGROUP_ROOT}${process_group}/memory.peak`, "utf8").trim(),
   );
-  const wasThrottled = afterHigh > beforeHigh;
-  const status = exitCode !== 0 ? "failed" : wasThrottled ? "invalid-throttled" : "passed";
+  const was_throttled = after_high > before_high;
+  const status = exit_code !== 0 ? "failed" : was_throttled ? "invalid-throttled" : "passed";
   const artifacts =
     status === "passed" && !values.rehearsal
       ? await readCaptureArtifacts(values.label, resolve(values["results-dir"]))
       : [];
-  const startedAtMs = Date.parse(metadata.timestamp);
+  const started_at_ms = Date.parse(metadata.timestamp);
   for (const artifact of artifacts) {
-    if (artifact.modifiedAtMs < startedAtMs) {
+    if (artifact.modifiedAtMs < started_at_ms) {
       throw new Error(`${values.label} left a stale artifact: ${artifact.file}`);
     }
   }
-  writeRecord(output, {
+  write_record(output, {
     protocol: "sheetwrite-capture-scope-v1",
     label: values.label,
     metadata,
     status,
     endedAt: new Date().toISOString(),
-    exitCode,
-    sliceHighAfter: afterHigh,
-    memoryPeakBytes: peakBytes,
+    exitCode: exit_code,
+    sliceHighAfter: after_high,
+    memoryPeakBytes: peak_bytes,
     artifacts,
   });
-  if (wasThrottled) {
+  if (was_throttled) {
     throw new Error(
-      `${values.label}: slice high counter rose from ${beforeHigh} to ${afterHigh}; discard these timings`,
+      `${values.label}: slice high counter rose from ${before_high} to ${after_high}; discard these timings`,
     );
   }
-  if (exitCode !== 0) throw new Error(`${values.label}: capture exited ${exitCode}`);
+  if (exit_code !== 0) throw new Error(`${values.label}: capture exited ${exit_code}`);
 }
 
 if (import.meta.main) await main();

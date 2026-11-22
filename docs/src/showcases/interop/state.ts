@@ -97,12 +97,12 @@ export const [modelChange, setModelChange] = createSignal<AnalyticalChange | nul
 export const [attacksRunAt, setAttacksRunAt] = createSignal<number | null>(null);
 
 /** One guard for every file operation on the page. */
-const [actionState, setActionState] = createSignal<ActionState>({ pending: false, error: null });
-const guard = createActionGuard(setActionState);
-export const actionPending = () => actionState().pending;
-export const actionError = () => actionState().error;
+const [action_state, set_action_state] = createSignal<ActionState>({ pending: false, error: null });
+const guard = createActionGuard(set_action_state);
+export const actionPending = () => action_state().pending;
+export const actionError = () => action_state().error;
 
-function describeError(error: unknown): string {
+function describe_error(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
@@ -112,6 +112,6 @@ export function run(command: (current: InteropEngine) => unknown): void {
   if (!current) return;
   void guard.run(
     () => command(current),
-    (error) => `The file operation failed: ${describeError(error)}. Try again.`,
+    (error) => `The file operation failed: ${describe_error(error)}. Try again.`,
   );
 }

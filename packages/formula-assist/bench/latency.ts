@@ -90,7 +90,7 @@ function workbook(): WorkbookSnapshot {
     );
   }
 
-  const orderColumns = [...headers, "Lookup", "Share"];
+  const order_columns = [...headers, "Lookup", "Share"];
   return {
     schemaVersion: 1,
     workbook: { activeSheet: "orders" },
@@ -100,7 +100,7 @@ function workbook(): WorkbookSnapshot {
         name: "Orders",
         order: 0,
         rowCount: DATA_ROWS + 2,
-        columns: columns(orderColumns),
+        columns: columns(order_columns),
         cells: [
           {
             startRow: 0,
@@ -180,30 +180,30 @@ await initSheetwrite();
 const store = SheetwriteStore.fromSnapshot(workbook());
 
 /** Heap in use after a full collection, in bytes. */
-function heapUsed(): number {
+function heap_used(): number {
   Bun.gc(true);
   return process.memoryUsage().heapUsed;
 }
 
 // Count the workbook's formulas in idle slices, as a grid does after it mounts.
-const heapBefore = heapUsed();
+const heap_before = heap_used();
 const counting = new WorkbookPatterns(store, "idle");
 const slices: number[] = [];
-const countStarted = performance.now();
+const count_started = performance.now();
 for (let more = true; more;) {
-  const sliceStarted = performance.now();
-  more = counting.step(sliceStarted + SLICE_MS);
-  slices.push(performance.now() - sliceStarted);
+  const slice_started = performance.now();
+  more = counting.step(slice_started + SLICE_MS);
+  slices.push(performance.now() - slice_started);
 }
-const countMs = performance.now() - countStarted;
-const countBytes = heapUsed() - heapBefore;
+const count_ms = performance.now() - count_started;
+const count_bytes = heap_used() - heap_before;
 counting.dispose();
 
 const predictor = attachPredictor(store, { signals: SIGNALS, build: "now" });
 const open: number[] = [];
 const suggest: number[] = [];
 /** Everything the formula bar does per key: the analysis, `suggest`, and the ghost's own analysis. */
-const perKey: number[] = [];
+const per_key: number[] = [];
 try {
   for (const target of targets()) {
     const cell = { sheet: "orders", row: target.row, col: target.col };
@@ -218,7 +218,7 @@ try {
     let ghost: GhostOnScreen | null = null;
     for (let length = 1; length <= target.formula.length; length++) {
       const text = target.formula.slice(0, length);
-      const keyStarted = performance.now();
+      const key_started = performance.now();
       const analysis = analyzeFormula(text, text.length, functions);
       started = performance.now();
       const suggestion = session.suggest(text, analysis);
@@ -227,7 +227,7 @@ try {
       ghost = shown === null ? null : { text, shown };
       // The bar analyses the text with the ghost to colour the ranges it names.
       if (shown !== null) analyzeFormula(text + shown.text, text.length, functions);
-      perKey.push(performance.now() - keyStarted);
+      per_key.push(performance.now() - key_started);
     }
     session.close();
     const restored: CellValue =
@@ -243,10 +243,10 @@ const result = {
   rows: DATA_ROWS,
   open: summary(open),
   suggest: summary(suggest),
-  perKey: summary(perKey),
+  perKey: summary(per_key),
   slices: summary(slices),
-  countMs,
-  countBytes,
+  countMs: count_ms,
+  countBytes: count_bytes,
   budgetMs: BUDGET_MS,
 };
 const MS_DIGITS = 3;
@@ -265,7 +265,7 @@ for (const [label, stats] of rows) {
 }
 const KIB = 1024;
 process.stdout.write(
-  `\nCounting the workbook: ${countMs.toFixed(0)} ms in ${slices.length} idle slices; heap ${(countBytes / KIB).toFixed(0)} KiB after it.\n`,
+  `\nCounting the workbook: ${count_ms.toFixed(0)} ms in ${slices.length} idle slices; heap ${(count_bytes / KIB).toFixed(0)} KiB after it.\n`,
 );
 if (values.json !== undefined) await writeFile(values.json, `${JSON.stringify(result, null, 2)}\n`);
 const worst = Math.max(result.open.p95, result.suggest.p95);

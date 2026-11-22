@@ -29,8 +29,8 @@ type SheetLimitIssue = Extract<MutationIssue, { kind: "resource-limit" }>;
  * every insert as this check does.
  */
 export class SheetGrowth {
-  private denseCells = 0;
-  private localCells = 0;
+  private dense_cells = 0;
+  private local_cells = 0;
 
   constructor(
     private readonly sheets: Map<SheetId, SheetDimensions>,
@@ -38,8 +38,8 @@ export class SheetGrowth {
   ) {
     for (const sheet of sheets.values()) {
       const cells = sheet.rows * sheet.columns;
-      if (sheet.storage === "dense") this.denseCells += cells;
-      if (sheet.storage === "local") this.localCells += cells;
+      if (sheet.storage === "dense") this.dense_cells += cells;
+      if (sheet.storage === "local") this.local_cells += cells;
     }
   }
 
@@ -51,8 +51,8 @@ export class SheetGrowth {
   grow(sheet: SheetId, rows: number, columns: number): SheetLimitIssue | undefined {
     const current = this.sheets.get(sheet);
     if (current === undefined) return undefined;
-    const nextRows = current.rows + rows;
-    const nextColumns = current.columns + columns;
+    const next_rows = current.rows + rows;
+    const next_columns = current.columns + columns;
     const issue = (
       resource: SheetLimitIssue["resource"],
       max: number,
@@ -67,48 +67,48 @@ export class SheetGrowth {
       message: `${current.name} cannot grow to ${actual.toLocaleString("en-US")} ${what}: the limit is ${max.toLocaleString("en-US")}.`,
     });
 
-    if (nextRows > this.limits.maxRowsPerSheet) {
-      return issue("sheet-rows", this.limits.maxRowsPerSheet, nextRows, "rows");
+    if (next_rows > this.limits.maxRowsPerSheet) {
+      return issue("sheet-rows", this.limits.maxRowsPerSheet, next_rows, "rows");
     }
-    if (nextColumns > this.limits.maxColumnsPerSheet) {
-      return issue("sheet-columns", this.limits.maxColumnsPerSheet, nextColumns, "columns");
+    if (next_columns > this.limits.maxColumnsPerSheet) {
+      return issue("sheet-columns", this.limits.maxColumnsPerSheet, next_columns, "columns");
     }
     const cells = current.rows * current.columns;
-    const nextCells = nextRows * nextColumns;
-    if (nextCells > this.limits.maxLogicalCellsPerSheet) {
-      return issue("sheet-cells", this.limits.maxLogicalCellsPerSheet, nextCells, "cells");
+    const next_cells = next_rows * next_columns;
+    if (next_cells > this.limits.maxLogicalCellsPerSheet) {
+      return issue("sheet-cells", this.limits.maxLogicalCellsPerSheet, next_cells, "cells");
     }
 
     let storage = current.storage;
-    let denseCells = this.denseCells;
-    let localCells = this.localCells;
+    let dense_cells = this.dense_cells;
+    let local_cells = this.local_cells;
     if (storage === "dense") {
-      denseCells -= cells;
-      if (denseCells + nextCells <= this.limits.maxDenseCells) {
-        denseCells += nextCells;
+      dense_cells -= cells;
+      if (dense_cells + next_cells <= this.limits.maxDenseCells) {
+        dense_cells += next_cells;
       } else {
         storage = "local";
       }
     } else if (storage === "local") {
-      localCells -= cells;
+      local_cells -= cells;
     }
     if (storage === "local") {
-      localCells += nextCells;
-      if (localCells > this.limits.maxLocalPagedCells) {
+      local_cells += next_cells;
+      if (local_cells > this.limits.maxLocalPagedCells) {
         return issue(
           "local-paged-cells",
           this.limits.maxLocalPagedCells,
-          localCells,
+          local_cells,
           "cells in local pages across the workbook",
         );
       }
     }
 
-    current.rows = nextRows;
-    current.columns = nextColumns;
+    current.rows = next_rows;
+    current.columns = next_columns;
     current.storage = storage;
-    this.denseCells = denseCells;
-    this.localCells = localCells;
+    this.dense_cells = dense_cells;
+    this.local_cells = local_cells;
     return undefined;
   }
 }

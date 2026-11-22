@@ -18,7 +18,7 @@ const RIGHT = 8;
 const EDGE_KEYS = 16;
 
 /** The edges of `rects` the cell at view row `row`, column `col` lies on, or -1 outside them. */
-function edgesAt(rects: readonly SelRect[], row: number, col: number): number {
+function edges_at(rects: readonly SelRect[], row: number, col: number): number {
   let edges = -1;
   for (const rect of rects) {
     if (row < rect.r0 || row > rect.r1 || col < rect.c0 || col > rect.c1) continue;
@@ -50,7 +50,7 @@ export function formatPreview(
   };
   const outside = border === "outside" || border === "thickOutside";
 
-  const previewStyle = (base: CellStyle, edges: number): CellStyle => {
+  const preview_style = (base: CellStyle, edges: number): CellStyle => {
     const next: CellStyle = { ...base, ...change.style };
     if (border === null) return next;
     if (border === "none" || border === "all") {
@@ -68,27 +68,27 @@ export function formatPreview(
   };
 
   return (view) => {
-    const { rows, cols, styleIds, styles } = view;
-    const previewIds = new Map<number, number>();
-    const nextStyles = [...styles];
-    let nextIds: Uint32Array | null = null;
+    const { rows, cols, styleIds: style_ids, styles } = view;
+    const preview_ids = new Map<number, number>();
+    const next_styles = [...styles];
+    let next_ids: Uint32Array | null = null;
     for (let row = rows.start; row < rows.end; row++) {
       for (let index = 0; index < cols.length; index++) {
-        const edges = edgesAt(rects, row, cols[index]!);
+        const edges = edges_at(rects, row, cols[index]!);
         if (edges < 0) continue;
 
         const cell = (row - rows.start) * cols.length + index;
-        const base = styleIds[cell]!;
+        const base = style_ids[cell]!;
         const key = base * EDGE_KEYS + edges;
-        let id = previewIds.get(key);
+        let id = preview_ids.get(key);
         if (id === undefined) {
-          id = nextStyles.push(previewStyle(styles[base] ?? {}, edges)) - 1;
-          previewIds.set(key, id);
+          id = next_styles.push(preview_style(styles[base] ?? {}, edges)) - 1;
+          preview_ids.set(key, id);
         }
-        const ids = nextIds ?? (nextIds = styleIds.slice());
+        const ids = next_ids ?? (next_ids = style_ids.slice());
         ids[cell] = id;
       }
     }
-    return nextIds ? { ...view, styleIds: nextIds, styles: nextStyles } : view;
+    return next_ids ? { ...view, styleIds: next_ids, styles: next_styles } : view;
   };
 }

@@ -16,29 +16,29 @@ import {
 const GIT_REPOSITORY_TEST_TIMEOUT_MS = 30_000;
 
 const root = resolve(import.meta.dir, "..");
-const workflowSources = {
+const workflow_sources = {
   ci: readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8"),
   release: readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8"),
   version: readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8"),
   docs: readFileSync(resolve(root, ".github/workflows/docs-deploy.yml"), "utf8"),
 } as const;
 
-function workflows(): Readonly<Record<keyof typeof workflowSources, WorkflowContract>> {
+function workflows(): Readonly<Record<keyof typeof workflow_sources, WorkflowContract>> {
   return {
-    ci: parseWorkflowContract(workflowSources.ci, "CI workflow"),
-    release: parseWorkflowContract(workflowSources.release, "release workflow"),
-    version: parseWorkflowContract(workflowSources.version, "version workflow"),
-    docs: parseWorkflowContract(workflowSources.docs, "docs deployment workflow"),
+    ci: parseWorkflowContract(workflow_sources.ci, "CI workflow"),
+    release: parseWorkflowContract(workflow_sources.release, "release workflow"),
+    version: parseWorkflowContract(workflow_sources.version, "version workflow"),
+    docs: parseWorkflowContract(workflow_sources.docs, "docs deployment workflow"),
   };
 }
 
-function job(workflow: keyof typeof workflowSources, name: string): WorkflowJob {
+function job(workflow: keyof typeof workflow_sources, name: string): WorkflowJob {
   const found = workflows()[workflow].jobs[name];
   if (!found) throw new Error(`Missing ${workflow} job ${name}`);
   return found;
 }
 
-function stepRun(found: WorkflowJob, name: string): string {
+function step_run(found: WorkflowJob, name: string): string {
   const step = found.steps?.find((candidate) => candidate.name === name);
   if (!step?.run) throw new Error(`Missing step ${name}`);
   return step.run;
@@ -75,8 +75,8 @@ describe("CI and release workflow contracts", () => {
 
   it("deploys production docs only from a release call or a manual run, never from CI", () => {
     // Production docs describe published packages; develop holds unreleased ones.
-    for (const [name, ciJob] of Object.entries(workflows().ci.jobs)) {
-      expect({ name, environment: ciJob.environment }).toEqual({ name, environment: undefined });
+    for (const [name, ci_job] of Object.entries(workflows().ci.jobs)) {
+      expect({ name, environment: ci_job.environment }).toEqual({ name, environment: undefined });
     }
     const docs = workflows().docs;
     expect(Object.keys(docs.on ?? {}).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
@@ -97,9 +97,9 @@ describe("CI and release workflow contracts", () => {
   });
 
   it("builds docs with the toolchain versions CI tests", () => {
-    const ciEnv = workflows().ci.env ?? {};
+    const ci_env = workflows().ci.env ?? {};
     for (const [name, version] of Object.entries(workflows().docs.env ?? {})) {
-      expect({ name, version }).toEqual({ name, version: ciEnv[name] });
+      expect({ name, version }).toEqual({ name, version: ci_env[name] });
     }
   });
 
@@ -107,15 +107,15 @@ describe("CI and release workflow contracts", () => {
     const publish = job("release", "publish");
     const docs = job("release", "docs");
     const steps = publish.steps ?? [];
-    const releaseIndex = steps.findIndex((step) => step.run === "bun scripts/release-github.ts");
-    const githubRelease = steps[releaseIndex];
-    if (githubRelease?.if === undefined) throw new Error("Missing GitHub release condition");
+    const release_index = steps.findIndex((step) => step.run === "bun scripts/release-github.ts");
+    const github_release = steps[release_index];
+    if (github_release?.if === undefined) throw new Error("Missing GitHub release condition");
 
-    const publishIndex = steps.findIndex((step) => step.id === "publish");
-    expect(publishIndex).toBeGreaterThan(-1);
-    expect(releaseIndex).toBeGreaterThan(publishIndex);
-    expect(githubRelease.if).toBe("steps.publish.outputs.pending != 'true'");
-    expect(githubRelease.env).toEqual({
+    const publish_index = steps.findIndex((step) => step.id === "publish");
+    expect(publish_index).toBeGreaterThan(-1);
+    expect(release_index).toBeGreaterThan(publish_index);
+    expect(github_release.if).toBe("steps.publish.outputs.pending != 'true'");
+    expect(github_release.env).toEqual({
       GH_TOKEN: "${{ github.token }}",
       EXPECTED_SHA: "${{ needs.identity.outputs.commit }}",
       VERIFIED_PACKAGES: "${{ steps.publish.outputs.verified }}",
@@ -128,7 +128,7 @@ describe("CI and release workflow contracts", () => {
       "fetch-depth": 0,
     });
 
-    expect(publish.outputs?.released).toBe(`\${{ ${githubRelease.if} }}`);
+    expect(publish.outputs?.released).toBe(`\${{ ${github_release.if} }}`);
     expect(docs.if).toBe("needs.publish.outputs.released == 'true'");
     expect(docs.needs).toEqual(["identity", "publish"]);
     expect(docs.uses).toBe("./.github/workflows/docs-deploy.yml");
@@ -138,7 +138,7 @@ describe("CI and release workflow contracts", () => {
   it(
     "deploys only develop commits that npm already released",
     async () => {
-      const guard = stepRun(job("docs", "build"), "Require a released commit on develop");
+      const guard = step_run(job("docs", "build"), "Require a released commit on develop");
       const repository = await mkdtemp(join(tmpdir(), "sheetwrite-docs-guard-"));
       // Outside the repository, so commits never pick it up.
       const output = `${repository}.output`;
@@ -147,7 +147,7 @@ describe("CI and release workflow contracts", () => {
         if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed`);
         return result.stdout.toString().trim();
       };
-      const runGuard = (commit: string): number => {
+      const run_guard = (commit: string): number => {
         git("checkout", "--quiet", "--detach", commit);
         return Bun.spawnSync(["bash", "-e", "-c", guard], {
           cwd: repository,
@@ -175,41 +175,41 @@ describe("CI and release workflow contracts", () => {
           return git("rev-parse", "HEAD");
         };
         const changeset = join(repository, ".changeset", "feature.md");
-        const corePackage = join(repository, "packages", "core", "package.json");
-        const setVersion = (version: string) =>
-          writeFile(corePackage, `${JSON.stringify({ name: "@sheetwrite/core", version })}\n`);
+        const core_package = join(repository, "packages", "core", "package.json");
+        const set_version = (version: string) =>
+          writeFile(core_package, `${JSON.stringify({ name: "@sheetwrite/core", version })}\n`);
         await mkdir(join(repository, ".changeset"));
         await mkdir(join(repository, "packages", "core"), { recursive: true });
         await writeFile(join(repository, ".changeset", "README.md"), "Changesets\n");
-        await setVersion("1.0.0");
+        await set_version("1.0.0");
         const released = commit("released 1.0.0");
         git("tag", "@sheetwrite/core@1.0.0");
         await writeFile(changeset, "---\n'@sheetwrite/core': minor\n---\n\nA feature.\n");
         const unreleased = commit("feature with a pending changeset");
         await rm(changeset);
-        await setVersion("1.1.0");
+        await set_version("1.1.0");
         const versioned = commit("version packages, not yet published");
-        const unpublishedDocs = commit("docs fix before publication");
-        git("update-ref", "refs/remotes/origin/develop", unpublishedDocs);
+        const unpublished_docs = commit("docs fix before publication");
+        git("update-ref", "refs/remotes/origin/develop", unpublished_docs);
 
         // npm does not have 1.1.0 yet: only the 1.0.0 release may deploy.
-        expect(runGuard(versioned)).not.toBe(0);
-        expect(runGuard(unpublishedDocs)).not.toBe(0);
-        expect(runGuard(unreleased)).not.toBe(0);
-        expect(runGuard(released)).toBe(0);
+        expect(run_guard(versioned)).not.toBe(0);
+        expect(run_guard(unpublished_docs)).not.toBe(0);
+        expect(run_guard(unreleased)).not.toBe(0);
+        expect(run_guard(released)).toBe(0);
         expect(await readFile(output, "utf8")).toBe(`commit=${released}\n`);
 
         // The release workflow tags 1.1.0 after npm publishes it.
-        git("checkout", "--quiet", "--detach", unpublishedDocs);
+        git("checkout", "--quiet", "--detach", unpublished_docs);
         git("tag", "@sheetwrite/core@1.1.0");
-        const docsFix = commit("docs-only fix after publication");
-        git("update-ref", "refs/remotes/origin/develop", docsFix);
+        const docs_fix = commit("docs-only fix after publication");
+        git("update-ref", "refs/remotes/origin/develop", docs_fix);
         git("checkout", "--quiet", "--detach", released);
         const unreviewed = commit("unreviewed branch");
 
-        expect(runGuard(versioned)).toBe(0);
-        expect(runGuard(docsFix)).toBe(0);
-        expect(runGuard(unreviewed)).not.toBe(0);
+        expect(run_guard(versioned)).toBe(0);
+        expect(run_guard(docs_fix)).toBe(0);
+        expect(run_guard(unreviewed)).not.toBe(0);
       } finally {
         await rm(repository, { recursive: true, force: true });
         await rm(output, { force: true });
@@ -222,7 +222,7 @@ describe("CI and release workflow contracts", () => {
     const required = job("ci", "required");
     const gate = required.steps?.find((step) => step.name === "Require every CI branch");
     if (!gate?.run) throw new Error("Missing Required CI gate command");
-    const gateCommand = gate.run;
+    const gate_command = gate.run;
     const env = {
       PREFLIGHT: "success",
       UNIT_COVERAGE: "success",
@@ -238,19 +238,19 @@ describe("CI and release workflow contracts", () => {
       BROWSER: "success",
       DOCS_REQUIRED: "true",
     };
-    const exitCode = (overrides: Readonly<Record<string, string>>): number =>
-      Bun.spawnSync(["bash", "-e", "-c", gateCommand], {
+    const exit_code = (overrides: Readonly<Record<string, string>>): number =>
+      Bun.spawnSync(["bash", "-e", "-c", gate_command], {
         env: { ...env, ...overrides },
         stdout: "pipe",
         stderr: "pipe",
       }).exitCode;
-    expect(exitCode({})).toBe(0);
+    expect(exit_code({})).toBe(0);
     for (const result of ["failure", "skipped", "cancelled"]) {
-      expect(exitCode({ DOCS: result })).not.toBe(0);
-      expect(exitCode({ BROWSER: result })).not.toBe(0);
+      expect(exit_code({ DOCS: result })).not.toBe(0);
+      expect(exit_code({ BROWSER: result })).not.toBe(0);
     }
-    expect(exitCode({ DOCS_REQUIRED: "false", DOCS: "skipped", BROWSER: "skipped" })).toBe(0);
-    expect(exitCode({ DOCS_REQUIRED: "false" })).not.toBe(0);
+    expect(exit_code({ DOCS_REQUIRED: "false", DOCS: "skipped", BROWSER: "skipped" })).toBe(0);
+    expect(exit_code({ DOCS_REQUIRED: "false" })).not.toBe(0);
   });
 
   it("installs Chromium on the runners without the Ubuntu apt mirrors", () => {
@@ -260,39 +260,39 @@ describe("CI and release workflow contracts", () => {
       readonly scripts: Readonly<Record<string, string>>;
     };
     expect(manifest.scripts["browser:install:chromium"]).toBe("bun scripts/install-chromium.ts");
-    const installs = Object.values(workflows().ci.jobs).flatMap((ciJob) =>
-      (ciJob.steps ?? []).filter((step) => step.name === "Install Chromium"),
+    const installs = Object.values(workflows().ci.jobs).flatMap((ci_job) =>
+      (ci_job.steps ?? []).filter((step) => step.name === "Install Chromium"),
     );
     expect(installs.length).toBeGreaterThan(0);
     for (const step of installs) expect(step.run).toBe("bun run browser:install:chromium");
-    expect(workflowSources.ci).not.toMatch(/--with-deps|install-deps|apt-get/);
+    expect(workflow_sources.ci).not.toMatch(/--with-deps|install-deps|apt-get/);
   });
 
   it("rejects every missing Vercel credential before invoking the deployment CLI", () => {
-    const run = stepRun(job("docs", "deploy"), "Deploy prebuilt production docs");
+    const run = step_run(job("docs", "deploy"), "Deploy prebuilt production docs");
     const credentials = {
       VERCEL_TOKEN: "test-token",
       VERCEL_ORG_ID: "test-org",
       VERCEL_PROJECT_ID: "test-project",
     };
     const CLI_REACHED_EXIT_CODE = 42;
-    const runDeployment = (env: Readonly<Record<string, string>>) =>
+    const run_deployment = (env: Readonly<Record<string, string>>) =>
       Bun.spawnSync(["bash", "-e", "-c", `npx() { exit ${CLI_REACHED_EXIT_CODE}; }\n${run}`], {
         env,
         stdout: "pipe",
         stderr: "pipe",
       });
-    expect(runDeployment(credentials).exitCode).toBe(CLI_REACHED_EXIT_CODE);
+    expect(run_deployment(credentials).exitCode).toBe(CLI_REACHED_EXIT_CODE);
     for (const name of Object.keys(credentials)) {
-      const result = runDeployment({ ...credentials, [name]: "" });
+      const result = run_deployment({ ...credentials, [name]: "" });
       expect(result.exitCode).toBe(1);
       expect(result.stdout.toString()).toContain(name);
       expect(result.stdout.toString()).not.toContain(credentials.VERCEL_TOKEN);
     }
-    const missingAll = runDeployment({});
-    expect(missingAll.exitCode).toBe(1);
+    const missing_all = run_deployment({});
+    expect(missing_all.exitCode).toBe(1);
     for (const name of Object.keys(credentials)) {
-      expect(missingAll.stdout.toString()).toContain(name);
+      expect(missing_all.stdout.toString()).toContain(name);
     }
   });
 

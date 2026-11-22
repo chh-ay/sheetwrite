@@ -227,59 +227,59 @@ interface InteractionDependencies {
 export class InteractionSessions {
   private readonly deps: InteractionDependencies;
   private readonly editor: EditController;
-  private readonly validationEditor: ValidationEditor;
-  private readonly customEditor: CustomEditorController;
-  private contextMenu: ContextMenu | null = null;
+  private readonly validation_editor: ValidationEditor;
+  private readonly custom_editor: CustomEditorController;
+  private context_menu: ContextMenu | null = null;
   /** Corners of the reference the editor last picked by pointer or arrow key. */
-  private pointAnchor: CellRef | null = null;
-  private pointEnd: CellRef | null = null;
-  private editingAddress: Readonly<CellAddress> | null = null;
-  private activeEditor:
+  private point_anchor: CellRef | null = null;
+  private point_end: CellRef | null = null;
+  private editing_address: Readonly<CellAddress> | null = null;
+  private active_editor:
     | EditController
     | ValidationEditor
     | CustomEditorController
     | PickList
     | null = null;
   /** Pick From Drop-down List, made when it first opens. */
-  private pickList: PickList | null = null;
+  private pick_list: PickList | null = null;
   private generation = 0;
-  private fillTarget: SelRect | null = null;
+  private fill_target: SelRect | null = null;
   /** The value tip of the fill handle's drag. */
   private tip: FillTip | null = null;
   /** Fills and the Auto Fill Options that redo them. */
   private readonly fills: FillController;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
-  private endMode = false;
+  private end_mode = false;
   /** Escape was the last key on the grid, so Tab leaves the grid instead of moving the cell. */
-  private escapeLeaves = false;
+  private escape_leaves = false;
   /** Excel's cell mode, which the `cell-mode` event last reported. */
   private mode: CellMode = "ready";
   /**
    * Excel's Tab run: the cell a run of Tab moves left active, and the column
    * the run started in, where the next Enter goes. Any other move ends it.
    */
-  private tabRun: { readonly row: number; readonly col: number; readonly start: number } | null =
+  private tab_run: { readonly row: number; readonly col: number; readonly start: number } | null =
     null;
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
   /** The load of AutoComplete's code, started by the first edit or list. */
-  private autocompleteLoad: Promise<typeof import("./autocomplete.js")> | null = null;
-  private dragMove: ((ev: PointerEvent) => void) | null = null;
-  private dragUp: ((ev: PointerEvent) => void) | null = null;
-  private dragCancel: ((ev: PointerEvent) => void) | null = null;
+  private autocomplete_load: Promise<typeof import("./autocomplete.js")> | null = null;
+  private drag_move: ((ev: PointerEvent) => void) | null = null;
+  private drag_up: ((ev: PointerEvent) => void) | null = null;
+  private drag_cancel: ((ev: PointerEvent) => void) | null = null;
   /** Pointer that owns the active drag; other pointers' events are ignored. */
-  private activePointerId: number | null = null;
+  private active_pointer_id: number | null = null;
 
   constructor(deps: InteractionDependencies) {
     this.deps = deps;
     this.editor = new EditController(deps.viewportEl, {
       highlightCells: deps.highlightCells,
       sheet: deps.activeSheet,
-      cell: () => this.editingAddress,
+      cell: () => this.editing_address,
       store: deps.store,
     });
-    this.validationEditor = new ValidationEditor(deps.viewportEl);
-    this.customEditor = new CustomEditorController(deps.viewportEl);
+    this.validation_editor = new ValidationEditor(deps.viewportEl);
+    this.custom_editor = new CustomEditorController(deps.viewportEl);
     this.fills = new FillController({
       store: deps.store,
       loadable: deps.loadable,
@@ -291,15 +291,15 @@ export class InteractionSessions {
       commit: deps.commit,
       undo: deps.undo,
     });
-    deps.scroller.addEventListener("contextmenu", this.onContextMenu);
-    deps.scroller.addEventListener("pointerdown", this.onPointerDown);
-    deps.scroller.addEventListener("dblclick", this.onDblClick);
-    deps.scroller.addEventListener("pointermove", this.onHover);
-    deps.host.addEventListener("keydown", this.onKeyDown);
+    deps.scroller.addEventListener("contextmenu", this.on_context_menu);
+    deps.scroller.addEventListener("pointerdown", this.on_pointer_down);
+    deps.scroller.addEventListener("dblclick", this.on_dbl_click);
+    deps.scroller.addEventListener("pointermove", this.on_hover);
+    deps.host.addEventListener("keydown", this.on_key_down);
   }
 
   get isEditing(): boolean {
-    return this.activeEditor !== null;
+    return this.active_editor !== null;
   }
 
   /** Excel's cell mode now; see {@link CellMode}. */
@@ -308,19 +308,19 @@ export class InteractionSessions {
   }
 
   /** Emit `cell-mode` when the mode of the open editor, or of none, changed. */
-  private reportCellMode(): void {
-    const editor = this.activeEditor;
+  private report_cell_mode(): void {
+    const editor = this.active_editor;
     let mode: CellMode = "ready";
     if (editor === this.editor) mode = this.editor.mode;
-    else if (editor === this.customEditor) mode = "edit";
+    else if (editor === this.custom_editor) mode = "edit";
     if (mode === this.mode) return;
     this.mode = mode;
     for (const listener of this.deps.editListeners["cell-mode"]) listener({ mode });
   }
 
   configureMenu(config: GridConfig | undefined, theme: Theme): void {
-    this.contextMenu?.destroy();
-    this.contextMenu =
+    this.context_menu?.destroy();
+    this.context_menu =
       config?.contextMenu === false
         ? null
         : new ContextMenu(
@@ -337,14 +337,14 @@ export class InteractionSessions {
    * an object, not a cell. Returns false when the host turned menus off.
    */
   openMenu(items: readonly ContextMenuItem[], clientX: number, clientY: number): boolean {
-    if (!this.contextMenu) return false;
+    if (!this.context_menu) return false;
 
-    this.contextMenu.open({ cell: null, clientX, clientY }, items);
+    this.context_menu.open({ cell: null, clientX, clientY }, items);
     return true;
   }
 
-  private readonly onContextMenu = (e: MouseEvent): void => {
-    if (!this.contextMenu) return;
+  private readonly on_context_menu = (e: MouseEvent): void => {
+    if (!this.context_menu) return;
     e.preventDefault();
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     const address = cell ? { sheet: this.deps.activeSheet(), ...cell } : null;
@@ -354,32 +354,32 @@ export class InteractionSessions {
       this.deps.emitSelection();
       this.deps.scheduleRender();
     }
-    this.contextMenu.open({ cell: address, clientX: e.clientX, clientY: e.clientY });
+    this.context_menu.open({ cell: address, clientX: e.clientX, clientY: e.clientY });
   };
 
   reconcile(change: "view" | "sheet" | "structure" | "read-only" | "value"): void {
-    if (change !== "value") this.cancelPointer();
+    if (change !== "value") this.cancel_pointer();
     // Any change but the fill's own ends Auto Fill Options, as in Excel.
     if (change === "sheet" || change === "read-only") this.fills.dismiss();
     else this.fills.documentChanged();
     if (change === "sheet" || change === "structure" || change === "read-only") {
-      this.cancelEditor();
+      this.cancel_editor();
       return;
     }
-    const address = this.editingAddress;
+    const address = this.editing_address;
     if (!address) return;
-    const viewRow = this.deps.toViewRow(address.row);
+    const view_row = this.deps.toViewRow(address.row);
     const column = this.deps.sheet().columns[address.col];
-    if (address.sheet !== this.deps.activeSheet() || viewRow === null || !column) {
-      this.cancelEditor();
+    if (address.sheet !== this.deps.activeSheet() || view_row === null || !column) {
+      this.cancel_editor();
       return;
     }
-    if (this.activeEditor === this.customEditor) {
+    if (this.active_editor === this.custom_editor) {
       const value = this.deps.store.getCell(address).resolved;
       const formula =
         this.deps.loadable?.getFormula(address) ?? this.deps.store.getFormula(address);
-      this.customEditor.update({
-        viewAddress: { sheet: address.sheet, row: viewRow, col: address.col },
+      this.custom_editor.update({
+        viewAddress: { sheet: address.sheet, row: view_row, col: address.col },
         column,
         value,
         text:
@@ -387,25 +387,25 @@ export class InteractionSessions {
           cellEditText(
             value,
             column.type,
-            this.numberFormatAt(address, column),
+            this.number_format_at(address, column),
             column.numberLocale,
           ),
-        label: this.editorLabel(viewRow, address.col),
+        label: this.editor_label(view_row, address.col),
       });
     }
   }
 
   reposition(contentTop: number, scrollLeft: number): void {
-    const address = this.editingAddress;
+    const address = this.editing_address;
     if (!address) return;
     const row = this.deps.toViewRow(address.row);
     if (row === null) return;
     const rect = this.deps.screenRect(row, address.col, contentTop, scrollLeft);
-    const editor = this.activeEditor;
+    const editor = this.active_editor;
     if (editor instanceof CustomEditorController) {
       editor.position({ x: rect.x, y: rect.y, width: rect.w, height: rect.h });
     } else {
-      editor?.position(editor === this.editor ? this.textBox(row, address.col, rect) : rect);
+      editor?.position(editor === this.editor ? this.text_box(row, address.col, rect) : rect);
     }
   }
 
@@ -419,7 +419,7 @@ export class InteractionSessions {
     if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
-      void this.loadAutocomplete().then(() => {
+      void this.load_autocomplete().then(() => {
         if (typed && this.generation === generation) this.editor.completeNow();
       });
     }
@@ -439,7 +439,7 @@ export class InteractionSessions {
       return made ?? null;
     };
     return {
-      complete: (field, typedText) => current()?.complete(field, typedText) ?? null,
+      complete: (field, typed_text) => current()?.complete(field, typed_text) ?? null,
       keyDown: (event, field) => current()?.keyDown(event, field) ?? false,
       reposition: (field) => made?.reposition(field),
       close: () => made?.close(),
@@ -447,12 +447,12 @@ export class InteractionSessions {
   }
 
   /** AutoComplete's code, loaded once. */
-  private loadAutocomplete(): Promise<typeof import("./autocomplete.js")> {
-    this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
+  private load_autocomplete(): Promise<typeof import("./autocomplete.js")> {
+    this.autocomplete_load ??= import("./autocomplete.js").then((module) => {
       this.autocomplete = module;
       return module;
     });
-    return this.autocompleteLoad;
+    return this.autocomplete_load;
   }
 
   /**
@@ -465,7 +465,7 @@ export class InteractionSessions {
     if (this.deps.readOnly()) return;
     const cell = this.deps.anchorCell(row, col);
     const generation = this.generation;
-    void this.loadAutocomplete().then((module) => {
+    void this.load_autocomplete().then((module) => {
       // An edit, a move or read-only since the key wins.
       const focus = this.deps.selection().focusCell;
       if (
@@ -487,9 +487,9 @@ export class InteractionSessions {
       };
       const current = this.deps.store.getCell(address).resolved;
       this.deps.onEditStart();
-      const list = (this.pickList ??= new module.PickList(this.deps.viewportEl));
-      this.editingAddress = address;
-      this.activeEditor = list;
+      const list = (this.pick_list ??= new module.PickList(this.deps.viewportEl));
+      this.editing_address = address;
+      this.active_editor = list;
       list.begin({
         entries,
         current: typeof current === "string" ? current : "",
@@ -501,8 +501,8 @@ export class InteractionSessions {
         ),
         theme: this.deps.theme(),
         onCommit: (entry, navigate) =>
-          this.finishEdit(address, { kind: "literal", value: entry }, navigate),
-        onCancel: () => this.endEditor(),
+          this.finish_edit(address, { kind: "literal", value: entry }, navigate),
+        onCancel: () => this.end_editor(),
       });
     });
   }
@@ -512,19 +512,19 @@ export class InteractionSessions {
    * header shows, the sheet row under a filter and the view position under a
    * view sort.
    */
-  private editorLabel(row: number, col: number): string {
+  private editor_label(row: number, col: number): string {
     const sorted = (this.deps.sheet().sortKeys?.length ?? 0) > 0;
     const shown = sorted ? row : this.deps.toDataRow(row);
     return `Edit ${this.deps.columnHeader(col)}, row ${shown + 1}`;
   }
 
-  private editorRect(
+  private editor_rect(
     row: number,
     col: number,
-    contentTop: number,
-    scrollLeft: number,
+    content_top: number,
+    scroll_left: number,
   ): CellEditorRect {
-    const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
+    const rect = this.deps.screenRect(row, col, content_top, scroll_left);
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
   }
 
@@ -532,8 +532,8 @@ export class InteractionSessions {
    * Where the cell editor sits: the cell, or in an AutoFilter header cell
    * its text box, which ends a gap before the filter button, as in Excel.
    */
-  private textBox(row: number, col: number, rect: EditRect): EditRect {
-    return this.isAutoFilterHeader(row, col)
+  private text_box(row: number, col: number, rect: EditRect): EditRect {
+    return this.is_auto_filter_header(row, col)
       ? { ...rect, w: filterTextRight(rect, this.deps.zoom()) - rect.x }
       : rect;
   }
@@ -543,72 +543,72 @@ export class InteractionSessions {
    * replacing a picked one. It names sheet rows: under a sort or filter view
    * the pointed cell's row in the sheet, as in Excel.
    */
-  private pointAt(anchor: CellRef, end: CellRef): void {
-    this.pointAnchor = anchor;
-    this.pointEnd = end;
-    const sheetCell = (cell: CellRef): CellRef => ({
+  private point_at(anchor: CellRef, end: CellRef): void {
+    this.point_anchor = anchor;
+    this.point_end = end;
+    const sheet_cell = (cell: CellRef): CellRef => ({
       row: this.deps.toDataRow(cell.row),
       col: cell.col,
     });
-    this.editor.setReference(rangeA1(sheetCell(anchor), sheetCell(end)));
+    this.editor.setReference(rangeA1(sheet_cell(anchor), sheet_cell(end)));
   }
 
   /**
    * An arrow key in Enter mode: move the pointed reference by one cell, or
    * with Shift stretch it, starting from the edited cell, as in Excel.
    */
-  private pointBy(editCell: CellRef, dRow: number, dCol: number, extend: boolean): void {
-    const picked = this.editor.isPointing ? this.pointAnchor : null;
-    const anchor = picked ?? editCell;
-    const end = (picked ? this.pointEnd : null) ?? editCell;
+  private point_by(edit_cell: CellRef, d_row: number, d_col: number, extend: boolean): void {
+    const picked = this.editor.isPointing ? this.point_anchor : null;
+    const anchor = picked ?? edit_cell;
+    const end = (picked ? this.point_end : null) ?? edit_cell;
     const step = (cell: CellRef): CellRef => ({
-      row: Math.max(0, Math.min(this.deps.rowCount() - 1, cell.row + dRow)),
-      col: dCol === 0 ? cell.col : this.deps.nextVisibleCol(cell.col, dCol < 0 ? -1 : 1),
+      row: Math.max(0, Math.min(this.deps.rowCount() - 1, cell.row + d_row)),
+      col: d_col === 0 ? cell.col : this.deps.nextVisibleCol(cell.col, d_col < 0 ? -1 : 1),
     });
     const moved = step(extend ? end : anchor);
-    if (extend) this.pointAt(anchor, moved);
-    else this.pointAt(moved, moved);
+    if (extend) this.point_at(anchor, moved);
+    else this.point_at(moved, moved);
     this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row: moved.row, col: moved.col });
   }
 
-  private endEditor(): void {
-    this.editingAddress = null;
-    this.activeEditor = null;
-    this.reportCellMode();
+  private end_editor(): void {
+    this.editing_address = null;
+    this.active_editor = null;
+    this.report_cell_mode();
     this.deps.host.focus();
     this.deps.scheduleRender();
     this.deps.editDraft.end();
   }
 
-  private cancelEditor(): void {
+  private cancel_editor(): void {
     ++this.generation;
-    this.editingAddress = null;
-    const editor = this.activeEditor;
-    this.activeEditor = null;
+    this.editing_address = null;
+    const editor = this.active_editor;
+    this.active_editor = null;
     editor?.cancel();
-    this.reportCellMode();
+    this.report_cell_mode();
   }
 
-  private finishEdit(
+  private finish_edit(
     address: Readonly<CellAddress>,
     input: string | CellValue,
     navigate: EditNavigate,
   ): void {
-    if (this.editingAddress !== address) return;
-    this.editingAddress = null;
-    this.activeEditor = null;
-    this.reportCellMode();
+    if (this.editing_address !== address) return;
+    this.editing_address = null;
+    this.active_editor = null;
+    this.report_cell_mode();
     try {
       if (address.sheet !== this.deps.activeSheet()) return;
-      const viewRow = this.deps.toViewRow(address.row);
-      if (viewRow === null) return;
+      const view_row = this.deps.toViewRow(address.row);
+      if (view_row === null) return;
       const column = this.deps.sheet().columns[address.col];
       const parsed =
         typeof input === "string"
           ? parseCellEntry(
               input,
               column?.type ?? "text",
-              this.numberFormatAt(address, column),
+              this.number_format_at(address, column),
               column?.numberLocale,
             )
           : { value: input };
@@ -618,25 +618,25 @@ export class InteractionSessions {
       // format that shows it as typed.
       const patches: DocumentOp[] =
         navigate === "stay"
-          ? this.selectionFill(address, viewRow, value, parsed.numberFormat)
+          ? this.selection_fill(address, view_row, value, parsed.numberFormat)
           : [
               {
                 op: "set",
                 addr: { ...address },
                 value,
-                style: this.entryStyle(address, column, parsed.numberFormat),
+                style: this.entry_style(address, column, parsed.numberFormat),
               },
             ];
       const entry: CellEntry = { address, value, patches, navigate };
       const decide = (): void => {
-        const rule = this.brokenRule(patches);
+        const rule = this.broken_rule(patches);
         if (rule) {
           const text =
-            typeof input === "string" ? input : this.entryText(value, column?.type ?? "text");
-          this.alertEntry(rule, entry, text);
+            typeof input === "string" ? input : this.entry_text(value, column?.type ?? "text");
+          this.alert_entry(rule, entry, text);
           return;
         }
-        this.commitCellEditAt(entry, viewRow);
+        this.commit_cell_edit_at(entry, view_row);
       };
       // The grid's check and the store's check of the entry are one check:
       // each list source is read once.
@@ -655,7 +655,7 @@ export class InteractionSessions {
    * that runs out of its budget finds none here; the store then refuses the
    * entry.
    */
-  private brokenRule(patches: readonly DocumentOp[]): DataValidationRule | undefined {
+  private broken_rule(patches: readonly DocumentOp[]): DataValidationRule | undefined {
     const rules = this.deps.sheet().validationRules;
     if (!rules?.length) return undefined;
     let broken: DataValidationRule | undefined;
@@ -665,7 +665,7 @@ export class InteractionSessions {
         (rule) => rule.policy !== "allow" && rangeContains(rule.range, patch.addr),
       );
       if (covering.length === 0) continue;
-      const value = this.enteredScalar(patch.addr, patch.value);
+      const value = this.entered_scalar(patch.addr, patch.value);
       if (value === undefined) continue;
       let rule: DataValidationRule | undefined;
       try {
@@ -686,7 +686,7 @@ export class InteractionSessions {
   }
 
   /** The value `value` gives the cell at `addr`: a formula's result; undefined when unknown. */
-  private enteredScalar(addr: Readonly<CellAddress>, value: CellValue): CellScalar | undefined {
+  private entered_scalar(addr: Readonly<CellAddress>, value: CellValue): CellScalar | undefined {
     if (value.kind === "literal") return value.value;
     if (value.kind !== "formula") return undefined;
     const preview = storeEngine(this.deps.store)?.previewFormula(addr, value.src);
@@ -695,13 +695,13 @@ export class InteractionSessions {
     return typeof result === "object" && result !== null ? result.error : result;
   }
 
-  private entryText(value: CellValue, type: CellFormat): string {
+  private entry_text(value: CellValue, type: CellFormat): string {
     if (value.kind === "formula") return value.src;
     return value.kind === "literal" ? cellEditText(value.value, type) : "";
   }
 
   /** A cell's effective number format: its own, then its column's. */
-  private numberFormatAt(
+  private number_format_at(
     addr: Readonly<CellAddress>,
     column: Column | undefined,
   ): string | undefined {
@@ -712,17 +712,17 @@ export class InteractionSessions {
     );
   }
 
-  /** The style an entry stores: the cell's own, in `entryFormat` when its format is General. */
-  private entryStyle(
+  /** The style an entry stores: the cell's own, in `entry_format` when its format is General. */
+  private entry_style(
     addr: Readonly<CellAddress>,
     column: Column | undefined,
-    entryFormat: string | undefined,
+    entry_format: string | undefined,
   ): CellStyle {
     const style = this.deps.store.getCell(addr).style;
-    if (entryFormat === undefined) return style;
-    const current = this.numberFormatAt(addr, column);
+    if (entry_format === undefined) return style;
+    const current = this.number_format_at(addr, column);
     return current === undefined || current === "General"
-      ? { ...style, numberFormat: entryFormat }
+      ? { ...style, numberFormat: entry_format }
       : style;
   }
 
@@ -731,7 +731,7 @@ export class InteractionSessions {
    * cell behind the alert as `text`; Retry and No return to it with the text
    * selected, Yes and OK store it, and Cancel drops it.
    */
-  private alertEntry(rule: DataValidationRule, entry: CellEntry, text: string): void {
+  private alert_entry(rule: DataValidationRule, entry: CellEntry, text: string): void {
     const generation = this.generation;
     const { address } = entry;
     const current = (): number | null =>
@@ -739,36 +739,36 @@ export class InteractionSessions {
         ? this.deps.toViewRow(address.row)
         : null;
     void import("./validation-alert.js").then(
-      async ({ validationAlert }) => {
-        let viewRow = current();
-        if (viewRow === null || this.isEditing) return;
-        this.beginEdit(viewRow, address.col, text, false, false);
+      async ({ validationAlert: validation_alert }) => {
+        let view_row = current();
+        if (view_row === null || this.isEditing) return;
+        this.beginEdit(view_row, address.col, text, false, false);
         const shown = this.generation;
-        const answer = await validationAlert(this.deps.dialogs, rule).result;
+        const answer = await validation_alert(this.deps.dialogs, rule).result;
         if (shown !== this.generation) return;
-        this.cancelEditor();
-        viewRow = this.deps.toViewRow(address.row);
-        if (viewRow === null || address.sheet !== this.deps.activeSheet()) return;
+        this.cancel_editor();
+        view_row = this.deps.toViewRow(address.row);
+        if (view_row === null || address.sheet !== this.deps.activeSheet()) return;
         if (answer === "retry" || answer === "no") {
-          this.beginEdit(viewRow, address.col, text, true);
+          this.beginEdit(view_row, address.col, text, true);
         } else if (answer === "yes" || answer === "ok") {
-          this.commitCellEditAt(entry, viewRow);
+          this.commit_cell_edit_at(entry, view_row);
         }
       },
       (error: unknown) => {
         // Without its alert the entry would vanish unexplained: hand it back to the editor.
-        const viewRow = current();
-        if (viewRow !== null && !this.isEditing) this.beginEdit(viewRow, address.col, text);
+        const view_row = current();
+        if (view_row !== null && !this.isEditing) this.beginEdit(view_row, address.col, text);
         reportError(error);
       },
     );
   }
 
-  private cancelPointer(): void {
-    if (this.activePointerId === null) return;
-    const cancel = this.dragCancel;
-    if (cancel) cancel(new PointerEvent("pointercancel", { pointerId: this.activePointerId }));
-    else this.detachDrag();
+  private cancel_pointer(): void {
+    if (this.active_pointer_id === null) return;
+    const cancel = this.drag_cancel;
+    if (cancel) cancel(new PointerEvent("pointercancel", { pointerId: this.active_pointer_id }));
+    else this.detach_drag();
   }
 
   /**
@@ -776,7 +776,7 @@ export class InteractionSessions {
    * cell's view of a draft another edit surface types (see `setEditText`).
    */
   beginEdit(row: number, col: number, initial?: string, selectAll = false, focus = true): void {
-    this.startEdit(row, col, { initial, selectAll, focus });
+    this.start_edit(row, col, { initial, selectAll, focus });
   }
 
   /**
@@ -785,63 +785,63 @@ export class InteractionSessions {
    * the items that contain it.
    */
   openList(row: number, col: number, filter = ""): void {
-    this.startEdit(row, col, { list: filter });
+    this.start_edit(row, col, { list: filter });
   }
 
-  private startEdit(row: number, col: number, request: EditRequest): void {
-    const { initial, selectAll = false, focus = true, list } = request;
+  private start_edit(row: number, col: number, request: EditRequest): void {
+    const { initial, selectAll: select_all = false, focus = true, list } = request;
     if (this.deps.readOnly()) return;
 
-    const editCell = this.deps.anchorCell(row, col);
+    const edit_cell = this.deps.anchorCell(row, col);
     const sheet = this.deps.sheet();
-    const column = sheet.columns[editCell.col];
+    const column = sheet.columns[edit_cell.col];
     if (!column) return;
 
-    const dataAddr = {
+    const data_addr = {
       sheet: this.deps.activeSheet(),
-      row: this.deps.toDataRow(editCell.row),
-      col: editCell.col,
+      row: this.deps.toDataRow(edit_cell.row),
+      col: edit_cell.col,
     };
 
-    const formula = this.deps.store.getFormula(dataAddr);
-    const current = this.deps.store.getCell(dataAddr).resolved;
+    const formula = this.deps.store.getFormula(data_addr);
+    const current = this.deps.store.getCell(data_addr).resolved;
     const text =
       initial ??
       formula ??
       cellEditText(
         current,
         column.type,
-        this.numberFormatAt(dataAddr, column),
+        this.number_format_at(data_addr, column),
         column.numberLocale,
       );
-    const contentTop = this.deps.contentTop();
+    const content_top = this.deps.contentTop();
 
-    this.cancelPointer();
+    this.cancel_pointer();
     this.deps.onEditStart();
-    this.cancelEditor();
+    this.cancel_editor();
     const generation = ++this.generation;
-    this.editingAddress = dataAddr;
+    this.editing_address = data_addr;
     const selection = this.deps.selection();
     // Typing inside a selection keeps it, so Enter and Tab move within it and
     // Ctrl+Enter fills it, as in Excel. Elsewhere the edited cell is selected.
-    let selectionChanged = false;
+    let selection_changed = false;
     const active = selection.focusCell;
-    if (selection.contains(editCell.row, editCell.col)) {
+    if (selection.contains(edit_cell.row, edit_cell.col)) {
       // Editing the active cell keeps the selection's moving corner for Shift+Arrow.
-      if (active?.row !== editCell.row || active.col !== editCell.col) {
-        selection.setActiveCell(editCell.row, editCell.col);
+      if (active?.row !== edit_cell.row || active.col !== edit_cell.col) {
+        selection.setActiveCell(edit_cell.row, edit_cell.col);
       }
     } else {
-      selectionChanged = true;
-      selection.selectCell(editCell.row, editCell.col);
+      selection_changed = true;
+      selection.selectCell(edit_cell.row, edit_cell.col);
     }
     this.deps.scheduleRender();
-    if (selectionChanged) this.deps.emitSelection();
+    if (selection_changed) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
     for (const listener of this.deps.editListeners["edit-begin"]) {
       listener({
-        addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col },
-        sheetAddress: { ...dataAddr },
+        addr: { sheet: data_addr.sheet, row: edit_cell.row, col: edit_cell.col },
+        sheetAddress: { ...data_addr },
       });
     }
 
@@ -849,9 +849,9 @@ export class InteractionSessions {
     // replace or invalidate this request, but cannot reopen its stale target.
     if (generation !== this.generation || this.deps.readOnly()) return;
 
-    const validationRule = sheet.validationRules?.find(
+    const validation_rule = sheet.validationRules?.find(
       (rule) =>
-        rangeContains(rule.range, dataAddr) &&
+        rangeContains(rule.range, data_addr) &&
         (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
     );
 
@@ -859,102 +859,107 @@ export class InteractionSessions {
     if (custom) {
       // A custom editor owns its own input; another surface cannot type its draft.
       if (!focus) {
-        this.editingAddress = null;
+        this.editing_address = null;
         return;
       }
-      this.activeEditor = this.customEditor;
-      this.customEditor.begin({
+      this.active_editor = this.custom_editor;
+      this.custom_editor.begin({
         editor: custom,
         grid: this.deps.grid,
-        address: dataAddr,
-        viewAddress: { sheet: this.deps.activeSheet(), row: editCell.row, col: editCell.col },
+        address: data_addr,
+        viewAddress: { sheet: this.deps.activeSheet(), row: edit_cell.row, col: edit_cell.col },
         column,
         value: current,
         text,
         initialInput: initial,
-        selectAll: selectAll || initial === undefined,
-        label: this.editorLabel(editCell.row, editCell.col),
-        rect: this.editorRect(
-          editCell.row,
-          editCell.col,
-          contentTop,
+        selectAll: select_all || initial === undefined,
+        label: this.editor_label(edit_cell.row, edit_cell.col),
+        rect: this.editor_rect(
+          edit_cell.row,
+          edit_cell.col,
+          content_top,
           this.deps.scroller.scrollLeft,
         ),
-        onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
-        onCancel: () => this.endEditor(),
+        onCommit: (value, navigate) => this.finish_edit(data_addr, value, navigate),
+        onCancel: () => this.end_editor(),
       });
-      this.reportCellMode();
+      this.report_cell_mode();
 
       return;
     }
 
     // A list opens only on request (its arrow, Alt+Down or typing); F2 and a
     // double-click edit the text, as in Excel. A checkbox opens on any edit.
-    const condition = validationRule?.condition;
+    const condition = validation_rule?.condition;
     if (
-      validationRule &&
+      validation_rule &&
       (condition?.kind === "list" ? list !== undefined : initial === undefined)
     ) {
-      this.activeEditor = this.validationEditor;
-      this.validationEditor.begin({
-        row: editCell.row,
-        col: editCell.col,
-        rule: validationRule,
+      this.active_editor = this.validation_editor;
+      this.validation_editor.begin({
+        row: edit_cell.row,
+        col: edit_cell.col,
+        rule: validation_rule,
         values: validationListItems(
-          validationRule,
-          dataAddr,
+          validation_rule,
+          data_addr,
           storeEngine(this.deps.store)?.validationReads,
         ),
         current,
         filter: list ?? "",
         rect: this.deps.screenRect(
-          editCell.row,
-          editCell.col,
-          contentTop,
+          edit_cell.row,
+          edit_cell.col,
+          content_top,
           this.deps.scroller.scrollLeft,
         ),
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
-          this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
-        onCommitText: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
-        onCancel: () => this.endEditor(),
+          this.finish_edit(data_addr, { kind: "literal", value }, navigate),
+        onCommitText: (value, navigate) => this.finish_edit(data_addr, value, navigate),
+        onCancel: () => this.end_editor(),
       });
 
       return;
     }
 
-    this.activeEditor = this.editor;
+    this.active_editor = this.editor;
     this.editor.begin({
-      row: editCell.row,
-      col: editCell.col,
+      row: edit_cell.row,
+      col: edit_cell.col,
       type: column.type,
       initial: text,
       // F2 and double-click put the caret at the end, as in Excel.
-      selectAll: focus && selectAll,
+      selectAll: focus && select_all,
       entering: initial !== undefined,
-      rect: this.textBox(
-        editCell.row,
-        editCell.col,
-        this.deps.screenRect(editCell.row, editCell.col, contentTop, this.deps.scroller.scrollLeft),
+      rect: this.text_box(
+        edit_cell.row,
+        edit_cell.col,
+        this.deps.screenRect(
+          edit_cell.row,
+          edit_cell.col,
+          content_top,
+          this.deps.scroller.scrollLeft,
+        ),
       ),
-      label: this.editorLabel(editCell.row, editCell.col),
+      label: this.editor_label(edit_cell.row, edit_cell.col),
       theme: this.deps.theme(),
-      look: this.editorLook(
+      look: this.editor_look(
         column,
-        this.deps.store.getCell(dataAddr).style,
+        this.deps.store.getCell(data_addr).style,
         // A formula edits left-aligned under General alignment, as in Excel;
         // a typed entry is not a value yet, so only a column type aligns it.
         initial !== undefined || formula !== null ? null : current,
       ),
       focus,
-      onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
-      onCancel: () => this.endEditor(),
+      onCommit: (value, navigate) => this.finish_edit(data_addr, value, navigate),
+      onCancel: () => this.end_editor(),
       onText: (value) => this.deps.editDraft.text(value),
-      onShortcut: (event) => this.runCustomShortcut(event, true),
-      onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
-      complete: this.completion(editCell.row, editCell.col, initial !== undefined),
-      onMode: () => this.reportCellMode(),
-      onRefuse: (message) => this.refuseFormula(message),
+      onShortcut: (event) => this.run_custom_shortcut(event, true),
+      onPoint: (d_row, d_col, extend) => this.point_by(edit_cell, d_row, d_col, extend),
+      complete: this.completion(edit_cell.row, edit_cell.col, initial !== undefined),
+      onMode: () => this.report_cell_mode(),
+      onRefuse: (message) => this.refuse_formula(message),
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
     this.deps.editDraft.text(this.editor.value);
@@ -967,7 +972,7 @@ export class InteractionSessions {
    * is the value the editor opened on, or null for a typed entry or a
    * formula, which edit left-aligned unless the column type is numeric.
    */
-  private editorLook(column: Column, own: CellStyle, shown: CellScalar): EditorLook {
+  private editor_look(column: Column, own: CellStyle, shown: CellScalar): EditorLook {
     const style = column.cellStyle === undefined ? own : { ...column.cellStyle, ...own };
     const theme = this.deps.theme();
     const lines = [style.underline ? "underline" : "", style.strikethrough ? "line-through" : ""];
@@ -981,9 +986,9 @@ export class InteractionSessions {
   }
 
   /** Excel's message for a formula that does not parse, with what is wrong with it. */
-  private async refuseFormula(problem: string): Promise<void> {
-    const { alertDialog } = await import("./dialog.js");
-    await alertDialog(this.deps.dialogs, {
+  private async refuse_formula(problem: string): Promise<void> {
+    const { alertDialog: alert_dialog } = await import("./dialog.js");
+    await alert_dialog(this.deps.dialogs, {
       title: "Formula",
       message: `There's a problem with this formula. ${problem}`,
     });
@@ -1001,7 +1006,7 @@ export class InteractionSessions {
       if (!focus) return false;
       this.beginEdit(focus.row, focus.col, text, false, false);
     }
-    if (this.activeEditor !== this.editor || !this.editor.isEditing) return false;
+    if (this.active_editor !== this.editor || !this.editor.isEditing) return false;
     this.editor.setText(text, selectionStart, selectionEnd);
     return true;
   }
@@ -1011,16 +1016,16 @@ export class InteractionSessions {
    * when the edit stays open: its formula does not parse.
    */
   commitEdit(): boolean {
-    return this.activeEditor !== this.editor || this.editor.commit("none");
+    return this.active_editor !== this.editor || this.editor.commit("none");
   }
 
   /** Cancel the open cell edit; both the editor and any formula bar show the stored value again. */
   cancelEdit(): void {
-    if (this.isEditing) this.cancelEditor();
+    if (this.isEditing) this.cancel_editor();
   }
 
-  /** Store `entry`, whose cell shows at `viewRow`, then move as its key asks. */
-  private commitCellEditAt(entry: CellEntry, viewRow: number): void {
+  /** Store `entry`, whose cell shows at `view_row`, then move as its key asks. */
+  private commit_cell_edit_at(entry: CellEntry, view_row: number): void {
     const { address, value, patches, navigate } = entry;
     const reason: CommitReason =
       navigate === "none"
@@ -1033,12 +1038,12 @@ export class InteractionSessions {
     if (outcome.status === "applied") {
       for (const listener of this.deps.editListeners["edit-commit"]) {
         listener({
-          addr: { sheet: address.sheet, row: viewRow, col: address.col },
+          addr: { sheet: address.sheet, row: view_row, col: address.col },
           sheetAddress: { ...address },
           value,
         });
       }
-      this.moveAfterCommit(viewRow, address.col, navigate);
+      this.move_after_commit(view_row, address.col, navigate);
     }
     this.deps.host.focus();
     this.deps.scheduleRender();
@@ -1049,30 +1054,30 @@ export class InteractionSessions {
    * formula's relative references shift with each cell. One cell when the
    * selection is only the edited cell.
    */
-  private selectionFill(
+  private selection_fill(
     address: Readonly<CellAddress>,
-    viewRow: number,
+    view_row: number,
     value: CellValue,
-    entryFormat?: string,
+    entry_format?: string,
   ): DocumentOp[] {
     const columns = this.deps.sheet().columns;
     const patches: DocumentOp[] = [];
     this.deps.selection().forEachRect((rect) => {
       for (let row = rect.r0; row <= rect.r1; row++) {
-        const dataRow = this.deps.toDataRow(row);
+        const data_row = this.deps.toDataRow(row);
         for (let col = rect.c0; col <= rect.c1; col++) {
           const anchor = this.deps.anchorCell(row, col);
           if (anchor.row !== row || anchor.col !== col) continue;
-          const addr = { sheet: address.sheet, row: dataRow, col };
+          const addr = { sheet: address.sheet, row: data_row, col };
           patches.push({
             op: "set",
             addr,
-            style: this.entryStyle(addr, columns[col], entryFormat),
+            style: this.entry_style(addr, columns[col], entry_format),
             value:
               value.kind === "formula"
                 ? {
                     kind: "formula",
-                    src: shiftA1Refs(value.src, row - viewRow, col - address.col),
+                    src: shiftA1Refs(value.src, row - view_row, col - address.col),
                   }
                 : value,
           });
@@ -1086,26 +1091,26 @@ export class InteractionSessions {
             op: "set",
             addr: { ...address },
             value,
-            style: this.entryStyle(address, columns[address.col], entryFormat),
+            style: this.entry_style(address, columns[address.col], entry_format),
           },
         ];
   }
 
-  private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
+  private move_after_commit(row: number, col: number, navigate: EditNavigate): void {
     const selection = this.deps.selection();
     switch (navigate) {
       // Enter and Tab move within a selection of several cells.
       case "down":
-        this.moveActiveCell(1, 0);
+        this.move_active_cell(1, 0);
         return;
       case "up":
-        this.moveActiveCell(-1, 0);
+        this.move_active_cell(-1, 0);
         return;
       case "right":
-        this.moveActiveCell(0, 1);
+        this.move_active_cell(0, 1);
         return;
       case "left":
-        this.moveActiveCell(0, -1);
+        this.move_active_cell(0, -1);
         return;
       // Ctrl+Enter keeps the selection and the active cell.
       case "stay":
@@ -1132,7 +1137,7 @@ export class InteractionSessions {
   }
 
   get fillPreview(): SelRect | null {
-    return this.fillTarget;
+    return this.fill_target;
   }
 
   /** The value tip beside the fill handle while it is dragged. */
@@ -1142,7 +1147,7 @@ export class InteractionSessions {
 
   /** The new cells of the dragged fill handle's fill, which show their values in place. */
   get fillValuesArea(): SelRect | null {
-    return this.fillTarget ? this.fills.dragArea : null;
+    return this.fill_target ? this.fills.dragArea : null;
   }
 
   /** What a cell of {@link fillValuesArea} will show; null for a formula. */
@@ -1152,7 +1157,7 @@ export class InteractionSessions {
 
   /** The cells of the last fill-handle fill, whose Auto Fill Options button shows with menus on. */
   get autoFillTarget(): SelRect | null {
-    return this.contextMenu && !this.fillTarget ? this.fills.optionsTarget : null;
+    return this.context_menu && !this.fill_target ? this.fills.optionsTarget : null;
   }
 
   /**
@@ -1166,7 +1171,7 @@ export class InteractionSessions {
         label: AUTO_FILL_LABELS[choice],
         onClick: () => {
           const target = this.fills.optionsTarget;
-          if (target && this.fills.redo(choice)) this.selectFilled(target);
+          if (target && this.fills.redo(choice)) this.select_filled(target);
           this.deps.scheduleRender();
         },
       })),
@@ -1175,7 +1180,7 @@ export class InteractionSessions {
     );
   }
 
-  private selectFilled(target: SelRect): void {
+  private select_filled(target: SelRect): void {
     const selection = this.deps.selection();
     selection.selectCell(target.r0, target.c0);
     selection.extendTo(target.r1, target.c1);
@@ -1188,18 +1193,18 @@ export class InteractionSessions {
     const theme = this.deps.theme();
     if (py < theme.headerHeight) return null;
 
-    const contentX = this.deps.contentXAt(clientX - rect.left);
-    const contentY = this.deps.contentYAt(py);
+    const content_x = this.deps.contentXAt(clientX - rect.left);
+    const content_y = this.deps.contentYAt(py);
 
-    const row = this.deps.rowAtOffset(Math.max(0, contentY));
-    const col = this.deps.colAtX(Math.max(0, contentX));
+    const row = this.deps.rowAtOffset(Math.max(0, content_y));
+    const col = this.deps.colAtX(Math.max(0, content_x));
     if (col === -1 || row < 0 || row >= this.deps.sheet().rowCount) return null;
 
     return this.deps.anchorCell(row, col);
   }
 
   fillHandleScreen(contentTop: number, scrollLeft: number): { x: number; y: number } | null {
-    const src = this.fillSourceRect();
+    const src = this.fill_source_rect();
     if (!src) return null;
     const r = this.deps.screenRect(src.r1, src.c1, contentTop, scrollLeft);
     const y = r.y + r.h;
@@ -1208,26 +1213,26 @@ export class InteractionSessions {
   }
 
   destroy(): void {
-    this.cancelPointer();
-    this.cancelEditor();
+    this.cancel_pointer();
+    this.cancel_editor();
     this.editor.destroy();
-    this.validationEditor.destroy();
-    this.customEditor.destroy();
-    this.pickList?.destroy();
-    this.contextMenu?.destroy();
-    this.deps.scroller.removeEventListener("contextmenu", this.onContextMenu);
-    this.deps.scroller.removeEventListener("pointerdown", this.onPointerDown);
-    this.deps.scroller.removeEventListener("dblclick", this.onDblClick);
-    this.deps.scroller.removeEventListener("pointermove", this.onHover);
-    this.deps.host.removeEventListener("keydown", this.onKeyDown);
+    this.validation_editor.destroy();
+    this.custom_editor.destroy();
+    this.pick_list?.destroy();
+    this.context_menu?.destroy();
+    this.deps.scroller.removeEventListener("contextmenu", this.on_context_menu);
+    this.deps.scroller.removeEventListener("pointerdown", this.on_pointer_down);
+    this.deps.scroller.removeEventListener("dblclick", this.on_dbl_click);
+    this.deps.scroller.removeEventListener("pointermove", this.on_hover);
+    this.deps.host.removeEventListener("keydown", this.on_key_down);
   }
 
-  private readonly onPointerDown = (e: PointerEvent): void => {
-    if (this.activePointerId !== null) return;
+  private readonly on_pointer_down = (e: PointerEvent): void => {
+    if (this.active_pointer_id !== null) return;
     // Primary button only. Touch contacts always report button 0; a pen barrel
     // button (non-zero) must not select, so the guard covers mouse AND pen.
     if (e.pointerType !== "touch" && e.button !== 0) return;
-    const isTouch = e.pointerType === "touch";
+    const is_touch = e.pointerType === "touch";
 
     const editor = this.editor;
     // Formula point mode: while editing a "=" formula, clicks/drags pick A1
@@ -1236,104 +1241,104 @@ export class InteractionSessions {
       e.preventDefault();
       const start = this.cellAtPointer(e.clientX, e.clientY);
       if (!start) return;
-      this.pointAt(start, start);
+      this.point_at(start, start);
       const move = (ev: PointerEvent): void => {
         const c = this.cellAtPointer(ev.clientX, ev.clientY);
-        if (c) this.pointAt(start, c);
+        if (c) this.point_at(start, c);
       };
       // The picked reference stays replaceable: the next click or arrow key
       // replaces it until the user types, as in Excel's Point mode.
       const up = (): void => {
-        this.detachDrag();
+        this.detach_drag();
       };
       const cancel = (): void => {
         editor.endReference();
-        this.detachDrag();
+        this.detach_drag();
       };
-      this.attachDrag(e, move, up, cancel);
+      this.attach_drag(e, move, up, cancel);
       return;
     }
     // A draft typed in a formula bar commits when the user clicks a cell, as
     // the focused editor's blur would.
-    if (this.activeEditor === editor && editor.isEditing && !editor.isFocused) {
+    if (this.active_editor === editor && editor.isEditing && !editor.isFocused) {
       editor.commit("none");
     }
     // A selected cell must own subsequent keyboard input across browsers.
     // Keep touch and active-editor gestures focused where they already are.
-    if (!isTouch && !this.isEditing) this.deps.host.focus({ preventScroll: true });
+    if (!is_touch && !this.isEditing) this.deps.host.focus({ preventScroll: true });
 
-    const viewportRect = this.deps.viewportEl.getBoundingClientRect();
-    if (!this.isEditing && this.hitsFillHandle(e.clientX, e.clientY)) {
+    const viewport_rect = this.deps.viewportEl.getBoundingClientRect();
+    if (!this.isEditing && this.hits_fill_handle(e.clientX, e.clientY)) {
       e.preventDefault();
-      this.startFillDrag(e);
+      this.start_fill_drag(e);
       return;
     }
 
     // Resize gesture: near a column boundary in the top header, or a row boundary
     // in the left gutter. Takes priority over selection; disabled while editing.
     if (!this.isEditing && !this.deps.readOnly()) {
-      const resize = this.resizeAt(e);
+      const resize = this.resize_at(e);
       if (resize) {
         e.preventDefault();
-        if (resize.kind === "col") this.startColumnResize(e, resize.index, e.clientX);
-        else this.startRowResize(e, resize.index, e.clientY);
+        if (resize.kind === "col") this.start_column_resize(e, resize.index, e.clientX);
+        else this.start_row_resize(e, resize.index, e.clientY);
         return;
       }
     }
 
     const additive = e.ctrlKey || e.metaKey;
     const theme = this.deps.theme();
-    const py = e.clientY - viewportRect.top;
+    const py = e.clientY - viewport_rect.top;
 
     // Column letters select columns and row numbers select rows; Shift
     // extends, Ctrl/Cmd adds, and a drag across the headers extends, as in Excel.
-    const px = e.clientX - viewportRect.left;
-    const columnHeader = py < theme.headerHeight;
-    const rowHeader = !columnHeader && px < theme.rowHeaderWidth;
-    if (columnHeader || rowHeader) {
-      const headerAt = (ev: PointerEvent): number => {
+    const px = e.clientX - viewport_rect.left;
+    const column_header = py < theme.headerHeight;
+    const row_header = !column_header && px < theme.rowHeaderWidth;
+    if (column_header || row_header) {
+      const header_at = (ev: PointerEvent): number => {
         const rect = this.deps.viewportEl.getBoundingClientRect();
-        if (columnHeader) return this.deps.colAtX(this.deps.contentXAt(ev.clientX - rect.left));
+        if (column_header) return this.deps.colAtX(this.deps.contentXAt(ev.clientX - rect.left));
         const row = this.deps.rowAtOffset(Math.max(0, this.deps.contentYAt(ev.clientY - rect.top)));
         return row < this.deps.rowCount() ? row : -1;
       };
-      const extendTo = (index: number): void => {
-        if (columnHeader) this.deps.selection().extendTo(0, index);
+      const extend_to = (index: number): void => {
+        if (column_header) this.deps.selection().extendTo(0, index);
         else this.deps.selection().extendTo(index, this.deps.firstCol());
       };
-      const index = headerAt(e);
+      const index = header_at(e);
       if (index === -1) return;
       const selection = this.deps.selection();
-      if (e.shiftKey) extendTo(index);
-      else if (columnHeader) selection.selectColumn(index, additive);
+      if (e.shiftKey) extend_to(index);
+      else if (column_header) selection.selectColumn(index, additive);
       else selection.selectRow(index, additive);
       this.deps.emitSelection();
       this.deps.scheduleRender();
-      if (isTouch) return;
+      if (is_touch) return;
       const move = (ev: PointerEvent): void => {
-        const reached = headerAt(ev);
+        const reached = header_at(ev);
         if (reached === -1) return;
-        extendTo(reached);
+        extend_to(reached);
         this.deps.emitSelection();
         this.deps.scheduleRender();
       };
-      this.attachDrag(e, move, () => this.detachDrag());
+      this.attach_drag(e, move, () => this.detach_drag());
       return;
     }
 
     // The dropdown arrow beside a selected list cell opens its list, or
     // closes it while it is open, as in Excel.
-    const listCell = this.activeEditor === this.editor ? null : this.listButtonCellAt(px, py);
-    if (listCell) {
+    const list_cell = this.active_editor === this.editor ? null : this.list_button_cell_at(px, py);
+    if (list_cell) {
       e.preventDefault();
-      if (this.activeEditor === this.validationEditor) this.cancelEditor();
-      else this.openList(listCell.row, listCell.col);
+      if (this.active_editor === this.validation_editor) this.cancel_editor();
+      else this.openList(list_cell.row, list_cell.col);
       return;
     }
 
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
-    if (this.isAutoFilterHeader(cell.row, cell.col)) {
+    if (this.is_auto_filter_header(cell.row, cell.col)) {
       // The area is at least 24 px wide, for touch, and may cover the inset.
       const hit = filterButtonHitRect(
         this.deps.screenRect(
@@ -1344,7 +1349,7 @@ export class InteractionSessions {
         ),
         this.deps.zoom(),
       );
-      const x = e.clientX - viewportRect.left;
+      const x = e.clientX - viewport_rect.left;
       if (x >= hit.x && x <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
         e.preventDefault();
         const selection = this.deps.selection();
@@ -1356,7 +1361,7 @@ export class InteractionSessions {
       }
     }
     if (
-      !isTouch &&
+      !is_touch &&
       additive &&
       !e.shiftKey &&
       this.deps.activateHyperlink({
@@ -1375,7 +1380,7 @@ export class InteractionSessions {
     // belongs to native scrolling — no capture, no preventDefault, no drag
     // listeners. Only a drag starting on the current multi-cell selection's
     // border extends the selection under touch.
-    if (isTouch && !e.shiftKey && !this.touchExtendHit(e)) {
+    if (is_touch && !e.shiftKey && !this.touch_extend_hit(e)) {
       selection.selectCell(cell.row, cell.col, additive);
       this.deps.emitSelection();
       this.deps.scheduleRender();
@@ -1383,11 +1388,11 @@ export class InteractionSessions {
     }
 
     if (e.shiftKey) selection.extendTo(cell.row, cell.col);
-    else if (!isTouch) selection.selectCell(cell.row, cell.col, additive);
+    else if (!is_touch) selection.selectCell(cell.row, cell.col, additive);
     this.deps.emitSelection();
     this.deps.scheduleRender();
 
-    if (isTouch) e.preventDefault();
+    if (is_touch) e.preventDefault();
     const move = (ev: PointerEvent): void => {
       const c = this.cellAtPointer(ev.clientX, ev.clientY);
       if (!c) return;
@@ -1395,7 +1400,7 @@ export class InteractionSessions {
       this.deps.emitSelection();
       this.deps.scheduleRender();
     };
-    this.attachDrag(e, move, () => this.detachDrag());
+    this.attach_drag(e, move, () => this.detach_drag());
   };
 
   /**
@@ -1403,44 +1408,44 @@ export class InteractionSessions {
    * around the rendered border of a current multi-cell selection rectangle.
    * Anywhere else (single cells, rect interiors) stays native-scroll.
    */
-  private touchExtendHit(e: PointerEvent): boolean {
-    const viewportRect = this.deps.viewportEl.getBoundingClientRect();
-    const px = e.clientX - viewportRect.left;
-    const py = e.clientY - viewportRect.top;
-    const contentTop = this.deps.contentTop();
-    const scrollLeft = this.deps.scroller.scrollLeft;
+  private touch_extend_hit(e: PointerEvent): boolean {
+    const viewport_rect = this.deps.viewportEl.getBoundingClientRect();
+    const px = e.clientX - viewport_rect.left;
+    const py = e.clientY - viewport_rect.top;
+    const content_top = this.deps.contentTop();
+    const scroll_left = this.deps.scroller.scrollLeft;
     const band = 6;
 
     let hit = false;
     this.deps.selection().forEachRect((r) => {
       if (r.r0 === r.r1 && r.c0 === r.c1) return;
-      const tl = this.deps.screenRect(r.r0, r.c0, contentTop, scrollLeft);
-      const br = this.deps.screenRect(r.r1, r.c1, contentTop, scrollLeft);
+      const tl = this.deps.screenRect(r.r0, r.c0, content_top, scroll_left);
+      const br = this.deps.screenRect(r.r1, r.c1, content_top, scroll_left);
       const left = tl.x;
       const top = tl.y;
       const right = br.x + br.w;
       const bottom = br.y + br.h;
-      const withinX = px >= left - band && px <= right + band;
-      const withinY = py >= top - band && py <= bottom + band;
-      if (!withinX || !withinY) return;
-      const onVertical = Math.abs(px - left) <= band || Math.abs(px - right) <= band;
-      const onHorizontal = Math.abs(py - top) <= band || Math.abs(py - bottom) <= band;
-      if (onVertical || onHorizontal) hit = true;
+      const within_x = px >= left - band && px <= right + band;
+      const within_y = py >= top - band && py <= bottom + band;
+      if (!within_x || !within_y) return;
+      const on_vertical = Math.abs(px - left) <= band || Math.abs(px - right) <= band;
+      const on_horizontal = Math.abs(py - top) <= band || Math.abs(py - bottom) <= band;
+      if (on_vertical || on_horizontal) hit = true;
     });
     return hit;
   }
 
-  private readonly onDblClick = (e: MouseEvent): void => {
+  private readonly on_dbl_click = (e: MouseEvent): void => {
     // Double-click a column boundary → autofit that column.
-    const resize = this.deps.readOnly() ? null : this.resizeAt(e);
+    const resize = this.deps.readOnly() ? null : this.resize_at(e);
     if (resize && resize.kind === "col") {
       e.preventDefault();
       this.deps.autoFitColumns([resize.index]);
       return;
     }
-    if (!this.deps.readOnly() && this.hitsFillHandle(e.clientX, e.clientY)) {
+    if (!this.deps.readOnly() && this.hits_fill_handle(e.clientX, e.clientY)) {
       e.preventDefault();
-      this.fillToAdjacentData();
+      this.fill_to_adjacent_data();
       return;
     }
     const cell = this.cellAtPointer(e.clientX, e.clientY);
@@ -1448,14 +1453,14 @@ export class InteractionSessions {
     this.beginEdit(cell.row, cell.col);
   };
 
-  /** Whether a pointer at (clientX, clientY) is on the selection's fill handle. */
-  private hitsFillHandle(clientX: number, clientY: number): boolean {
+  /** Whether a pointer at (client_x, client_y) is on the selection's fill handle. */
+  private hits_fill_handle(client_x: number, client_y: number): boolean {
     const handle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
     if (!handle) return false;
     const viewport = this.deps.viewportEl.getBoundingClientRect();
     return (
-      Math.abs(clientX - viewport.left - handle.x) <= FILL_HANDLE_HIT_RADIUS &&
-      Math.abs(clientY - viewport.top - handle.y) <= FILL_HANDLE_HIT_RADIUS
+      Math.abs(client_x - viewport.left - handle.x) <= FILL_HANDLE_HIT_RADIUS &&
+      Math.abs(client_y - viewport.top - handle.y) <= FILL_HANDLE_HIT_RADIUS
     );
   }
 
@@ -1463,8 +1468,8 @@ export class InteractionSessions {
    * Double-click on the fill handle: fill down as far as the data in the
    * column next to the selection reaches, left column first, as in Excel.
    */
-  private fillToAdjacentData(): void {
-    const source = this.fillSourceRect();
+  private fill_to_adjacent_data(): void {
+    const source = this.fill_source_rect();
     if (!source) return;
     const below = source.r1 + 1;
     if (below >= this.deps.rowCount()) return;
@@ -1483,44 +1488,44 @@ export class InteractionSessions {
       const end = this.deps.dataEdge(below, col, 1, 0);
       if (end === null || end < below) return;
       const target = { ...source, r1: end };
-      if (this.fills.fill(source, target, {}, true)) this.selectFilled(target);
+      if (this.fills.fill(source, target, {}, true)) this.select_filled(target);
       this.deps.scheduleRender();
       return;
     }
   }
 
-  private readonly onHover = (e: PointerEvent): void => {
+  private readonly on_hover = (e: PointerEvent): void => {
     if (e.pointerType === "touch") return; // no hover cursors for touch
-    const resize = this.deps.readOnly() ? null : this.resizeAt(e);
+    const resize = this.deps.readOnly() ? null : this.resize_at(e);
     this.deps.scroller.style.cursor =
       resize?.kind === "col" ? "col-resize" : resize?.kind === "row" ? "row-resize" : "";
   };
 
-  private resizeAt(e: MouseEvent): { kind: "col" | "row"; index: number } | null {
+  private resize_at(e: MouseEvent): { kind: "col" | "row"; index: number } | null {
     const rect = this.deps.viewportEl.getBoundingClientRect();
     const theme = this.deps.theme();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
     if (y < theme.headerHeight && x >= theme.rowHeaderWidth) {
-      const contentX = this.deps.contentXAt(x);
-      const col = this.deps.colAtX(Math.max(0, contentX));
+      const content_x = this.deps.contentXAt(x);
+      const col = this.deps.colAtX(Math.max(0, content_x));
       if (col === -1) return null;
 
       const prev = this.deps.previousVisibleColumn(col);
       const start = this.deps.colLeftOf(col);
       const width = (this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH) * this.deps.zoom();
-      const target = resizeTargetAt(contentX, col, start, width, prev);
+      const target = resizeTargetAt(content_x, col, start, width, prev);
       return target === null ? null : { kind: "col", index: target };
     }
 
     if (x < theme.rowHeaderWidth && y >= theme.headerHeight) {
-      const contentY = this.deps.contentYAt(y);
-      const row = this.deps.rowAtOffset(Math.max(0, contentY));
+      const content_y = this.deps.contentYAt(y);
+      const row = this.deps.rowAtOffset(Math.max(0, content_y));
       if (row < 0 || row >= this.deps.rowCount()) return null;
 
       const target = resizeTargetAt(
-        contentY,
+        content_y,
         row,
         this.deps.rowTop(row),
         this.deps.rowHeight(row),
@@ -1532,18 +1537,18 @@ export class InteractionSessions {
     return null;
   }
 
-  private startColumnResize(e: PointerEvent, col: number, startX: number): void {
-    const startWidth = this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH;
-    let finalWidth = startWidth;
+  private start_column_resize(e: PointerEvent, col: number, start_x: number): void {
+    const start_width = this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH;
+    let final_width = start_width;
 
     const move = (ev: PointerEvent): void => {
       // Pointer deltas are screen px; widths persist in base (unzoomed) units.
-      const delta = (ev.clientX - startX) / this.deps.zoom();
-      finalWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + delta));
-      this.deps.previewColumnWidth(col, finalWidth);
+      const delta = (ev.clientX - start_x) / this.deps.zoom();
+      final_width = Math.max(MIN_COLUMN_WIDTH, Math.round(start_width + delta));
+      this.deps.previewColumnWidth(col, final_width);
     };
     const up = (): void => {
-      this.detachDrag();
+      this.detach_drag();
       this.deps.clearResizePreview();
       this.deps.commit(
         [
@@ -1551,52 +1556,52 @@ export class InteractionSessions {
             op: "setColumn",
             sheet: this.deps.activeSheet(),
             col,
-            patch: { width: finalWidth },
+            patch: { width: final_width },
           },
         ],
         "structure",
       );
     };
     const cancel = (): void => {
-      this.detachDrag();
+      this.detach_drag();
       this.deps.clearResizePreview();
     };
-    this.attachDrag(e, move, up, cancel);
+    this.attach_drag(e, move, up, cancel);
   }
 
-  private startRowResize(e: PointerEvent, row: number, startY: number): void {
+  private start_row_resize(e: PointerEvent, row: number, start_y: number): void {
     const sheet = this.deps.activeSheet();
-    const dataRow = this.deps.toDataRow(row);
-    const startHeight = this.deps.rowHeight(row) / this.deps.zoom();
-    let finalHeight = startHeight;
+    const data_row = this.deps.toDataRow(row);
+    const start_height = this.deps.rowHeight(row) / this.deps.zoom();
+    let final_height = start_height;
     const move = (ev: PointerEvent): void => {
-      finalHeight = Math.max(
+      final_height = Math.max(
         MIN_ROW_HEIGHT,
-        Math.round(startHeight + (ev.clientY - startY) / this.deps.zoom()),
+        Math.round(start_height + (ev.clientY - start_y) / this.deps.zoom()),
       );
-      this.deps.previewRowHeight(row, finalHeight);
+      this.deps.previewRowHeight(row, final_height);
     };
     const cancel = (): void => {
-      this.detachDrag();
+      this.detach_drag();
       this.deps.clearResizePreview();
     };
     const up = (): void => {
       cancel();
       this.deps.commit(
-        [{ op: "setRowMeta", sheet, row: dataRow, meta: { height: finalHeight } }],
+        [{ op: "setRowMeta", sheet, row: data_row, meta: { height: final_height } }],
         "structure",
       );
     };
-    this.attachDrag(e, move, up, cancel);
+    this.attach_drag(e, move, up, cancel);
   }
 
   /** Runs a host command bound to this key combination; true when one ran. */
-  private runCustomShortcut(e: KeyboardEvent, editing: boolean): boolean {
-    const focusCell = this.deps.selection().focusCell;
+  private run_custom_shortcut(e: KeyboardEvent, editing: boolean): boolean {
+    const focus_cell = this.deps.selection().focusCell;
     return this.deps.keymap().runCustom(
       e,
       {
-        cell: focusCell ? { sheet: this.deps.activeSheet(), ...focusCell } : null,
+        cell: focus_cell ? { sheet: this.deps.activeSheet(), ...focus_cell } : null,
         clientX: 0,
         clientY: 0,
       },
@@ -1614,7 +1619,7 @@ export class InteractionSessions {
     const target = document.activeElement;
     // Nothing focused, or the grid: the key acts on the grid, which it was pressed on.
     if (!target || target === this.deps.host || target === document.body) {
-      this.onKeyDown(e);
+      this.on_key_down(e);
     } else if (
       (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
       e.key.length === 1 &&
@@ -1636,7 +1641,7 @@ export class InteractionSessions {
    * edit the cell in the formula bar. Returns false for the other keys, which
    * act as usual.
    */
-  private hiddenActiveKey(e: KeyboardEvent, cell: CellAddress, mod: boolean): boolean {
+  private hidden_active_key(e: KeyboardEvent, cell: CellAddress, mod: boolean): boolean {
     if (mod || e.altKey) return false;
     const enter = e.key === "Enter";
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || enter) {
@@ -1668,19 +1673,19 @@ export class InteractionSessions {
    * Shift+Tab. A shell handles F6 itself before this. They run before a
    * host's own keymap, so no binding can close the way out.
    */
-  private leaveGridKey(e: KeyboardEvent): boolean {
+  private leave_grid_key(e: KeyboardEvent): boolean {
     // Shift on its own, on the way to Shift+Tab, keeps Escape's effect.
     if (Object.hasOwn(MODIFIER_KEYS, e.key)) return false;
-    const afterEscape = this.escapeLeaves;
-    this.escapeLeaves = e.key === "Escape";
+    const after_escape = this.escape_leaves;
+    this.escape_leaves = e.key === "Escape";
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
-    if (e.key !== "F6" && !(afterEscape && e.key === "Tab")) return false;
+    if (e.key !== "F6" && !(after_escape && e.key === "Tab")) return false;
     e.preventDefault();
     focusOutside(this.deps.host, !e.shiftKey);
     return true;
   }
 
-  private readonly onKeyDown = (e: KeyboardEvent): void => {
+  private readonly on_key_down = (e: KeyboardEvent): void => {
     // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
     // Keys typed into an editable widget inside the host (find bar, custom
@@ -1688,25 +1693,25 @@ export class InteractionSessions {
     // type-to-edit default steals focus mid-keystroke and Backspace becomes a
     // destructive clearSelection().
     const target = e.target;
-    const inEditableWidget =
+    const in_editable_widget =
       target !== this.deps.host &&
       (target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         (target instanceof HTMLElement && target.isContentEditable));
-    if (inEditableWidget) return;
+    if (in_editable_widget) return;
     // A key pressed while a command loads its code acts after that command.
     if (this.deps.holdKey(e)) {
       e.preventDefault();
       return;
     }
-    if (this.leaveGridKey(e)) return;
+    if (this.leave_grid_key(e)) return;
 
     // Headless hosts own the keymap: a handler intercepts first and consumes
     // by returning true; `false` drops every stock binding but keeps the
     // host's own menu commands.
     const keyboard = this.deps.keyboard();
     if (typeof keyboard === "function" && keyboard(e)) return;
-    if (this.runCustomShortcut(e, false)) return;
+    if (this.run_custom_shortcut(e, false)) return;
     if (keyboard === false) return;
 
     const mod = e.ctrlKey || e.metaKey;
@@ -1714,8 +1719,8 @@ export class InteractionSessions {
     // A modifier pressed alone changes nothing, so End then Shift+Arrow still extends.
     if (Object.hasOwn(MODIFIER_KEYS, e.key)) return;
     // End mode lasts for one key: End, then an arrow jumps like Ctrl+Arrow.
-    const endMode = this.endMode;
-    this.endMode = false;
+    const end_mode = this.end_mode;
+    this.end_mode = false;
 
     const action = this.deps.keymap().action(e);
     // A dashboard has no cells: of the grid keys, only undo and redo act on it.
@@ -1791,19 +1796,19 @@ export class InteractionSessions {
 
         case "insertDate":
         case "insertTime":
-          this.insertNow(action === "insertDate");
+          this.insert_now(action === "insertDate");
           break;
 
         case "selectAll":
-          this.selectRegionOrSheet();
+          this.select_region_or_sheet();
           break;
 
         case "fillDown":
-          this.fillFromEdge(true);
+          this.fill_from_edge(true);
           break;
 
         case "fillRight":
-          this.fillFromEdge(false);
+          this.fill_from_edge(false);
           break;
 
         case "toggleFilter":
@@ -1822,7 +1827,7 @@ export class InteractionSessions {
     const focus = selection.focusCell;
     // The active cell on a row the view hides, after the Name Box went to it.
     const hidden = focus ? null : this.deps.hiddenActive();
-    if (hidden && this.hiddenActiveKey(e, hidden, mod)) {
+    if (hidden && this.hidden_active_key(e, hidden, mod)) {
       e.preventDefault();
       return;
     }
@@ -1844,9 +1849,9 @@ export class InteractionSessions {
 
     // Shift extends from the selection's moving corner; the active cell stays.
     const from = e.shiftKey ? (selection.extentCell ?? focus) : focus;
-    const jump = mod || endMode;
+    const jump = mod || end_mode;
     const theme = this.deps.theme();
-    const pageRows = Math.max(
+    const page_rows = Math.max(
       1,
       Math.floor((this.deps.viewportH() - theme.headerHeight) / theme.rowHeight),
     );
@@ -1855,11 +1860,11 @@ export class InteractionSessions {
       case "ArrowDown":
         // Alt+Down opens a header's AutoFilter dropdown, a list rule's list, or
         // else Pick From Drop-down List, as in Excel and as on a combobox.
-        if (e.altKey && !mod && focus && this.isAutoFilterHeader(focus.row, focus.col)) {
+        if (e.altKey && !mod && focus && this.is_auto_filter_header(focus.row, focus.col)) {
           this.deps.openAutoFilter(focus.col);
           break;
         }
-        if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
+        if (e.altKey && !mod && focus && this.has_list_rule(focus.row, focus.col)) {
           this.openList(focus.row, focus.col);
           break;
         }
@@ -1869,7 +1874,7 @@ export class InteractionSessions {
         }
         this.navigate(
           from,
-          jump ? this.dataEdgeRow(from, 1) : this.stepFrom(from, 1, 0).row,
+          jump ? this.data_edge_row(from, 1) : this.step_from(from, 1, 0).row,
           undefined,
           e.shiftKey,
         );
@@ -1878,7 +1883,7 @@ export class InteractionSessions {
       case "ArrowUp":
         this.navigate(
           from,
-          jump ? this.dataEdgeRow(from, -1) : this.stepFrom(from, -1, 0).row,
+          jump ? this.data_edge_row(from, -1) : this.step_from(from, -1, 0).row,
           undefined,
           e.shiftKey,
         );
@@ -1888,7 +1893,7 @@ export class InteractionSessions {
         this.navigate(
           from,
           undefined,
-          jump ? this.dataEdgeCol(from, 1) : this.stepFrom(from, 0, 1).col,
+          jump ? this.data_edge_col(from, 1) : this.step_from(from, 0, 1).col,
           e.shiftKey,
         );
         break;
@@ -1897,17 +1902,17 @@ export class InteractionSessions {
         this.navigate(
           from,
           undefined,
-          jump ? this.dataEdgeCol(from, -1) : this.stepFrom(from, 0, -1).col,
+          jump ? this.data_edge_col(from, -1) : this.step_from(from, 0, -1).col,
           e.shiftKey,
         );
         break;
 
       case "PageDown":
-        this.navigate(from, (from?.row ?? 0) + pageRows, undefined, e.shiftKey);
+        this.navigate(from, (from?.row ?? 0) + page_rows, undefined, e.shiftKey);
         break;
 
       case "PageUp":
-        this.navigate(from, (from?.row ?? 0) - pageRows, undefined, e.shiftKey);
+        this.navigate(from, (from?.row ?? 0) - page_rows, undefined, e.shiftKey);
         break;
 
       case "Home":
@@ -1918,19 +1923,19 @@ export class InteractionSessions {
       case "End":
         // Ctrl+End goes to the last used cell. End alone only starts End mode.
         if (mod) {
-          const last = this.lastUsedCell();
+          const last = this.last_used_cell();
           this.navigate(from, last.row, last.col, e.shiftKey);
-        } else this.endMode = true;
+        } else this.end_mode = true;
         break;
 
       case "Enter":
         if (mod || e.altKey) return;
-        this.moveActiveCell(e.shiftKey ? -1 : 1, 0);
+        this.move_active_cell(e.shiftKey ? -1 : 1, 0);
         break;
 
       case "Tab":
         if (mod || e.altKey) return;
-        this.moveActiveCell(0, e.shiftKey ? -1 : 1);
+        this.move_active_cell(0, e.shiftKey ? -1 : 1);
         break;
 
       case "F2":
@@ -1946,8 +1951,8 @@ export class InteractionSessions {
       case "Escape":
         // Esc ends a fill-handle drag without filling, and a cut's moving
         // border, as in Excel.
-        if (this.fillTarget !== null) {
-          this.cancelPointer();
+        if (this.fill_target !== null) {
+          this.cancel_pointer();
           break;
         }
         if (!this.deps.cancelCut()) return;
@@ -1958,7 +1963,7 @@ export class InteractionSessions {
           // Typing in a list cell opens its list filtered by the typed text,
           // as Excel's AutoComplete for dropdown lists does; a formula still
           // starts in the cell editor.
-          if (e.key !== "=" && this.hasListRule(focus.row, focus.col)) {
+          if (e.key !== "=" && this.has_list_rule(focus.row, focus.col)) {
             this.openList(focus.row, focus.col, e.key);
           } else this.beginEdit(focus.row, focus.col, e.key, false);
         } else {
@@ -1975,39 +1980,39 @@ export class InteractionSessions {
    * as in Excel; otherwise it moves to the next visible cell, and Enter after
    * a run of Tab moves goes to the column where the run started.
    */
-  private moveActiveCell(dRow: -1 | 0 | 1, dCol: -1 | 0 | 1): void {
+  private move_active_cell(d_row: -1 | 0 | 1, d_col: -1 | 0 | 1): void {
     const selection = this.deps.selection();
     const focus = selection.focusCell;
     if (!focus) return;
-    const run = this.tabRun;
-    this.tabRun = null;
-    const rect = this.activeRect();
+    const run = this.tab_run;
+    this.tab_run = null;
+    const rect = this.active_rect();
     if (rect === null || (rect.r0 === rect.r1 && rect.c0 === rect.c1)) {
-      const inRun = run !== null && run.row === focus.row && run.col === focus.col;
-      const start = inRun ? run.start : focus.col;
+      const in_run = run !== null && run.row === focus.row && run.col === focus.col;
+      const start = in_run ? run.start : focus.col;
       let col: number | undefined;
-      if (dCol !== 0) col = this.deps.nextVisibleCol(focus.col, dCol);
-      else if (dRow > 0 && inRun) col = start;
-      this.navigate(focus, focus.row + dRow, col, false);
+      if (d_col !== 0) col = this.deps.nextVisibleCol(focus.col, d_col);
+      else if (d_row > 0 && in_run) col = start;
+      this.navigate(focus, focus.row + d_row, col, false);
       const moved = this.deps.selection().focusCell;
-      if (dCol !== 0 && moved) this.tabRun = { row: moved.row, col: moved.col, start };
+      if (d_col !== 0 && moved) this.tab_run = { row: moved.row, col: moved.col, start };
       return;
     }
 
     let { row, col } = focus;
-    if (dRow !== 0) {
-      row += dRow;
+    if (d_row !== 0) {
+      row += d_row;
       if (row > rect.r1 || row < rect.r0) {
-        row = dRow > 0 ? rect.r0 : rect.r1;
-        col += dRow;
+        row = d_row > 0 ? rect.r0 : rect.r1;
+        col += d_row;
         if (col > rect.c1) col = rect.c0;
         else if (col < rect.c0) col = rect.c1;
       }
     } else {
-      col += dCol;
+      col += d_col;
       if (col > rect.c1 || col < rect.c0) {
-        col = dCol > 0 ? rect.c0 : rect.c1;
-        row += dCol;
+        col = d_col > 0 ? rect.c0 : rect.c1;
+        row += d_col;
         if (row > rect.r1) row = rect.r0;
         else if (row < rect.r0) row = rect.r1;
       }
@@ -2019,7 +2024,7 @@ export class InteractionSessions {
   }
 
   /** The selected rectangle that holds the active cell, or null without a selection. */
-  private activeRect(): SelRect | null {
+  private active_rect(): SelRect | null {
     const focus = this.deps.selection().focusCell;
     if (!focus) return null;
     let found: SelRect | null = null;
@@ -2036,8 +2041,8 @@ export class InteractionSessions {
    * in Excel; A1 on an empty sheet. Stores without data-edge support give the
    * sheet's last cell.
    */
-  private lastUsedCell(): CellRef {
-    const lastRow = Math.max(0, this.deps.rowCount() - 1);
+  private last_used_cell(): CellRef {
+    const last_row = Math.max(0, this.deps.rowCount() - 1);
     const sheet = this.deps.activeSheet();
     const filled = (row: number, col: number): boolean => {
       const value = this.deps.store.getCell({ sheet, row: this.deps.toDataRow(row), col }).resolved;
@@ -2046,10 +2051,10 @@ export class InteractionSessions {
     let row = 0;
     let col = this.deps.firstCol();
     for (const candidate of this.deps.colIndices()) {
-      let bottom: number | null = lastRow;
-      if (!filled(lastRow, candidate)) {
-        const edge = this.deps.dataEdge(lastRow, candidate, -1, 0);
-        if (edge === null) return { row: lastRow, col: this.deps.lastCol() };
+      let bottom: number | null = last_row;
+      if (!filled(last_row, candidate)) {
+        const edge = this.deps.dataEdge(last_row, candidate, -1, 0);
+        if (edge === null) return { row: last_row, col: this.deps.lastCol() };
         bottom = filled(edge, candidate) ? edge : null;
       }
       if (bottom === null) continue;
@@ -2064,18 +2069,18 @@ export class InteractionSessions {
    * filled cells bounded by empty rows and columns), and the whole sheet when
    * that region is already selected or the active cell has no data around it.
    */
-  private selectRegionOrSheet(): void {
+  private select_region_or_sheet(): void {
     const selection = this.deps.selection();
     const focus = selection.focusCell;
     if (!focus) return;
-    const sheetRect: SelRect = {
+    const sheet_rect: SelRect = {
       r0: 0,
       c0: this.deps.firstCol(),
       r1: Math.max(0, this.deps.rowCount() - 1),
       c1: this.deps.lastCol(),
     };
-    const region = this.currentRegion(focus);
-    const current = this.activeRect();
+    const region = this.current_region(focus);
+    const current = this.active_rect();
     const same =
       current !== null &&
       current.r0 === region.r0 &&
@@ -2083,18 +2088,18 @@ export class InteractionSessions {
       current.c0 === region.c0 &&
       current.c1 === region.c1;
     const single = region.r0 === region.r1 && region.c0 === region.c1;
-    selection.selectRect(same || single ? sheetRect : region, focus);
+    selection.selectRect(same || single ? sheet_rect : region, focus);
     this.deps.emitSelection();
     this.deps.scheduleRender();
   }
 
   /** Excel's current region: grow from `start` while a cell next to the block, diagonals included, is filled. */
-  private currentRegion(start: CellRef): SelRect {
+  private current_region(start: CellRef): SelRect {
     const sheet = this.deps.activeSheet();
-    const lastRow = this.deps.rowCount() - 1;
+    const last_row = this.deps.rowCount() - 1;
     const columns = this.deps.colIndices();
     const filled = (row: number, col: number): boolean => {
-      if (row < 0 || row > lastRow || !columns.includes(col)) return false;
+      if (row < 0 || row > last_row || !columns.includes(col)) return false;
       const value = this.deps.store.getCell({ sheet, row: this.deps.toDataRow(row), col }).resolved;
       return value !== null && value !== "";
     };
@@ -2119,14 +2124,14 @@ export class InteractionSessions {
           grown = true;
         }
       }
-      for (let row = Math.max(0, rect.r0 - 1); row <= Math.min(lastRow, rect.r1 + 1); row++) {
+      for (let row = Math.max(0, rect.r0 - 1); row <= Math.min(last_row, rect.r1 + 1); row++) {
         if (after !== rect.c1 && filled(row, after)) {
           rect.c1 = after;
           grown = true;
           break;
         }
       }
-      for (let row = Math.max(0, rect.r0 - 1); row <= Math.min(lastRow, rect.r1 + 1); row++) {
+      for (let row = Math.max(0, rect.r0 - 1); row <= Math.min(last_row, rect.r1 + 1); row++) {
         if (before !== rect.c0 && filled(row, before)) {
           rect.c0 = before;
           grown = true;
@@ -2141,7 +2146,7 @@ export class InteractionSessions {
    * Ctrl+; and Ctrl+Shift+;: enter today's date or the current time in the
    * active cell as a date serial with Excel's short date or time format.
    */
-  private insertNow(date: boolean): void {
+  private insert_now(date: boolean): void {
     const focus = this.deps.selection().focusCell;
     if (!focus || this.deps.readOnly()) return;
     const cell = this.deps.anchorCell(focus.row, focus.col);
@@ -2166,7 +2171,7 @@ export class InteractionSessions {
   }
 
   /** Whether view `row`, `col` is a header cell of the sheet's AutoFilter. */
-  private isAutoFilterHeader(row: number, col: number): boolean {
+  private is_auto_filter_header(row: number, col: number): boolean {
     const range = this.deps.sheet().autoFilter?.range;
     return (
       range !== undefined &&
@@ -2177,7 +2182,7 @@ export class InteractionSessions {
   }
 
   /** Whether a list validation rule covers the cell at view `row`, `col`. */
-  private hasListRule(row: number, col: number): boolean {
+  private has_list_rule(row: number, col: number): boolean {
     const cell = this.deps.anchorCell(row, col);
     const addr = {
       sheet: this.deps.activeSheet(),
@@ -2197,9 +2202,9 @@ export class InteractionSessions {
    * The active cell when (`x`, `y`), in viewport pixels, falls on the
    * dropdown arrow painted beside it; null otherwise.
    */
-  private listButtonCellAt(x: number, y: number): CellRef | null {
+  private list_button_cell_at(x: number, y: number): CellRef | null {
     const focus = this.deps.selection().focusCell;
-    if (!focus || !this.hasListRule(focus.row, focus.col)) return null;
+    if (!focus || !this.has_list_rule(focus.row, focus.col)) return null;
     const button = listButtonRect(
       this.deps.screenRect(
         focus.row,
@@ -2220,16 +2225,16 @@ export class InteractionSessions {
     col: number | undefined,
     extend: boolean,
   ): void {
-    const maxRow = Math.max(0, this.deps.rowCount() - 1);
-    const firstCol = this.deps.firstCol();
-    const lastCol = this.deps.lastCol();
-    const targetRow = Math.max(0, Math.min(maxRow, row ?? focus?.row ?? 0));
-    const targetCol = Math.max(firstCol, Math.min(lastCol, col ?? focus?.col ?? firstCol));
+    const max_row = Math.max(0, this.deps.rowCount() - 1);
+    const first_col = this.deps.firstCol();
+    const last_col = this.deps.lastCol();
+    const target_row = Math.max(0, Math.min(max_row, row ?? focus?.row ?? 0));
+    const target_col = Math.max(first_col, Math.min(last_col, col ?? focus?.col ?? first_col));
     const selection = this.deps.selection();
-    if (extend) selection.extendTo(targetRow, targetCol);
-    else selection.selectCell(targetRow, targetCol);
+    if (extend) selection.extendTo(target_row, target_col);
+    else selection.selectCell(target_row, target_col);
     this.deps.emitSelection();
-    this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row: targetRow, col: targetCol });
+    this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row: target_row, col: target_col });
     this.deps.scheduleRender();
   }
 
@@ -2237,15 +2242,15 @@ export class InteractionSessions {
    * One arrow step from `from`. A step that would stay inside the same merged
    * cell continues past it, so Right from a merged A6:B6 lands on C6, as in Excel.
    */
-  private stepFrom(from: CellRef | null, dRow: number, dCol: -1 | 0 | 1): CellRef {
+  private step_from(from: CellRef | null, d_row: number, d_col: -1 | 0 | 1): CellRef {
     const start = from ?? { row: 0, col: this.deps.firstCol() };
     const merged = this.deps.anchorCell(start.row, start.col);
-    const maxRow = Math.max(0, this.deps.rowCount() - 1);
+    const max_row = Math.max(0, this.deps.rowCount() - 1);
     let cell = start;
     for (;;) {
       const next = {
-        row: Math.max(0, Math.min(maxRow, cell.row + dRow)),
-        col: dCol === 0 ? cell.col : this.deps.nextVisibleCol(cell.col, dCol),
+        row: Math.max(0, Math.min(max_row, cell.row + d_row)),
+        col: d_col === 0 ? cell.col : this.deps.nextVisibleCol(cell.col, d_col),
       };
       if (next.row === cell.row && next.col === cell.col) return cell;
       cell = next;
@@ -2255,7 +2260,7 @@ export class InteractionSessions {
   }
 
   /** Ctrl+Arrow vertical target: data-run edge when available, else sheet edge. */
-  private dataEdgeRow(focus: CellRef | null, dir: 1 | -1): number {
+  private data_edge_row(focus: CellRef | null, dir: 1 | -1): number {
     const edge = dir > 0 ? this.deps.rowCount() - 1 : 0;
     if (!focus) return edge;
     return this.deps.dataEdge(focus.row, focus.col, dir, 0) ?? edge;
@@ -2265,7 +2270,7 @@ export class InteractionSessions {
    * Ctrl+Arrow horizontal target. A data edge landing on a hidden column is
    * nudged to the nearest visible column in the travel direction.
    */
-  private dataEdgeCol(focus: CellRef | null, dir: 1 | -1): number {
+  private data_edge_col(focus: CellRef | null, dir: 1 | -1): number {
     const edge = dir > 0 ? this.deps.lastCol() : this.deps.firstCol();
     if (!focus) return edge;
 
@@ -2277,7 +2282,7 @@ export class InteractionSessions {
     return this.deps.nextVisibleCol(target, dir);
   }
 
-  private fillSourceRect(): SelRect | null {
+  private fill_source_rect(): SelRect | null {
     const focus = this.deps.selection().focusCell;
     if (!focus) return null;
     let found: SelRect | null = null;
@@ -2289,30 +2294,30 @@ export class InteractionSessions {
     return found;
   }
 
-  private fillCellAt(clientX: number, clientY: number): CellRef {
+  private fill_cell_at(client_x: number, client_y: number): CellRef {
     const rect = this.deps.viewportEl.getBoundingClientRect();
-    const contentX = this.deps.contentXAt(clientX - rect.left);
-    const contentY = this.deps.contentYAt(clientY - rect.top);
-    const rowCount = this.deps.sheet().rowCount;
-    const row = Math.max(0, Math.min(rowCount - 1, this.deps.rowAtOffset(Math.max(0, contentY))));
-    let col = this.deps.colAtX(Math.max(0, contentX));
+    const content_x = this.deps.contentXAt(client_x - rect.left);
+    const content_y = this.deps.contentYAt(client_y - rect.top);
+    const row_count = this.deps.sheet().rowCount;
+    const row = Math.max(0, Math.min(row_count - 1, this.deps.rowAtOffset(Math.max(0, content_y))));
+    let col = this.deps.colAtX(Math.max(0, content_x));
     if (col === -1) {
       const cols = this.deps.colIndices();
-      col = contentX < 0 ? (cols[0] ?? 0) : (cols[cols.length - 1] ?? 0);
+      col = content_x < 0 ? (cols[0] ?? 0) : (cols[cols.length - 1] ?? 0);
     }
     return { row, col };
   }
 
-  private startFillDrag(e: PointerEvent): void {
-    const source = this.fillSourceRect();
+  private start_fill_drag(e: PointerEvent): void {
+    const source = this.fill_source_rect();
     if (!source) return;
-    this.fillTarget = null;
+    this.fill_target = null;
     this.fills.dismiss();
     this.fills.beginDrag(source);
     const move = (ev: PointerEvent): void => {
-      const c = this.fillCellAt(ev.clientX, ev.clientY);
-      const target = this.extendFill(source, c);
-      this.fillTarget = target;
+      const c = this.fill_cell_at(ev.clientX, ev.clientY);
+      const target = this.extend_fill(source, c);
+      this.fill_target = target;
       // Excel's tip: the value the last cell will get, beside the pointer.
       const text = this.fills.drag(target, { swap: ev.ctrlKey || ev.altKey });
       const viewport = this.deps.viewportEl.getBoundingClientRect();
@@ -2323,29 +2328,29 @@ export class InteractionSessions {
       this.deps.scheduleRender();
     };
     const up = (ev: PointerEvent): void => {
-      this.detachDrag();
-      const target = this.fillTarget;
-      this.fillTarget = null;
+      this.detach_drag();
+      const target = this.fill_target;
+      this.fill_target = null;
       this.tip = null;
       // Ctrl (Option on a Mac) swaps counting and copying, as in Excel.
       if (target && this.fills.fill(source, target, { swap: ev.ctrlKey || ev.altKey }, true)) {
-        this.selectFilled(target);
+        this.select_filled(target);
       }
       this.fills.endDrag();
       this.deps.scheduleRender();
     };
     const cancel = (): void => {
       // A cancelled fill-drag (browser reclaimed the pointer) commits nothing.
-      this.fillTarget = null;
+      this.fill_target = null;
       this.tip = null;
       this.fills.endDrag();
-      this.detachDrag();
+      this.detach_drag();
       this.deps.scheduleRender();
     };
-    this.attachDrag(e, move, up, cancel);
+    this.attach_drag(e, move, up, cancel);
   }
 
-  private extendFill(source: SelRect, c: CellRef): SelRect {
+  private extend_fill(source: SelRect, c: CellRef): SelRect {
     const down = Math.max(c.row - source.r1, 0);
     const up = Math.max(source.r0 - c.row, 0);
     const right = Math.max(c.col - source.c1, 0);
@@ -2366,8 +2371,8 @@ export class InteractionSessions {
    * with its formats, into the rest of it. With one cell selected, copy the
    * cell above (or to the left) into it, as Excel's Fill Down and Fill Right do.
    */
-  private fillFromEdge(down: boolean): void {
-    const rect = this.fillSourceRect();
+  private fill_from_edge(down: boolean): void {
+    const rect = this.fill_source_rect();
     if (!rect) return;
     const single = down ? rect.r0 === rect.r1 : rect.c0 === rect.c1;
     if (single && (down ? rect.r0 === 0 : rect.c0 === this.deps.firstCol())) return;
@@ -2388,33 +2393,33 @@ export class InteractionSessions {
    * track it until `pointerup` (commit) or `pointercancel` (abandon, never
    * commit). Events from other pointers are ignored for the drag's lifetime.
    */
-  private attachDrag(
+  private attach_drag(
     e: PointerEvent,
     move: (ev: PointerEvent) => void,
     up: (ev: PointerEvent) => void,
     cancel?: (ev: PointerEvent) => void,
   ): void {
-    this.cancelPointer();
+    this.cancel_pointer();
     const scroller = this.deps.scroller;
-    this.activePointerId = e.pointerId;
+    this.active_pointer_id = e.pointerId;
 
-    const own = (ev: PointerEvent): boolean => ev.pointerId === this.activePointerId;
-    this.dragMove = (ev) => {
+    const own = (ev: PointerEvent): boolean => ev.pointerId === this.active_pointer_id;
+    this.drag_move = (ev) => {
       if (own(ev)) move(ev);
     };
-    this.dragUp = (ev) => {
+    this.drag_up = (ev) => {
       if (own(ev)) up(ev);
     };
-    this.dragCancel = (ev) => {
+    this.drag_cancel = (ev) => {
       if (!own(ev)) return;
       if (cancel) cancel(ev);
-      else this.detachDrag();
+      else this.detach_drag();
     };
 
-    scroller.addEventListener("pointermove", this.dragMove);
-    scroller.addEventListener("pointerup", this.dragUp);
-    scroller.addEventListener("pointercancel", this.dragCancel);
-    scroller.addEventListener("lostpointercapture", this.dragCancel);
+    scroller.addEventListener("pointermove", this.drag_move);
+    scroller.addEventListener("pointerup", this.drag_up);
+    scroller.addEventListener("pointercancel", this.drag_cancel);
+    scroller.addEventListener("lostpointercapture", this.drag_cancel);
     if (typeof scroller.setPointerCapture === "function") {
       try {
         scroller.setPointerCapture(e.pointerId);
@@ -2426,27 +2431,27 @@ export class InteractionSessions {
     }
   }
 
-  private detachDrag(): void {
+  private detach_drag(): void {
     const scroller = this.deps.scroller;
-    if (this.dragMove) scroller.removeEventListener("pointermove", this.dragMove);
-    if (this.dragUp) scroller.removeEventListener("pointerup", this.dragUp);
-    if (this.dragCancel) {
-      scroller.removeEventListener("pointercancel", this.dragCancel);
-      scroller.removeEventListener("lostpointercapture", this.dragCancel);
+    if (this.drag_move) scroller.removeEventListener("pointermove", this.drag_move);
+    if (this.drag_up) scroller.removeEventListener("pointerup", this.drag_up);
+    if (this.drag_cancel) {
+      scroller.removeEventListener("pointercancel", this.drag_cancel);
+      scroller.removeEventListener("lostpointercapture", this.drag_cancel);
     }
-    this.dragMove = null;
-    this.dragUp = null;
-    this.dragCancel = null;
+    this.drag_move = null;
+    this.drag_up = null;
+    this.drag_cancel = null;
 
-    const pointerId = this.activePointerId;
-    this.activePointerId = null;
+    const pointer_id = this.active_pointer_id;
+    this.active_pointer_id = null;
     if (
-      pointerId !== null &&
+      pointer_id !== null &&
       typeof scroller.hasPointerCapture === "function" &&
       typeof scroller.releasePointerCapture === "function" &&
-      scroller.hasPointerCapture(pointerId)
+      scroller.hasPointerCapture(pointer_id)
     ) {
-      scroller.releasePointerCapture(pointerId);
+      scroller.releasePointerCapture(pointer_id);
     }
   }
 }

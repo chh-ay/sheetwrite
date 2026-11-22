@@ -2,7 +2,7 @@ import type { WorkbookSnapshot, XlsxSourceSnapshot } from "./types/document.js";
 
 type SourceVerifier = (snapshot: WorkbookSnapshot) => XlsxSourceSnapshot | undefined;
 let verifier: SourceVerifier | undefined;
-const admittedStores = new WeakSet<object>();
+const admitted_stores = new WeakSet<object>();
 
 /** Wire the optional backend without making stores depend on compression. */
 export function setXlsxSourceVerifier(next: SourceVerifier | undefined): void {
@@ -16,17 +16,17 @@ export function admitStoreXlsxSource(
 ): XlsxSourceSnapshot | undefined {
   if (!verifier) return snapshot.workbook.xlsxSource;
   const source = verifier(snapshot);
-  admittedStores.add(store);
+  admitted_stores.add(store);
   return source;
 }
 
 /** Provenance belongs to the store, never a mutable snapshot returned to callers. */
 export function hasAdmittedXlsxSource(store: object): boolean {
-  return admittedStores.has(store);
+  return admitted_stores.has(store);
 }
 
 /** Verified provenance follows the document, not the facade that used to hold it. */
 export function replaceStoreXlsxSource(store: object, replacement: object): void {
-  admittedStores.delete(store);
-  if (admittedStores.has(replacement)) admittedStores.add(store);
+  admitted_stores.delete(store);
+  if (admitted_stores.has(replacement)) admitted_stores.add(store);
 }

@@ -316,7 +316,7 @@ const EXPECTED_OPERATION_COUNTS: Record<BillionCellScenarioId, number> = {
 };
 const FIXED_SCHEMA_OWNERS = new Set(["wasm.sheet-indexes-metadata", "js.datasource.schema-index"]);
 
-function runtimeMemory(): RuntimeMemoryObservation & { readonly rssBytes: number | null } {
+function runtime_memory(): RuntimeMemoryObservation & { readonly rssBytes: number | null } {
   const usage = process.memoryUsage();
   return {
     usedJSHeapSize: Number.isFinite(usage.heapUsed) ? usage.heapUsed : null,
@@ -346,19 +346,19 @@ function workbook(config: ScaleConfig): Workbook {
   };
 }
 
-function copyBands(bands: readonly DataSourceColumnBand[]): DataSourceColumnBand[] {
+function copy_bands(bands: readonly DataSourceColumnBand[]): DataSourceColumnBand[] {
   return bands.map((band) => ({ start: band.start, end: band.end, keys: [...band.keys] }));
 }
 
-function countBandColumns(bands: readonly DataSourceColumnBand[]): number {
+function count_band_columns(bands: readonly DataSourceColumnBand[]): number {
   return bands.reduce((sum, band) => sum + band.end - band.start, 0);
 }
 
-function jsonBytes(value: unknown): number {
+function json_bytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value));
 }
 
-function emptyTraffic(): MutableTrafficCounters {
+function empty_traffic(): MutableTrafficCounters {
   return {
     requests: 0,
     pages: 0,
@@ -374,7 +374,7 @@ function emptyTraffic(): MutableTrafficCounters {
   };
 }
 
-function addTraffic(target: MutableTrafficCounters, exchange: ProtocolExchange): void {
+function add_traffic(target: MutableTrafficCounters, exchange: ProtocolExchange): void {
   target.requests += 1;
   target.pages += 1;
   target.requestedRows += exchange.request.end - exchange.request.start;
@@ -400,9 +400,9 @@ class DeterministicDatasource implements DataSource {
   }
 
   trafficSince(mark: number): TrafficCounters {
-    const counters = emptyTraffic();
+    const counters = empty_traffic();
     for (let index = mark; index < this.exchanges.length; index += 1) {
-      addTraffic(counters, this.exchanges[index]!);
+      add_traffic(counters, this.exchanges[index]!);
     }
     return counters;
   }
@@ -412,14 +412,14 @@ class DeterministicDatasource implements DataSource {
       throw new Error("billion-cell datasource received an invalid protocol or sheet");
     }
     if (request.signal.aborted) throw request.signal.reason;
-    let previousEnd = -1;
+    let previous_end = -1;
     const declared: Array<{ key: string; column: number }> = [];
     for (const band of request.columns) {
       if (
         !Number.isSafeInteger(band.start) ||
         !Number.isSafeInteger(band.end) ||
         band.start < 0 ||
-        band.start < previousEnd ||
+        band.start < previous_end ||
         band.end <= band.start ||
         band.end > this.config.columns ||
         band.keys.length !== band.end - band.start
@@ -432,17 +432,17 @@ class DeterministicDatasource implements DataSource {
         if (key !== `c${column}`) throw new Error("billion-cell datasource received a stale key");
         declared.push({ key, column });
       }
-      previousEnd = band.end;
+      previous_end = band.end;
     }
 
     const rows: RowData[] = [];
-    let explicitNullCells = 0;
+    let explicit_null_cells = 0;
     for (let row = request.start; row < request.end; row += 1) {
       const result: RowData = {};
       for (const { key, column } of declared) {
         const blank = (row * 17 + column * 13) % 29 === 0;
         result[key] = blank ? null : (row * 1_003 + column) % 1_000_003;
-        if (blank) explicitNullCells += 1;
+        if (blank) explicit_null_cells += 1;
       }
       if (Object.keys(result).length !== declared.length) {
         throw new Error("billion-cell datasource omitted a declared cell key");
@@ -450,7 +450,7 @@ class DeterministicDatasource implements DataSource {
       rows.push(result);
     }
 
-    const columns = copyBands(request.columns);
+    const columns = copy_bands(request.columns);
     const page: DataSourcePage = {
       protocol: 2,
       start: request.start,
@@ -458,8 +458,8 @@ class DeterministicDatasource implements DataSource {
       rows,
       revision: request.revision,
     };
-    const requestedCells = (request.end - request.start) * declared.length;
-    const requestEnvelope = {
+    const requested_cells = (request.end - request.start) * declared.length;
+    const request_envelope = {
       protocol: request.protocol,
       sheet: request.sheet,
       start: request.start,
@@ -470,10 +470,10 @@ class DeterministicDatasource implements DataSource {
     const exchange: ProtocolExchange = {
       scenario: this.scenario,
       request: {
-        ...requestEnvelope,
+        ...request_envelope,
         keys: Object.keys(request).sort(),
-        bytes: jsonBytes(requestEnvelope),
-        cells: requestedCells,
+        bytes: json_bytes(request_envelope),
+        cells: requested_cells,
       },
       page: {
         protocol: 2,
@@ -483,8 +483,8 @@ class DeterministicDatasource implements DataSource {
         keys: Object.keys(page).sort(),
         rows: rows.length,
         cells: rows.length * declared.length,
-        bytes: jsonBytes(page),
-        explicitNullCells,
+        bytes: json_bytes(page),
+        explicitNullCells: explicit_null_cells,
         everyRowHasEveryDeclaredKey: true,
       },
     };
@@ -497,38 +497,38 @@ function indices(start: number, count: number): number[] {
   return Array.from({ length: count }, (_, offset) => start + offset);
 }
 
-function visibleColumns(): number[] {
+function visible_columns(): number[] {
   return indices(0, VISIBLE_TILE_COLUMNS);
 }
 
-function frozenWindowColumns(columnCount: number, movingStart: number): number[] {
+function frozen_window_columns(column_count: number, moving_start: number): number[] {
   const width = VISIBLE_TILE_COLUMNS - 2;
-  const boundedStart = Math.max(2, Math.min(columnCount - width, movingStart));
-  return [0, 1, ...indices(boundedStart, width)];
+  const bounded_start = Math.max(2, Math.min(column_count - width, moving_start));
+  return [0, 1, ...indices(bounded_start, width)];
 }
 
-function uniformStart(index: number, count: number, maximum: number): number {
+function uniform_start(index: number, count: number, maximum: number): number {
   if (count <= 1 || maximum <= 0) return 0;
   return Math.floor((index * maximum) / (count - 1));
 }
 
-function horizontalColumns(config: ScaleConfig, index: number, count: number): number[] {
-  const maximumMovingStart = config.columns - (VISIBLE_TILE_COLUMNS - 2);
-  const start = 2 + uniformStart(index, count, maximumMovingStart - 2);
-  return frozenWindowColumns(config.columns, start);
+function horizontal_columns(config: ScaleConfig, index: number, count: number): number[] {
+  const maximum_moving_start = config.columns - (VISIBLE_TILE_COLUMNS - 2);
+  const start = 2 + uniform_start(index, count, maximum_moving_start - 2);
+  return frozen_window_columns(config.columns, start);
 }
 
-function diagonalPosition(
+function diagonal_position(
   config: ScaleConfig,
   index: number,
   multiplier: number,
 ): { rowStart: number; columns: number[] } {
-  const maximumRowStart = config.rows - VISIBLE_TILE_ROWS;
-  const rowOrdinal = (index * multiplier) % DIAGONAL_CHURN_TILES;
-  const columnOrdinal = (index * 37 + multiplier) % DIAGONAL_CHURN_TILES;
+  const maximum_row_start = config.rows - VISIBLE_TILE_ROWS;
+  const row_ordinal = (index * multiplier) % DIAGONAL_CHURN_TILES;
+  const column_ordinal = (index * 37 + multiplier) % DIAGONAL_CHURN_TILES;
   return {
-    rowStart: uniformStart(rowOrdinal, DIAGONAL_CHURN_TILES, maximumRowStart),
-    columns: horizontalColumns(config, columnOrdinal, DIAGONAL_CHURN_TILES),
+    rowStart: uniform_start(row_ordinal, DIAGONAL_CHURN_TILES, maximum_row_start),
+    columns: horizontal_columns(config, column_ordinal, DIAGONAL_CHURN_TILES),
   };
 }
 
@@ -550,7 +550,7 @@ function summarize(samples: readonly number[]): TimingSummary {
   };
 }
 
-async function settleController(
+async function settle_controller(
   controller: DatasourceController,
   errors: unknown[],
 ): Promise<void> {
@@ -564,7 +564,7 @@ async function settleController(
   throw new Error("billion-cell datasource did not settle");
 }
 
-function sumOwners(owners: readonly ResourceOwnerBytes[]): ResourceEvidence["ownerSums"] {
+function sum_owners(owners: readonly ResourceOwnerBytes[]): ResourceEvidence["ownerSums"] {
   return owners.reduce(
     (sum, owner) => ({
       logicalBytes: sum.logicalBytes + owner.logicalBytes,
@@ -575,7 +575,7 @@ function sumOwners(owners: readonly ResourceOwnerBytes[]): ResourceEvidence["own
   );
 }
 
-function collectResources(
+function collect_resources(
   config: ScaleConfig,
   store: SheetwriteStore,
   controller: DatasourceController,
@@ -583,14 +583,14 @@ function collectResources(
   disposed = false,
 ): ResourceEvidence {
   Bun.gc(true);
-  const memory = runtimeMemory();
+  const memory = runtime_memory();
   const snapshot = store.getRuntimeResourceSnapshot(
     operation,
     disposed ? "after-destroy" : "settled",
     memory,
   );
-  const controllerOwners = controller.getResourceOwners();
-  const owners = [...snapshot.wasm.owners, ...snapshot.jsOwners, ...controllerOwners].map(
+  const controller_owners = controller.getResourceOwners();
+  const owners = [...snapshot.wasm.owners, ...snapshot.jsOwners, ...controller_owners].map(
     (owner) => ({
       ...owner,
     }),
@@ -600,24 +600,24 @@ function collectResources(
     if (names.has(owner.owner)) throw new Error(`resource owner ${owner.owner} was counted twice`);
     names.add(owner.owner);
   }
-  const ownerSums = sumOwners(owners);
-  const controllerTileOwners = controllerOwners.filter(
+  const owner_sums = sum_owners(owners);
+  const controller_tile_owners = controller_owners.filter(
     (owner) =>
       owner.owner.startsWith("js.datasource.") && owner.owner !== "js.datasource.schema-index",
   );
-  const controllerTileMetadataBytes = controllerTileOwners.reduce(
+  const controller_tile_metadata_bytes = controller_tile_owners.reduce(
     (sum, owner) => sum + owner.allocatedBytes,
     0,
   );
-  const controllerTileMetadataEntries = controllerTileOwners.reduce(
+  const controller_tile_metadata_entries = controller_tile_owners.reduce(
     (sum, owner) => sum + owner.entries,
     0,
   );
-  const nonSchemaAllocatedBytes = owners.reduce(
+  const non_schema_allocated_bytes = owners.reduce(
     (sum, owner) => sum + (FIXED_SCHEMA_OWNERS.has(owner.owner) ? 0 : owner.allocatedBytes),
     0,
   );
-  const unmeasuredOwnerEntries = owners.reduce(
+  const unmeasured_owner_entries = owners.reduce(
     (sum, owner) => sum + (owner.measurement === "entry-count-only" ? owner.entries : 0),
     0,
   );
@@ -633,12 +633,12 @@ function collectResources(
     residentChunks: paged.chunks,
     cleanAllocatedBytes: paged.allocatedBytes,
     dirtyAllocatedBytes: paged.dirtyAllocatedBytes,
-    controllerTileMetadataBytes,
-    controllerTileMetadataEntries,
-    nonSchemaAllocatedBytes,
-    unmeasuredOwnerEntries,
+    controllerTileMetadataBytes: controller_tile_metadata_bytes,
+    controllerTileMetadataEntries: controller_tile_metadata_entries,
+    nonSchemaAllocatedBytes: non_schema_allocated_bytes,
+    unmeasuredOwnerEntries: unmeasured_owner_entries,
     owners,
-    ownerSums,
+    ownerSums: owner_sums,
     runtime: memory,
     wasm: {
       liveBytes: snapshot.wasm.logicalLiveBytes,
@@ -657,41 +657,41 @@ function collectResources(
   };
 }
 
-function collectCrossings(
+function collect_crossings(
   store: SheetwriteStore,
   operation: RuntimeResourceOperation,
   requests: number,
 ): CrossingCounters {
-  const snapshot = store.getRuntimeResourceSnapshot(operation, "settled", runtimeMemory());
-  let ffiCalls = 0;
-  let jsToWasmBytes = 0;
-  let wasmToJsBytes = 0;
-  let bulkCalls = 0;
-  let scalarCalls = 0;
+  const snapshot = store.getRuntimeResourceSnapshot(operation, "settled", runtime_memory());
+  let ffi_calls = 0;
+  let js_to_wasm_bytes = 0;
+  let wasm_to_js_bytes = 0;
+  let bulk_calls = 0;
+  let scalar_calls = 0;
   for (const boundary of snapshot.boundary) {
-    ffiCalls += boundary.ffiCalls;
-    jsToWasmBytes += boundary.jsToWasmBytes;
-    wasmToJsBytes += boundary.wasmToJsBytes;
-    bulkCalls += boundary.bulkCalls;
-    scalarCalls += boundary.scalarCalls;
+    ffi_calls += boundary.ffiCalls;
+    js_to_wasm_bytes += boundary.jsToWasmBytes;
+    wasm_to_js_bytes += boundary.wasmToJsBytes;
+    bulk_calls += boundary.bulkCalls;
+    scalar_calls += boundary.scalarCalls;
   }
   return {
     datasourceRequests: requests,
-    ffiCalls,
-    jsToWasmBytes,
-    wasmToJsBytes,
-    bulkCalls,
-    scalarCalls,
-    totalCrossings: requests + ffiCalls,
-    ffiCallsPerRequest: requests === 0 ? 0 : ffiCalls / requests,
+    ffiCalls: ffi_calls,
+    jsToWasmBytes: js_to_wasm_bytes,
+    wasmToJsBytes: wasm_to_js_bytes,
+    bulkCalls: bulk_calls,
+    scalarCalls: scalar_calls,
+    totalCrossings: requests + ffi_calls,
+    ffiCallsPerRequest: requests === 0 ? 0 : ffi_calls / requests,
   };
 }
 
-async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
+async function run_scale_once(config: ScaleConfig): Promise<SingleScaleRun> {
   const wb = workbook(config);
   Bun.gc(true);
-  const startupBaseline = runtimeMemory();
-  const startupStarted = performance.now();
+  const startup_baseline = runtime_memory();
+  const startup_started = performance.now();
   const store = new SheetwriteStore(wb, undefined, {
     storage: "paged",
     chunkRows: PAGED_CHUNK_ROWS,
@@ -700,7 +700,7 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
   });
   const datasource = new DeterministicDatasource(config);
   const errors: unknown[] = [];
-  let logicalClock = 0;
+  let logical_clock = 0;
   const controller = new DatasourceController(
     {
       datasource,
@@ -713,25 +713,25 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
       retainRevision: () => () => {},
       onRowsLoaded: () => {},
       onError: (_request, error) => errors.push(error),
-      now: () => logicalClock,
+      now: () => logical_clock,
     },
     config.rows,
   );
-  const startupElapsed = performance.now() - startupStarted;
-  const startupResources = collectResources(config, store, controller, "startup");
-  const startupHeap = startupResources.runtime.usedJSHeapSize;
-  const baselineHeap = startupBaseline.usedJSHeapSize;
-  const startupRuntimeMetadataBytes =
-    startupHeap === null || baselineHeap === null ? 0 : Math.max(0, startupHeap - baselineHeap);
+  const startup_elapsed = performance.now() - startup_started;
+  const startup_resources = collect_resources(config, store, controller, "startup");
+  const startup_heap = startup_resources.runtime.usedJSHeapSize;
+  const baseline_heap = startup_baseline.usedJSHeapSize;
+  const startup_runtime_metadata_bytes =
+    startup_heap === null || baseline_heap === null ? 0 : Math.max(0, startup_heap - baseline_heap);
   const scenarios: SingleScenarioResult[] = [];
-  const startupCrossings = collectCrossings(store, "startup", 0);
+  const startup_crossings = collect_crossings(store, "startup", 0);
   scenarios.push({
     id: "construction",
-    samplesMs: [startupElapsed],
+    samplesMs: [startup_elapsed],
     operationCount: 1,
-    traffic: emptyTraffic(),
-    crossings: startupCrossings,
-    resources: startupResources,
+    traffic: empty_traffic(),
+    crossings: startup_crossings,
+    resources: startup_resources,
     parameters: { rows: config.rows, columns: config.columns },
   });
 
@@ -744,25 +744,25 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     datasource.setScenario(id);
     controller.resetTelemetry();
     store.resetRuntimeResourceAccounting();
-    const exchangeMark = datasource.exchanges.length;
+    const exchange_mark = datasource.exchanges.length;
     const samples: number[] = [];
     const measure = async (action: () => void | Promise<void>): Promise<void> => {
       const started = performance.now();
       await action();
-      await settleController(controller, errors);
+      await settle_controller(controller, errors);
       samples.push(performance.now() - started);
     };
-    const operationCount = await run(measure);
-    const traffic = datasource.trafficSince(exchangeMark);
+    const operation_count = await run(measure);
+    const traffic = datasource.trafficSince(exchange_mark);
     if (traffic.requests !== controller.getTelemetry().requests) {
       throw new Error(`${id} controller/datasource request count diverged`);
     }
-    const crossings = collectCrossings(store, operation, traffic.requests);
-    const resources = collectResources(config, store, controller, operation);
+    const crossings = collect_crossings(store, operation, traffic.requests);
+    const resources = collect_resources(config, store, controller, operation);
     scenarios.push({
       id,
       samplesMs: samples,
-      operationCount,
+      operationCount: operation_count,
       traffic,
       crossings,
       resources,
@@ -770,42 +770,42 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     });
   };
 
-  const emptyMark = datasource.exchanges.length;
+  const empty_mark = datasource.exchanges.length;
   controller.ensureLoaded(0, VISIBLE_TILE_ROWS, []);
-  await settleController(controller, errors);
-  const emptyDemandRequests = datasource.exchanges.length - emptyMark;
-  if (emptyDemandRequests !== 0)
+  await settle_controller(controller, errors);
+  const empty_demand_requests = datasource.exchanges.length - empty_mark;
+  if (empty_demand_requests !== 0)
     throw new Error("empty column demand emitted a datasource request");
 
   await scenario(
     "first-visible-tile",
     "scroll",
-    { rowStart: 0, rows: VISIBLE_TILE_ROWS, columns: visibleColumns() },
+    { rowStart: 0, rows: VISIBLE_TILE_ROWS, columns: visible_columns() },
     async (measure) => {
-      logicalClock += 16.7;
-      await measure(() => controller.updateViewport(0, VISIBLE_TILE_ROWS, visibleColumns()));
+      logical_clock += 16.7;
+      await measure(() => controller.updateViewport(0, VISIBLE_TILE_ROWS, visible_columns()));
       return 1;
     },
   );
 
-  const deepRow = Math.floor(config.rows * DEEP_JUMP_ROW_FRACTION);
-  const farColumnStart = config.columns - VISIBLE_TILE_COLUMNS;
-  const farColumns = indices(farColumnStart, VISIBLE_TILE_COLUMNS);
+  const deep_row = Math.floor(config.rows * DEEP_JUMP_ROW_FRACTION);
+  const far_column_start = config.columns - VISIBLE_TILE_COLUMNS;
+  const far_columns = indices(far_column_start, VISIBLE_TILE_COLUMNS);
   await scenario(
     "deep-two-axis-jump",
     "scroll",
     {
-      rowStart: deepRow,
-      targetRow: deepRow,
+      rowStart: deep_row,
+      targetRow: deep_row,
       rowFraction: DEEP_JUMP_ROW_FRACTION,
-      columnStart: farColumnStart,
+      columnStart: far_column_start,
       rows: VISIBLE_TILE_ROWS,
-      columns: farColumns,
+      columns: far_columns,
     },
     async (measure) => {
-      logicalClock += 16.7;
+      logical_clock += 16.7;
       await measure(() =>
-        controller.updateViewport(deepRow, deepRow + VISIBLE_TILE_ROWS, farColumns),
+        controller.updateViewport(deep_row, deep_row + VISIBLE_TILE_ROWS, far_columns),
       );
       return 1;
     },
@@ -817,10 +817,10 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     { tiles: HORIZONTAL_SWEEP_TILES, frozenColumns: 2, movingColumns: VISIBLE_TILE_COLUMNS - 2 },
     async (measure) => {
       for (let tile = 0; tile < HORIZONTAL_SWEEP_TILES; tile += 1) {
-        const columns = horizontalColumns(config, tile, HORIZONTAL_SWEEP_TILES);
-        logicalClock += 16.7;
+        const columns = horizontal_columns(config, tile, HORIZONTAL_SWEEP_TILES);
+        logical_clock += 16.7;
         await measure(() =>
-          controller.updateViewport(deepRow, deepRow + VISIBLE_TILE_ROWS, columns),
+          controller.updateViewport(deep_row, deep_row + VISIBLE_TILE_ROWS, columns),
         );
       }
       return HORIZONTAL_SWEEP_TILES;
@@ -830,13 +830,17 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
   await scenario(
     "vertical-sweep",
     "scroll",
-    { tiles: VERTICAL_SWEEP_TILES, columns: farColumns },
+    { tiles: VERTICAL_SWEEP_TILES, columns: far_columns },
     async (measure) => {
       for (let tile = 0; tile < VERTICAL_SWEEP_TILES; tile += 1) {
-        const rowStart = uniformStart(tile, VERTICAL_SWEEP_TILES, config.rows - VISIBLE_TILE_ROWS);
-        logicalClock += 16.7;
+        const row_start = uniform_start(
+          tile,
+          VERTICAL_SWEEP_TILES,
+          config.rows - VISIBLE_TILE_ROWS,
+        );
+        logical_clock += 16.7;
         await measure(() =>
-          controller.updateViewport(rowStart, rowStart + VISIBLE_TILE_ROWS, farColumns),
+          controller.updateViewport(row_start, row_start + VISIBLE_TILE_ROWS, far_columns),
         );
       }
       return VERTICAL_SWEEP_TILES;
@@ -853,7 +857,7 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     },
     async (measure) => {
       for (let tile = 0; tile < DIAGONAL_CHURN_TILES; tile += 1) {
-        const position = diagonalPosition(config, tile, 17);
+        const position = diagonal_position(config, tile, 17);
         await measure(() =>
           controller.ensureLoaded(
             position.rowStart,
@@ -866,12 +870,12 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     },
   );
 
-  const editAddresses = Array.from({ length: DIRTY_EDIT_COUNT }, (_, index) => ({
+  const edit_addresses = Array.from({ length: DIRTY_EDIT_COUNT }, (_, index) => ({
     sheet: SHEET,
-    row: uniformStart(index, DIRTY_EDIT_COUNT, config.rows - 1),
-    col: uniformStart(index, DIRTY_EDIT_COUNT, config.columns - 1),
+    row: uniform_start(index, DIRTY_EDIT_COUNT, config.rows - 1),
+    col: uniform_start(index, DIRTY_EDIT_COUNT, config.columns - 1),
   }));
-  const editPatches: DocumentOp[] = editAddresses.map((addr, index) => ({
+  const edit_patches: DocumentOp[] = edit_addresses.map((addr, index) => ({
     op: "set",
     addr,
     value: { kind: "literal", value: 10_000_000 + index },
@@ -883,7 +887,7 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     async (measure) => {
       await measure(() => {
         const outcome = store.withResourceOperation("edit", () =>
-          store.applyTransaction({ patches: editPatches }),
+          store.applyTransaction({ patches: edit_patches }),
         );
         if (outcome.status !== "applied") {
           throw new Error(`100 distant edits were ${outcome.status}`);
@@ -902,7 +906,7 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     { evictionTiles: DIAGONAL_CHURN_TILES, revisitedDirtyCells: DIRTY_EDIT_COUNT },
     async (measure) => {
       for (let tile = 0; tile < DIAGONAL_CHURN_TILES; tile += 1) {
-        const position = diagonalPosition(config, tile, 73);
+        const position = diagonal_position(config, tile, 73);
         await measure(() =>
           controller.ensureLoaded(
             position.rowStart,
@@ -913,8 +917,8 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
       }
       await measure(() => {
         store.withResourceOperation("scroll", () => {
-          for (let index = 0; index < editAddresses.length; index += 1) {
-            const address = editAddresses[index]!;
+          for (let index = 0; index < edit_addresses.length; index += 1) {
+            const address = edit_addresses[index]!;
             const resolved = store.getCell(address).resolved;
             if (
               resolved !== 10_000_000 + index ||
@@ -938,7 +942,7 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
     { acknowledgedDirtyCells: DIRTY_EDIT_COUNT },
     async (measure) => {
       await measure(() => {
-        store.withResourceOperation("dirty-clear", () => store.acknowledgeOperations(editPatches));
+        store.withResourceOperation("dirty-clear", () => store.acknowledgeOperations(edit_patches));
         controller.reset(config.rows);
       });
       if (store.getPagedStats(SHEET).dirtyCells !== 0) {
@@ -951,32 +955,32 @@ async function runScaleOnce(config: ScaleConfig): Promise<SingleScaleRun> {
   datasource.setScenario("destroy");
   controller.resetTelemetry();
   store.resetRuntimeResourceAccounting();
-  const destroyStarted = performance.now();
+  const destroy_started = performance.now();
   controller.destroy();
   store.dispose();
-  const destroyElapsed = performance.now() - destroyStarted;
-  const destroyResources = collectResources(config, store, controller, "teardown", true);
-  const destroyCrossings = collectCrossings(store, "teardown", 0);
+  const destroy_elapsed = performance.now() - destroy_started;
+  const destroy_resources = collect_resources(config, store, controller, "teardown", true);
+  const destroy_crossings = collect_crossings(store, "teardown", 0);
   scenarios.push({
     id: "destroy",
-    samplesMs: [destroyElapsed],
+    samplesMs: [destroy_elapsed],
     operationCount: 1,
-    traffic: emptyTraffic(),
-    crossings: destroyCrossings,
-    resources: destroyResources,
+    traffic: empty_traffic(),
+    crossings: destroy_crossings,
+    resources: destroy_resources,
     parameters: { controllerDestroyed: 1, storeDisposed: 1 },
   });
 
   return {
-    startupBaseline,
-    startupRuntimeMetadataBytes,
+    startupBaseline: startup_baseline,
+    startupRuntimeMetadataBytes: startup_runtime_metadata_bytes,
     emptyDemandRequests: 0,
     exchanges: datasource.exchanges,
     scenarios,
   };
 }
 
-function sameDeterministicCounters(
+function same_deterministic_counters(
   expected: SingleScenarioResult,
   actual: SingleScenarioResult,
 ): void {
@@ -989,7 +993,7 @@ function sameDeterministicCounters(
   if (JSON.stringify(expected.crossings) !== JSON.stringify(actual.crossings)) {
     throw new Error(`${expected.id} crossing counts changed between sample runs`);
   }
-  const deterministicResourceFields = [
+  const deterministic_resource_fields = [
     "logicalCells",
     "loadedCleanCells",
     "dirtyCells",
@@ -999,27 +1003,28 @@ function sameDeterministicCounters(
     "unmeasuredOwnerEntries",
     "controller",
   ] as const;
-  for (const field of deterministicResourceFields) {
-    const expectedValue = JSON.stringify(expected.resources[field]);
-    const actualValue = JSON.stringify(actual.resources[field]);
-    if (expectedValue !== actualValue) {
+  for (const field of deterministic_resource_fields) {
+    const expected_value = JSON.stringify(expected.resources[field]);
+    const actual_value = JSON.stringify(actual.resources[field]);
+    if (expected_value !== actual_value) {
       throw new Error(
-        `${expected.id} retained ${field} changed between sample runs: ${expectedValue} != ${actualValue}`,
+        `${expected.id} retained ${field} changed between sample runs: ${expected_value} != ${actual_value}`,
       );
     }
   }
 }
 
-async function runScale(config: ScaleConfig): Promise<ScaleEvidence> {
+async function run_scale(config: ScaleConfig): Promise<ScaleEvidence> {
   const runs: SingleScaleRun[] = [];
-  for (let run = 0; run < BILLION_CELL_SAMPLE_RUNS; run += 1) runs.push(await runScaleOnce(config));
+  for (let run = 0; run < BILLION_CELL_SAMPLE_RUNS; run += 1)
+    runs.push(await run_scale_once(config));
   const representative = runs[0]!;
-  const startupRun = runs[BILLION_CELL_STARTUP_WARMUP_RUNS] ?? representative;
-  const scenarios = representative.scenarios.map((base, scenarioIndex): ScenarioEvidence => {
+  const startup_run = runs[BILLION_CELL_STARTUP_WARMUP_RUNS] ?? representative;
+  const scenarios = representative.scenarios.map((base, scenario_index): ScenarioEvidence => {
     const samples: number[] = [];
     for (const run of runs) {
-      const candidate = run.scenarios[scenarioIndex]!;
-      sameDeterministicCounters(base, candidate);
+      const candidate = run.scenarios[scenario_index]!;
+      same_deterministic_counters(base, candidate);
       samples.push(...candidate.samplesMs);
     }
     return {
@@ -1034,26 +1039,26 @@ async function runScale(config: ScaleConfig): Promise<ScaleEvidence> {
       parameters: base.parameters,
     };
   });
-  const observedBandModes: BandMode[] = ["empty"];
+  const observed_band_modes: BandMode[] = ["empty"];
   if (representative.exchanges.some((exchange) => exchange.request.columns.length === 1)) {
-    observedBandModes.push("contiguous");
+    observed_band_modes.push("contiguous");
   }
   if (representative.exchanges.some((exchange) => exchange.request.columns.length > 1)) {
-    observedBandModes.push("disjoint-frozen");
+    observed_band_modes.push("disjoint-frozen");
   }
   return {
     id: config.id,
     rows: config.rows,
     columns: config.columns,
     logicalCells: config.logicalCells,
-    startupRuntimeBaseline: startupRun.startupBaseline,
-    startupRuntimeMetadataBytes: startupRun.startupRuntimeMetadataBytes,
+    startupRuntimeBaseline: startup_run.startupBaseline,
+    startupRuntimeMetadataBytes: startup_run.startupRuntimeMetadataBytes,
     protocol: {
       contract: "protocol-2-windowed",
       capabilities: { protocol: 2, columns: "windowed" },
       requestKeys: [...REQUEST_KEYS],
       pageKeys: [...PAGE_KEYS],
-      observedBandModes,
+      observedBandModes: observed_band_modes,
       emptyDemandRequests: 0,
       exchanges: representative.exchanges,
     },
@@ -1082,13 +1087,13 @@ function check(
   };
 }
 
-function scenarioOf(scale: ScaleEvidence, id: BillionCellScenarioId): ScenarioEvidence {
+function scenario_of(scale: ScaleEvidence, id: BillionCellScenarioId): ScenarioEvidence {
   const scenario = scale.scenarios.find((candidate) => candidate.id === id);
   if (!scenario) throw new Error(`scale ${scale.id} is missing ${id}`);
   return scenario;
 }
 
-function finiteRatio(numerator: number, denominator: number): number {
+function finite_ratio(numerator: number, denominator: number): number {
   if (denominator === 0) return numerator === 0 ? 1 : Number.MAX_SAFE_INTEGER;
   return numerator / denominator;
 }
@@ -1096,24 +1101,24 @@ function finiteRatio(numerator: number, denominator: number): number {
 export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): GateCheck[] {
   const checks: GateCheck[] = [];
   for (const scale of scales) {
-    const construction = scenarioOf(scale, "construction");
-    const deepJump = scenarioOf(scale, "deep-two-axis-jump");
-    const deepRow = deepJump.parameters.rowStart;
-    const deepColumn = deepJump.parameters.columnStart;
-    if (typeof deepRow !== "number" || typeof deepColumn !== "number") {
+    const construction = scenario_of(scale, "construction");
+    const deep_jump = scenario_of(scale, "deep-two-axis-jump");
+    const deep_row = deep_jump.parameters.rowStart;
+    const deep_column = deep_jump.parameters.columnStart;
+    if (typeof deep_row !== "number" || typeof deep_column !== "number") {
       throw new Error(`scale ${scale.id} deep-jump targets are missing`);
     }
-    const churn = scenarioOf(scale, "diagonal-churn-100");
-    const edits = scenarioOf(scale, "distant-edits-100");
-    const revisit = scenarioOf(scale, "dirty-revisit-after-eviction");
-    const clear = scenarioOf(scale, "clear");
-    const destroy = scenarioOf(scale, "destroy");
+    const churn = scenario_of(scale, "diagonal-churn-100");
+    const edits = scenario_of(scale, "distant-edits-100");
+    const revisit = scenario_of(scale, "dirty-revisit-after-eviction");
+    const clear = scenario_of(scale, "clear");
+    const destroy = scenario_of(scale, "destroy");
     checks.push(
       check(
         `${scale.id}:deep-row-target`,
         scale.id,
         "scale-relative deep-jump row",
-        deepRow,
+        deep_row,
         Math.floor(scale.rows * DEEP_JUMP_ROW_FRACTION),
         "=",
       ),
@@ -1121,7 +1126,7 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
         `${scale.id}:deep-column-target`,
         scale.id,
         "far 20-column window start",
-        deepColumn,
+        deep_column,
         scale.columns - VISIBLE_TILE_COLUMNS,
         "=",
       ),
@@ -1196,10 +1201,10 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
       ),
     );
 
-    const maxCleanAllocation = Math.max(
+    const max_clean_allocation = Math.max(
       ...scale.scenarios.map((scenario) => scenario.resources.cleanAllocatedBytes),
     );
-    const maxControllerMetadata = Math.max(
+    const max_controller_metadata = Math.max(
       ...scale.scenarios.map((scenario) => scenario.resources.controllerTileMetadataBytes),
     );
     checks.push(
@@ -1207,14 +1212,14 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
         `${scale.id}:clean-allocation`,
         scale.id,
         "clean paged allocated bytes",
-        maxCleanAllocation,
+        max_clean_allocation,
         CLEAN_ALLOCATION_LIMIT_BYTES,
       ),
       check(
         `${scale.id}:controller-metadata`,
         scale.id,
         "controller tile metadata bytes",
-        maxControllerMetadata,
+        max_controller_metadata,
         CONTROLLER_TILE_METADATA_LIMIT_BYTES,
       ),
     );
@@ -1236,14 +1241,14 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
             `${scale.id}:${scenario.id}:returned-amplification`,
             `${scale.id}/${scenario.id}`,
             "returned/requested cell amplification",
-            finiteRatio(traffic.returnedCells, traffic.requestedCells),
+            finite_ratio(traffic.returnedCells, traffic.requestedCells),
             HORIZONTAL_TILE_AMPLIFICATION_LIMIT,
           ),
           check(
             `${scale.id}:${scenario.id}:transferred-amplification`,
             `${scale.id}/${scenario.id}`,
             "transferred/requested cell amplification",
-            finiteRatio(traffic.transferredCells, traffic.requestedCells),
+            finite_ratio(traffic.transferredCells, traffic.requestedCells),
             HORIZONTAL_TILE_AMPLIFICATION_LIMIT,
           ),
           check(
@@ -1259,22 +1264,22 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
   }
 
   for (let index = 1; index < scales.length; index += 1) {
-    const previous = scenarioOf(scales[index - 1]!, "diagonal-churn-100").resources;
-    const current = scenarioOf(scales[index]!, "diagonal-churn-100").resources;
+    const previous = scenario_of(scales[index - 1]!, "diagonal-churn-100").resources;
+    const current = scenario_of(scales[index]!, "diagonal-churn-100").resources;
     const scope = `${scales[index - 1]!.id}->${scales[index]!.id}`;
     checks.push(
       check(
         `${scope}:retained-byte-slope`,
         scope,
         "fixed-window non-schema retained-byte ratio",
-        finiteRatio(current.nonSchemaAllocatedBytes, previous.nonSchemaAllocatedBytes),
+        finite_ratio(current.nonSchemaAllocatedBytes, previous.nonSchemaAllocatedBytes),
         FIXED_WINDOW_SLOPE_LIMIT,
       ),
       check(
         `${scope}:retained-cardinality-slope`,
         scope,
         "fixed-window resident-cardinality ratio",
-        finiteRatio(
+        finite_ratio(
           current.residentCells + current.residentChunks + current.controllerTileMetadataEntries,
           previous.residentCells + previous.residentChunks + previous.controllerTileMetadataEntries,
         ),
@@ -1290,10 +1295,10 @@ export async function runBillionCellBenchmark(): Promise<BillionCellBenchmarkArt
   // The first measured scale otherwise absorbs one-time runtime growth (JIT,
   // interned strings, engine caches) into its startup-metadata delta. Warm the
   // process once, discard the result, and start every scale from a warm heap.
-  await runScaleOnce(BILLION_CELL_SCALE_CONFIGS[0]!);
+  await run_scale_once(BILLION_CELL_SCALE_CONFIGS[0]!);
   Bun.gc(true);
   const scales: ScaleEvidence[] = [];
-  for (const config of BILLION_CELL_SCALE_CONFIGS) scales.push(await runScale(config));
+  for (const config of BILLION_CELL_SCALE_CONFIGS) scales.push(await run_scale(config));
   const checks = deriveBillionCellGateChecks(scales);
   const failures = checks.filter((candidate) => !candidate.passed);
   const status: BillionCellGateStatus = failures.length === 0 ? "passed" : "failed";
@@ -1354,23 +1359,23 @@ function record(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function finiteNumbers(value: unknown, path = "artifact"): void {
+function finite_numbers(value: unknown, path = "artifact"): void {
   if (typeof value === "number") {
     if (!Number.isFinite(value)) invalid(`${path} must be finite`);
     return;
   }
   if (Array.isArray(value)) {
     value.forEach((child, index) => {
-      finiteNumbers(child, `${path}[${index}]`);
+      finite_numbers(child, `${path}[${index}]`);
     });
     return;
   }
   if (typeof value === "object" && value !== null) {
-    for (const [key, child] of Object.entries(value)) finiteNumbers(child, `${path}.${key}`);
+    for (const [key, child] of Object.entries(value)) finite_numbers(child, `${path}.${key}`);
   }
 }
 
-function nonNegativeInteger(value: unknown, label: string): number {
+function non_negative_integer(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
     invalid(`${label} must be a non-negative safe integer`);
   }
@@ -1381,7 +1386,7 @@ function exact(value: unknown, expected: unknown, label: string): void {
   if (value !== expected) invalid(`${label} must equal ${String(expected)}`);
 }
 
-function nonEmptyString(value: unknown, label: string): void {
+function non_empty_string(value: unknown, label: string): void {
   if (typeof value !== "string" || value.length === 0)
     invalid(`${label} must be a non-empty string`);
 }
@@ -1401,7 +1406,7 @@ export function assertCapturedOnRunningMachine(
   exact(toolchain.architecture, process.arch, "toolchain.architecture");
 }
 
-function validateRuntimeMemory(value: unknown, label: string): void {
+function validate_runtime_memory(value: unknown, label: string): void {
   const runtime = record(value, label);
   for (const field of [
     "usedJSHeapSize",
@@ -1410,45 +1415,45 @@ function validateRuntimeMemory(value: unknown, label: string): void {
     "browserBackingStoreBytes",
     "rssBytes",
   ]) {
-    if (runtime[field] !== null) nonNegativeInteger(runtime[field], `${label}.${field}`);
+    if (runtime[field] !== null) non_negative_integer(runtime[field], `${label}.${field}`);
   }
 }
-function isScenarioId(value: unknown): value is BillionCellScenarioId {
+function is_scenario_id(value: unknown): value is BillionCellScenarioId {
   return typeof value === "string" && BILLION_CELL_SCENARIOS.some((scenario) => scenario === value);
 }
 
-function validateBands(
+function validate_bands(
   value: unknown,
-  columnCount: number,
+  column_count: number,
   label: string,
 ): readonly DataSourceColumnBand[] {
   if (!Array.isArray(value) || value.length === 0) invalid(`${label} must contain column bands`);
-  let previousEnd = -1;
+  let previous_end = -1;
   for (let index = 0; index < value.length; index += 1) {
     const band = record(value[index], `${label}[${index}]`);
-    const start = nonNegativeInteger(band.start, `${label}[${index}].start`);
-    const end = nonNegativeInteger(band.end, `${label}[${index}].end`);
-    if (start < previousEnd || end <= start || end > columnCount)
+    const start = non_negative_integer(band.start, `${label}[${index}].start`);
+    const end = non_negative_integer(band.end, `${label}[${index}].end`);
+    if (start < previous_end || end <= start || end > column_count)
       invalid(`${label} is not sorted/disjoint`);
     if (!Array.isArray(band.keys) || band.keys.length !== end - start)
       invalid(`${label} key count mismatch`);
     for (let offset = 0; offset < band.keys.length; offset += 1) {
       exact(band.keys[offset], `c${start + offset}`, `${label}[${index}].keys[${offset}]`);
     }
-    previousEnd = end;
+    previous_end = end;
   }
   return value as DataSourceColumnBand[];
 }
 
-function validateResources(value: unknown, logicalCells: number, label: string): void {
+function validate_resources(value: unknown, logical_cells: number, label: string): void {
   const resources = record(value, label);
-  exact(resources.logicalCells, logicalCells, `${label}.logicalCells`);
-  const loadedCleanCells = nonNegativeInteger(
+  exact(resources.logicalCells, logical_cells, `${label}.logicalCells`);
+  const loaded_clean_cells = non_negative_integer(
     resources.loadedCleanCells,
     `${label}.loadedCleanCells`,
   );
-  const dirtyCells = nonNegativeInteger(resources.dirtyCells, `${label}.dirtyCells`);
-  const residentCells = nonNegativeInteger(resources.residentCells, `${label}.residentCells`);
+  const dirty_cells = non_negative_integer(resources.dirtyCells, `${label}.dirtyCells`);
+  const resident_cells = non_negative_integer(resources.residentCells, `${label}.residentCells`);
   for (const field of [
     "residentChunks",
     "cleanAllocatedBytes",
@@ -1458,10 +1463,10 @@ function validateResources(value: unknown, logicalCells: number, label: string):
     "nonSchemaAllocatedBytes",
     "unmeasuredOwnerEntries",
   ]) {
-    nonNegativeInteger(resources[field], `${label}.${field}`);
+    non_negative_integer(resources[field], `${label}.${field}`);
   }
-  exact(residentCells, loadedCleanCells + dirtyCells, `${label}.residentCells`);
-  if (residentCells >= logicalCells)
+  exact(resident_cells, loaded_clean_cells + dirty_cells, `${label}.residentCells`);
+  if (resident_cells >= logical_cells)
     invalid(`${label} conflates residency with logical addressability`);
   if (!Array.isArray(resources.owners)) invalid(`${label}.owners missing`);
   const names = new Set<string>();
@@ -1471,53 +1476,56 @@ function validateResources(value: unknown, logicalCells: number, label: string):
     if (typeof owner.owner !== "string" || names.has(owner.owner))
       invalid(`${label} owner names must be unique`);
     names.add(owner.owner);
-    sums.logicalBytes += nonNegativeInteger(
+    sums.logicalBytes += non_negative_integer(
       owner.logicalBytes,
       `${label}.owners[${index}].logicalBytes`,
     );
-    sums.allocatedBytes += nonNegativeInteger(
+    sums.allocatedBytes += non_negative_integer(
       owner.allocatedBytes,
       `${label}.owners[${index}].allocatedBytes`,
     );
-    sums.entries += nonNegativeInteger(owner.entries, `${label}.owners[${index}].entries`);
-    const validMeasurements = [
+    sums.entries += non_negative_integer(owner.entries, `${label}.owners[${index}].entries`);
+    const valid_measurements = [
       "exact-capacity",
       "hash-capacity-v1",
       "typed-array-byte-length",
       "utf16-upper-bound",
       "entry-count-only",
     ];
-    if (typeof owner.measurement !== "string" || !validMeasurements.includes(owner.measurement)) {
+    if (typeof owner.measurement !== "string" || !valid_measurements.includes(owner.measurement)) {
       invalid(`${label}.owners[${index}].measurement is invalid`);
     }
   }
-  const ownerSums = record(resources.ownerSums, `${label}.ownerSums`);
-  exact(ownerSums.logicalBytes, sums.logicalBytes, `${label}.ownerSums.logicalBytes`);
-  exact(ownerSums.allocatedBytes, sums.allocatedBytes, `${label}.ownerSums.allocatedBytes`);
-  exact(ownerSums.entries, sums.entries, `${label}.ownerSums.entries`);
+  const owner_sums = record(resources.ownerSums, `${label}.ownerSums`);
+  exact(owner_sums.logicalBytes, sums.logicalBytes, `${label}.ownerSums.logicalBytes`);
+  exact(owner_sums.allocatedBytes, sums.allocatedBytes, `${label}.ownerSums.allocatedBytes`);
+  exact(owner_sums.entries, sums.entries, `${label}.ownerSums.entries`);
   const wasm = record(resources.wasm, `${label}.wasm`);
   for (const field of ["liveBytes", "allocatedBytes", "unaccountedBytes"]) {
-    nonNegativeInteger(wasm[field], `${label}.wasm.${field}`);
+    non_negative_integer(wasm[field], `${label}.wasm.${field}`);
   }
   if (wasm.committedBytes !== null)
-    nonNegativeInteger(wasm.committedBytes, `${label}.wasm.committedBytes`);
-  validateRuntimeMemory(resources.runtime, `${label}.runtime`);
+    non_negative_integer(wasm.committedBytes, `${label}.wasm.committedBytes`);
+  validate_runtime_memory(resources.runtime, `${label}.runtime`);
 }
 
-function validateTraffic(value: unknown, label: string): TrafficCounters {
+function validate_traffic(value: unknown, label: string): TrafficCounters {
   const traffic = record(value, label);
   const counters = {
-    requests: nonNegativeInteger(traffic.requests, `${label}.requests`),
-    pages: nonNegativeInteger(traffic.pages, `${label}.pages`),
-    requestedRows: nonNegativeInteger(traffic.requestedRows, `${label}.requestedRows`),
-    returnedRows: nonNegativeInteger(traffic.returnedRows, `${label}.returnedRows`),
-    requestedCells: nonNegativeInteger(traffic.requestedCells, `${label}.requestedCells`),
-    returnedCells: nonNegativeInteger(traffic.returnedCells, `${label}.returnedCells`),
-    transferredCells: nonNegativeInteger(traffic.transferredCells, `${label}.transferredCells`),
-    requestedBytes: nonNegativeInteger(traffic.requestedBytes, `${label}.requestedBytes`),
-    returnedBytes: nonNegativeInteger(traffic.returnedBytes, `${label}.returnedBytes`),
-    transferredBytes: nonNegativeInteger(traffic.transferredBytes, `${label}.transferredBytes`),
-    explicitNullCells: nonNegativeInteger(traffic.explicitNullCells, `${label}.explicitNullCells`),
+    requests: non_negative_integer(traffic.requests, `${label}.requests`),
+    pages: non_negative_integer(traffic.pages, `${label}.pages`),
+    requestedRows: non_negative_integer(traffic.requestedRows, `${label}.requestedRows`),
+    returnedRows: non_negative_integer(traffic.returnedRows, `${label}.returnedRows`),
+    requestedCells: non_negative_integer(traffic.requestedCells, `${label}.requestedCells`),
+    returnedCells: non_negative_integer(traffic.returnedCells, `${label}.returnedCells`),
+    transferredCells: non_negative_integer(traffic.transferredCells, `${label}.transferredCells`),
+    requestedBytes: non_negative_integer(traffic.requestedBytes, `${label}.requestedBytes`),
+    returnedBytes: non_negative_integer(traffic.returnedBytes, `${label}.returnedBytes`),
+    transferredBytes: non_negative_integer(traffic.transferredBytes, `${label}.transferredBytes`),
+    explicitNullCells: non_negative_integer(
+      traffic.explicitNullCells,
+      `${label}.explicitNullCells`,
+    ),
   };
   exact(counters.pages, counters.requests, `${label}.pages`);
   exact(counters.returnedCells, counters.requestedCells, `${label}.returnedCells`);
@@ -1529,15 +1537,15 @@ function validateTraffic(value: unknown, label: string): TrafficCounters {
 export function validateBillionCellBenchmark(
   value: unknown,
 ): asserts value is BillionCellBenchmarkArtifact {
-  finiteNumbers(value);
+  finite_numbers(value);
   const artifact = record(value, "artifact");
   exact(artifact.schemaVersion, BILLION_CELL_BENCHMARK_SCHEMA_VERSION, "schemaVersion");
   const toolchain = record(artifact.toolchain, "toolchain");
   exact(toolchain.runtime, "bun", "toolchain.runtime");
-  nonEmptyString(toolchain.bunVersion, "toolchain.bunVersion");
-  nonEmptyString(toolchain.typescriptVersion, "toolchain.typescriptVersion");
-  nonEmptyString(toolchain.platform, "toolchain.platform");
-  nonEmptyString(toolchain.architecture, "toolchain.architecture");
+  non_empty_string(toolchain.bunVersion, "toolchain.bunVersion");
+  non_empty_string(toolchain.typescriptVersion, "toolchain.typescriptVersion");
+  non_empty_string(toolchain.platform, "toolchain.platform");
+  non_empty_string(toolchain.architecture, "toolchain.architecture");
   exact(
     toolchain.resourceSchemaVersion,
     RUNTIME_RESOURCE_SCHEMA_VERSION,
@@ -1579,7 +1587,7 @@ export function validateBillionCellBenchmark(
     "configuration.runtimeMetadataPolicy",
   );
   const ceilings = record(configuration.ceilings, "configuration.ceilings");
-  const expectedCeilings = {
+  const expected_ceilings = {
     directCellAmplification: HORIZONTAL_TILE_AMPLIFICATION_LIMIT,
     startupMedianMs: STARTUP_MEDIAN_LIMIT_MS,
     scenarioP95Ms: SCENARIO_P95_LIMIT_MS,
@@ -1591,7 +1599,7 @@ export function validateBillionCellBenchmark(
     fixedWindowSlopeRatio: FIXED_WINDOW_SLOPE_LIMIT,
     ffiCrossingsPerRequest: FFI_CROSSINGS_PER_REQUEST_LIMIT,
   };
-  for (const [key, expected] of Object.entries(expectedCeilings))
+  for (const [key, expected] of Object.entries(expected_ceilings))
     exact(ceilings[key], expected, `ceilings.${key}`);
 
   if (
@@ -1600,144 +1608,148 @@ export function validateBillionCellBenchmark(
   ) {
     invalid(`scales must contain exactly ${BILLION_CELL_SCALE_CONFIGS.length} entries`);
   }
-  for (let scaleIndex = 0; scaleIndex < BILLION_CELL_SCALE_CONFIGS.length; scaleIndex += 1) {
-    const expectedScale = BILLION_CELL_SCALE_CONFIGS[scaleIndex]!;
-    const scale = record(artifact.scales[scaleIndex], `scales[${scaleIndex}]`);
-    exact(scale.id, expectedScale.id, `scales[${scaleIndex}].id`);
-    exact(scale.rows, expectedScale.rows, `scales[${scaleIndex}].rows`);
-    exact(scale.columns, expectedScale.columns, `scales[${scaleIndex}].columns`);
-    exact(scale.logicalCells, expectedScale.logicalCells, `scales[${scaleIndex}].logicalCells`);
+  for (let scale_index = 0; scale_index < BILLION_CELL_SCALE_CONFIGS.length; scale_index += 1) {
+    const expected_scale = BILLION_CELL_SCALE_CONFIGS[scale_index]!;
+    const scale = record(artifact.scales[scale_index], `scales[${scale_index}]`);
+    exact(scale.id, expected_scale.id, `scales[${scale_index}].id`);
+    exact(scale.rows, expected_scale.rows, `scales[${scale_index}].rows`);
+    exact(scale.columns, expected_scale.columns, `scales[${scale_index}].columns`);
+    exact(scale.logicalCells, expected_scale.logicalCells, `scales[${scale_index}].logicalCells`);
     exact(
-      expectedScale.rows * expectedScale.columns,
-      expectedScale.logicalCells,
-      `scales[${scaleIndex}] row/column product`,
+      expected_scale.rows * expected_scale.columns,
+      expected_scale.logicalCells,
+      `scales[${scale_index}] row/column product`,
     );
-    nonNegativeInteger(
+    non_negative_integer(
       scale.startupRuntimeMetadataBytes,
-      `scales[${scaleIndex}].startupRuntimeMetadataBytes`,
+      `scales[${scale_index}].startupRuntimeMetadataBytes`,
     );
-    validateRuntimeMemory(
+    validate_runtime_memory(
       scale.startupRuntimeBaseline,
-      `scales[${scaleIndex}].startupRuntimeBaseline`,
+      `scales[${scale_index}].startupRuntimeBaseline`,
     );
-    const protocol = record(scale.protocol, `scales[${scaleIndex}].protocol`);
-    exact(protocol.contract, "protocol-2-windowed", `scales[${scaleIndex}].protocol.contract`);
+    const protocol = record(scale.protocol, `scales[${scale_index}].protocol`);
+    exact(protocol.contract, "protocol-2-windowed", `scales[${scale_index}].protocol.contract`);
     const capabilities = record(
       protocol.capabilities,
-      `scales[${scaleIndex}].protocol.capabilities`,
+      `scales[${scale_index}].protocol.capabilities`,
     );
-    exact(capabilities.protocol, 2, `scales[${scaleIndex}].protocol.capabilities.protocol`);
-    exact(capabilities.columns, "windowed", `scales[${scaleIndex}].protocol.capabilities.columns`);
-    exact(protocol.emptyDemandRequests, 0, `scales[${scaleIndex}].protocol.emptyDemandRequests`);
+    exact(capabilities.protocol, 2, `scales[${scale_index}].protocol.capabilities.protocol`);
+    exact(capabilities.columns, "windowed", `scales[${scale_index}].protocol.capabilities.columns`);
+    exact(protocol.emptyDemandRequests, 0, `scales[${scale_index}].protocol.emptyDemandRequests`);
     if (JSON.stringify(protocol.requestKeys) !== JSON.stringify(REQUEST_KEYS))
       invalid("request keys changed");
     if (JSON.stringify(protocol.pageKeys) !== JSON.stringify(PAGE_KEYS))
       invalid("page keys changed");
-    const expectedBandModes: BandMode[] = ["empty", "contiguous", "disjoint-frozen"];
-    if (JSON.stringify(protocol.observedBandModes) !== JSON.stringify(expectedBandModes)) {
+    const expected_band_modes: BandMode[] = ["empty", "contiguous", "disjoint-frozen"];
+    if (JSON.stringify(protocol.observedBandModes) !== JSON.stringify(expected_band_modes)) {
       invalid(
-        `protocol band modes ${JSON.stringify(protocol.observedBandModes)}; expected ${JSON.stringify(expectedBandModes)} for ${expectedScale.id}`,
+        `protocol band modes ${JSON.stringify(protocol.observedBandModes)}; expected ${JSON.stringify(expected_band_modes)} for ${expected_scale.id}`,
       );
     }
     if (!Array.isArray(protocol.exchanges) || protocol.exchanges.length === 0)
       invalid("protocol exchanges missing");
-    const traceTraffic = new Map<BillionCellScenarioId, MutableTrafficCounters>();
-    for (const [exchangeIndex, candidate] of protocol.exchanges.entries()) {
-      const exchange = record(candidate, `protocol.exchanges[${exchangeIndex}]`);
-      if (!isScenarioId(exchange.scenario)) invalid("exchange scenario is invalid");
+    const trace_traffic = new Map<BillionCellScenarioId, MutableTrafficCounters>();
+    for (const [exchange_index, candidate] of protocol.exchanges.entries()) {
+      const exchange = record(candidate, `protocol.exchanges[${exchange_index}]`);
+      if (!is_scenario_id(exchange.scenario)) invalid("exchange scenario is invalid");
       const scenario = exchange.scenario;
-      const request = record(exchange.request, `protocol.exchanges[${exchangeIndex}].request`);
-      const page = record(exchange.page, `protocol.exchanges[${exchangeIndex}].page`);
+      const request = record(exchange.request, `protocol.exchanges[${exchange_index}].request`);
+      const page = record(exchange.page, `protocol.exchanges[${exchange_index}].page`);
       exact(request.protocol, 2, "request.protocol");
       exact(page.protocol, 2, "page.protocol");
       exact(page.start, request.start, "page.start");
-      const bands = validateBands(request.columns, expectedScale.columns, "request.columns");
-      validateBands(page.columns, expectedScale.columns, "page.columns");
+      const bands = validate_bands(request.columns, expected_scale.columns, "request.columns");
+      validate_bands(page.columns, expected_scale.columns, "page.columns");
       if (JSON.stringify(request.columns) !== JSON.stringify(page.columns))
         invalid("page columns differ from request");
-      const requestStart = nonNegativeInteger(request.start, "request.start");
-      const requestEnd = nonNegativeInteger(request.end, "request.end");
-      if (requestEnd <= requestStart) invalid("request row interval is empty");
-      const requestedRows = requestEnd - requestStart;
-      const declaredColumns = countBandColumns(bands);
-      const requestCells = nonNegativeInteger(request.cells, "request.cells");
-      const pageRows = nonNegativeInteger(page.rows, "page.rows");
-      const pageCells = nonNegativeInteger(page.cells, "page.cells");
-      const requestBytes = nonNegativeInteger(request.bytes, "request.bytes");
-      const pageBytes = nonNegativeInteger(page.bytes, "page.bytes");
-      const explicitNullCells = nonNegativeInteger(
+      const request_start = non_negative_integer(request.start, "request.start");
+      const request_end = non_negative_integer(request.end, "request.end");
+      if (request_end <= request_start) invalid("request row interval is empty");
+      const requested_rows = request_end - request_start;
+      const declared_columns = count_band_columns(bands);
+      const request_cells = non_negative_integer(request.cells, "request.cells");
+      const page_rows = non_negative_integer(page.rows, "page.rows");
+      const page_cells = non_negative_integer(page.cells, "page.cells");
+      const request_bytes = non_negative_integer(request.bytes, "request.bytes");
+      const page_bytes = non_negative_integer(page.bytes, "page.bytes");
+      const explicit_null_cells = non_negative_integer(
         page.explicitNullCells,
         "page.explicitNullCells",
       );
-      exact(requestCells, requestedRows * declaredColumns, "request.cells");
-      exact(pageRows, requestedRows, "page.rows");
-      exact(pageCells, requestCells, "page.cells");
+      exact(request_cells, requested_rows * declared_columns, "request.cells");
+      exact(page_rows, requested_rows, "page.rows");
+      exact(page_cells, request_cells, "page.cells");
       exact(page.everyRowHasEveryDeclaredKey, true, "page.everyRowHasEveryDeclaredKey");
       if (JSON.stringify(request.keys) !== JSON.stringify(REQUEST_KEYS))
         invalid("request trace keys changed");
       if (JSON.stringify(page.keys) !== JSON.stringify(PAGE_KEYS))
         invalid("page trace keys changed");
-      let counters = traceTraffic.get(scenario);
+      let counters = trace_traffic.get(scenario);
       if (!counters) {
-        counters = emptyTraffic();
-        traceTraffic.set(scenario, counters);
+        counters = empty_traffic();
+        trace_traffic.set(scenario, counters);
       }
       counters.requests += 1;
       counters.pages += 1;
-      counters.requestedRows += requestedRows;
-      counters.returnedRows += pageRows;
-      counters.requestedCells += requestCells;
-      counters.returnedCells += pageCells;
-      counters.transferredCells += pageCells;
-      counters.requestedBytes += requestBytes;
-      counters.returnedBytes += pageBytes;
-      counters.transferredBytes += pageBytes;
-      counters.explicitNullCells += explicitNullCells;
+      counters.requestedRows += requested_rows;
+      counters.returnedRows += page_rows;
+      counters.requestedCells += request_cells;
+      counters.returnedCells += page_cells;
+      counters.transferredCells += page_cells;
+      counters.requestedBytes += request_bytes;
+      counters.returnedBytes += page_bytes;
+      counters.transferredBytes += page_bytes;
+      counters.explicitNullCells += explicit_null_cells;
     }
 
     if (
       !Array.isArray(scale.scenarios) ||
       scale.scenarios.length !== BILLION_CELL_SCENARIOS.length
     ) {
-      invalid(`scale ${expectedScale.id} scenarios missing`);
+      invalid(`scale ${expected_scale.id} scenarios missing`);
     }
-    for (let scenarioIndex = 0; scenarioIndex < BILLION_CELL_SCENARIOS.length; scenarioIndex += 1) {
-      const expectedId = BILLION_CELL_SCENARIOS[scenarioIndex]!;
+    for (
+      let scenario_index = 0;
+      scenario_index < BILLION_CELL_SCENARIOS.length;
+      scenario_index += 1
+    ) {
+      const expected_id = BILLION_CELL_SCENARIOS[scenario_index]!;
       const scenario = record(
-        scale.scenarios[scenarioIndex],
-        `scale ${expectedScale.id} scenario ${expectedId}`,
+        scale.scenarios[scenario_index],
+        `scale ${expected_scale.id} scenario ${expected_id}`,
       );
-      exact(scenario.id, expectedId, `scenario ${expectedId}.id`);
-      exact(scenario.status, "completed", `scenario ${expectedId}.status`);
-      exact(scenario.runs, BILLION_CELL_SAMPLE_RUNS, `scenario ${expectedId}.runs`);
-      const operationCount = nonNegativeInteger(
+      exact(scenario.id, expected_id, `scenario ${expected_id}.id`);
+      exact(scenario.status, "completed", `scenario ${expected_id}.status`);
+      exact(scenario.runs, BILLION_CELL_SAMPLE_RUNS, `scenario ${expected_id}.runs`);
+      const operation_count = non_negative_integer(
         scenario.operationCountPerRun,
-        `scenario ${expectedId}.operationCountPerRun`,
+        `scenario ${expected_id}.operationCountPerRun`,
       );
       exact(
-        operationCount,
-        EXPECTED_OPERATION_COUNTS[expectedId],
-        `scenario ${expectedId}.operationCountPerRun`,
+        operation_count,
+        EXPECTED_OPERATION_COUNTS[expected_id],
+        `scenario ${expected_id}.operationCountPerRun`,
       );
-      const timing = record(scenario.timing, `scenario ${expectedId}.timing`);
+      const timing = record(scenario.timing, `scenario ${expected_id}.timing`);
       if (
         !Array.isArray(timing.samplesMs) ||
-        timing.samplesMs.length !== operationCount * BILLION_CELL_SAMPLE_RUNS
+        timing.samplesMs.length !== operation_count * BILLION_CELL_SAMPLE_RUNS
       ) {
-        invalid(`scenario ${expectedId} timing sample count is inconsistent`);
+        invalid(`scenario ${expected_id} timing sample count is inconsistent`);
       }
-      const expectedTiming = summarize(timing.samplesMs);
+      const expected_timing = summarize(timing.samplesMs);
       for (const field of ["medianMs", "p95Ms", "minMs", "maxMs"] as const) {
-        exact(timing[field], expectedTiming[field], `scenario ${expectedId}.timing.${field}`);
+        exact(timing[field], expected_timing[field], `scenario ${expected_id}.timing.${field}`);
       }
-      const traffic = validateTraffic(
+      const traffic = validate_traffic(
         scenario.trafficPerRun,
-        `scenario ${expectedId}.trafficPerRun`,
+        `scenario ${expected_id}.trafficPerRun`,
       );
-      const traced = traceTraffic.get(expectedId) ?? emptyTraffic();
+      const traced = trace_traffic.get(expected_id) ?? empty_traffic();
       if (JSON.stringify(traffic) !== JSON.stringify(traced))
-        invalid(`scenario ${expectedId} traffic does not match trace`);
-      const crossings = record(scenario.crossingsPerRun, `scenario ${expectedId}.crossingsPerRun`);
+        invalid(`scenario ${expected_id} traffic does not match trace`);
+      const crossings = record(scenario.crossingsPerRun, `scenario ${expected_id}.crossingsPerRun`);
       for (const field of [
         "datasourceRequests",
         "ffiCalls",
@@ -1747,48 +1759,51 @@ export function validateBillionCellBenchmark(
         "scalarCalls",
         "totalCrossings",
       ]) {
-        nonNegativeInteger(crossings[field], `scenario ${expectedId}.crossingsPerRun.${field}`);
+        non_negative_integer(crossings[field], `scenario ${expected_id}.crossingsPerRun.${field}`);
       }
-      const datasourceRequests = nonNegativeInteger(
+      const datasource_requests = non_negative_integer(
         crossings.datasourceRequests,
-        `scenario ${expectedId}.datasourceRequests`,
+        `scenario ${expected_id}.datasourceRequests`,
       );
-      const ffiCalls = nonNegativeInteger(crossings.ffiCalls, `scenario ${expectedId}.ffiCalls`);
-      exact(datasourceRequests, traffic.requests, `scenario ${expectedId}.datasourceRequests`);
+      const ffi_calls = non_negative_integer(
+        crossings.ffiCalls,
+        `scenario ${expected_id}.ffiCalls`,
+      );
+      exact(datasource_requests, traffic.requests, `scenario ${expected_id}.datasourceRequests`);
       exact(
         crossings.totalCrossings,
-        datasourceRequests + ffiCalls,
-        `scenario ${expectedId}.totalCrossings`,
+        datasource_requests + ffi_calls,
+        `scenario ${expected_id}.totalCrossings`,
       );
       exact(
         crossings.ffiCallsPerRequest,
-        traffic.requests === 0 ? 0 : ffiCalls / traffic.requests,
-        `scenario ${expectedId}.ffiCallsPerRequest`,
+        traffic.requests === 0 ? 0 : ffi_calls / traffic.requests,
+        `scenario ${expected_id}.ffiCallsPerRequest`,
       );
-      validateResources(
+      validate_resources(
         scenario.resources,
-        expectedScale.logicalCells,
-        `scenario ${expectedId}.resources`,
+        expected_scale.logicalCells,
+        `scenario ${expected_id}.resources`,
       );
     }
     if (
-      [...traceTraffic.values()].reduce((sum, traffic) => sum + traffic.explicitNullCells, 0) === 0
+      [...trace_traffic.values()].reduce((sum, traffic) => sum + traffic.explicitNullCells, 0) === 0
     ) {
-      invalid(`scale ${expectedScale.id} did not transfer explicit null blanks`);
+      invalid(`scale ${expected_scale.id} did not transfer explicit null blanks`);
     }
   }
 
   const scales = artifact.scales as ScaleEvidence[];
-  const expectedChecks = deriveBillionCellGateChecks(scales);
+  const expected_checks = deriveBillionCellGateChecks(scales);
   const gate = record(artifact.gate, "gate");
-  if (JSON.stringify(gate.checks) !== JSON.stringify(expectedChecks))
+  if (JSON.stringify(gate.checks) !== JSON.stringify(expected_checks))
     invalid("gate checks do not match measured evidence");
-  const expectedFailures = expectedChecks.filter((candidate) => !candidate.passed);
-  if (JSON.stringify(gate.failures) !== JSON.stringify(expectedFailures))
+  const expected_failures = expected_checks.filter((candidate) => !candidate.passed);
+  if (JSON.stringify(gate.failures) !== JSON.stringify(expected_failures))
     invalid("gate failures are incomplete");
-  const expectedStatus = expectedFailures.length === 0 ? "passed" : "failed";
-  exact(artifact.status, expectedStatus, "status");
-  exact(gate.status, expectedStatus, "gate.status");
+  const expected_status = expected_failures.length === 0 ? "passed" : "failed";
+  exact(artifact.status, expected_status, "status");
+  exact(gate.status, expected_status, "gate.status");
 }
 
 if (import.meta.main) {
@@ -1800,9 +1815,9 @@ if (import.meta.main) {
     scales: artifact.scales.map((scale) => ({
       id: scale.id,
       logicalCells: scale.logicalCells,
-      startupMedianMs: scenarioOf(scale, "construction").timing.medianMs,
-      churnLoadedCells: scenarioOf(scale, "diagonal-churn-100").resources.loadedCleanCells,
-      dirtyCells: scenarioOf(scale, "dirty-revisit-after-eviction").resources.dirtyCells,
+      startupMedianMs: scenario_of(scale, "construction").timing.medianMs,
+      churnLoadedCells: scenario_of(scale, "diagonal-churn-100").resources.loadedCleanCells,
+      dirtyCells: scenario_of(scale, "dirty-revisit-after-eviction").resources.dirtyCells,
     })),
     failures: artifact.gate.failures,
     output: output.pathname,

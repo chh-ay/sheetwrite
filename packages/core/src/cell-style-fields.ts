@@ -68,17 +68,17 @@ const BORDER_SIDES = new Set<string>(BORDER_SIDE_KEYS);
 const BORDER_KEYS = new Set(["color", "width", "style"]);
 
 /** Absent, a valid `#rrggbb` color, or null for anything else. */
-function sanitizeColor(value: unknown): string | undefined | null {
+function sanitize_color(value: unknown): string | undefined | null {
   if (value === undefined) return undefined;
 
   return typeof value === "string" && HEX_COLOR.test(value) ? value : null;
 }
 
-function sanitizeBorder(value: unknown): CellBorder | null {
+function sanitize_border(value: unknown): CellBorder | null {
   const border = dataProperties(value, BORDER_KEYS);
   if (!border) return null;
 
-  const color = sanitizeColor(border.color);
+  const color = sanitize_color(border.color);
   if (color === null) return null;
 
   const { width, style } = border;
@@ -100,7 +100,7 @@ function sanitizeBorder(value: unknown): CellBorder | null {
   };
 }
 
-function sanitizeBorders(value: unknown): CellStyle["border"] | null {
+function sanitize_borders(value: unknown): CellStyle["border"] | null {
   const borders = dataProperties(value, BORDER_SIDES);
   if (!borders) return null;
 
@@ -108,14 +108,14 @@ function sanitizeBorders(value: unknown): CellStyle["border"] | null {
   for (const side of BORDER_SIDE_KEYS) {
     if (borders[side] === undefined) continue;
 
-    const border = sanitizeBorder(borders[side]);
+    const border = sanitize_border(borders[side]);
     if (!border) return null;
     result[side] = border;
   }
   return result;
 }
 
-function isCellFontSize(value: unknown): value is number {
+function is_cell_font_size(value: unknown): value is number {
   return (
     typeof value === "number" &&
     Number.isFinite(value) &&
@@ -144,40 +144,47 @@ export function sanitizeCellStyle(value: unknown): CellStyle | null {
     result[key] = flag;
   }
 
-  const { fontSize, fontFamily, numberFormat, align, verticalAlign, border } = style;
-  if (fontSize !== undefined) {
-    if (!isCellFontSize(fontSize)) return null;
-    result.fontSize = fontSize;
+  const {
+    fontSize: font_size,
+    fontFamily: font_family,
+    numberFormat: number_format,
+    align,
+    verticalAlign: vertical_align,
+    border,
+  } = style;
+  if (font_size !== undefined) {
+    if (!is_cell_font_size(font_size)) return null;
+    result.fontSize = font_size;
   }
 
-  if (fontFamily !== undefined) {
-    if (typeof fontFamily !== "string" || !isCellFontFamily(fontFamily)) return null;
-    result.fontFamily = fontFamily;
+  if (font_family !== undefined) {
+    if (typeof font_family !== "string" || !isCellFontFamily(font_family)) return null;
+    result.fontFamily = font_family;
   }
 
-  if (numberFormat !== undefined) {
-    if (typeof numberFormat !== "string" || !isCellNumberFormat(numberFormat)) return null;
-    result.numberFormat = numberFormat;
+  if (number_format !== undefined) {
+    if (typeof number_format !== "string" || !isCellNumberFormat(number_format)) return null;
+    result.numberFormat = number_format;
   }
 
-  const color = sanitizeColor(style.color);
-  const backgroundColor = sanitizeColor(style.backgroundColor);
-  if (color === null || backgroundColor === null) return null;
+  const color = sanitize_color(style.color);
+  const background_color = sanitize_color(style.backgroundColor);
+  if (color === null || background_color === null) return null;
   if (color !== undefined) result.color = color;
-  if (backgroundColor !== undefined) result.backgroundColor = backgroundColor;
+  if (background_color !== undefined) result.backgroundColor = background_color;
 
   if (align !== undefined) {
     if (align !== "left" && align !== "center" && align !== "right") return null;
     result.align = align;
   }
 
-  if (verticalAlign !== undefined) {
-    if (!isCellVerticalAlign(verticalAlign)) return null;
-    result.verticalAlign = verticalAlign;
+  if (vertical_align !== undefined) {
+    if (!isCellVerticalAlign(vertical_align)) return null;
+    result.verticalAlign = vertical_align;
   }
 
   if (border !== undefined) {
-    const borders = sanitizeBorders(border);
+    const borders = sanitize_borders(border);
     if (!borders) return null;
     result.border = borders;
   }

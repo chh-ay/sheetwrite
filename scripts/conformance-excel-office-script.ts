@@ -21,11 +21,11 @@ type CellResult = string | number | boolean | null;
  * and a blank as `""`, so the text of the value alone cannot tell `="#x"`,
  * `=""`, an error and an empty cell apart.
  */
-function cellResult(
+function cell_result(
   value: string | number | boolean,
-  valueType: ExcelScript.RangeValueType,
+  value_type: ExcelScript.RangeValueType,
 ): { type: "number" | "boolean" | "string" | "error" | "blank"; value: CellResult } {
-  switch (valueType) {
+  switch (value_type) {
     case ExcelScript.RangeValueType.empty:
       return { type: "blank", value: null };
     case ExcelScript.RangeValueType.error:
@@ -38,21 +38,21 @@ function cellResult(
     case ExcelScript.RangeValueType.boolean:
       return { type: "boolean", value };
     default:
-      throw new Error(`Unsupported Excel value type ${String(valueType)}`);
+      throw new Error(`Unsupported Excel value type ${String(value_type)}`);
   }
 }
 
-function resultOf(range: ExcelScript.Range): Record<string, unknown> {
+function result_of(range: ExcelScript.Range): Record<string, unknown> {
   const formula = range.getFormula();
-  const anchor = cellResult(range.getValue(), range.getValueType());
+  const anchor = cell_result(range.getValue(), range.getValueType());
   const spill = anchor.type === "error" ? undefined : range.getSpillingToRange();
   if (spill) {
-    const valueTypes = spill.getValueTypes();
+    const value_types = spill.getValueTypes();
     const value = spill.getValues().map((line, row) =>
       line.map((cell, column) => {
-        const valueType = valueTypes[row]?.[column];
-        if (valueType === undefined) throw new Error("Excel value types do not match values");
-        return cellResult(cell, valueType).value;
+        const value_type = value_types[row]?.[column];
+        if (value_type === undefined) throw new Error("Excel value types do not match values");
+        return cell_result(cell, value_type).value;
       }),
     );
     return {
@@ -64,11 +64,11 @@ function resultOf(range: ExcelScript.Range): Record<string, unknown> {
     };
   }
 
-  const displayedText = range.getText();
-  if (anchor.type === "blank") return { type: "blank", displayedText, formula };
+  const displayed_text = range.getText();
+  if (anchor.type === "blank") return { type: "blank", displayedText: displayed_text, formula };
   if (anchor.type === "error")
-    return { type: "error", error: anchor.value, displayedText, formula };
-  return { type: anchor.type, value: anchor.value, displayedText, formula };
+    return { type: "error", error: anchor.value, displayedText: displayed_text, formula };
+  return { type: anchor.type, value: anchor.value, displayedText: displayed_text, formula };
 }
 
 /** Office Script entry point copied verbatim into the protected Excel runner. */
@@ -88,7 +88,7 @@ export function main(
   // iteration leaves formulas without a circular reference unchanged.
   const calculation = payload.cases.find((entry) => entry.calculation)?.calculation;
   const iteration = workbook.getApplication().getIterativeCalculation();
-  const previousIteration = {
+  const previous_iteration = {
     enabled: iteration.getEnabled(),
     maxIteration: iteration.getMaxIteration(),
     maxChange: iteration.getMaxChange(),
@@ -115,8 +115,8 @@ export function main(
       if (entry.numberFormat) target.setNumberFormat(entry.numberFormat);
     });
     workbook.getApplication().calculate(ExcelScript.CalculationType.fullRebuild);
-    for (const { caseId, target, sheet } of created) {
-      observations.push({ caseId, result: resultOf(sheet.getRange(target)) });
+    for (const { caseId: case_id, target, sheet } of created) {
+      observations.push({ caseId: case_id, result: result_of(sheet.getRange(target)) });
     }
     return JSON.stringify({
       protocol: 1,
@@ -129,8 +129,8 @@ export function main(
     });
   } finally {
     for (const { sheet } of created.reverse()) sheet.delete();
-    iteration.setEnabled(previousIteration.enabled);
-    iteration.setMaxIteration(previousIteration.maxIteration);
-    iteration.setMaxChange(previousIteration.maxChange);
+    iteration.setEnabled(previous_iteration.enabled);
+    iteration.setMaxIteration(previous_iteration.maxIteration);
+    iteration.setMaxChange(previous_iteration.maxChange);
   }
 }

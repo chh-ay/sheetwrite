@@ -44,7 +44,7 @@ export function validateMatchedEngineArtifact(
 }
 
 /** The full-only workloads, engine sizes and cold start; detail for the section. */
-function analysisDetail(machines: readonly MachineEvidence<FullEngineResult>[]): string[] {
+function analysis_detail(machines: readonly MachineEvidence<FullEngineResult>[]): string[] {
   return [
     "#### Analysis workloads",
     "",
@@ -105,8 +105,8 @@ export function renderFullEngineEvidence(
     }
   }
   const choices = full.engines.map((engine) => {
-    const isFull = engine.engine === "full";
-    return `<div class="sw-engine-choice"><span>${isFull ? "Full engine" : "Default engine"}</span><h4><code>@sheetwrite/${isFull ? "formulas" : "wasm"}</code></h4><p>${isFull ? "Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions." : "Core spreadsheet functions, with the smaller download."}</p><strong>${formatBytes(engine.wasm.brotliBytes)}</strong><small>Brotli WASM · ${formatBytes(engine.wasm.rawBytes)} uncompressed</small></div>`;
+    const is_full = engine.engine === "full";
+    return `<div class="sw-engine-choice"><span>${is_full ? "Full engine" : "Default engine"}</span><h4><code>@sheetwrite/${is_full ? "formulas" : "wasm"}</code></h4><p>${is_full ? "Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions." : "Core spreadsheet functions, with the smaller download."}</p><strong>${formatBytes(engine.wasm.brotliBytes)}</strong><small>Brotli WASM · ${formatBytes(engine.wasm.rawBytes)} uncompressed</small></div>`;
   });
   return [
     "### Choose a formula engine",
@@ -120,7 +120,7 @@ export function renderFullEngineEvidence(
     "[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/features/formulas/analysis-formulas/)",
     "",
     ...allMeasurements("Default and full engine · analysis workloads", [
-      ...analysisDetail(machines),
+      ...analysis_detail(machines),
       "",
       ...provenanceList([
         ["Analysis capture", `${formatCaptureTime(full.meta.timestamp)} UTC`],

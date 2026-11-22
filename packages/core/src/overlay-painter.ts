@@ -42,20 +42,20 @@ const EMPTY_VIEW_ROWS = new Int32Array(0);
 const EMPTY_VIEW_ITEMS = new Uint32Array(0);
 
 /** Sort the accepted prefix of `items` by `rows`, keeping equal rows in item order. */
-function sortByViewRow(rows: Int32Array, items: Uint32Array, length: number): void {
+function sort_by_view_row(rows: Int32Array, items: Uint32Array, length: number): void {
   const order = new Uint32Array(length);
   for (let position = 0; position < length; position++) order[position] = position;
   order.sort((left, right) => (rows[left] ?? 0) - (rows[right] ?? 0) || left - right);
 
-  const rowsInOrder = new Int32Array(length);
-  const itemsInOrder = new Uint32Array(length);
+  const rows_in_order = new Int32Array(length);
+  const items_in_order = new Uint32Array(length);
   for (let position = 0; position < length; position++) {
     const source = order[position] ?? 0;
-    rowsInOrder[position] = rows[source] ?? 0;
-    itemsInOrder[position] = items[source] ?? 0;
+    rows_in_order[position] = rows[source] ?? 0;
+    items_in_order[position] = items[source] ?? 0;
   }
-  rows.set(rowsInOrder);
-  items.set(itemsInOrder);
+  rows.set(rows_in_order);
+  items.set(items_in_order);
 }
 
 /**
@@ -68,7 +68,7 @@ class ViewRowIndex {
   private rows = EMPTY_VIEW_ROWS;
   private items = EMPTY_VIEW_ITEMS;
   private length = 0;
-  private isViewRowOrdered = true;
+  private is_view_row_ordered = true;
 
   get count(): number {
     return this.length;
@@ -76,7 +76,7 @@ class ViewRowIndex {
 
   /** True when the accepted items were already in ascending view-row order. */
   get isOrdered(): boolean {
-    return this.isViewRowOrdered;
+    return this.is_view_row_ordered;
   }
 
   rowAt(position: number): number {
@@ -96,16 +96,16 @@ class ViewRowIndex {
     const rows = this.rows;
     const items = this.items;
     let accepted = 0;
-    let isOrdered = true;
+    let is_ordered = true;
     for (let item = 0; item < matches.length; item++) {
-      const viewRow = toViewRow(matches.rowAt(item));
-      if (viewRow === null) continue;
-      if (accepted > 0 && viewRow < (rows[accepted - 1] ?? 0)) isOrdered = false;
-      rows[accepted] = viewRow;
+      const view_row = toViewRow(matches.rowAt(item));
+      if (view_row === null) continue;
+      if (accepted > 0 && view_row < (rows[accepted - 1] ?? 0)) is_ordered = false;
+      rows[accepted] = view_row;
       items[accepted] = item;
       accepted += 1;
     }
-    this.commit(accepted, isOrdered);
+    this.commit(accepted, is_ordered);
   }
 
   /** Rebuild from a sheet's notes; `toViewRow` maps rows to the current view. */
@@ -117,24 +117,24 @@ class ViewRowIndex {
     const rows = this.rows;
     const items = this.items;
     let accepted = 0;
-    let isOrdered = true;
+    let is_ordered = true;
     for (let item = 0; item < notes.length; item++) {
       const note = notes[item];
-      const viewRow = note ? toViewRow(note.addr.row) : null;
-      if (viewRow === null) continue;
-      if (accepted > 0 && viewRow < (rows[accepted - 1] ?? 0)) isOrdered = false;
-      rows[accepted] = viewRow;
+      const view_row = note ? toViewRow(note.addr.row) : null;
+      if (view_row === null) continue;
+      if (accepted > 0 && view_row < (rows[accepted - 1] ?? 0)) is_ordered = false;
+      rows[accepted] = view_row;
       items[accepted] = item;
       accepted += 1;
     }
-    this.commit(accepted, isOrdered);
+    this.commit(accepted, is_ordered);
   }
 
   /** Accept the filled prefix, sorting it when the source was out of order. */
-  private commit(accepted: number, isOrdered: boolean): void {
-    if (!isOrdered) sortByViewRow(this.rows, this.items, accepted);
+  private commit(accepted: number, is_ordered: boolean): void {
+    if (!is_ordered) sort_by_view_row(this.rows, this.items, accepted);
     this.length = accepted;
-    this.isViewRowOrdered = isOrdered;
+    this.is_view_row_ordered = is_ordered;
     if (accepted === 0 && this.rows.length > 0) {
       this.rows = EMPTY_VIEW_ROWS;
       this.items = EMPTY_VIEW_ITEMS;
@@ -197,7 +197,7 @@ interface NormalizedPresenceOverlay {
   readonly foreground: "#000000" | "#ffffff";
 }
 
-function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null): PresenceColor {
+function presence_color(value: string, resolver?: CanvasRenderingContext2D | null): PresenceColor {
   const input = value.trim();
   const hex = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(input);
   if (hex) {
@@ -228,7 +228,7 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
     resolver.fillStyle = input;
     const resolved = String(resolver.fillStyle);
     if (resolved !== sentinel || input.toLowerCase() === sentinel) {
-      const parsed = presenceColor(resolved);
+      const parsed = presence_color(resolved);
       return { ...parsed, css: input };
     }
   }
@@ -236,7 +236,7 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
   return { css: input || "#475569", red: 71, green: 85, blue: 105 };
 }
 
-function readablePresenceForeground(color: PresenceColor): "#000000" | "#ffffff" {
+function readable_presence_foreground(color: PresenceColor): "#000000" | "#ffffff" {
   const luminance = relativeLuminance({ ...color, alpha: 1 });
   return contrastRatio(luminance, 0) >= contrastRatio(luminance, 1) ? "#000000" : "#ffffff";
 }
@@ -294,7 +294,7 @@ const CUT_DASHES_FROM = "0 0, 0 100%, 0 0, 100% 0";
 const CUT_DASHES_TO = "8px 0, -8px 100%, 0 -8px, 100% 8px";
 
 /** Stop the dashes of a pooled div that marked a cut, so it can serve another rect. */
-function endCutDashes(el: HTMLDivElement): void {
+function end_cut_dashes(el: HTMLDivElement): void {
   el.removeAttribute("data-sheetwrite-cut");
   for (const animation of el.getAnimations?.() ?? []) animation.cancel();
 }
@@ -306,89 +306,89 @@ function endCutDashes(el: HTMLDivElement): void {
 export class OverlayPainter {
   private readonly overlay: HTMLDivElement;
   private readonly deps: OverlayPainterDeps;
-  private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
-  private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
+  private manual_highlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
+  private presence_overlays: readonly NormalizedPresenceOverlay[] = [];
   /** The cells of a cut that waits for a paste, in data rows. */
-  private cutMark: Range | null = null;
+  private cut_mark: Range | null = null;
   /** The cells an undo or redo changed, in data rows, shown for a moment. */
   private flash: readonly Range[] = [];
 
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
-  // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
+  // `acquire_rect` hands out `pool[cursor++]`, creating and appending a fresh
   // div only when the pool runs short. Surplus divs are hidden with
   // `display:none`, never removed, so subsequent passes can reclaim them.
   private readonly pool: HTMLDivElement[] = [];
   private cursor = 0;
-  private readonly presenceLabelPool: HTMLDivElement[] = [];
-  private readonly presenceLabelBounds = new Float64Array(32 * 8 * 4);
-  private presenceLabelCursor = 0;
-  private presenceLabelBoundsCount = 0;
-  private presenceColorContext: CanvasRenderingContext2D | null | undefined;
+  private readonly presence_label_pool: HTMLDivElement[] = [];
+  private readonly presence_label_bounds = new Float64Array(32 * 8 * 4);
+  private presence_label_cursor = 0;
+  private presence_label_bounds_count = 0;
+  private presence_color_context: CanvasRenderingContext2D | null | undefined;
   /** The active cell's validation input message; built when one first shows. */
-  private inputMessage: HTMLDivElement | null = null;
+  private input_message: HTMLDivElement | null = null;
 
   // Threaded into the `forEachRect` selection callback, which cannot take args.
-  private paintContentTop = 0;
-  private paintScrollLeft = 0;
-  private paintClientW = 0;
-  private paintClientH = 0;
-  private paintTheme: Theme | null = null;
-  private paintSheet: Sheet | null = null;
+  private paint_content_top = 0;
+  private paint_scroll_left = 0;
+  private paint_client_w = 0;
+  private paint_client_h = 0;
+  private paint_theme: Theme | null = null;
+  private paint_sheet: Sheet | null = null;
 
-  private highlightVersion = 0;
-  private presenceVersion = 0;
-  private cutVersion = 0;
-  private flashVersion = 0;
+  private highlight_version = 0;
+  private presence_version = 0;
+  private cut_version = 0;
+  private flash_version = 0;
 
   // Repaints look up only the rows in the painted band. Each index rebuilds
   // when its items or the view order change, never on scroll.
-  private readonly matchIndex = new ViewRowIndex();
-  private matchIndexSet: SearchMatchSet | null = null;
-  private matchIndexSheet: SheetId | null = null;
-  private matchIndexVersion = -1;
-  private matchIndexGeometry = -1;
+  private readonly match_index = new ViewRowIndex();
+  private match_index_set: SearchMatchSet | null = null;
+  private match_index_sheet: SheetId | null = null;
+  private match_index_version = -1;
+  private match_index_geometry = -1;
   /** Match indices of the painted band, kept in match order. */
-  private readonly matchPaintOrder: number[] = [];
-  private readonly noteIndex = new ViewRowIndex();
-  private noteIndexNotes: readonly CellNote[] | null = null;
-  private noteIndexGeometry = -1;
+  private readonly match_paint_order: number[] = [];
+  private readonly note_index = new ViewRowIndex();
+  private note_index_notes: readonly CellNote[] | null = null;
+  private note_index_geometry = -1;
   /** Note indices of the painted band, kept in note order. */
-  private readonly notePaintOrder: number[] = [];
+  private readonly note_paint_order: number[] = [];
 
   // `paint` skips when every field below is unchanged and the theme identity
   // still matches.
-  private lastPaintTheme: Theme | null = null;
-  private lastContentTop = 0;
-  private lastScrollLeft = 0;
-  private lastClientW = 0;
-  private lastClientH = 0;
-  private lastActiveSheet: SheetId = "";
-  private lastSelVersion = -1;
-  private lastHighlightVersion = -1;
-  private lastPresenceVersion = -1;
-  private lastCutVersion = -1;
-  private lastFlashVersion = -1;
-  private lastSearchVersion = -1;
-  private lastGeometryVersion = -1;
-  private lastPaintNotes: readonly CellNote[] | undefined;
-  private lastAutoFilter: AutoFilter | undefined;
-  private lastValidationRules: Sheet["validationRules"];
-  private lastFilters: Sheet["filters"];
-  private lastSearchActive = -1;
-  private lastEditing = false;
-  private lastFillPresent = false;
-  private lastFillR0 = 0;
-  private lastFillC0 = 0;
-  private lastFillR1 = 0;
-  private lastFillC1 = 0;
-  private lastFillTip: FillTip | null = null;
-  private lastAutoFillTarget: SelRect | null = null;
+  private last_paint_theme: Theme | null = null;
+  private last_content_top = 0;
+  private last_scroll_left = 0;
+  private last_client_w = 0;
+  private last_client_h = 0;
+  private last_active_sheet: SheetId = "";
+  private last_sel_version = -1;
+  private last_highlight_version = -1;
+  private last_presence_version = -1;
+  private last_cut_version = -1;
+  private last_flash_version = -1;
+  private last_search_version = -1;
+  private last_geometry_version = -1;
+  private last_paint_notes: readonly CellNote[] | undefined;
+  private last_auto_filter: AutoFilter | undefined;
+  private last_validation_rules: Sheet["validationRules"];
+  private last_filters: Sheet["filters"];
+  private last_search_active = -1;
+  private last_editing = false;
+  private last_fill_present = false;
+  private last_fill_r0 = 0;
+  private last_fill_c0 = 0;
+  private last_fill_r1 = 0;
+  private last_fill_c1 = 0;
+  private last_fill_tip: FillTip | null = null;
+  private last_auto_fill_target: SelRect | null = null;
   /** Excel's tip beside the dragged fill handle; made on the first drag. */
-  private tipElement: HTMLDivElement | null = null;
+  private tip_element: HTMLDivElement | null = null;
   /** The Auto Fill Options button; made after the first fill. */
-  private autoFillButton: HTMLButtonElement | null = null;
+  private auto_fill_button: HTMLButtonElement | null = null;
   /** The values a dragged fill will write, drawn faintly in their cells; made on the first drag. */
-  private fillValues: HTMLCanvasElement | null = null;
+  private fill_values: HTMLCanvasElement | null = null;
 
   constructor(parent: HTMLElement, deps: OverlayPainterDeps) {
     this.deps = deps;
@@ -405,23 +405,23 @@ export class OverlayPainter {
   }
 
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
-    this.manualHighlights =
+    this.manual_highlights =
       ranges && ranges.length > 0 ? { ranges, color: color ?? this.deps.theme().highlight } : null;
-    this.highlightVersion += 1;
+    this.highlight_version += 1;
     this.deps.scheduleRender();
   }
 
   setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void {
     if (!overlays) {
-      this.presenceOverlays = [];
+      this.presence_overlays = [];
     } else {
       const count = Math.min(overlays.length, 32);
       const normalized = new Array<NormalizedPresenceOverlay>(count);
-      const colorResolver = this.getPresenceColorContext();
+      const color_resolver = this.get_presence_color_context();
       for (let index = 0; index < count; index++) {
         const overlay = overlays[index]!;
         const identity = overlay.displayName?.trim() || overlay.actorId;
-        const color = presenceColor(overlay.color, colorResolver);
+        const color = presence_color(overlay.color, color_resolver);
         normalized[index] = {
           actorId: overlay.actorId,
           activeSheet: overlay.activeSheet,
@@ -429,76 +429,76 @@ export class OverlayPainter {
           identity,
           label: identity.slice(0, PRESENCE_LABEL_MAX_CHARS),
           color,
-          foreground: readablePresenceForeground(color),
+          foreground: readable_presence_foreground(color),
           tint: `color-mix(in srgb, ${color.css} 12%, transparent)`,
           border: `color-mix(in srgb, ${color.css} 72%, #000000 28%)`,
         };
       }
-      this.presenceOverlays = normalized;
+      this.presence_overlays = normalized;
     }
-    this.presenceVersion += 1;
+    this.presence_version += 1;
     this.deps.scheduleRender();
   }
 
   /** Mark the cells of a cut with a moving dashed border, as Excel does, or remove the mark. */
   setCutMark(range: Range | null): void {
-    this.cutMark = range;
-    this.cutVersion += 1;
+    this.cut_mark = range;
+    this.cut_version += 1;
     this.deps.scheduleRender();
   }
 
   /** Tint the cells an undo or redo changed, so the user sees them; `[]` removes the tint. */
   setFlash(ranges: readonly Range[]): void {
     this.flash = ranges;
-    this.flashVersion += 1;
+    this.flash_version += 1;
     this.deps.scheduleRender();
   }
 
-  private getPresenceColorContext(): CanvasRenderingContext2D | null {
-    if (this.presenceColorContext !== undefined) return this.presenceColorContext;
-    this.presenceColorContext = document.createElement("canvas").getContext("2d");
-    return this.presenceColorContext;
+  private get_presence_color_context(): CanvasRenderingContext2D | null {
+    if (this.presence_color_context !== undefined) return this.presence_color_context;
+    this.presence_color_context = document.createElement("canvas").getContext("2d");
+    return this.presence_color_context;
   }
 
   paint(contentTop: number, scrollLeft: number, clientW: number, clientH: number): void {
     const theme = this.deps.theme();
-    if (this.samePaintState(contentTop, scrollLeft, clientW, clientH, theme)) return;
+    if (this.same_paint_state(contentTop, scrollLeft, clientW, clientH, theme)) return;
 
     const sheet = this.deps.sheet();
     this.cursor = 0;
-    this.presenceLabelCursor = 0;
-    this.presenceLabelBoundsCount = 0;
-    this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintFlash(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintNotes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.presence_label_cursor = 0;
+    this.presence_label_bounds_count = 0;
+    this.paint_highlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paint_flash(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paint_presence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paint_notes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
 
     const selection = this.deps.selection();
     if (!selection.isEmpty) {
-      this.paintContentTop = contentTop;
-      this.paintScrollLeft = scrollLeft;
-      this.paintClientW = clientW;
-      this.paintClientH = clientH;
-      this.paintTheme = theme;
-      this.paintSheet = sheet;
-      selection.forEachRect(this.appendSelectionRect);
-      this.paintTheme = null;
-      this.paintSheet = null;
+      this.paint_content_top = contentTop;
+      this.paint_scroll_left = scrollLeft;
+      this.paint_client_w = clientW;
+      this.paint_client_h = clientH;
+      this.paint_theme = theme;
+      this.paint_sheet = sheet;
+      selection.forEachRect(this.append_selection_rect);
+      this.paint_theme = null;
+      this.paint_sheet = null;
 
-      this.paintFocus(theme, contentTop, scrollLeft, clientW, clientH);
-      this.paintFillPreview(theme, sheet, contentTop, scrollLeft);
-      this.paintFillHandle(theme, contentTop, scrollLeft);
+      this.paint_focus(theme, contentTop, scrollLeft, clientW, clientH);
+      this.paint_fill_preview(theme, sheet, contentTop, scrollLeft);
+      this.paint_fill_handle(theme, contentTop, scrollLeft);
     }
 
-    this.paintFillValues(theme, contentTop, scrollLeft, clientW, clientH);
-    this.paintFillTip();
-    this.paintAutoFillButton(theme, contentTop, scrollLeft, clientW, clientH);
+    this.paint_fill_values(theme, contentTop, scrollLeft, clientW, clientH);
+    this.paint_fill_tip();
+    this.paint_auto_fill_button(theme, contentTop, scrollLeft, clientW, clientH);
     // As in Excel, the moving border of a cut shows over the selection.
-    this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintValidation(theme, contentTop, scrollLeft, clientW, clientH);
-    this.hideSurplus();
-    this.hideSurplusPresenceLabels();
+    this.paint_cut_mark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paint_filter_buttons(sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paint_validation(theme, contentTop, scrollLeft, clientW, clientH);
+    this.hide_surplus();
+    this.hide_surplus_presence_labels();
   }
 
   /**
@@ -510,11 +510,11 @@ export class OverlayPainter {
     for (let index = this.cursor; index < this.pool.length; index++) this.pool[index]?.remove();
     this.pool.length = this.cursor;
 
-    for (let index = this.presenceLabelCursor; index < this.presenceLabelPool.length; index++) {
-      this.presenceLabelPool[index]?.remove();
+    for (let index = this.presence_label_cursor; index < this.presence_label_pool.length; index++) {
+      this.presence_label_pool[index]?.remove();
     }
-    this.presenceLabelPool.length = this.presenceLabelCursor;
-    this.presenceColorContext = undefined;
+    this.presence_label_pool.length = this.presence_label_cursor;
+    this.presence_color_context = undefined;
   }
 
   destroy(): void {
@@ -527,129 +527,137 @@ export class OverlayPainter {
    * (and `false` returned) only when something differs, matching the old
    * signature-plus-theme-identity skip.
    */
-  private samePaintState(
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+  private same_paint_state(
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
     theme: Theme,
   ): boolean {
     const selection = this.deps.selection();
     const fill = this.deps.fillTarget();
-    const activeSheet = this.deps.activeSheet();
-    const selVersion = selection.version;
-    const searchVersion = this.deps.searchVersion();
-    const geometryVersion = this.deps.geometryVersion();
+    const active_sheet = this.deps.activeSheet();
+    const sel_version = selection.version;
+    const search_version = this.deps.searchVersion();
+    const geometry_version = this.deps.geometryVersion();
     const sheet = this.deps.sheet();
     const notes = sheet.notes;
-    const autoFilter = sheet.autoFilter;
+    const auto_filter = sheet.autoFilter;
     const filters = sheet.filters;
-    const validationRules = sheet.validationRules;
-    const searchActive = this.deps.searchActive();
+    const validation_rules = sheet.validationRules;
+    const search_active = this.deps.searchActive();
     const editing = this.deps.isEditing();
-    const fillPresent = fill !== null;
-    const fillR0 = fill ? fill.r0 : 0;
-    const fillC0 = fill ? fill.c0 : 0;
-    const fillR1 = fill ? fill.r1 : 0;
-    const fillC1 = fill ? fill.c1 : 0;
-    const fillTip = this.deps.fillTip();
-    const autoFillTarget = this.deps.autoFillTarget();
+    const fill_present = fill !== null;
+    const fill_r0 = fill ? fill.r0 : 0;
+    const fill_c0 = fill ? fill.c0 : 0;
+    const fill_r1 = fill ? fill.r1 : 0;
+    const fill_c1 = fill ? fill.c1 : 0;
+    const fill_tip = this.deps.fillTip();
+    const auto_fill_target = this.deps.autoFillTarget();
 
     if (
-      theme === this.lastPaintTheme &&
-      contentTop === this.lastContentTop &&
-      scrollLeft === this.lastScrollLeft &&
-      clientW === this.lastClientW &&
-      clientH === this.lastClientH &&
-      activeSheet === this.lastActiveSheet &&
-      selVersion === this.lastSelVersion &&
-      this.highlightVersion === this.lastHighlightVersion &&
-      this.presenceVersion === this.lastPresenceVersion &&
-      this.cutVersion === this.lastCutVersion &&
-      this.flashVersion === this.lastFlashVersion &&
-      searchVersion === this.lastSearchVersion &&
-      geometryVersion === this.lastGeometryVersion &&
-      notes === this.lastPaintNotes &&
-      autoFilter === this.lastAutoFilter &&
-      validationRules === this.lastValidationRules &&
-      filters === this.lastFilters &&
-      searchActive === this.lastSearchActive &&
-      editing === this.lastEditing &&
-      fillPresent === this.lastFillPresent &&
-      fillR0 === this.lastFillR0 &&
-      fillC0 === this.lastFillC0 &&
-      fillR1 === this.lastFillR1 &&
-      fillC1 === this.lastFillC1 &&
-      fillTip === this.lastFillTip &&
-      autoFillTarget === this.lastAutoFillTarget
+      theme === this.last_paint_theme &&
+      content_top === this.last_content_top &&
+      scroll_left === this.last_scroll_left &&
+      client_w === this.last_client_w &&
+      client_h === this.last_client_h &&
+      active_sheet === this.last_active_sheet &&
+      sel_version === this.last_sel_version &&
+      this.highlight_version === this.last_highlight_version &&
+      this.presence_version === this.last_presence_version &&
+      this.cut_version === this.last_cut_version &&
+      this.flash_version === this.last_flash_version &&
+      search_version === this.last_search_version &&
+      geometry_version === this.last_geometry_version &&
+      notes === this.last_paint_notes &&
+      auto_filter === this.last_auto_filter &&
+      validation_rules === this.last_validation_rules &&
+      filters === this.last_filters &&
+      search_active === this.last_search_active &&
+      editing === this.last_editing &&
+      fill_present === this.last_fill_present &&
+      fill_r0 === this.last_fill_r0 &&
+      fill_c0 === this.last_fill_c0 &&
+      fill_r1 === this.last_fill_r1 &&
+      fill_c1 === this.last_fill_c1 &&
+      fill_tip === this.last_fill_tip &&
+      auto_fill_target === this.last_auto_fill_target
     ) {
       return true;
     }
 
-    this.lastPaintTheme = theme;
-    this.lastContentTop = contentTop;
-    this.lastScrollLeft = scrollLeft;
-    this.lastClientW = clientW;
-    this.lastClientH = clientH;
-    this.lastActiveSheet = activeSheet;
-    this.lastSelVersion = selVersion;
-    this.lastHighlightVersion = this.highlightVersion;
-    this.lastPresenceVersion = this.presenceVersion;
-    this.lastCutVersion = this.cutVersion;
-    this.lastFlashVersion = this.flashVersion;
-    this.lastSearchVersion = searchVersion;
-    this.lastGeometryVersion = geometryVersion;
-    this.lastPaintNotes = notes;
-    this.lastAutoFilter = autoFilter;
-    this.lastValidationRules = validationRules;
-    this.lastFilters = filters;
-    this.lastSearchActive = searchActive;
-    this.lastEditing = editing;
-    this.lastFillPresent = fillPresent;
-    this.lastFillR0 = fillR0;
-    this.lastFillC0 = fillC0;
-    this.lastFillR1 = fillR1;
-    this.lastFillC1 = fillC1;
-    this.lastFillTip = fillTip;
-    this.lastAutoFillTarget = autoFillTarget;
+    this.last_paint_theme = theme;
+    this.last_content_top = content_top;
+    this.last_scroll_left = scroll_left;
+    this.last_client_w = client_w;
+    this.last_client_h = client_h;
+    this.last_active_sheet = active_sheet;
+    this.last_sel_version = sel_version;
+    this.last_highlight_version = this.highlight_version;
+    this.last_presence_version = this.presence_version;
+    this.last_cut_version = this.cut_version;
+    this.last_flash_version = this.flash_version;
+    this.last_search_version = search_version;
+    this.last_geometry_version = geometry_version;
+    this.last_paint_notes = notes;
+    this.last_auto_filter = auto_filter;
+    this.last_validation_rules = validation_rules;
+    this.last_filters = filters;
+    this.last_search_active = search_active;
+    this.last_editing = editing;
+    this.last_fill_present = fill_present;
+    this.last_fill_r0 = fill_r0;
+    this.last_fill_c0 = fill_c0;
+    this.last_fill_r1 = fill_r1;
+    this.last_fill_c1 = fill_c1;
+    this.last_fill_tip = fill_tip;
+    this.last_auto_fill_target = auto_fill_target;
     return false;
   }
 
-  private paintHighlights(
+  private paint_highlights(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const activeSheet = this.deps.activeSheet();
+    const active_sheet = this.deps.activeSheet();
 
-    const manualHighlights = this.manualHighlights;
-    if (manualHighlights) {
-      for (const range of manualHighlights.ranges) {
-        if (range.sheet !== activeSheet) continue;
-        this.appendRange(
+    const manual_highlights = this.manual_highlights;
+    if (manual_highlights) {
+      for (const range of manual_highlights.ranges) {
+        if (range.sheet !== active_sheet) continue;
+        this.append_range(
           Math.min(range.start.row, range.end.row),
           Math.min(range.start.col, range.end.col),
           Math.max(range.start.row, range.end.row),
           Math.max(range.start.col, range.end.col),
-          range.color ?? manualHighlights.color,
+          range.color ?? manual_highlights.color,
           "transparent",
           theme,
           sheet,
-          contentTop,
-          scrollLeft,
-          clientW,
-          clientH,
+          content_top,
+          scroll_left,
+          client_w,
+          client_h,
         );
       }
     }
 
-    const searchMatches = this.deps.searchMatches();
-    if (searchMatches.sheet !== activeSheet) return;
-    this.ensureMatchIndex(searchMatches, activeSheet);
-    this.paintSearchMatches(searchMatches, theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    const search_matches = this.deps.searchMatches();
+    if (search_matches.sheet !== active_sheet) return;
+    this.ensure_match_index(search_matches, active_sheet);
+    this.paint_search_matches(
+      search_matches,
+      theme,
+      sheet,
+      content_top,
+      scroll_left,
+      client_w,
+      client_h,
+    );
   }
 
   /**
@@ -658,22 +666,22 @@ export class OverlayPainter {
    * used to do, but it now runs only on search, sort, filter and geometry
    * changes instead of on every scroll step.
    */
-  private ensureMatchIndex(matches: SearchMatchSet, sheet: SheetId): void {
-    const searchVersion = this.deps.searchVersion();
-    const geometryVersion = this.deps.geometryVersion();
+  private ensure_match_index(matches: SearchMatchSet, sheet: SheetId): void {
+    const search_version = this.deps.searchVersion();
+    const geometry_version = this.deps.geometryVersion();
     if (
-      this.matchIndexSet === matches &&
-      this.matchIndexSheet === sheet &&
-      this.matchIndexVersion === searchVersion &&
-      this.matchIndexGeometry === geometryVersion
+      this.match_index_set === matches &&
+      this.match_index_sheet === sheet &&
+      this.match_index_version === search_version &&
+      this.match_index_geometry === geometry_version
     ) {
       return;
     }
-    this.matchIndex.buildFromMatches(matches, this.deps.toViewRow);
-    this.matchIndexSet = matches;
-    this.matchIndexSheet = sheet;
-    this.matchIndexVersion = searchVersion;
-    this.matchIndexGeometry = geometryVersion;
+    this.match_index.buildFromMatches(matches, this.deps.toViewRow);
+    this.match_index_set = matches;
+    this.match_index_sheet = sheet;
+    this.match_index_version = search_version;
+    this.match_index_geometry = geometry_version;
   }
 
   /**
@@ -682,107 +690,107 @@ export class OverlayPainter {
    * band lookup is two binary searches, and the rects keep match order so a
    * sorted view paints the same DOM order a full scan produced.
    */
-  private paintSearchMatches(
+  private paint_search_matches(
     matches: SearchMatchSet,
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const index = this.matchIndex;
+    const index = this.match_index;
     if (index.count === 0) return;
 
     const active = this.deps.searchActive();
-    const { fr, frozenH } = this.deps.freeze();
-    const offsetOf = this.deps.rowOffsetOf;
-    const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
-    const bodyStart = Math.max(frozenEnd, index.bandStart(contentTop + frozenH, offsetOf));
-    const bodyEnd = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
+    const { fr, frozenH: frozen_h } = this.deps.freeze();
+    const offset_of = this.deps.rowOffsetOf;
+    const frozen_end = fr > 0 ? index.lowerBoundRow(fr) : 0;
+    const body_start = Math.max(frozen_end, index.bandStart(content_top + frozen_h, offset_of));
+    const body_end = index.lowerBoundOffset(content_top + client_h - theme.headerHeight, offset_of);
 
     if (index.isOrdered) {
-      for (let position = 0; position < frozenEnd; position++) {
-        this.appendSearchMatch(
+      for (let position = 0; position < frozen_end; position++) {
+        this.append_search_match(
           matches,
           position,
           active,
           theme,
           sheet,
-          contentTop,
-          scrollLeft,
-          clientW,
-          clientH,
+          content_top,
+          scroll_left,
+          client_w,
+          client_h,
         );
       }
-      for (let position = bodyStart; position < bodyEnd; position++) {
-        this.appendSearchMatch(
+      for (let position = body_start; position < body_end; position++) {
+        this.append_search_match(
           matches,
           position,
           active,
           theme,
           sheet,
-          contentTop,
-          scrollLeft,
-          clientW,
-          clientH,
+          content_top,
+          scroll_left,
+          client_w,
+          client_h,
         );
       }
       return;
     }
 
-    const order = this.matchPaintOrder;
+    const order = this.match_paint_order;
     order.length = 0;
-    for (let position = 0; position < frozenEnd; position++) order.push(position);
-    for (let position = bodyStart; position < bodyEnd; position++) order.push(position);
+    for (let position = 0; position < frozen_end; position++) order.push(position);
+    for (let position = body_start; position < body_end; position++) order.push(position);
     order.sort((left, right) => index.itemAt(left) - index.itemAt(right));
     for (const position of order) {
-      this.appendSearchMatch(
+      this.append_search_match(
         matches,
         position,
         active,
         theme,
         sheet,
-        contentTop,
-        scrollLeft,
-        clientW,
-        clientH,
+        content_top,
+        scroll_left,
+        client_w,
+        client_h,
       );
     }
   }
 
-  private appendSearchMatch(
+  private append_search_match(
     matches: SearchMatchSet,
     position: number,
     active: number,
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const viewRow = this.matchIndex.rowAt(position);
-    const matchIndex = this.matchIndex.itemAt(position);
-    const col = matches.colAt(matchIndex);
-    const border = matchIndex === active ? theme.searchActiveMatch : "transparent";
-    this.appendRange(
-      viewRow,
+    const view_row = this.match_index.rowAt(position);
+    const match_index = this.match_index.itemAt(position);
+    const col = matches.colAt(match_index);
+    const border = match_index === active ? theme.searchActiveMatch : "transparent";
+    this.append_range(
+      view_row,
       col,
-      viewRow,
+      view_row,
       col,
       theme.searchMatch,
       border,
       theme,
       sheet,
-      contentTop,
-      scrollLeft,
-      clientW,
-      clientH,
+      content_top,
+      scroll_left,
+      client_w,
+      client_h,
     );
   }
 
-  private appendRange(
+  private append_range(
     r0: number,
     c0: number,
     r1: number,
@@ -791,12 +799,12 @@ export class OverlayPainter {
     border: string,
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    this.appendClampedRange(
+    this.append_clamped_range(
       r0,
       c0,
       r1,
@@ -805,10 +813,10 @@ export class OverlayPainter {
       border,
       theme,
       sheet,
-      contentTop,
-      scrollLeft,
-      clientW,
-      clientH,
+      content_top,
+      scroll_left,
+      client_w,
+      client_h,
     );
   }
 
@@ -818,7 +826,7 @@ export class OverlayPainter {
    * positioned with its zone's scroll offsets and clamped to its zone so
    * scrolled body content never bleeds into a pinned band.
    */
-  private appendClampedRange(
+  private append_clamped_range(
     r0: number,
     c0: number,
     r1: number,
@@ -827,98 +835,103 @@ export class OverlayPainter {
     border: string,
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const { fr, frozenH, frozenW, firstBodyCol } = this.deps.freeze();
+    const {
+      fr,
+      frozenH: frozen_h,
+      frozenW: frozen_w,
+      firstBodyCol: first_body_col,
+    } = this.deps.freeze();
     const g = theme.rowHeaderWidth;
     const hh = theme.headerHeight;
 
-    const rowSegs: Array<{ r0: number; r1: number; frozen: boolean }> = [];
-    if (fr > 0 && r0 < fr) rowSegs.push({ r0, r1: Math.min(r1, fr - 1), frozen: true });
-    if (r1 >= fr) rowSegs.push({ r0: Math.max(r0, fr), r1, frozen: false });
+    const row_segs: Array<{ r0: number; r1: number; frozen: boolean }> = [];
+    if (fr > 0 && r0 < fr) row_segs.push({ r0, r1: Math.min(r1, fr - 1), frozen: true });
+    if (r1 >= fr) row_segs.push({ r0: Math.max(r0, fr), r1, frozen: false });
 
-    const hasFrozenCols = frozenW > 0;
-    const colSegs: Array<{ c0: number; c1: number; frozen: boolean }> = [];
-    if (hasFrozenCols && c0 < firstBodyCol) {
-      colSegs.push({ c0, c1: Math.min(c1, firstBodyCol - 1), frozen: true });
+    const has_frozen_cols = frozen_w > 0;
+    const col_segs: Array<{ c0: number; c1: number; frozen: boolean }> = [];
+    if (has_frozen_cols && c0 < first_body_col) {
+      col_segs.push({ c0, c1: Math.min(c1, first_body_col - 1), frozen: true });
     }
-    if (!hasFrozenCols || c1 >= firstBodyCol) {
-      colSegs.push({ c0: hasFrozenCols ? Math.max(c0, firstBodyCol) : c0, c1, frozen: false });
+    if (!has_frozen_cols || c1 >= first_body_col) {
+      col_segs.push({ c0: has_frozen_cols ? Math.max(c0, first_body_col) : c0, c1, frozen: false });
     }
 
-    for (const rs of rowSegs) {
-      const rowScroll = rs.frozen ? 0 : contentTop;
-      const top = hh + this.deps.rowOffsetOf(rs.r0) - rowScroll;
-      const bottom = hh + this.deps.rowOffsetOf(rs.r1 + 1) - rowScroll;
+    for (const rs of row_segs) {
+      const row_scroll = rs.frozen ? 0 : content_top;
+      const top = hh + this.deps.rowOffsetOf(rs.r0) - row_scroll;
+      const bottom = hh + this.deps.rowOffsetOf(rs.r1 + 1) - row_scroll;
       // Pinned bands clamp hard on both edges; the body clamps only against
       // the band (the viewport edge is handled by overlay overflow).
-      const clipTop = rs.frozen ? hh : hh + frozenH;
-      const clipBottom = rs.frozen ? hh + frozenH : Number.POSITIVE_INFINITY;
-      const cTop = Math.max(clipTop, top);
-      const cBottom = Math.min(clipBottom, bottom);
-      if (cBottom <= cTop || top >= clientH) continue;
+      const clip_top = rs.frozen ? hh : hh + frozen_h;
+      const clip_bottom = rs.frozen ? hh + frozen_h : Number.POSITIVE_INFINITY;
+      const c_top = Math.max(clip_top, top);
+      const c_bottom = Math.min(clip_bottom, bottom);
+      if (c_bottom <= c_top || top >= client_h) continue;
 
-      for (const cs of colSegs) {
-        const colScroll = cs.frozen ? 0 : scrollLeft;
-        const left = g + this.deps.colLeftOf(cs.c0) - colScroll;
-        const right = g + this.colRight(cs.c1, sheet) - colScroll;
-        const clipLeft = cs.frozen ? g : g + frozenW;
-        const clipRight = cs.frozen ? g + frozenW : Number.POSITIVE_INFINITY;
-        const cLeft = Math.max(clipLeft, left);
-        const cRight = Math.min(clipRight, right);
-        if (cRight <= cLeft || left >= clientW) continue;
+      for (const cs of col_segs) {
+        const col_scroll = cs.frozen ? 0 : scroll_left;
+        const left = g + this.deps.colLeftOf(cs.c0) - col_scroll;
+        const right = g + this.col_right(cs.c1, sheet) - col_scroll;
+        const clip_left = cs.frozen ? g : g + frozen_w;
+        const clip_right = cs.frozen ? g + frozen_w : Number.POSITIVE_INFINITY;
+        const c_left = Math.max(clip_left, left);
+        const c_right = Math.min(clip_right, right);
+        if (c_right <= c_left || left >= client_w) continue;
 
-        this.acquireRect(cLeft, cTop, cRight - cLeft, cBottom - cTop, fill, border);
+        this.acquire_rect(c_left, c_top, c_right - c_left, c_bottom - c_top, fill, border);
       }
     }
   }
 
-  private paintPresence(
+  private paint_presence(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     if (sheet.rowCount <= 0 || sheet.columns.length <= 0) return;
-    const activeSheet = this.deps.activeSheet();
-    const maxRow = sheet.rowCount - 1;
-    const maxCol = sheet.columns.length - 1;
+    const active_sheet = this.deps.activeSheet();
+    const max_row = sheet.rowCount - 1;
+    const max_col = sheet.columns.length - 1;
 
-    for (const presence of this.presenceOverlays) {
-      if (presence.activeSheet !== activeSheet) continue;
-      const rangeCount = Math.min(presence.ranges.length, 8);
-      let labelPainted = false;
-      for (let rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++) {
-        const range = presence.ranges[rangeIndex]!;
-        if (range.sheet !== activeSheet) continue;
+    for (const presence of this.presence_overlays) {
+      if (presence.activeSheet !== active_sheet) continue;
+      const range_count = Math.min(presence.ranges.length, 8);
+      let label_painted = false;
+      for (let range_index = 0; range_index < range_count; range_index++) {
+        const range = presence.ranges[range_index]!;
+        if (range.sheet !== active_sheet) continue;
 
-        const dataR0 = Math.max(0, Math.min(maxRow, Math.min(range.start.row, range.end.row)));
-        const dataR1 = Math.max(0, Math.min(maxRow, Math.max(range.start.row, range.end.row)));
-        const viewR0 = this.deps.toViewRow(dataR0);
-        const viewR1 = this.deps.toViewRow(dataR1);
-        if (viewR0 === null || viewR1 === null) continue;
-        const c0 = Math.max(0, Math.min(maxCol, Math.min(range.start.col, range.end.col)));
-        const c1 = Math.max(0, Math.min(maxCol, Math.max(range.start.col, range.end.col)));
+        const data_r0 = Math.max(0, Math.min(max_row, Math.min(range.start.row, range.end.row)));
+        const data_r1 = Math.max(0, Math.min(max_row, Math.max(range.start.row, range.end.row)));
+        const view_r0 = this.deps.toViewRow(data_r0);
+        const view_r1 = this.deps.toViewRow(data_r1);
+        if (view_r0 === null || view_r1 === null) continue;
+        const c0 = Math.max(0, Math.min(max_col, Math.min(range.start.col, range.end.col)));
+        const c1 = Math.max(0, Math.min(max_col, Math.max(range.start.col, range.end.col)));
 
         const before = this.cursor;
-        this.appendClampedRange(
-          Math.min(viewR0, viewR1),
+        this.append_clamped_range(
+          Math.min(view_r0, view_r1),
           c0,
-          Math.max(viewR0, viewR1),
+          Math.max(view_r0, view_r1),
           c1,
           presence.tint,
           presence.color.css,
           theme,
           sheet,
-          contentTop,
-          scrollLeft,
-          clientW,
-          clientH,
+          content_top,
+          scroll_left,
+          client_w,
+          client_h,
         );
 
         for (let index = before; index < this.cursor; index++) {
@@ -929,96 +942,103 @@ export class OverlayPainter {
           rect.style.outlineWidth = "2px";
         }
 
-        const firstVisibleSegment = this.pool[before];
-        if (!labelPainted && firstVisibleSegment) {
-          labelPainted = this.paintPresenceLabel(
+        const first_visible_segment = this.pool[before];
+        if (!label_painted && first_visible_segment) {
+          label_painted = this.paint_presence_label(
             presence,
-            firstVisibleSegment,
+            first_visible_segment,
             theme,
-            clientW,
-            clientH,
+            client_w,
+            client_h,
           );
         }
       }
     }
   }
 
-  private paintPresenceLabel(
+  private paint_presence_label(
     presence: NormalizedPresenceOverlay,
     segment: HTMLDivElement,
     theme: Theme,
-    clientW: number,
-    clientH: number,
+    client_w: number,
+    client_h: number,
   ): boolean {
-    const segmentLeft = Number.parseFloat(segment.style.left);
-    const segmentTop = Number.parseFloat(segment.style.top);
-    const segmentWidth = Number.parseFloat(segment.style.width);
-    const minLeft = theme.rowHeaderWidth;
-    const minTop = theme.headerHeight;
-    const availableWidth = Math.max(0, clientW - minLeft);
-    const labelWidth = Math.min(
+    const segment_left = Number.parseFloat(segment.style.left);
+    const segment_top = Number.parseFloat(segment.style.top);
+    const segment_width = Number.parseFloat(segment.style.width);
+    const min_left = theme.rowHeaderWidth;
+    const min_top = theme.headerHeight;
+    const available_width = Math.max(0, client_w - min_left);
+    const label_width = Math.min(
       PRESENCE_LABEL_MAX_WIDTH,
-      availableWidth,
+      available_width,
       Math.max(28, Math.ceil(presence.label.length * 6.6) + 14),
     );
-    const maxLabelLeft = Math.max(minLeft, clientW - labelWidth);
-    const preferredLeft = Math.min(Math.max(segmentLeft, minLeft), maxLabelLeft);
-    const labelTop = segmentTop - PRESENCE_LABEL_HEIGHT - 2;
-    if (labelWidth >= 28 && labelTop >= 0 && labelTop + PRESENCE_LABEL_HEIGHT <= minTop) {
-      if (this.reservePresenceLabel(preferredLeft, labelTop, labelWidth, PRESENCE_LABEL_HEIGHT)) {
-        this.acquirePresenceLabel(
+    const max_label_left = Math.max(min_left, client_w - label_width);
+    const preferred_left = Math.min(Math.max(segment_left, min_left), max_label_left);
+    const label_top = segment_top - PRESENCE_LABEL_HEIGHT - 2;
+    if (label_width >= 28 && label_top >= 0 && label_top + PRESENCE_LABEL_HEIGHT <= min_top) {
+      if (
+        this.reserve_presence_label(preferred_left, label_top, label_width, PRESENCE_LABEL_HEIGHT)
+      ) {
+        this.acquire_presence_label(
           presence,
           theme,
           "chip",
-          preferredLeft,
-          labelTop,
-          labelWidth,
+          preferred_left,
+          label_top,
+          label_width,
           PRESENCE_LABEL_HEIGHT,
         );
         return true;
       }
 
-      for (let candidateLeft = minLeft; candidateLeft <= maxLabelLeft; candidateLeft += 4) {
+      for (let candidate_left = min_left; candidate_left <= max_label_left; candidate_left += 4) {
         if (
-          !this.reservePresenceLabel(candidateLeft, labelTop, labelWidth, PRESENCE_LABEL_HEIGHT)
+          !this.reserve_presence_label(
+            candidate_left,
+            label_top,
+            label_width,
+            PRESENCE_LABEL_HEIGHT,
+          )
         ) {
           continue;
         }
 
-        this.acquirePresenceLabel(
+        this.acquire_presence_label(
           presence,
           theme,
           "chip",
-          candidateLeft,
-          labelTop,
-          labelWidth,
+          candidate_left,
+          label_top,
+          label_width,
           PRESENCE_LABEL_HEIGHT,
         );
         return true;
       }
     }
 
-    const markerTop = Math.min(
-      Math.max(segmentTop + 1, minTop),
-      Math.max(minTop, clientH - PRESENCE_MARKER_SIZE),
+    const marker_top = Math.min(
+      Math.max(segment_top + 1, min_top),
+      Math.max(min_top, client_h - PRESENCE_MARKER_SIZE),
     );
-    const markerMinLeft = Math.min(
-      Math.max(segmentLeft + 2, minLeft),
-      Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE),
+    const marker_min_left = Math.min(
+      Math.max(segment_left + 2, min_left),
+      Math.max(min_left, client_w - PRESENCE_MARKER_SIZE),
     );
-    const markerMaxLeft = Math.min(
-      Math.max(segmentLeft + segmentWidth - PRESENCE_MARKER_SIZE - 2, markerMinLeft),
-      Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE),
+    const marker_max_left = Math.min(
+      Math.max(segment_left + segment_width - PRESENCE_MARKER_SIZE - 2, marker_min_left),
+      Math.max(min_left, client_w - PRESENCE_MARKER_SIZE),
     );
     for (
-      let markerLeft = markerMaxLeft;
-      markerLeft >= markerMinLeft;
-      markerLeft -= PRESENCE_MARKER_SIZE
+      let marker_left = marker_max_left;
+      marker_left >= marker_min_left;
+      marker_left -= PRESENCE_MARKER_SIZE
     ) {
       if (
-        !this.reservePresenceLabel(
-          markerLeft,
-          markerTop,
+        !this.reserve_presence_label(
+          marker_left,
+          marker_top,
           PRESENCE_MARKER_SIZE,
           PRESENCE_MARKER_SIZE,
         )
@@ -1026,12 +1046,12 @@ export class OverlayPainter {
         continue;
       }
 
-      this.acquirePresenceLabel(
+      this.acquire_presence_label(
         presence,
         theme,
         "marker",
-        markerLeft,
-        markerTop,
+        marker_left,
+        marker_top,
         PRESENCE_MARKER_SIZE,
         PRESENCE_MARKER_SIZE,
       );
@@ -1039,17 +1059,17 @@ export class OverlayPainter {
     }
 
     if (theme.headerHeight < PRESENCE_MARKER_SIZE) return false;
-    const railMarkerTop = Math.max(0, (theme.headerHeight - PRESENCE_MARKER_SIZE) / 2);
-    const maxRailMarkerLeft = Math.max(minLeft, clientW - PRESENCE_MARKER_SIZE);
+    const rail_marker_top = Math.max(0, (theme.headerHeight - PRESENCE_MARKER_SIZE) / 2);
+    const max_rail_marker_left = Math.max(min_left, client_w - PRESENCE_MARKER_SIZE);
     for (
-      let markerLeft = minLeft;
-      markerLeft <= maxRailMarkerLeft;
-      markerLeft += PRESENCE_MARKER_SIZE
+      let marker_left = min_left;
+      marker_left <= max_rail_marker_left;
+      marker_left += PRESENCE_MARKER_SIZE
     ) {
       if (
-        !this.reservePresenceLabel(
-          markerLeft,
-          railMarkerTop,
+        !this.reserve_presence_label(
+          marker_left,
+          rail_marker_top,
           PRESENCE_MARKER_SIZE,
           PRESENCE_MARKER_SIZE,
         )
@@ -1057,12 +1077,12 @@ export class OverlayPainter {
         continue;
       }
 
-      this.acquirePresenceLabel(
+      this.acquire_presence_label(
         presence,
         theme,
         "marker",
-        markerLeft,
-        railMarkerTop,
+        marker_left,
+        rail_marker_top,
         PRESENCE_MARKER_SIZE,
         PRESENCE_MARKER_SIZE,
       );
@@ -1072,30 +1092,35 @@ export class OverlayPainter {
     return false;
   }
 
-  private reservePresenceLabel(left: number, top: number, width: number, height: number): boolean {
+  private reserve_presence_label(
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ): boolean {
     const right = left + width;
     const bottom = top + height;
-    for (let index = 0; index < this.presenceLabelBoundsCount; index++) {
+    for (let index = 0; index < this.presence_label_bounds_count; index++) {
       const offset = index * 4;
       if (
-        right > this.presenceLabelBounds[offset]! &&
-        left < this.presenceLabelBounds[offset + 2]! &&
-        bottom > this.presenceLabelBounds[offset + 1]! &&
-        top < this.presenceLabelBounds[offset + 3]!
+        right > this.presence_label_bounds[offset]! &&
+        left < this.presence_label_bounds[offset + 2]! &&
+        bottom > this.presence_label_bounds[offset + 1]! &&
+        top < this.presence_label_bounds[offset + 3]!
       ) {
         return false;
       }
     }
-    const offset = this.presenceLabelBoundsCount * 4;
-    this.presenceLabelBounds[offset] = left;
-    this.presenceLabelBounds[offset + 1] = top;
-    this.presenceLabelBounds[offset + 2] = right;
-    this.presenceLabelBounds[offset + 3] = bottom;
-    this.presenceLabelBoundsCount += 1;
+    const offset = this.presence_label_bounds_count * 4;
+    this.presence_label_bounds[offset] = left;
+    this.presence_label_bounds[offset + 1] = top;
+    this.presence_label_bounds[offset + 2] = right;
+    this.presence_label_bounds[offset + 3] = bottom;
+    this.presence_label_bounds_count += 1;
     return true;
   }
 
-  private acquirePresenceLabel(
+  private acquire_presence_label(
     presence: NormalizedPresenceOverlay,
     theme: Theme,
     kind: "chip" | "marker",
@@ -1104,7 +1129,7 @@ export class OverlayPainter {
     width: number,
     height: number,
   ): void {
-    let label = this.presenceLabelPool[this.presenceLabelCursor];
+    let label = this.presence_label_pool[this.presence_label_cursor];
     if (!label) {
       label = document.createElement("div");
       label.className = "sheetwrite-presence-label";
@@ -1113,12 +1138,12 @@ export class OverlayPainter {
       label.style.pointerEvents = "none";
       label.style.boxSizing = "border-box";
       label.style.zIndex = "3";
-      this.presenceLabelPool[this.presenceLabelCursor] = label;
+      this.presence_label_pool[this.presence_label_cursor] = label;
       this.overlay.appendChild(label);
     } else if (label.style.display === "none") {
       label.style.display = "";
     }
-    this.presenceLabelCursor += 1;
+    this.presence_label_cursor += 1;
 
     label.dataset.sheetwritePresenceLabel = presence.actorId;
     label.dataset.presenceKind = kind;
@@ -1146,79 +1171,82 @@ export class OverlayPainter {
    * when the note list or the view order changes, never on scroll, and the band
    * lookup keeps the indicators in note order.
    */
-  private paintNotes(
+  private paint_notes(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const notes = sheet.notes;
     if (!notes || notes.length === 0) return;
 
-    const geometryVersion = this.deps.geometryVersion();
-    if (this.noteIndexNotes !== notes || this.noteIndexGeometry !== geometryVersion) {
-      this.noteIndex.buildFromNotes(notes, this.deps.toViewRow);
-      this.noteIndexNotes = notes;
-      this.noteIndexGeometry = geometryVersion;
+    const geometry_version = this.deps.geometryVersion();
+    if (this.note_index_notes !== notes || this.note_index_geometry !== geometry_version) {
+      this.note_index.buildFromNotes(notes, this.deps.toViewRow);
+      this.note_index_notes = notes;
+      this.note_index_geometry = geometry_version;
     }
 
-    const index = this.noteIndex;
+    const index = this.note_index;
     if (index.count === 0) return;
 
     // Notes in pinned rows stay at their pinned position, so they are always in
     // the painted band; body notes are found by their scrolled content offset.
     const { fr } = this.deps.freeze();
-    const offsetOf = this.deps.rowOffsetOf;
-    const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
+    const offset_of = this.deps.rowOffsetOf;
+    const frozen_end = fr > 0 ? index.lowerBoundRow(fr) : 0;
     // Indicators draw over the header band, so the upper edge of the searched
     // range sits one header height above the scroll offset.
-    const start = Math.max(frozenEnd, index.bandStart(contentTop - theme.headerHeight, offsetOf));
-    const end = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
+    const start = Math.max(
+      frozen_end,
+      index.bandStart(content_top - theme.headerHeight, offset_of),
+    );
+    const end = index.lowerBoundOffset(content_top + client_h - theme.headerHeight, offset_of);
 
     if (index.isOrdered) {
-      for (let position = 0; position < frozenEnd; position++) {
-        this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+      for (let position = 0; position < frozen_end; position++) {
+        this.append_note_indicator(notes, position, content_top, scroll_left, client_w, client_h);
       }
       for (let position = start; position < end; position++) {
-        this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+        this.append_note_indicator(notes, position, content_top, scroll_left, client_w, client_h);
       }
       return;
     }
 
-    const order = this.notePaintOrder;
+    const order = this.note_paint_order;
     order.length = 0;
-    for (let position = 0; position < frozenEnd; position++) order.push(position);
+    for (let position = 0; position < frozen_end; position++) order.push(position);
     for (let position = start; position < end; position++) order.push(position);
     order.sort((left, right) => index.itemAt(left) - index.itemAt(right));
     for (const position of order) {
-      this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+      this.append_note_indicator(notes, position, content_top, scroll_left, client_w, client_h);
     }
   }
 
-  private appendNoteIndicator(
+  private append_note_indicator(
     notes: readonly CellNote[],
     position: number,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const note = notes[this.noteIndex.itemAt(position)];
+    const note = notes[this.note_index.itemAt(position)];
     if (!note) return;
     const rect = this.deps.screenRect(
-      this.noteIndex.rowAt(position),
+      this.note_index.rowAt(position),
       note.addr.col,
-      contentTop,
-      scrollLeft,
+      content_top,
+      scroll_left,
     );
-    if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= clientW || rect.y >= clientH) {
+    if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= client_w || rect.y >= client_h) {
       return;
     }
     // The marker scales with the zoom, as the cell does.
     const size = Math.min(NOTE_INDICATOR_SIZE * this.deps.zoom(), rect.w, rect.h);
-    const indicator = this.acquireRect(
+    const indicator = this.acquire_rect(
       rect.x + rect.w - size,
       rect.y,
       size,
@@ -1229,35 +1257,35 @@ export class OverlayPainter {
     indicator.style.clipPath = "polygon(0 0, 100% 0, 100% 100%)";
   }
 
-  private readonly appendSelectionRect = (rect: SelRect): void => {
-    const theme = this.paintTheme;
-    const sheet = this.paintSheet;
+  private readonly append_selection_rect = (rect: SelRect): void => {
+    const theme = this.paint_theme;
+    const sheet = this.paint_sheet;
     if (!theme || !sheet) return;
 
     let { r0, c0, r1, c1 } = rect;
     const merges = sheet.merges;
     if (merges) {
-      const mergeIndex = prepareMergeIndex(merges);
+      const merge_index = prepareMergeIndex(merges);
       let expanded: boolean;
       do {
         expanded = false;
-        for (const merge of intersectingMerges(mergeIndex, r0, r1 + 1, [c0, c1])) {
+        for (const merge of intersectingMerges(merge_index, r0, r1 + 1, [c0, c1])) {
           if (merge.r1 < r0 || merge.r0 > r1 || merge.c1 < c0 || merge.c0 > c1) continue;
-          const nextR0 = Math.min(r0, merge.r0);
-          const nextC0 = Math.min(c0, merge.c0);
-          const nextR1 = Math.max(r1, merge.r1);
-          const nextC1 = Math.max(c1, merge.c1);
-          if (nextR0 === r0 && nextC0 === c0 && nextR1 === r1 && nextC1 === c1) continue;
-          r0 = nextR0;
-          c0 = nextC0;
-          r1 = nextR1;
-          c1 = nextC1;
+          const next_r0 = Math.min(r0, merge.r0);
+          const next_c0 = Math.min(c0, merge.c0);
+          const next_r1 = Math.max(r1, merge.r1);
+          const next_c1 = Math.max(c1, merge.c1);
+          if (next_r0 === r0 && next_c0 === c0 && next_r1 === r1 && next_c1 === c1) continue;
+          r0 = next_r0;
+          c0 = next_c0;
+          r1 = next_r1;
+          c1 = next_c1;
           expanded = true;
         }
       } while (expanded);
     }
 
-    this.appendClampedRange(
+    this.append_clamped_range(
       r0,
       c0,
       r1,
@@ -1266,70 +1294,76 @@ export class OverlayPainter {
       theme.selectionBorder,
       theme,
       sheet,
-      this.paintContentTop,
-      this.paintScrollLeft,
-      this.paintClientW,
-      this.paintClientH,
+      this.paint_content_top,
+      this.paint_scroll_left,
+      this.paint_client_w,
+      this.paint_client_h,
     );
   };
 
-  private paintFocus(
+  private paint_focus(
     theme: Theme,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const focus = this.deps.selection().focusCell;
     if (!focus || this.deps.isEditing()) return;
 
-    const { fr, frozenH, frozenW, firstBodyCol } = this.deps.freeze();
-    const r = this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft);
+    const {
+      fr,
+      frozenH: frozen_h,
+      frozenW: frozen_w,
+      firstBodyCol: first_body_col,
+    } = this.deps.freeze();
+    const r = this.deps.screenRect(focus.row, focus.col, content_top, scroll_left);
     // A body-zone focus cell scrolled under a pinned band is hidden, not
     // clamped onto the band.
-    const clampTop = fr > 0 && focus.row >= fr ? theme.headerHeight + frozenH : theme.headerHeight;
-    const clampLeft =
-      frozenW > 0 && focus.col >= firstBodyCol
-        ? theme.rowHeaderWidth + frozenW
+    const clamp_top =
+      fr > 0 && focus.row >= fr ? theme.headerHeight + frozen_h : theme.headerHeight;
+    const clamp_left =
+      frozen_w > 0 && focus.col >= first_body_col
+        ? theme.rowHeaderWidth + frozen_w
         : theme.rowHeaderWidth;
-    if (r.y + r.h <= clampTop || r.y >= clientH || r.x + r.w <= clampLeft || r.x >= clientW) {
+    if (r.y + r.h <= clamp_top || r.y >= client_h || r.x + r.w <= clamp_left || r.x >= client_w) {
       return;
     }
 
-    const ring = this.acquireRect(
-      Math.max(clampLeft, r.x),
-      Math.max(clampTop, r.y),
-      r.w - Math.max(0, clampLeft - r.x),
-      r.h - Math.max(0, clampTop - r.y),
+    const ring = this.acquire_rect(
+      Math.max(clamp_left, r.x),
+      Math.max(clamp_top, r.y),
+      r.w - Math.max(0, clamp_left - r.x),
+      r.h - Math.max(0, clamp_top - r.y),
       "transparent",
       theme.selectionBorder,
     );
     ring.style.outlineWidth = "2px";
   }
 
-  private paintFillPreview(
+  private paint_fill_preview(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
+    content_top: number,
+    scroll_left: number,
   ): void {
-    const fillTarget = this.deps.fillTarget();
-    if (!fillTarget) return;
+    const fill_target = this.deps.fillTarget();
+    if (!fill_target) return;
 
     const before = this.cursor;
-    this.appendClampedRange(
-      fillTarget.r0,
-      fillTarget.c0,
-      fillTarget.r1,
-      fillTarget.c1,
+    this.append_clamped_range(
+      fill_target.r0,
+      fill_target.c0,
+      fill_target.r1,
+      fill_target.c1,
       "transparent",
       theme.selectionBorder,
       theme,
       sheet,
-      contentTop,
-      scrollLeft,
-      this.paintClientW,
-      this.paintClientH,
+      content_top,
+      scroll_left,
+      this.paint_client_w,
+      this.paint_client_h,
     );
     for (let i = before; i < this.cursor; i++) {
       const el = this.pool[i];
@@ -1337,13 +1371,13 @@ export class OverlayPainter {
     }
   }
 
-  private paintFillHandle(theme: Theme, contentTop: number, scrollLeft: number): void {
-    const fillHandle = this.deps.fillHandleScreen(contentTop, scrollLeft);
-    if (!fillHandle || this.deps.isEditing()) return;
+  private paint_fill_handle(theme: Theme, content_top: number, scroll_left: number): void {
+    const fill_handle = this.deps.fillHandleScreen(content_top, scroll_left);
+    if (!fill_handle || this.deps.isEditing()) return;
 
-    const sq = this.acquireRect(
-      fillHandle.x - 3,
-      fillHandle.y - 3,
+    const sq = this.acquire_rect(
+      fill_handle.x - 3,
+      fill_handle.y - 3,
       6,
       6,
       theme.selectionBorder,
@@ -1358,15 +1392,15 @@ export class OverlayPainter {
    * screen are drawn, on one canvas: the cost follows the viewport, not the
    * size of the fill.
    */
-  private paintFillValues(
+  private paint_fill_values(
     theme: Theme,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const area = this.deps.fillValuesArea();
-    let canvas = this.fillValues;
+    let canvas = this.fill_values;
     if (!area) {
       if (canvas) canvas.hidden = true;
       return;
@@ -1376,43 +1410,43 @@ export class OverlayPainter {
       canvas.className = "sheetwrite-fill-values";
       canvas.setAttribute("aria-hidden", "true");
       this.overlay.prepend(canvas);
-      this.fillValues = canvas;
+      this.fill_values = canvas;
     }
     const context = canvas.getContext("2d");
     if (!context) return;
     const ratio = window.devicePixelRatio || 1;
-    const width = Math.ceil(clientW * ratio);
-    const height = Math.ceil(clientH * ratio);
+    const width = Math.ceil(client_w * ratio);
+    const height = Math.ceil(client_h * ratio);
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
-      canvas.style.width = `${clientW}px`;
-      canvas.style.height = `${clientH}px`;
+      canvas.style.width = `${client_w}px`;
+      canvas.style.height = `${client_h}px`;
     }
     canvas.hidden = false;
     const zoom = this.deps.zoom();
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, clientW, clientH);
+    context.clearRect(0, 0, client_w, client_h);
     context.font = theme.font;
     context.fillStyle = theme.fg;
     context.globalAlpha = 0.45;
     context.textBaseline = "middle";
 
-    const { fr, frozenH } = this.deps.freeze();
+    const { fr, frozenH: frozen_h } = this.deps.freeze();
     const top = theme.headerHeight;
     // Pinned rows first, then the body rows from the first one on screen.
-    const bodyStart = Math.max(area.r0, fr, this.deps.rowAtOffset(contentTop));
+    const body_start = Math.max(area.r0, fr, this.deps.rowAtOffset(content_top));
     const rows: number[] = [];
     for (let row = area.r0; row <= Math.min(area.r1, fr - 1); row++) rows.push(row);
-    for (let row = bodyStart; row <= area.r1; row++) {
-      if (this.deps.screenRect(row, area.c0, contentTop, scrollLeft).y >= clientH) break;
+    for (let row = body_start; row <= area.r1; row++) {
+      if (this.deps.screenRect(row, area.c0, content_top, scroll_left).y >= client_h) break;
       rows.push(row);
     }
     for (const row of rows) {
-      const clip = row < fr ? top : top + frozenH;
+      const clip = row < fr ? top : top + frozen_h;
       for (let col = area.c0; col <= area.c1; col++) {
-        const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
-        if (rect.x >= clientW) break;
+        const rect = this.deps.screenRect(row, col, content_top, scroll_left);
+        if (rect.x >= client_w) break;
         if (rect.w <= 0 || rect.x + rect.w <= theme.rowHeaderWidth || rect.y + rect.h <= clip)
           continue;
         const value = this.deps.fillValueAt(row, col);
@@ -1432,19 +1466,19 @@ export class OverlayPainter {
   }
 
   /** Excel's tip beside the dragged fill handle: the value the last cell will get. */
-  private paintFillTip(): void {
+  private paint_fill_tip(): void {
     const tip = this.deps.fillTip();
     if (!tip) {
-      if (this.tipElement) this.tipElement.hidden = true;
+      if (this.tip_element) this.tip_element.hidden = true;
       return;
     }
-    let element = this.tipElement;
+    let element = this.tip_element;
     if (!element) {
       element = document.createElement("div");
       element.className = "sheetwrite-fill-tip";
       element.setAttribute("role", "tooltip");
       this.overlay.appendChild(element);
-      this.tipElement = element;
+      this.tip_element = element;
     }
     element.hidden = false;
     element.textContent = tip.text;
@@ -1453,16 +1487,16 @@ export class OverlayPainter {
   }
 
   /** The Auto Fill Options button just outside the bottom-right corner of the last fill. */
-  private paintAutoFillButton(
+  private paint_auto_fill_button(
     theme: Theme,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const target = this.deps.autoFillTarget();
     const corner = target
-      ? this.deps.screenRect(target.r1, target.c1, contentTop, scrollLeft)
+      ? this.deps.screenRect(target.r1, target.c1, content_top, scroll_left)
       : null;
     const x = corner ? corner.x + corner.w + 1 : 0;
     const y = corner ? corner.y + corner.h + 1 : 0;
@@ -1471,13 +1505,13 @@ export class OverlayPainter {
       this.deps.isEditing() ||
       x < theme.rowHeaderWidth ||
       y < theme.headerHeight ||
-      x >= clientW ||
-      y >= clientH
+      x >= client_w ||
+      y >= client_h
     ) {
-      if (this.autoFillButton) this.autoFillButton.hidden = true;
+      if (this.auto_fill_button) this.auto_fill_button.hidden = true;
       return;
     }
-    let button = this.autoFillButton;
+    let button = this.auto_fill_button;
     if (!button) {
       button = document.createElement("button");
       button.type = "button";
@@ -1494,29 +1528,29 @@ export class OverlayPainter {
         if (box) this.deps.openAutoFillOptions(box.left, box.bottom);
       });
       this.overlay.appendChild(button);
-      this.autoFillButton = button;
+      this.auto_fill_button = button;
     }
     button.hidden = false;
     button.style.transform = `translate(${x}px, ${y}px)`;
   }
 
-  private paintFlash(
+  private paint_flash(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const activeSheet = this.deps.activeSheet();
+    const active_sheet = this.deps.activeSheet();
     const tint = `color-mix(in srgb, ${theme.searchActiveMatch} 45%, transparent)`;
     for (const range of this.flash) {
-      if (range.sheet !== activeSheet) continue;
+      if (range.sheet !== active_sheet) continue;
       const first = this.deps.toViewRow(range.start.row);
       const last = this.deps.toViewRow(range.end.row);
       if (first === null || last === null) continue;
       const before = this.cursor;
-      this.appendClampedRange(
+      this.append_clamped_range(
         Math.min(first, last),
         Math.min(range.start.col, range.end.col),
         Math.max(first, last),
@@ -1525,10 +1559,10 @@ export class OverlayPainter {
         "transparent",
         theme,
         sheet,
-        contentTop,
-        scrollLeft,
-        clientW,
-        clientH,
+        content_top,
+        scroll_left,
+        client_w,
+        client_h,
       );
       for (let index = before; index < this.cursor; index++) {
         this.pool[index]?.setAttribute("data-sheetwrite-flash", "");
@@ -1542,22 +1576,22 @@ export class OverlayPainter {
    * motion. Every piece runs on the document timeline, so a repaint while
    * scrolling does not restart the dashes.
    */
-  private paintCutMark(
+  private paint_cut_mark(
     theme: Theme,
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
-    const mark = this.cutMark;
+    const mark = this.cut_mark;
     if (!mark || mark.sheet !== this.deps.activeSheet()) return;
     const first = this.deps.toViewRow(mark.start.row);
     const last = this.deps.toViewRow(mark.end.row);
     if (first === null || last === null) return;
 
     const before = this.cursor;
-    this.appendClampedRange(
+    this.append_clamped_range(
       Math.min(first, last),
       mark.start.col,
       Math.max(first, last),
@@ -1566,10 +1600,10 @@ export class OverlayPainter {
       "transparent",
       theme,
       sheet,
-      contentTop,
-      scrollLeft,
-      clientW,
-      clientH,
+      content_top,
+      scroll_left,
+      client_w,
+      client_h,
     );
     const color = theme.selectionBorder;
     const across = `linear-gradient(90deg, ${color} 50%, transparent 50%)`;
@@ -1594,7 +1628,7 @@ export class OverlayPainter {
     }
   }
 
-  private colRight(col: number, sheet: Sheet): number {
+  private col_right(col: number, sheet: Sheet): number {
     // Column widths persist in base units; display geometry is zoomed.
     return this.deps.colLeftOf(col) + (sheet.columns[col]?.width ?? 0) * this.deps.zoom();
   }
@@ -1604,12 +1638,12 @@ export class OverlayPainter {
    * right edge, and its glyph from the icon sheet: `filterArrow`, or
    * `filterActive` when its column is filtered.
    */
-  private paintFilterButtons(
+  private paint_filter_buttons(
     sheet: Sheet,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const range = sheet.autoFilter?.range;
     if (!range) return;
@@ -1618,16 +1652,16 @@ export class OverlayPainter {
 
     const filtered = new Set(sheet.filters?.map(([col]) => col));
     for (let col = range.start.col; col <= range.end.col; col++) {
-      const cell = this.deps.screenRect(row, col, contentTop, scrollLeft);
-      if (cell.w <= 0 || cell.x >= clientW || cell.y >= clientH) continue;
+      const cell = this.deps.screenRect(row, col, content_top, scroll_left);
+      if (cell.w <= 0 || cell.x >= client_w || cell.y >= client_h) continue;
       // A header row scrolled under the column headers shows no button.
       if (cell.x + cell.w <= 0 || cell.y < this.deps.theme().headerHeight) continue;
       const button = filterButtonRect(cell, this.deps.zoom());
-      const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      const el = this.acquire_rect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-autofilter-button";
       el.style.outlineStyle = "none";
       el.dataset.filtered = String(filtered.has(col));
-      const glyph = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      const glyph = this.acquire_rect(button.x, button.y, button.w, button.h, "", "transparent");
       glyph.className = "sheetwrite-icon sheetwrite-autofilter-glyph";
       glyph.style.outlineStyle = "none";
       glyph.style.setProperty("--sheetwrite-icon-size", `${button.w}px`);
@@ -1642,53 +1676,53 @@ export class OverlayPainter {
    * cell, starting at its middle. Screen readers hear the input message as
    * the cell's description (`aria-mirror.ts`).
    */
-  private paintValidation(
+  private paint_validation(
     theme: Theme,
-    contentTop: number,
-    scrollLeft: number,
-    clientW: number,
-    clientH: number,
+    content_top: number,
+    scroll_left: number,
+    client_w: number,
+    client_h: number,
   ): void {
     const focus = this.deps.selection().focusCell;
     const rule = focus ? this.deps.validationRuleAt(focus.row, focus.col) : undefined;
     const cell =
-      focus && rule ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft) : null;
+      focus && rule ? this.deps.screenRect(focus.row, focus.col, content_top, scroll_left) : null;
     if (
       !rule ||
       !cell ||
       cell.y + cell.h <= theme.headerHeight ||
-      cell.y >= clientH ||
+      cell.y >= client_h ||
       cell.x + cell.w <= theme.rowHeaderWidth ||
-      cell.x >= clientW
+      cell.x >= client_w
     ) {
-      this.inputMessage?.remove();
+      this.input_message?.remove();
       return;
     }
 
     if (hasListDropdown(rule)) {
       const button = listButtonRect(cell, this.deps.zoom());
-      const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      const el = this.acquire_rect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-list-button";
       el.style.outlineStyle = "none";
-      const glyph = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      const glyph = this.acquire_rect(button.x, button.y, button.w, button.h, "", "transparent");
       glyph.className = "sheetwrite-icon sheetwrite-list-glyph";
       glyph.style.outlineStyle = "none";
       glyph.style.setProperty("--sheetwrite-icon-size", `${button.w}px`);
       glyph.dataset.icon = "filterArrow";
     }
     if (!hasInputMessage(rule)) {
-      this.inputMessage?.remove();
+      this.input_message?.remove();
       return;
     }
 
-    let card = this.inputMessage;
+    let card = this.input_message;
     if (!card) {
       card = document.createElement("div");
       card.className = "sheetwrite-input-message";
       card.setAttribute("aria-hidden", "true");
       card.style.position = "absolute";
       card.style.pointerEvents = "none";
-      this.inputMessage = card;
+      this.input_message = card;
     }
     const title = document.createElement("strong");
     title.textContent = rule.inputTitle ?? "";
@@ -1708,7 +1742,7 @@ export class OverlayPainter {
    * so a div previously used as a focus ring (2px) or fill preview (dashed)
    * comes back clean; a hidden div is re-shown and any leftover cursor cleared.
    */
-  private acquireRect(
+  private acquire_rect(
     left: number,
     top: number,
     width: number,
@@ -1729,7 +1763,7 @@ export class OverlayPainter {
       el.style.display = "";
     }
     this.cursor++;
-    if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
+    if (el.hasAttribute("data-sheetwrite-cut")) end_cut_dashes(el);
 
     el.style.clipPath = "";
     if (el.className) el.className = "";
@@ -1759,10 +1793,10 @@ export class OverlayPainter {
   }
 
   /** Hide pool divs left over past `cursor` from earlier, busier passes. */
-  private hideSurplus(): void {
+  private hide_surplus(): void {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
-      if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
+      if (el.hasAttribute("data-sheetwrite-cut")) end_cut_dashes(el);
       el.removeAttribute("data-sheetwrite-presence");
       el.removeAttribute("data-sheetwrite-flash");
       // A hidden filter button must not stay one, for queries and styles alike.
@@ -1777,9 +1811,9 @@ export class OverlayPainter {
     }
   }
 
-  private hideSurplusPresenceLabels(): void {
-    for (let index = this.presenceLabelCursor; index < this.presenceLabelPool.length; index++) {
-      const label = this.presenceLabelPool[index]!;
+  private hide_surplus_presence_labels(): void {
+    for (let index = this.presence_label_cursor; index < this.presence_label_pool.length; index++) {
+      const label = this.presence_label_pool[index]!;
       label.removeAttribute("data-sheetwrite-presence-label");
       label.removeAttribute("data-presence-kind");
       label.removeAttribute("title");

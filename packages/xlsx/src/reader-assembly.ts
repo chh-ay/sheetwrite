@@ -30,7 +30,7 @@ import { ParsedStyles } from "./styles.js";
  * onto a new object, not object spread: with spread, the per-cell copies raised
  * the import peak RSS of the bench corpus by about 20 MiB.
  */
-function copyCellStyle(source: CellStyle): CellStyle {
+function copy_cell_style(source: CellStyle): CellStyle {
   const copy: CellStyle = Object.assign({}, source);
   if (source.border) {
     const borders: CellBorders = Object.assign({}, source.border);
@@ -43,30 +43,35 @@ function copyCellStyle(source: CellStyle): CellStyle {
   return copy;
 }
 
-function snapshotColumns(
+function snapshot_columns(
   source: ParsedSheet,
   meta: SheetSnapshot | undefined,
   styles: ParsedStyles,
   context: XlsxCodecContext,
 ) {
-  const tableColumnCount = source.tables.reduce(
+  const table_column_count = source.tables.reduce(
     (maximum, table) => Math.max(maximum, table.range.end.col + 1),
     0,
   );
-  const columnCount = Math.max(1, source.columnCount, tableColumnCount, meta?.columns.length ?? 0);
-  assertResource(context, "maxColumnsPerSheet", columnCount);
+  const column_count = Math.max(
+    1,
+    source.columnCount,
+    table_column_count,
+    meta?.columns.length ?? 0,
+  );
+  assertResource(context, "maxColumnsPerSheet", column_count);
   const columns: Column[] = [];
   const keys = new Set<string>();
-  for (let col = 0; col < columnCount; col++) {
-    const metaColumn = meta?.columns[col];
-    const key = claimColumnKey(metaColumn?.key ?? `column${col + 1}`, keys);
-    const nativeColumn = columnFromParsed(source, styles, col, key);
-    if (!metaColumn) {
-      columns.push(nativeColumn);
+  for (let col = 0; col < column_count; col++) {
+    const meta_column = meta?.columns[col];
+    const key = claimColumnKey(meta_column?.key ?? `column${col + 1}`, keys);
+    const native_column = columnFromParsed(source, styles, col, key);
+    if (!meta_column) {
+      columns.push(native_column);
       continue;
     }
-    const column = structuredClone(metaColumn);
-    if (nativeColumn.cellStyle) column.cellStyle = nativeColumn.cellStyle;
+    const column = structuredClone(meta_column);
+    if (native_column.cellStyle) column.cellStyle = native_column.cellStyle;
     else delete column.cellStyle;
     const definition = source.columns.get(col);
     if (definition) {
@@ -76,15 +81,15 @@ function snapshotColumns(
         // still represents the metadata width; native edits remain authoritative.
         if (
           property === "width" &&
-          value === columnWidthPixels(columnWidthCharacters(metaColumn.width))
+          value === columnWidthPixels(columnWidthCharacters(meta_column.width))
         )
           continue;
         if (value !== undefined) Object.assign(column, { [property]: structuredClone(value) });
       }
     }
     if (source.columnCells.has(col)) {
-      column.type = nativeColumn.type;
-      if (nativeColumn.numberFormat) column.numberFormat = nativeColumn.numberFormat;
+      column.type = native_column.type;
+      if (native_column.numberFormat) column.numberFormat = native_column.numberFormat;
       else delete column.numberFormat;
     }
     column.key = key;
@@ -93,18 +98,22 @@ function snapshotColumns(
   return columns;
 }
 
-function styleSnapshotCells(source: ParsedSheet, columns: readonly Column[], styles: ParsedStyles) {
+function style_snapshot_cells(
+  source: ParsedSheet,
+  columns: readonly Column[],
+  styles: ParsedStyles,
+) {
   // The parsed cells become the snapshot's cells: each gets its own style copy
   // now that every column default is known, and no second array is built.
-  const snapshotCells = source.cells;
-  if (source.cellStyles.length !== snapshotCells.length) {
+  const snapshot_cells = source.cells;
+  if (source.cellStyles.length !== snapshot_cells.length) {
     throw new RangeError("Sheetwrite: XLSX cell styles and cells are out of step");
   }
-  for (let index = 0; index < snapshotCells.length; index++) {
-    const cell = snapshotCells[index];
+  for (let index = 0; index < snapshot_cells.length; index++) {
+    const cell = snapshot_cells[index];
     if (!cell) continue;
     const record = styles.at(source.cellStyles.at(index));
-    let style = record.style ? copyCellStyle(record.style) : undefined;
+    let style = record.style ? copy_cell_style(record.style) : undefined;
     // Native center is normally unset, but must override an inherited bottom.
     if (
       style?.verticalAlign === undefined &&
@@ -113,60 +122,60 @@ function styleSnapshotCells(source: ParsedSheet, columns: readonly Column[], sty
       style ??= {};
       style.verticalAlign = "middle";
     }
-    const numberFormat = cellNumberFormatOverride(
+    const number_format = cellNumberFormatOverride(
       record,
       cell.value,
       columns[cell.colOffset]?.numberFormat,
     );
-    const cellStyle = numberFormat ? { ...style, numberFormat } : style;
-    if (cellStyle) cell.style = cellStyle;
+    const cell_style = number_format ? { ...style, numberFormat: number_format } : style;
+    if (cell_style) cell.style = cell_style;
   }
-  return snapshotCells;
+  return snapshot_cells;
 }
 
-function snapshotValidations(source: ParsedSheet, meta: SheetSnapshot | undefined, id: string) {
-  const nativeValidations = source.validations.map((validation, index) => {
+function snapshot_validations(source: ParsedSheet, meta: SheetSnapshot | undefined, id: string) {
+  const native_validations = source.validations.map((validation, index) => {
     const sidecar = meta?.validationRules?.[index];
-    const { range, allowBlank, ...fields } = validation;
-    const sameBlankDefault =
+    const { range, allowBlank: allow_blank, ...fields } = validation;
+    const same_blank_default =
       sidecar !== undefined &&
-      allowBlank === (sidecar.allowBlank === undefined ? true : sidecar.allowBlank);
+      allow_blank === (sidecar.allowBlank === undefined ? true : sidecar.allowBlank);
     return {
       id: sidecar?.id ?? `xlsx-validation-${index + 1}`,
       range: { sheet: id, ...structuredClone(range) },
       ...structuredClone(fields),
-      ...(sameBlankDefault
+      ...(same_blank_default
         ? sidecar?.allowBlank !== undefined
           ? { allowBlank: sidecar.allowBlank }
           : {}
-        : allowBlank !== undefined
-          ? { allowBlank }
+        : allow_blank !== undefined
+          ? { allowBlank: allow_blank }
           : {}),
     };
   });
   const validations = source.hasValidationCollection
-    ? nativeValidations
+    ? native_validations
     : (structuredClone(meta?.validationRules) ?? []);
   return validations;
 }
 
-function snapshotHyperlinks(
+function snapshot_hyperlinks(
   source: ParsedSheet,
   meta: SheetSnapshot | undefined,
   id: string,
   order: number,
-  sheetIds: ReadonlyMap<string, string>,
+  sheet_ids: ReadonlyMap<string, string>,
   context: XlsxCodecContext,
 ) {
-  const nativeHyperlinks = reconcileHyperlinks(
-    source.hyperlinks.flatMap((link, linkIndex): CellHyperlink[] => {
+  const native_hyperlinks = reconcileHyperlinks(
+    source.hyperlinks.flatMap((link, link_index): CellHyperlink[] => {
       let target: CellHyperlink["target"] | null;
       if (link.target.kind === "external") {
         target = structuredClone(link.target);
       } else {
         const internal = link.target;
-        const targetSheet = sheetIds.get(sheetNameKey(internal.sheetName));
-        if (!targetSheet) {
+        const target_sheet = sheet_ids.get(sheetNameKey(internal.sheetName));
+        if (!target_sheet) {
           emitWarning(context, {
             code: "hyperlink",
             message: "Hyperlink internal target references a missing worksheet and was dropped",
@@ -176,14 +185,14 @@ function snapshotHyperlinks(
         } else {
           target = {
             kind: "internal",
-            range: { sheet: targetSheet, ...structuredClone(internal.range) },
+            range: { sheet: target_sheet, ...structuredClone(internal.range) },
           };
         }
       }
       if (!target) return [];
       return [
         {
-          id: `xlsx-hyperlink-${order + 1}-${linkIndex + 1}`,
+          id: `xlsx-hyperlink-${order + 1}-${link_index + 1}`,
           range: { sheet: id, ...structuredClone(link.range) },
           target,
           ...(link.display !== undefined ? { display: link.display } : {}),
@@ -193,43 +202,43 @@ function snapshotHyperlinks(
     meta?.hyperlinks,
   );
   const hyperlinks = source.hasHyperlinks
-    ? nativeHyperlinks
+    ? native_hyperlinks
     : (structuredClone(meta?.hyperlinks) ?? []);
   return hyperlinks;
 }
 
-function snapshotTables(
+function snapshot_tables(
   source: ParsedSheet,
   meta: SheetSnapshot | undefined,
   id: string,
-  usedTableIds: Set<string>,
-  usedTableNames: Set<string>,
+  used_table_ids: Set<string>,
+  used_table_names: Set<string>,
 ) {
-  const tables: WorkbookTable[] = source.tables.map((nativeTable, tableIndex) => {
-    const metaTable =
+  const tables: WorkbookTable[] = source.tables.map((native_table, table_index) => {
+    const meta_table =
       meta?.tables?.find(
         (candidate) =>
           candidate.name.normalize("NFC").toUpperCase() ===
-          nativeTable.name.normalize("NFC").toUpperCase(),
-      ) ?? meta?.tables?.[tableIndex];
-    const tableId = metaTable?.id ?? nativeTable.id;
-    const tableNameKey = nativeTable.name.normalize("NFC").toUpperCase();
-    if (usedTableIds.has(tableId) || usedTableNames.has(tableNameKey)) {
-      return readerFailure(`workbook table ${nativeTable.name} has a duplicate identity or name`);
+          native_table.name.normalize("NFC").toUpperCase(),
+      ) ?? meta?.tables?.[table_index];
+    const table_id = meta_table?.id ?? native_table.id;
+    const table_name_key = native_table.name.normalize("NFC").toUpperCase();
+    if (used_table_ids.has(table_id) || used_table_names.has(table_name_key)) {
+      return readerFailure(`workbook table ${native_table.name} has a duplicate identity or name`);
     }
-    usedTableIds.add(tableId);
-    usedTableNames.add(tableNameKey);
+    used_table_ids.add(table_id);
+    used_table_names.add(table_name_key);
     return {
-      ...structuredClone(nativeTable),
-      id: tableId,
-      range: { sheet: id, ...structuredClone(nativeTable.range) },
-      columns: nativeTable.columns.map((column, columnIndex) => ({
+      ...structuredClone(native_table),
+      id: table_id,
+      range: { sheet: id, ...structuredClone(native_table.range) },
+      columns: native_table.columns.map((column, column_index) => ({
         ...structuredClone(column),
-        id: metaTable?.columns[columnIndex]?.id ?? column.id,
+        id: meta_table?.columns[column_index]?.id ?? column.id,
       })),
-      ...(metaTable?.style !== undefined ? { style: structuredClone(metaTable.style) } : {}),
-      ...(metaTable?.unsupportedFeatures !== undefined
-        ? { unsupportedFeatures: structuredClone(metaTable.unsupportedFeatures) }
+      ...(meta_table?.style !== undefined ? { style: structuredClone(meta_table.style) } : {}),
+      ...(meta_table?.unsupportedFeatures !== undefined
+        ? { unsupportedFeatures: structuredClone(meta_table.unsupportedFeatures) }
         : {}),
     };
   });
@@ -242,21 +251,21 @@ export function buildWorkbookSheets(
   styles: ParsedStyles,
   context: XlsxCodecContext,
 ) {
-  const sheetIds = new Map<string, string>();
-  const resolvedMetadata = claimSidecarSheets(sourceSheets, metadata, context);
-  const usedIds = new Set<string>();
-  for (const meta of resolvedMetadata) {
-    if (meta) usedIds.add(meta.id);
+  const sheet_ids = new Map<string, string>();
+  const resolved_metadata = claimSidecarSheets(sourceSheets, metadata, context);
+  const used_ids = new Set<string>();
+  for (const meta of resolved_metadata) {
+    if (meta) used_ids.add(meta.id);
   }
 
   const identities = sourceSheets.map((source, order) => {
-    const meta = resolvedMetadata[order];
-    const id = meta?.id ?? uniqueSheetId(source.name, order, usedIds);
-    sheetIds.set(sheetNameKey(source.name), id);
+    const meta = resolved_metadata[order];
+    const id = meta?.id ?? uniqueSheetId(source.name, order, used_ids);
+    sheet_ids.set(sheetNameKey(source.name), id);
     return { source, meta, id, order };
   });
-  const usedTableIds = new Set<string>();
-  const usedTableNames = new Set<string>();
+  const used_table_ids = new Set<string>();
+  const used_table_names = new Set<string>();
   const sheets: SheetSnapshot[] = [];
   for (const { source, meta, id, order } of identities) {
     checkAbort(context);
@@ -265,36 +274,36 @@ export function buildWorkbookSheets(
       sheets.push(restoredDashboard(meta, id, source.name, order, source.state));
       continue;
     }
-    const columns = snapshotColumns(source, meta, styles, context);
-    const rowCount = Math.max(
+    const columns = snapshot_columns(source, meta, styles, context);
+    const row_count = Math.max(
       source.rowCount,
       source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
     );
-    assertResource(context, "maxRowsPerSheet", rowCount);
-    const snapshotCells = styleSnapshotCells(source, columns, styles);
-    const validations = snapshotValidations(source, meta, id);
-    const nativeNotes = source.notes.map((note) => ({
+    assertResource(context, "maxRowsPerSheet", row_count);
+    const snapshot_cells = style_snapshot_cells(source, columns, styles);
+    const validations = snapshot_validations(source, meta, id);
+    const native_notes = source.notes.map((note) => ({
       addr: { sheet: id, row: note.row, col: note.col },
       text: note.text,
     }));
-    const notes = source.hasComments ? nativeNotes : (structuredClone(meta?.notes) ?? []);
-    const hyperlinks = snapshotHyperlinks(source, meta, id, order, sheetIds, context);
-    const nativeConditionalFormats = reconcileConditionalFormats(
+    const notes = source.hasComments ? native_notes : (structuredClone(meta?.notes) ?? []);
+    const hyperlinks = snapshot_hyperlinks(source, meta, id, order, sheet_ids, context);
+    const native_conditional_formats = reconcileConditionalFormats(
       source.conditionalFormats.map((rule) => ({
         ...structuredClone(rule),
         range: { ...structuredClone(rule.range), sheet: id },
       })),
       meta?.conditionalFormats,
     );
-    const conditionalFormats = source.hasConditionalFormatting
-      ? nativeConditionalFormats
+    const conditional_formats = source.hasConditionalFormatting
+      ? native_conditional_formats
       : (structuredClone(meta?.conditionalFormats) ?? []);
     // A live view sort comes only from Sheetwrite's own metadata. The
     // worksheet sortState is kept unapplied, unless it is the export of that
     // view sort.
-    const sortKeys = structuredClone(meta?.sortKeys) ?? [];
-    const sortState = sortKeys.length === 0 ? source.sortState : undefined;
-    const tables = snapshotTables(source, meta, id, usedTableIds, usedTableNames);
+    const sort_keys = structuredClone(meta?.sortKeys) ?? [];
+    const sort_state = sort_keys.length === 0 ? source.sortState : undefined;
+    const tables = snapshot_tables(source, meta, id, used_table_ids, used_table_names);
     if (source.hasUnsupportedValidation && validations.length === 0) {
       emitWarning(context, {
         code: "validation-loss",
@@ -318,13 +327,13 @@ export function buildWorkbookSheets(
         ? { visibility: source.state }
         : {}),
       ...(source.tabColor ? { tabColor: source.tabColor } : {}),
-      rowCount,
+      rowCount: row_count,
       columns,
       ...(source.frozenRows ? { frozenRows: source.frozenRows } : {}),
       ...(source.frozenCols ? { frozenCols: source.frozenCols } : {}),
       ...(source.rowMeta.length > 0 ? { rowMeta: source.rowMeta } : {}),
       ...(source.merges.length > 0 ? { merges: source.merges } : {}),
-      ...(conditionalFormats.length > 0 ? { conditionalFormats } : {}),
+      ...(conditional_formats.length > 0 ? { conditionalFormats: conditional_formats } : {}),
       ...(hyperlinks.length > 0 ? { hyperlinks } : {}),
       ...(source.hasRowOutlines
         ? { rowGroups: source.rowGroups }
@@ -336,23 +345,39 @@ export function buildWorkbookSheets(
         ? { protectedRanges: structuredClone(meta.protectedRanges) }
         : {}),
       ...(notes.length > 0 ? { notes } : {}),
-      ...(sortKeys.length > 0 ? { sortKeys } : {}),
-      ...(sortState ? { sortState: structuredClone(sortState) } : {}),
-      ...snapshotAutoFilter(source.autoFilter, meta, id, snapshotCells, columns, rowCount, context),
+      ...(sort_keys.length > 0 ? { sortKeys: sort_keys } : {}),
+      ...(sort_state ? { sortState: structuredClone(sort_state) } : {}),
+      ...snapshotAutoFilter(
+        source.autoFilter,
+        meta,
+        id,
+        snapshot_cells,
+        columns,
+        row_count,
+        context,
+      ),
       ...(tables.length > 0 ? { tables } : {}),
       cells:
-        snapshotCells.length > 0
-          ? [{ startRow: 0, startCol: 0, rowCount, colCount: columns.length, cells: snapshotCells }]
+        snapshot_cells.length > 0
+          ? [
+              {
+                startRow: 0,
+                startCol: 0,
+                rowCount: row_count,
+                colCount: columns.length,
+                cells: snapshot_cells,
+              },
+            ]
           : [],
     });
   }
   for (const owner of sheets) {
     for (const hyperlink of owner.hyperlinks ?? []) {
       if (hyperlink.target.kind !== "internal") continue;
-      const targetRange = hyperlink.target.range;
-      const target = sheets.find((candidate) => candidate.id === targetRange.sheet);
-      if (target) extendSheet(target, targetRange.end.row, targetRange.end.col);
+      const target_range = hyperlink.target.range;
+      const target = sheets.find((candidate) => candidate.id === target_range.sheet);
+      if (target) extendSheet(target, target_range.end.row, target_range.end.col);
     }
   }
-  return { sheets, sheetIds, resolvedMetadata };
+  return { sheets, sheetIds: sheet_ids, resolvedMetadata: resolved_metadata };
 }

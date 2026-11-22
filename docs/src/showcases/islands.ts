@@ -8,7 +8,7 @@ export interface ShowcaseIsland {
   readonly load: () => Promise<IslandRender>;
 }
 
-function withProps<Props extends object>(component: Component<Props>): IslandRender {
+function with_props<Props extends object>(component: Component<Props>): IslandRender {
   // The server wrote these props from the same component's props (islands/Island.tsx).
   return (_island, props) => createComponent(component, props as Props);
 }
@@ -17,202 +17,204 @@ function withProps<Props extends object>(component: Component<Props>): IslandRen
 export const SHOWCASE_ISLANDS = {
   "showcase-hub-filter": {
     source: "src/showcases/hub/HubFilter.tsx",
-    load: () => import("./hub/HubFilter.js").then(({ HubFilter }) => withProps(HubFilter)),
+    load: () => import("./hub/HubFilter.js").then(({ HubFilter }) => with_props(HubFilter)),
   },
   "showcase-spreadsheet": {
     source: "src/showcases/spreadsheet/SpreadsheetStage.tsx",
     load: () =>
       import("./spreadsheet/SpreadsheetStage.js").then(({ SpreadsheetStage }) =>
-        withProps(SpreadsheetStage),
+        with_props(SpreadsheetStage),
       ),
   },
   "showcase-analysis": {
     source: "src/showcases/analysis/AnalysisStage.tsx",
     load: () =>
-      import("./analysis/AnalysisStage.js").then(({ AnalysisStage }) => withProps(AnalysisStage)),
+      import("./analysis/AnalysisStage.js").then(({ AnalysisStage }) => with_props(AnalysisStage)),
   },
   "showcase-data-tools": {
     source: "src/showcases/data-tools/DataToolsStage.tsx",
     load: () =>
       import("./data-tools/DataToolsStage.js").then(({ DataToolsStage }) =>
-        withProps(DataToolsStage),
+        with_props(DataToolsStage),
       ),
   },
   "showcase-data-events": {
     source: "src/showcases/data-tools/DataEvents.tsx",
     load: () =>
-      import("./data-tools/DataEvents.js").then(({ DataEvents }) => withProps(DataEvents)),
+      import("./data-tools/DataEvents.js").then(({ DataEvents }) => with_props(DataEvents)),
   },
   "showcase-formulas": {
     source: "src/showcases/formulas/FormulasStage.tsx",
     load: () =>
-      import("./formulas/FormulasStage.js").then(({ FormulasStage }) => withProps(FormulasStage)),
+      import("./formulas/FormulasStage.js").then(({ FormulasStage }) => with_props(FormulasStage)),
   },
   "showcase-formatting": {
     source: "src/showcases/formatting/FormattingStage.tsx",
     load: () =>
       import("./formatting/FormattingStage.js").then(({ FormattingStage }) =>
-        withProps(FormattingStage),
+        with_props(FormattingStage),
       ),
   },
   "showcase-formatting-imported": {
     source: "src/showcases/formatting/FormattingImported.tsx",
     load: () =>
       import("./formatting/FormattingImported.js").then(({ FormattingImported }) =>
-        withProps(FormattingImported),
+        with_props(FormattingImported),
       ),
   },
   "showcase-host-rows": {
     source: "src/showcases/host-rows/HostRowsStage.tsx",
     load: () =>
-      import("./host-rows/HostRowsStage.js").then(({ HostRowsStage }) => withProps(HostRowsStage)),
+      import("./host-rows/HostRowsStage.js").then(({ HostRowsStage }) => with_props(HostRowsStage)),
   },
   "showcase-performance": {
     source: "src/showcases/performance/PerformanceStage.tsx",
     load: () =>
       import("./performance/PerformanceStage.js").then(({ PerformanceStage }) =>
-        withProps(PerformanceStage),
+        with_props(PerformanceStage),
       ),
   },
   "showcase-performance-diagnostics": {
     source: "src/showcases/performance/PerformanceDiagnostics.tsx",
     load: () =>
       import("./performance/PerformanceDiagnostics.js").then(({ PerformanceDiagnostics }) =>
-        withProps(PerformanceDiagnostics),
+        with_props(PerformanceDiagnostics),
       ),
   },
   "showcase-database": {
     source: "src/showcases/database/DatabaseStage.tsx",
     load: () =>
-      import("./database/DatabaseStage.js").then(({ DatabaseStage }) => withProps(DatabaseStage)),
+      import("./database/DatabaseStage.js").then(({ DatabaseStage }) => with_props(DatabaseStage)),
   },
   "showcase-database-lab": {
     source: "src/showcases/database/DatabaseLab.tsx",
     load: () =>
-      import("./database/DatabaseLab.js").then(({ DatabaseLab }) => withProps(DatabaseLab)),
+      import("./database/DatabaseLab.js").then(({ DatabaseLab }) => with_props(DatabaseLab)),
   },
   "showcase-collaboration": {
     source: "src/showcases/collaboration/CollaborationStage.tsx",
     load: () =>
       import("./collaboration/CollaborationStage.js").then(({ CollaborationStage }) =>
-        withProps(CollaborationStage),
+        with_props(CollaborationStage),
       ),
   },
   "showcase-collaboration-faults": {
     source: "src/showcases/collaboration/CollaborationFaults.tsx",
     load: () =>
       import("./collaboration/CollaborationFaults.js").then(({ CollaborationFaults }) =>
-        withProps(CollaborationFaults),
+        with_props(CollaborationFaults),
       ),
   },
   "showcase-interop": {
     source: "src/showcases/interop/InteropStage.tsx",
     load: () =>
-      import("./interop/InteropStage.js").then(({ InteropStage }) => withProps(InteropStage)),
+      import("./interop/InteropStage.js").then(({ InteropStage }) => with_props(InteropStage)),
   },
   "showcase-interop-spill": {
     source: "src/showcases/interop/SpillProof.tsx",
-    load: () => import("./interop/SpillProof.js").then(({ SpillProof }) => withProps(SpillProof)),
+    load: () => import("./interop/SpillProof.js").then(({ SpillProof }) => with_props(SpillProof)),
   },
   "showcase-interop-labs": {
     source: "src/showcases/interop/labs/InteropLabs.tsx",
     load: () =>
-      import("./interop/labs/InteropLabs.js").then(({ InteropLabs }) => withProps(InteropLabs)),
+      import("./interop/labs/InteropLabs.js").then(({ InteropLabs }) => with_props(InteropLabs)),
   },
   "showcase-formula-assist-video": {
     source: "src/showcases/formula-assist/DemoVideo.tsx",
     load: () =>
-      import("./formula-assist/DemoVideo.js").then(({ DemoVideo }) => withProps(DemoVideo)),
+      import("./formula-assist/DemoVideo.js").then(({ DemoVideo }) => with_props(DemoVideo)),
   },
   "showcase-formula-assist": {
     source: "src/showcases/formula-assist/FormulaAssistStage.tsx",
     load: () =>
       import("./formula-assist/FormulaAssistStage.js").then(({ FormulaAssistStage }) =>
-        withProps(FormulaAssistStage),
+        with_props(FormulaAssistStage),
       ),
   },
   "showcase-sort": {
     source: "src/showcases/sort/SortStage.tsx",
-    load: () => import("./sort/SortStage.js").then(({ SortStage }) => withProps(SortStage)),
+    load: () => import("./sort/SortStage.js").then(({ SortStage }) => with_props(SortStage)),
   },
   "showcase-functions": {
     source: "src/showcases/functions/FunctionsStage.tsx",
     load: () =>
       import("./functions/FunctionsStage.js").then(({ FunctionsStage }) =>
-        withProps(FunctionsStage),
+        with_props(FunctionsStage),
       ),
   },
   "showcase-recalculation": {
     source: "src/showcases/recalculation/RecalculationStage.tsx",
     load: () =>
       import("./recalculation/RecalculationStage.js").then(({ RecalculationStage }) =>
-        withProps(RecalculationStage),
+        with_props(RecalculationStage),
       ),
   },
   "showcase-recalculation-fact": {
     source: "src/showcases/recalculation/FirstCalculationFact.tsx",
     load: () =>
       import("./recalculation/FirstCalculationFact.js").then(({ FirstCalculationFact }) =>
-        withProps(FirstCalculationFact),
+        with_props(FirstCalculationFact),
       ),
   },
   "showcase-data-model": {
     source: "src/showcases/data-model/DataModelStage.tsx",
     load: () =>
       import("./data-model/DataModelStage.js").then(({ DataModelStage }) =>
-        withProps(DataModelStage),
+        with_props(DataModelStage),
       ),
   },
   "showcase-dashboards": {
     source: "src/showcases/dashboards/DashboardsStage.tsx",
     load: () =>
       import("./dashboards/DashboardsStage.js").then(({ DashboardsStage }) =>
-        withProps(DashboardsStage),
+        with_props(DashboardsStage),
       ),
   },
   "showcase-dashboards-items": {
     source: "src/showcases/dashboards/ItemCountFact.tsx",
     load: () =>
-      import("./dashboards/ItemCountFact.js").then(({ ItemCountFact }) => withProps(ItemCountFact)),
+      import("./dashboards/ItemCountFact.js").then(({ ItemCountFact }) =>
+        with_props(ItemCountFact),
+      ),
   },
   "showcase-queries": {
     source: "src/showcases/queries/QueriesStage.tsx",
     load: () =>
-      import("./queries/QueriesStage.js").then(({ QueriesStage }) => withProps(QueriesStage)),
+      import("./queries/QueriesStage.js").then(({ QueriesStage }) => with_props(QueriesStage)),
   },
   "showcase-version-history": {
     source: "src/showcases/version-history/VersionHistoryStage.tsx",
     load: () =>
       import("./version-history/VersionHistoryStage.js").then(({ VersionHistoryStage }) =>
-        withProps(VersionHistoryStage),
+        with_props(VersionHistoryStage),
       ),
   },
   "workbench-vanilla": {
     source: "src/showcases/frameworks/vanilla/VanillaWorkbench.tsx",
     load: () =>
       import("./frameworks/vanilla/VanillaWorkbench.js").then(({ VanillaWorkbench }) =>
-        withProps(VanillaWorkbench),
+        with_props(VanillaWorkbench),
       ),
   },
   "workbench-react": {
     source: "src/showcases/frameworks/FrameworkMount.tsx",
     load: () =>
       import("./frameworks/FrameworkMount.js").then(({ ReactWorkbenchIsland }) =>
-        withProps(ReactWorkbenchIsland),
+        with_props(ReactWorkbenchIsland),
       ),
   },
   "workbench-vue": {
     source: "src/showcases/frameworks/FrameworkMount.tsx",
     load: () =>
       import("./frameworks/FrameworkMount.js").then(({ VueWorkbenchIsland }) =>
-        withProps(VueWorkbenchIsland),
+        with_props(VueWorkbenchIsland),
       ),
   },
   "workbench-svelte": {
     source: "src/showcases/frameworks/FrameworkMount.tsx",
     load: () =>
       import("./frameworks/FrameworkMount.js").then(({ SvelteWorkbenchIsland }) =>
-        withProps(SvelteWorkbenchIsland),
+        with_props(SvelteWorkbenchIsland),
       ),
   },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;

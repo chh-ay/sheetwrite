@@ -68,7 +68,7 @@ const FIELD_ATTRIBUTES = [
   "aria-invalid",
 ] as const;
 
-let helpSerial = 0;
+let help_serial = 0;
 
 /** The pause after the last keystroke before the result preview calculates. */
 const PREVIEW_DELAY_MS = 120;
@@ -77,7 +77,7 @@ const PREVIEW_TEXT_CHARS = 80;
 /** Significant digits of a number in the preview, as the grid shows them. */
 const PREVIEW_DIGITS = 15;
 
-function previewValueText(value: FormulaPreviewValue): string {
+function preview_value_text(value: FormulaPreviewValue): string {
   if (value === null) return "0";
   if (typeof value === "number") return String(Number(value.toPrecision(PREVIEW_DIGITS)));
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
@@ -89,12 +89,12 @@ function previewValueText(value: FormulaPreviewValue): string {
 }
 
 /** The preview line for a result; empty when there is nothing to show. */
-function previewLine(preview: FormulaPreview): string {
+function preview_line(preview: FormulaPreview): string {
   switch (preview.status) {
     case "value":
-      return `= ${previewValueText(preview.value)}`;
+      return `= ${preview_value_text(preview.value)}`;
     case "array":
-      return `= ${previewValueText(preview.first)} … (${preview.rows} × ${preview.cols} array)`;
+      return `= ${preview_value_text(preview.first)} … (${preview.rows} × ${preview.cols} array)`;
     case "unavailable":
       switch (preview.reason) {
         case "unsafe-function":
@@ -115,7 +115,7 @@ function previewLine(preview: FormulaPreview): string {
  * Such a formula has no preview, as in Excel: a function name without its
  * `(` would only show `#NAME?`.
  */
-function unfinishedName(text: string, completion: FormulaCompletion | null): boolean {
+function unfinished_name(text: string, completion: FormulaCompletion | null): boolean {
   if (completion === null) return false;
   const typed = text.slice(completion.from, completion.to).toUpperCase();
   return !completion.matches.some(
@@ -128,7 +128,7 @@ function unfinishedName(text: string, completion: FormulaCompletion | null): boo
  * waits while the caret is at the end of the text, where the user is still
  * typing it.
  */
-function shownDiagnostics(
+function shown_diagnostics(
   diagnostics: readonly FormulaDiagnostic[],
   cursor: number,
   length: number,
@@ -136,7 +136,7 @@ function shownDiagnostics(
   return diagnostics.filter((diagnostic) => !diagnostic.incomplete || cursor !== length);
 }
 
-function sameMatches(
+function same_matches(
   left: readonly FormulaCompletionItem[],
   right: readonly FormulaCompletionItem[],
 ): boolean {
@@ -162,7 +162,7 @@ const MAX_FIX_EDITS = 2;
  * Edits that turn `left` into `right`: a character added, removed or
  * changed, or two neighbours swapped. Stops counting past `limit`.
  */
-function editDistance(left: string, right: string, limit: number): number {
+function edit_distance(left: string, right: string, limit: number): number {
   if (Math.abs(left.length - right.length) > limit) return limit + 1;
   let before: number[] = [];
   let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
@@ -195,12 +195,12 @@ function editDistance(left: string, right: string, limit: number): number {
 }
 
 /** The name in `candidates` nearest to `typed`, ignoring case, within {@link MAX_FIX_EDITS}; null when none. */
-function nearestName(typed: string, candidates: Iterable<string>): string | null {
+function nearest_name(typed: string, candidates: Iterable<string>): string | null {
   const key = typed.toUpperCase();
   let nearest: string | null = null;
   let edits = MAX_FIX_EDITS + 1;
   for (const candidate of candidates) {
-    const distance = editDistance(key, candidate.toUpperCase(), edits - 1);
+    const distance = edit_distance(key, candidate.toUpperCase(), edits - 1);
     if (distance < edits && distance > 0) {
       nearest = candidate;
       edits = distance;
@@ -216,7 +216,7 @@ function nearestName(typed: string, candidates: Iterable<string>): string | null
  * that ends the text is still being typed, so it waits like a missing `)`.
  * A formula with `LET` or `LAMBDA` names its own values, so it has none.
  */
-function misspelledNames(
+function misspelled_names(
   text: string,
   analysis: FormulaAnalysis,
   names: FormulaNames,
@@ -235,7 +235,7 @@ function misspelledNames(
     if (token.kind !== "name" || keys.has(name.toUpperCase()) || text.charAt(token.to) === "[") {
       continue;
     }
-    const near = nearestName(name, known);
+    const near = nearest_name(name, known);
     if (near === null) continue;
     const diagnostic: FormulaDiagnostic = {
       from: token.from,
@@ -253,7 +253,7 @@ function misspelledNames(
  * end, as Enter adds them; a `)` that closes nothing removed; a function name
  * within two edits of a known one. Null when the error has no one clear fix.
  */
-function syntaxFix(
+function syntax_fix(
   text: string,
   diagnostic: FormulaDiagnostic,
   functions: readonly FormulaFunctionMetadata[],
@@ -276,7 +276,7 @@ function syntaxFix(
     return open === 0 ? { label: "Remove the extra )", from, to, insert: "" } : null;
   }
   if (text.charAt(to) !== "(") return null;
-  const near = nearestName(
+  const near = nearest_name(
     text.slice(from, to),
     functions.map((fn) => fn.name),
   );
@@ -287,7 +287,7 @@ function syntaxFix(
  * The defined names a formula on `sheet` sees, the workbook's tables, and
  * the table that holds `cell`, for the completion list.
  */
-function formulaNames(
+function formula_names(
   store: Store,
   sheet: SheetId,
   cell: Readonly<CellAddress> | null,
@@ -298,7 +298,7 @@ function formulaNames(
     if (defined.scope === undefined || defined.scope === sheet) names.add(defined.name);
   }
   const tables: FormulaTableNames[] = [];
-  let cellTable: string | undefined;
+  let cell_table: string | undefined;
   for (const entry of workbook.sheets) {
     for (const table of entry.tables ?? []) {
       tables.push({ name: table.name, columns: table.columns.map((column) => column.name) });
@@ -311,15 +311,19 @@ function formulaNames(
         cell.col >= range.start.col &&
         cell.col <= range.end.col
       ) {
-        cellTable = table.name;
+        cell_table = table.name;
       }
     }
   }
-  return { names: [...names], tables, ...(cellTable === undefined ? {} : { cellTable }) };
+  return {
+    names: [...names],
+    tables,
+    ...(cell_table === undefined ? {} : { cellTable: cell_table }),
+  };
 }
 
 /** `NAME(a, b, ...)` with the argument at `active` in bold. */
-function signatureLine(fn: FormulaFunctionMetadata, active: number | null): HTMLElement {
+function signature_line(fn: FormulaFunctionMetadata, active: number | null): HTMLElement {
   const line = document.createElement("div");
   line.className = "sheetwrite-formula-signature";
   line.append(`${fn.name}(`);
@@ -342,9 +346,9 @@ function signatureLine(fn: FormulaFunctionMetadata, active: number | null): HTML
   return line;
 }
 
-function textLine(className: string, text: string): HTMLElement {
+function text_line(class_name: string, text: string): HTMLElement {
   const line = document.createElement("div");
-  line.className = className;
+  line.className = class_name;
   line.textContent = text;
   return line;
 }
@@ -367,17 +371,17 @@ export class FormulaHelp {
   private guide: HTMLDivElement | null = null;
   private list: HTMLDivElement | null = null;
   private preview: HTMLDivElement | null = null;
-  private previewTimer: ReturnType<typeof setTimeout> | undefined;
+  private preview_timer: ReturnType<typeof setTimeout> | undefined;
   private mirror: TextMirror | null = null;
   /** The text the guide shows now, so an unchanged guide is not announced again. */
-  private guideText = "";
+  private guide_text = "";
   /** The list's active entry when the ghost showed; null without a ghost. */
-  private ghostEntry: number | null = null;
+  private ghost_entry: number | null = null;
 
   private completion: FormulaCompletion | null = null;
-  private activeIndex = 0;
+  private active_index = 0;
   /** The text at which Escape closed the list; the list stays closed until the text changes. */
-  private dismissedText: string | null = null;
+  private dismissed_text: string | null = null;
   /** The call at the caret and the errors shown, which the guide reads. */
   private call: FormulaCall | null = null;
   private diagnostics: readonly FormulaDiagnostic[] = [];
@@ -386,16 +390,16 @@ export class FormulaHelp {
   /** The analysis of the field's text at its last update, which the ghost's keys read. */
   private analysis: FormulaAnalysis | null = null;
   /** Tells screen readers about a suggestion once it has held for `ANNOUNCE_DELAY_MS`. */
-  private ghostStatus: HTMLDivElement | null = null;
-  private announceTimer: ReturnType<typeof setTimeout> | undefined;
+  private ghost_status: HTMLDivElement | null = null;
+  private announce_timer: ReturnType<typeof setTimeout> | undefined;
   private announced = "";
   /** The fix of the first error shown, which the guide offers and Tab applies. */
   private fix: FormulaFix | null = null;
 
   constructor(deps: AssistDeps) {
-    helpSerial += 1;
+    help_serial += 1;
     this.deps = deps;
-    this.id = `sheetwrite-formula-help-${helpSerial}`;
+    this.id = `sheetwrite-formula-help-${help_serial}`;
   }
 
   get isOpen(): boolean {
@@ -406,8 +410,8 @@ export class FormulaHelp {
   attach(field: FormulaEditorElement, theme: Theme | null): void {
     this.detach();
     this.field = field;
-    this.names = formulaNames(this.deps.store, this.deps.sheet(), this.deps.cell());
-    this.mountLayer(field, theme);
+    this.names = formula_names(this.deps.store, this.deps.sheet(), this.deps.cell());
+    this.mount_layer(field, theme);
     if (this.deps.suggestions === true) {
       this.ghost = new FormulaGhost({
         store: this.deps.store,
@@ -418,15 +422,15 @@ export class FormulaHelp {
       status.className = "sheetwrite-formula-ghost-status";
       status.setAttribute("role", "status");
       this.layer?.append(status);
-      this.ghostStatus = status;
+      this.ghost_status = status;
     }
     field.setAttribute("aria-autocomplete", "list");
     if (field instanceof HTMLInputElement) {
       field.setAttribute("role", "combobox");
       field.setAttribute("aria-expanded", "false");
     }
-    field.addEventListener("scroll", this.onScroll);
-    document.addEventListener("selectionchange", this.onSelectionChange);
+    field.addEventListener("scroll", this.on_scroll);
+    document.addEventListener("selectionchange", this.on_selection_change);
     this.update();
 
     // Host functions can change between edits, so every edit reads the list.
@@ -448,9 +452,9 @@ export class FormulaHelp {
     const field = this.field;
     if (field === null) return;
 
-    this.cancelPreview();
-    field.removeEventListener("scroll", this.onScroll);
-    document.removeEventListener("selectionchange", this.onSelectionChange);
+    this.cancel_preview();
+    field.removeEventListener("scroll", this.on_scroll);
+    document.removeEventListener("selectionchange", this.on_selection_change);
     for (const name of FIELD_ATTRIBUTES) field.removeAttribute(name);
     this.mirror?.remove();
     this.layer?.remove();
@@ -462,12 +466,12 @@ export class FormulaHelp {
     this.guide = null;
     this.list = null;
     this.preview = null;
-    this.guideText = "";
+    this.guide_text = "";
     this.completion = null;
-    this.dismissedText = null;
+    this.dismissed_text = null;
     this.ghost?.close();
-    clearTimeout(this.announceTimer);
-    this.ghostStatus = null;
+    clearTimeout(this.announce_timer);
+    this.ghost_status = null;
     this.announced = "";
     this.ghost = null;
     this.analysis = null;
@@ -487,13 +491,13 @@ export class FormulaHelp {
     const cursor = field.selectionStart ?? text.length;
     const analysis = analyzeFormula(text, cursor, this.functions, this.names);
     this.analysis = analysis;
-    const nameFixes = misspelledNames(text, analysis, this.names);
-    const diagnostics = shownDiagnostics(
-      [...analysis.diagnostics, ...nameFixes.keys()].sort((left, right) => left.from - right.from),
+    const name_fixes = misspelled_names(text, analysis, this.names);
+    const diagnostics = shown_diagnostics(
+      [...analysis.diagnostics, ...name_fixes.keys()].sort((left, right) => left.from - right.from),
       cursor,
       text.length,
     );
-    if (this.dismissedText !== null && this.dismissedText !== text) this.dismissedText = null;
+    if (this.dismissed_text !== null && this.dismissed_text !== text) this.dismissed_text = null;
     const collapsed = field.selectionStart === field.selectionEnd;
     const ghost = this.ghost?.update(text, collapsed ? cursor : -1, analysis) ?? null;
 
@@ -502,23 +506,25 @@ export class FormulaHelp {
       ghost === null
         ? analysis
         : analyzeFormula(text + ghost.text, text.length, this.functions, this.names);
-    this.paintReferences(painted.references, text.length);
-    this.paintText(field, text, analysis.references, diagnostics, ghost?.text ?? "");
-    this.showCompletion(this.dismissedText === null ? analysis.completion : null);
+    this.paint_references(painted.references, text.length);
+    this.paint_text(field, text, analysis.references, diagnostics, ghost?.text ?? "");
+    this.show_completion(this.dismissed_text === null ? analysis.completion : null);
     if (ghost !== null && ghost.listIndex !== null && this.completion !== null) {
-      this.activeIndex = ghost.listIndex;
-      this.renderActive();
+      this.active_index = ghost.listIndex;
+      this.render_active();
     }
-    this.ghostEntry = ghost === null ? null : this.activeIndex;
+    this.ghost_entry = ghost === null ? null : this.active_index;
     this.call = analysis.call;
     this.diagnostics = diagnostics;
     const first = diagnostics[0];
     this.fix =
-      first === undefined ? null : (nameFixes.get(first) ?? syntaxFix(text, first, this.functions));
-    this.showGuide();
-    this.schedulePreview(
+      first === undefined
+        ? null
+        : (name_fixes.get(first) ?? syntax_fix(text, first, this.functions));
+    this.show_guide();
+    this.schedule_preview(
       text,
-      analysis.diagnostics.length === 0 && !unfinishedName(text, analysis.completion),
+      analysis.diagnostics.length === 0 && !unfinished_name(text, analysis.completion),
     );
     field.setAttribute("aria-invalid", diagnostics.length > 0 ? "true" : "false");
     this.reposition();
@@ -533,11 +539,11 @@ export class FormulaHelp {
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     if (this.completion === null) {
-      if (this.ghostKey(event)) return true;
+      if (this.ghost_key(event)) return true;
       const fix = this.fix;
       if (event.key !== "Tab" || event.shiftKey || fix === null) return false;
       event.preventDefault();
-      this.applyFix(fix);
+      this.apply_fix(fix);
       return true;
     }
 
@@ -549,7 +555,7 @@ export class FormulaHelp {
         return true;
       case "Tab":
         // A ghost takes Tab until the user moves in the list: the list's entry is theirs then.
-        if (this.ghostEntry === this.activeIndex && this.ghostKey(event)) return true;
+        if (this.ghost_entry === this.active_index && this.ghost_key(event)) return true;
         event.preventDefault();
         this.accept();
         return true;
@@ -560,7 +566,7 @@ export class FormulaHelp {
       case "Escape":
         event.preventDefault();
         if (this.field !== null) this.ghost?.dismiss(this.field.value);
-        this.dismissedText = this.field?.value ?? null;
+        this.dismissed_text = this.field?.value ?? null;
         this.update();
         return true;
       default:
@@ -569,7 +575,7 @@ export class FormulaHelp {
   }
 
   /** The ghost's keys, while the caret is at the end of the text. */
-  private ghostKey(event: KeyboardEvent): boolean {
+  private ghost_key(event: KeyboardEvent): boolean {
     const field = this.field;
     const analysis = this.analysis;
     if (this.ghost === null || field === null || analysis === null) return false;
@@ -593,15 +599,15 @@ export class FormulaHelp {
 
   /** Announce `ghost` once it has held for a moment; a cleared ghost clears the status at once. */
   private announce(ghost: string): void {
-    clearTimeout(this.announceTimer);
-    const status = this.ghostStatus;
+    clearTimeout(this.announce_timer);
+    const status = this.ghost_status;
     if (status === null || ghost === this.announced) return;
     if (ghost === "") {
       this.announced = "";
       status.textContent = "";
       return;
     }
-    this.announceTimer = setTimeout(() => {
+    this.announce_timer = setTimeout(() => {
       this.announced = ghost;
       status.textContent = `Suggestion: ${ghost}. Tab to accept.`;
     }, ANNOUNCE_DELAY_MS);
@@ -620,16 +626,16 @@ export class FormulaHelp {
     this.mirror?.sync();
   }
 
-  private readonly onScroll = (): void => {
+  private readonly on_scroll = (): void => {
     this.mirror?.sync();
   };
 
-  private readonly onSelectionChange = (): void => {
+  private readonly on_selection_change = (): void => {
     if (this.field !== null && document.activeElement === this.field) this.update();
   };
 
   /** The layer under the field that holds the guide and the function list. */
-  private mountLayer(field: FormulaEditorElement, theme: Theme | null): void {
+  private mount_layer(field: FormulaEditorElement, theme: Theme | null): void {
     const layer = document.createElement("div");
     layer.className = "sheetwrite-formula-help";
     if (theme !== null) {
@@ -662,31 +668,31 @@ export class FormulaHelp {
    * Calculates the result preview once typing pauses. A formula with a
    * problem has no preview; its error is in the guide instead.
    */
-  private schedulePreview(text: string, complete: boolean): void {
-    this.cancelPreview();
+  private schedule_preview(text: string, complete: boolean): void {
+    this.cancel_preview();
     if (!complete) {
-      this.showPreview("");
+      this.show_preview("");
       return;
     }
 
-    this.previewTimer = setTimeout(() => {
-      this.previewTimer = undefined;
+    this.preview_timer = setTimeout(() => {
+      this.preview_timer = undefined;
       const engine = storeEngine(this.deps.store);
       const cell = this.deps.cell();
       if (this.field?.value !== text || engine === null || cell === null) return;
 
-      this.showPreview(previewLine(engine.previewFormula(cell, text)));
+      this.show_preview(preview_line(engine.previewFormula(cell, text)));
     }, PREVIEW_DELAY_MS);
   }
 
-  private cancelPreview(): void {
-    if (this.previewTimer === undefined) return;
+  private cancel_preview(): void {
+    if (this.preview_timer === undefined) return;
 
-    clearTimeout(this.previewTimer);
-    this.previewTimer = undefined;
+    clearTimeout(this.preview_timer);
+    this.preview_timer = undefined;
   }
 
-  private showPreview(line: string): void {
+  private show_preview(line: string): void {
     if (this.preview !== null && this.preview.textContent !== line) this.preview.textContent = line;
   }
 
@@ -696,26 +702,27 @@ export class FormulaHelp {
     this.announce("");
     this.mirror?.remove();
     this.mirror = null;
-    this.cancelPreview();
-    this.showPreview("");
-    this.showCompletion(null);
+    this.cancel_preview();
+    this.show_preview("");
+    this.show_completion(null);
     this.call = null;
     this.diagnostics = [];
-    this.showGuide();
+    this.show_guide();
     this.field?.removeAttribute("aria-invalid");
   }
 
   /**
    * Fill each referenced range on the grid with its reference's colour; the
-   * ranges a suggestion names, from `suggestedFrom` on, more faintly.
+   * ranges a suggestion names, from `suggested_from` on, more faintly.
    */
-  private paintReferences(references: readonly FormulaReference[], suggestedFrom: number): void {
+  private paint_references(references: readonly FormulaReference[], suggested_from: number): void {
     const ranges: HighlightRange[] = [];
     for (const reference of references) {
-      const sheet = reference.sheet === null ? this.deps.sheet() : this.sheetNamed(reference.sheet);
+      const sheet =
+        reference.sheet === null ? this.deps.sheet() : this.sheet_named(reference.sheet);
       if (sheet === null) continue;
 
-      const alpha = reference.from >= suggestedFrom ? GHOST_FILL_ALPHA : RANGE_FILL_ALPHA;
+      const alpha = reference.from >= suggested_from ? GHOST_FILL_ALPHA : RANGE_FILL_ALPHA;
       const color = `${referenceColor(reference)}${alpha}`;
       ranges.push({ sheet, start: reference.start, end: reference.end, color });
     }
@@ -723,7 +730,7 @@ export class FormulaHelp {
     this.deps.highlightCells(ranges.length > 0 ? ranges : null);
   }
 
-  private sheetNamed(name: string): SheetId | null {
+  private sheet_named(name: string): SheetId | null {
     const key = sheetNameKey(name);
     const sheet = this.deps.store
       .getWorkbook()
@@ -731,7 +738,7 @@ export class FormulaHelp {
     return sheet?.id ?? null;
   }
 
-  private paintText(
+  private paint_text(
     field: FormulaEditorElement,
     text: string,
     references: readonly FormulaReference[],
@@ -746,7 +753,7 @@ export class FormulaHelp {
     this.mirror.render(text, marks, ghost);
   }
 
-  private showCompletion(completion: FormulaCompletion | null): void {
+  private show_completion(completion: FormulaCompletion | null): void {
     const previous = this.completion;
     this.completion = completion;
     if (completion === null) {
@@ -758,14 +765,14 @@ export class FormulaHelp {
       return;
     }
 
-    const unchanged = previous !== null && sameMatches(previous.matches, completion.matches);
+    const unchanged = previous !== null && same_matches(previous.matches, completion.matches);
     if (unchanged && this.list !== null) return;
 
-    this.activeIndex = 0;
-    this.renderList(completion.matches);
+    this.active_index = 0;
+    this.render_list(completion.matches);
   }
 
-  private renderList(matches: readonly FormulaCompletionItem[]): void {
+  private render_list(matches: readonly FormulaCompletionItem[]): void {
     const field = this.field;
     if (field === null || this.layer === null) return;
 
@@ -789,7 +796,7 @@ export class FormulaHelp {
         // mousedown, not click, so the pick lands before the field blurs.
         option.addEventListener("mousedown", (event) => {
           event.preventDefault();
-          this.activeIndex = index;
+          this.active_index = index;
           this.accept();
         });
         return option;
@@ -800,27 +807,27 @@ export class FormulaHelp {
 
     field.setAttribute("aria-controls", list.id);
     if (field instanceof HTMLInputElement) field.setAttribute("aria-expanded", "true");
-    this.renderActive();
+    this.render_active();
   }
 
   private move(delta: number): void {
     const count = this.completion?.matches.length ?? 0;
     if (count === 0) return;
 
-    this.activeIndex = (this.activeIndex + delta + count) % count;
-    this.renderActive();
-    this.showGuide();
+    this.active_index = (this.active_index + delta + count) % count;
+    this.render_active();
+    this.show_guide();
   }
 
-  private renderActive(): void {
+  private render_active(): void {
     const list = this.list;
     if (list === null) return;
 
     for (const [index, option] of [...list.children].entries()) {
-      option.setAttribute("aria-selected", index === this.activeIndex ? "true" : "false");
+      option.setAttribute("aria-selected", index === this.active_index ? "true" : "false");
     }
 
-    const active = list.children[this.activeIndex];
+    const active = list.children[this.active_index];
     if (active instanceof HTMLElement) {
       this.field?.setAttribute("aria-activedescendant", active.id);
       if (typeof active.scrollIntoView === "function") active.scrollIntoView({ block: "nearest" });
@@ -831,7 +838,7 @@ export class FormulaHelp {
   private accept(): void {
     const field = this.field;
     const completion = this.completion;
-    const item = completion?.matches[this.activeIndex];
+    const item = completion?.matches[this.active_index];
     if (field === null || completion === null || item === undefined) return;
 
     const text = field.value;
@@ -848,7 +855,7 @@ export class FormulaHelp {
   }
 
   /** Make the change `fix` names; the caret goes after the changed text. */
-  private applyFix(fix: FormulaFix): void {
+  private apply_fix(fix: FormulaFix): void {
     const field = this.field;
     if (field === null) return;
 
@@ -858,7 +865,7 @@ export class FormulaHelp {
     field.setSelectionRange(caret, caret);
     // A fixed function name ends at the caret; listing functions for it would
     // take the next Enter or Tab, which should commit as without a fix.
-    this.dismissedText = field.value;
+    this.dismissed_text = field.value;
     field.focus();
     field.dispatchEvent(new Event("input", { bubbles: true }));
   }
@@ -868,12 +875,12 @@ export class FormulaHelp {
    * the caret with its current argument in bold, then the first error and
    * the button that fixes it.
    */
-  private showGuide(): void {
+  private show_guide(): void {
     const guide = this.guide;
     if (guide === null) return;
 
     const call = this.call;
-    const listed = this.completion?.matches[this.activeIndex]?.function;
+    const listed = this.completion?.matches[this.active_index]?.function;
     const fn = listed ?? call?.function;
     const active = listed === undefined ? (call?.argumentIndex ?? null) : null;
     const error = this.diagnostics[0]?.message;
@@ -881,10 +888,10 @@ export class FormulaHelp {
 
     const lines: HTMLElement[] = [];
     if (fn !== undefined) {
-      lines.push(signatureLine(fn, active));
-      lines.push(textLine("sheetwrite-formula-description", fn.description));
+      lines.push(signature_line(fn, active));
+      lines.push(text_line("sheetwrite-formula-description", fn.description));
     }
-    if (error !== undefined) lines.push(textLine("sheetwrite-formula-error", error));
+    if (error !== undefined) lines.push(text_line("sheetwrite-formula-error", error));
     if (fix !== null) {
       const button = document.createElement("button");
       button.type = "button";
@@ -894,15 +901,15 @@ export class FormulaHelp {
       // mousedown, not click, so the fix lands before the field blurs.
       button.addEventListener("mousedown", (event) => {
         event.preventDefault();
-        this.applyFix(fix);
+        this.apply_fix(fix);
       });
       lines.push(button);
     }
 
     const key = `${fn === undefined ? "" : signature(fn)}|${active ?? ""}|${error ?? ""}|${fix === null ? "" : `${fix.label}@${fix.from}`}`;
-    if (key === this.guideText) return;
+    if (key === this.guide_text) return;
 
-    this.guideText = key;
+    this.guide_text = key;
     guide.replaceChildren(...lines);
   }
 }

@@ -8,7 +8,7 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, WorkbookSnapshot } from "../src/types.js";
 
 const ACTIONS_MODULE = "../src/autofilter-actions.js";
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 const disposers: (() => void)[] = [];
 
 beforeAll(async () => {
@@ -16,12 +16,12 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
   for (const dispose of disposers.splice(0).reverse()) dispose();
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -59,14 +59,14 @@ function mount(
             startCol: 0,
             rowCount: rows.length,
             colCount: 2,
-            cells: rows.flatMap((row, rowOffset) =>
-              row.map((value, colOffset) => {
-                const numberFormat = colOffset === 0 ? formats[rowOffset] : undefined;
+            cells: rows.flatMap((row, row_offset) =>
+              row.map((value, col_offset) => {
+                const number_format = col_offset === 0 ? formats[row_offset] : undefined;
                 return {
-                  rowOffset,
-                  colOffset,
+                  rowOffset: row_offset,
+                  colOffset: col_offset,
                   value: { kind: "literal" as const, value },
-                  ...(numberFormat ? { style: { numberFormat } } : {}),
+                  ...(number_format ? { style: { numberFormat: number_format } } : {}),
                 };
               }),
             ),
@@ -112,7 +112,7 @@ async function dropdown(): Promise<HTMLElement> {
  * A browser clipboard whose rich format carries a cut's token, as a browser's
  * does. Returns a reader of its plain text.
  */
-function stubClipboard(): () => Promise<string | undefined> {
+function stub_clipboard(): () => Promise<string | undefined> {
   class ClipItem {
     readonly types: string[];
     constructor(private readonly entries: Record<string, Blob>) {
@@ -139,7 +139,7 @@ function stubClipboard(): () => Promise<string | undefined> {
 }
 
 /** A browser clipboard of plain `text` only. */
-function textClipboard(text: string): void {
+function text_clipboard(text: string): void {
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: { read: () => Promise.resolve([]), readText: () => Promise.resolve(text) },
@@ -292,7 +292,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("cuts a filtered range as Excel does: the rows the filter hides move too", async () => {
-    stubClipboard();
+    stub_clipboard();
     const { grid, store } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
@@ -342,7 +342,7 @@ describe("AutoFilter in the grid", () => {
   ])(
     "pastes a block over rows %s hid into them too, then into the shown rows only (#937)",
     async (_, hide) => {
-      textClipboard("10\n20\n30");
+      text_clipboard("10\n20\n30");
       const { grid, store } = mount();
       hide(grid);
       const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
@@ -382,7 +382,7 @@ describe("AutoFilter in the grid", () => {
   );
 
   it("refuses Paste into visible rows only when the shown rows below are too few, and keeps the paste", async () => {
-    textClipboard("10\n20\n30");
+    text_clipboard("10\n20\n30");
     const { grid, store } = mount();
     grid.hideRows([8]);
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
@@ -403,7 +403,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("refuses a paste under a view sort that runs past the view's last row", async () => {
-    textClipboard("1\n2\n3");
+    text_clipboard("1\n2\n3");
     const { grid, store } = mount();
     grid.setViewSort([{ col: 1, ascending: false }]);
     const qty = () =>
@@ -423,7 +423,7 @@ describe("AutoFilter in the grid", () => {
   it("pastes over more than 10,000 shown cells of a filtered range", async () => {
     // Excel fills one copied value into every shown cell of the selection,
     // however many; the paste is one operation, not one per cell.
-    textClipboard("5");
+    text_clipboard("5");
     const rows: CellScalar[][] = [["Item", "Qty"]];
     for (let row = 1; row <= 12_000; row++) rows.push([row % 2 === 1 ? "keep" : "hide", row]);
     const { grid, store } = mount(rows);
@@ -442,7 +442,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("offers Paste into visible rows only only after a paste that applied, and undoes only that paste", async () => {
-    textClipboard("10\n20\n30");
+    text_clipboard("10\n20\n30");
     const { grid, host, store } = mount();
     // An earlier edit, which no paste offer may undo.
     grid.beginEdit(8, 0, "x");
@@ -472,7 +472,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("says a paste or a cut's paste that the grid refused pasted nothing", async () => {
-    textClipboard("10\n20");
+    text_clipboard("10\n20");
     const { grid, store } = mount();
     grid.setProtectedRange({
       id: "locked",
@@ -487,7 +487,7 @@ describe("AutoFilter in the grid", () => {
     expect(notice()?.textContent).toBe(refused);
     expect([1, 2].map(qty)).toEqual([3, 12]);
 
-    stubClipboard();
+    stub_clipboard();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
     expect(await grid.actions.cut()).toBe("done");
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
@@ -497,7 +497,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("shows the rows Hide Rows hid, from the cut notice's Show them", async () => {
-    stubClipboard();
+    stub_clipboard();
     const { grid, host } = mount();
     // Sheet row 2 (banana) is hidden; view rows 1 and 2 show apple and fig.
     grid.hideRows([2]);
@@ -516,7 +516,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("shows the rows of the sheet that was cut, after a switch to another sheet", async () => {
-    stubClipboard();
+    stub_clipboard();
     const { grid } = mount();
     grid.hideRows([2]);
     grid.setSelection({
@@ -542,7 +542,7 @@ describe("AutoFilter in the grid", () => {
   });
 
   it("copies and cuts the active cell of a hidden row, as Excel does", async () => {
-    const clipboardText = stubClipboard();
+    const clipboard_text = stub_clipboard();
     const { grid, store } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
     grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
@@ -550,7 +550,7 @@ describe("AutoFilter in the grid", () => {
     const banana = { sheet: "s1", row: 2, col: 0 };
     expect(grid.goToCell(banana)).toBe(true);
     expect(await grid.actions.copy()).toBe("done");
-    expect(await clipboardText()).toBe("banana");
+    expect(await clipboard_text()).toBe("banana");
 
     expect(await grid.actions.cut()).toBe("done");
     // Paste on A7: view row 5 shows sheet row 6, below the filtered range.
@@ -566,8 +566,10 @@ describe("AutoFilter in the grid", () => {
     grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
     const begins: unknown[] = [];
     const focuses: unknown[] = [];
-    grid.on("edit-begin", ({ addr, sheetAddress }) => begins.push([addr.row, sheetAddress.row]));
-    grid.on("selection", ({ sheetFocus }) => focuses.push(sheetFocus?.row));
+    grid.on("edit-begin", ({ addr, sheetAddress: sheet_address }) =>
+      begins.push([addr.row, sheet_address.row]),
+    );
+    grid.on("selection", ({ sheetFocus: sheet_focus }) => focuses.push(sheet_focus?.row));
     // View row 2 shows fig, on sheet row 3.
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
     grid.beginEdit(2, 0);

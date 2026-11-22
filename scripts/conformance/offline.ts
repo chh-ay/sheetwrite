@@ -17,12 +17,12 @@ export async function runOffline(
     readFormulaInventory(paths.inventory),
   ]);
   const { manifest } = generateConformanceEvidence(inventory);
-  const corpusIssues = [
+  const corpus_issues = [
     ...artifacts.issues,
     ...validateCorpus(corpus, manifest, inventory, artifacts.verified),
   ];
-  if (corpusIssues.length > 0) throw new Error(corpusIssues.join("\n"));
-  const localCanaries = corpus.cases.filter((entry) => entry.localCanary === true).length;
+  if (corpus_issues.length > 0) throw new Error(corpus_issues.join("\n"));
+  const local_canaries = corpus.cases.filter((entry) => entry.localCanary === true).length;
 
   const failures: string[] = [];
   const warnings: string[] = [];
@@ -33,23 +33,23 @@ export async function runOffline(
   for (const entry of corpus.cases) {
     checked += 1;
     const actual = await runSheetwriteCase(entry);
-    const localDifferences = compareResults(entry.expected, actual);
-    if (localDifferences.length > 0) {
-      failures.push(`${entry.id} sheetwrite: ${localDifferences.join("; ")}`);
+    const local_differences = compareResults(entry.expected, actual);
+    if (local_differences.length > 0) {
+      failures.push(`${entry.id} sheetwrite: ${local_differences.join("; ")}`);
     }
     if (entry.unsupported) {
       unsupported.push(entry.id);
       warnings.push(`${entry.id}: explicitly unsupported; compatibility is not claimed`);
       continue;
     }
-    const reviewedObservations = entry.observations.filter(
+    const reviewed_observations = entry.observations.filter(
       (observation) => observation.status === "reviewed",
     );
-    if (reviewedObservations.length === 0) {
+    if (reviewed_observations.length === 0) {
       deferred += 1;
       warnings.push(`${entry.id}: no reviewed producer capture; compatibility is not claimed`);
     }
-    for (const observation of reviewedObservations) {
+    for (const observation of reviewed_observations) {
       reviewed += 1;
       const differences = compareReviewedObservation(
         entry.expected,
@@ -65,7 +65,7 @@ export async function runOffline(
   return {
     status: deferred === 0 && unsupported.length === 0 ? "verified" : "blocked",
     checked,
-    localCanaries,
+    localCanaries: local_canaries,
     reviewed,
     deferred,
     warnings,

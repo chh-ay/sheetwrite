@@ -49,7 +49,7 @@ const STATUSES = ["Shipped", "Shipped", "Shipped", "Packing", "Cancelled"] as co
 const MONEY = "$#,##0";
 
 /** One order line of the host's CSV feed; the index makes it deterministic. */
-function feedLine(index: number): string {
+function feed_line(index: number): string {
   const region = FEED_REGION_WEIGHTS[(index * 5) % FEED_REGION_WEIGHTS.length] ?? "EU";
   const status = STATUSES[(index * 3) % STATUSES.length] ?? "Shipped";
   const amount = 40 + ((index * 389) % 2_160);
@@ -60,7 +60,7 @@ function feedLine(index: number): string {
 /** Which order statuses the Region totals query keeps. */
 export type StatusFilter = "shipped" | "all";
 
-function regionTotalsQuery(statuses: StatusFilter): SavedQuery {
+function region_totals_query(statuses: StatusFilter): SavedQuery {
   return {
     id: "region-totals",
     name: "Region totals",
@@ -127,7 +127,7 @@ const REGIONS_QUERY: SavedQuery = {
 const LARGE_ORDERS_QUERY: SavedQuery = {
   id: "large-orders",
   name: "Large orders",
-  source: regionTotalsQuery("all").source,
+  source: region_totals_query("all").source,
   steps: [
     {
       kind: "filter",
@@ -155,7 +155,7 @@ export const REPORT_ROWS_USED = Math.max(1 + REGIONS.length, REPORT_FORMULAS.len
 /** Money columns: Revenue in Region totals and Amount in Large orders. */
 const MONEY_COLUMNS: Readonly<Record<string, number>> = { [REPORT_SHEET]: 1, [LARGE_SHEET]: 3 };
 
-function queriesWorkbook(): Workbook {
+function queries_workbook(): Workbook {
   // A column format, because a refresh rewrites the table cells and their styles.
   const columns = (sheet: string, widths: readonly number[]) =>
     widths.map((width, index) => ({
@@ -181,11 +181,11 @@ function queriesWorkbook(): Workbook {
         columns: columns(LARGE_SHEET, [112, 104, 80, 104]),
       },
     ],
-    queries: [REGIONS_QUERY, regionTotalsQuery("shipped"), LARGE_ORDERS_QUERY],
+    queries: [REGIONS_QUERY, region_totals_query("shipped"), LARGE_ORDERS_QUERY],
   };
 }
 
-function reportOperations(): DocumentOp[] {
+function report_operations(): DocumentOp[] {
   return REPORT_FORMULAS.flatMap((formula, row): DocumentOp[] => [
     {
       op: "set",
@@ -210,7 +210,7 @@ function reportOperations(): DocumentOp[] {
 }
 
 /** Why a refresh wrote nothing, with the engine's diagnostic when it has one. */
-function refreshFailure(result: QueryRefreshResult): string {
+function refresh_failure(result: QueryRefreshResult): string {
   if (result.status === "failed") {
     const { code, step, column } = result.diagnostic;
     const at = [step === null ? null : `step ${step + 1}`, column].filter(Boolean).join(", ");
@@ -253,20 +253,20 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
   const controller = new AbortController();
   const listeners = createListeners();
   const encoder = new TextEncoder();
-  const feed = Array.from({ length: FEED_START_ROWS }, (_, index) => feedLine(index));
+  const feed = Array.from({ length: FEED_START_ROWS }, (_, index) => feed_line(index));
   let grid: Grid | null = null;
-  let shellElement: HTMLElement | null = null;
+  let shell_element: HTMLElement | null = null;
   let session: QuerySession | null = null;
   let dispose = () => {};
   let fetches = 0;
   let statuses: StatusFilter = "shipped";
-  let definitionChanged = false;
-  let feedChanged = false;
-  let lastRefresh: RefreshReading | null = null;
+  let definition_changed = false;
+  let feed_changed = false;
+  let last_refresh: RefreshReading | null = null;
   let refreshing = false;
 
   // The host's only source access: the session never fetches by itself.
-  const fetchSource = async (request: { sourceId: string }) => {
+  const fetch_source = async (request: { sourceId: string }) => {
     fetches += 1;
     const text =
       request.sourceId === REGIONS_SOURCE
@@ -275,17 +275,17 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
     return { kind: "bytes" as const, bytes: encoder.encode(text) };
   };
 
-  const refreshAll = async () => {
+  const refresh_all = async () => {
     if (!session) throw new Error("The query session is still connecting");
     refreshing = true;
     listeners.notify();
     const started = performance.now();
     try {
       const result = await session.refreshAll({ signal: controller.signal });
-      lastRefresh = { status: result.status, milliseconds: performance.now() - started };
-      if (result.status !== "applied") throw new Error(refreshFailure(result));
-      definitionChanged = false;
-      feedChanged = false;
+      last_refresh = { status: result.status, milliseconds: performance.now() - started };
+      if (result.status !== "applied") throw new Error(refresh_failure(result));
+      definition_changed = false;
+      feed_changed = false;
     } finally {
       refreshing = false;
       listeners.notify();
@@ -297,29 +297,29 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
       host,
       // Letter headers without filler columns: the grid ends with the report's columns.
       {
-        workbook: queriesWorkbook(),
+        workbook: queries_workbook(),
         presentation: "data-grid",
-        addons: { queries: { fetchSource } },
+        addons: { queries: { fetchSource: fetch_source } },
       },
       controller.signal,
       [queriesAddon()],
     );
     if (!shell) return;
     grid = shell.grid;
-    shellElement = shell.element;
-    requireApplied(grid.applyRemoteOperations(reportOperations()), "The report formulas");
+    shell_element = shell.element;
+    requireApplied(grid.applyRemoteOperations(report_operations()), "The report formulas");
     // The query engine's WASM loads with this grid, the only one given a source.
     session = await querySessionOf(grid);
-    const stopChanges = grid.on("change", () => listeners.notify());
+    const stop_changes = grid.on("change", () => listeners.notify());
     dispose = () => {
-      stopChanges();
+      stop_changes();
       shell.dispose();
     };
     if (controller.signal.aborted) return;
-    await refreshAll();
+    await refresh_all();
   })();
 
-  const requireGrid = (): Grid => {
+  const require_grid = (): Grid => {
     if (!grid) throw new Error("The report is still loading");
     return grid;
   };
@@ -333,9 +333,9 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
         feedRows: feed.length,
         fetches,
         statuses,
-        definitionChanged,
-        feedChanged,
-        lastRefresh,
+        definitionChanged: definition_changed,
+        feedChanged: feed_changed,
+        lastRefresh: last_refresh,
         refreshing,
         formulas: REPORT_FORMULAS.map((formula, row) => {
           const value = current?.store.getCell({
@@ -352,29 +352,29 @@ export function createQueriesScenario(host: HTMLElement): QueriesScenario {
         }),
       };
     },
-    refreshAll,
+    refreshAll: refresh_all,
     addOrders() {
       const start = feed.length;
-      for (let index = start; index < start + FEED_BATCH_ROWS; index++) feed.push(feedLine(index));
-      feedChanged = true;
+      for (let index = start; index < start + FEED_BATCH_ROWS; index++) feed.push(feed_line(index));
+      feed_changed = true;
       listeners.notify();
     },
     setStatuses(next) {
       if (!session) throw new Error("The query session is still connecting");
-      const result = session.define(regionTotalsQuery(next));
+      const result = session.define(region_totals_query(next));
       if (result.status === "invalid")
         throw new Error(`The query is invalid: ${result.diagnostic.code}`);
       requireApplied(result, "The query change");
       statuses = next;
-      definitionChanged = true;
+      definition_changed = true;
       listeners.notify();
     },
     openQueriesPanel() {
-      if (!shellElement) throw new Error("The report is still loading");
-      pressRibbonCommand(shellElement, "Data", "queries");
+      if (!shell_element) throw new Error("The report is still loading");
+      pressRibbonCommand(shell_element, "Data", "queries");
     },
     undo() {
-      requireGrid().undo();
+      require_grid().undo();
     },
     dispose() {
       controller.abort();

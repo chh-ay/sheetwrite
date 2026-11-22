@@ -27,13 +27,18 @@ describe("sitemap normalization contract", () => {
         .map((path) => `<url><loc>${SITE}${path}</loc></url>`)
         .join("\n")}\n</urlset>\n`,
     );
-    const keptPaths = ["/", "/react/", "/docs/start/installation/", "/showcases/interoperability/"];
+    const kept_paths = [
+      "/",
+      "/react/",
+      "/docs/start/installation/",
+      "/showcases/interoperability/",
+    ];
     expect([...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1])).toEqual(
-      keptPaths.map((path) => `${SITE}${path}`),
+      kept_paths.map((path) => `${SITE}${path}`),
     );
     expect({ kept, dropped }).toEqual({
-      kept: keptPaths.length,
-      dropped: paths.length - keptPaths.length,
+      kept: kept_paths.length,
+      dropped: paths.length - kept_paths.length,
     });
   });
 });

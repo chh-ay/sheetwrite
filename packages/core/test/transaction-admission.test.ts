@@ -19,7 +19,7 @@ function reservation(log: string[], name: string): GridTransactionAdmissionReser
 }
 
 /** Admits an empty transaction through two guards on a fresh grid. */
-function admitTwoGuards(log: string[]): GridTransactionAdmissionReservation {
+function admit_two_guards(log: string[]): GridTransactionAdmissionReservation {
   const grid = {} as Grid;
   for (const name of ["first", "second"]) {
     registerGridTransactionAdmission(grid, {
@@ -35,14 +35,14 @@ describe("grid transaction admission", () => {
   it("keeps a later guard when an earlier guard's dispose runs twice", () => {
     const grid = {} as Grid;
     const log: string[] = [];
-    const disposeFirst = registerGridTransactionAdmission(grid, {
+    const dispose_first = registerGridTransactionAdmission(grid, {
       reserve: () => ({ ok: true, reservation: reservation(log, "first") }),
     });
-    disposeFirst();
+    dispose_first();
     registerGridTransactionAdmission(grid, {
       reserve: () => ({ ok: true, reservation: reservation(log, "second") }),
     });
-    disposeFirst();
+    dispose_first();
 
     const admitted = beginGridTransactionAdmission(grid, []);
     if (!admitted.ok) throw new Error("admission unexpectedly rejected");
@@ -51,28 +51,28 @@ describe("grid transaction admission", () => {
   });
 
   it("finishes or cancels every reservation exactly once", () => {
-    const finishLog: string[] = [];
-    const finished = admitTwoGuards(finishLog);
+    const finish_log: string[] = [];
+    const finished = admit_two_guards(finish_log);
     finished.finish(outcome);
     finished.finish(outcome);
     finished.cancel();
-    expect(finishLog).toEqual(["first:finish:noop", "second:finish:noop"]);
+    expect(finish_log).toEqual(["first:finish:noop", "second:finish:noop"]);
 
-    const cancelLog: string[] = [];
-    const cancelled = admitTwoGuards(cancelLog);
+    const cancel_log: string[] = [];
+    const cancelled = admit_two_guards(cancel_log);
     cancelled.cancel();
     cancelled.cancel();
     cancelled.finish(outcome);
-    expect(cancelLog).toEqual(["first:cancel", "second:cancel"]);
+    expect(cancel_log).toEqual(["first:cancel", "second:cancel"]);
   });
 
   it("cancels earlier reservations when a later guard rejects or throws", () => {
-    const rejectedGrid = {} as Grid;
-    const rejectedLog: string[] = [];
-    registerGridTransactionAdmission(rejectedGrid, {
-      reserve: () => ({ ok: true, reservation: reservation(rejectedLog, "first") }),
+    const rejected_grid = {} as Grid;
+    const rejected_log: string[] = [];
+    registerGridTransactionAdmission(rejected_grid, {
+      reserve: () => ({ ok: true, reservation: reservation(rejected_log, "first") }),
     });
-    registerGridTransactionAdmission(rejectedGrid, {
+    registerGridTransactionAdmission(rejected_grid, {
       reserve: () => ({
         ok: false,
         issue: {
@@ -85,22 +85,22 @@ describe("grid transaction admission", () => {
         },
       }),
     });
-    const rejected = beginGridTransactionAdmission(rejectedGrid, []);
+    const rejected = beginGridTransactionAdmission(rejected_grid, []);
     expect(rejected.ok).toBe(false);
-    expect(rejectedLog).toEqual(["first:cancel"]);
+    expect(rejected_log).toEqual(["first:cancel"]);
 
-    const thrownGrid = {} as Grid;
-    const thrownLog: string[] = [];
-    const throwingGuard: GridTransactionAdmissionGuard = {
+    const thrown_grid = {} as Grid;
+    const thrown_log: string[] = [];
+    const throwing_guard: GridTransactionAdmissionGuard = {
       reserve: () => {
         throw new Error("guard failed");
       },
     };
-    registerGridTransactionAdmission(thrownGrid, {
-      reserve: () => ({ ok: true, reservation: reservation(thrownLog, "first") }),
+    registerGridTransactionAdmission(thrown_grid, {
+      reserve: () => ({ ok: true, reservation: reservation(thrown_log, "first") }),
     });
-    registerGridTransactionAdmission(thrownGrid, throwingGuard);
-    expect(() => beginGridTransactionAdmission(thrownGrid, [])).toThrow("guard failed");
-    expect(thrownLog).toEqual(["first:cancel"]);
+    registerGridTransactionAdmission(thrown_grid, throwing_guard);
+    expect(() => beginGridTransactionAdmission(thrown_grid, [])).toThrow("guard failed");
+    expect(thrown_log).toEqual(["first:cancel"]);
   });
 });

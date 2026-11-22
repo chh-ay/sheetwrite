@@ -72,7 +72,7 @@ interface Shown {
 }
 
 /** Letter case aside, so a dismissed formula stays dismissed however it is typed. */
-function formulaKey(formula: string): string {
+function formula_key(formula: string): string {
   return formula.toUpperCase();
 }
 
@@ -99,7 +99,7 @@ class Session implements PredictionSession {
     const candidates: Candidate[] = [];
     for (const signal of this.signals) {
       for (const proposal of signal.proposals(text, analysis)) {
-        if (this.dismissed.has(formulaKey(proposal.formula))) continue;
+        if (this.dismissed.has(formula_key(proposal.formula))) continue;
         // A reason the development sets never saw has no measured chance, so it never shows.
         const confidence = CALIBRATION[calibrationKey(proposal, text)] ?? 0;
         candidates.push({ ...proposal, confidence });
@@ -129,7 +129,7 @@ class Session implements PredictionSession {
   feedback(event: "accept" | "accept-word" | "dismiss"): void {
     const shown = this.shown;
     if (event !== "dismiss" || shown === null) return;
-    this.dismissed.add(formulaKey(shown.text + shown.choice.text));
+    this.dismissed.add(formula_key(shown.text + shown.choice.text));
     this.shown = null;
   }
 

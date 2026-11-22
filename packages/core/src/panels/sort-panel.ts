@@ -37,14 +37,14 @@ function button(label: string, run: () => void): HTMLButtonElement {
 function checkbox(
   label: string,
   checked: boolean,
-  focusKey: string,
+  focus_key: string,
 ): { element: HTMLLabelElement; box: HTMLInputElement } {
   const element = document.createElement("label");
   element.className = "sheetwrite-panel-check";
   const box = document.createElement("input");
   box.type = "checkbox";
   box.checked = checked;
-  box.dataset.focusKey = focusKey;
+  box.dataset.focusKey = focus_key;
   element.append(box, label);
   return { element, box };
 }
@@ -53,7 +53,7 @@ function checkbox(
  * The range a sort starts with: the selected rectangle when it has more than
  * one cell, else the current region around the selected cell.
  */
-function initialRange(grid: Grid): Range | null {
+function initial_range(grid: Grid): Range | null {
   const range = selectionRange(grid.getSelection(), grid.store.getWorkbook().sheets);
   if (range === null) return null;
 
@@ -64,9 +64,9 @@ function initialRange(grid: Grid): Range | null {
 }
 
 /** Column choices of a range: the header text when it has one, else the column letter. */
-function columnOptions(grid: Grid, range: Range, hasHeader: boolean): [string, string][] {
+function column_options(grid: Grid, range: Range, has_header: boolean): [string, string][] {
   const options: [string, string][] = [];
-  const headers = hasHeader
+  const headers = has_header
     ? readRowValues(grid.store, {
         sheet: range.sheet,
         row: range.start.row,
@@ -87,38 +87,38 @@ export function sortPanel(grid: Grid): GridPanel {
     title: "Sort",
     render(body) {
       const sheets = grid.store.getWorkbook().sheets;
-      const start = initialRange(grid);
+      const start = initial_range(grid);
       const sheet = start?.sheet ?? sheets[0]?.id ?? "";
 
       const form = document.createElement("form");
-      const rangeInput = document.createElement("input");
-      rangeInput.type = "text";
-      rangeInput.autocomplete = "off";
-      rangeInput.spellcheck = false;
-      rangeInput.value = start === null ? "" : formatRangeText(start, sheets, sheet);
-      const rangeField = panelField("Range", rangeInput, "sort-range");
+      const range_input = document.createElement("input");
+      range_input.type = "text";
+      range_input.autocomplete = "off";
+      range_input.spellcheck = false;
+      range_input.value = start === null ? "" : formatRangeText(start, sheets, sheet);
+      const range_field = panelField("Range", range_input, "sort-range");
       const header = checkbox(
         "My data has headers",
         start !== null && looksLikeHeader(grid.store, start),
         "sort-header",
       );
-      const viewOnly = checkbox("Sort view only (cells keep their rows)", false, "sort-view-only");
-      const headerBox = header.box;
-      const viewOnlyBox = viewOnly.box;
+      const view_only = checkbox("Sort view only (cells keep their rows)", false, "sort-view-only");
+      const header_box = header.box;
+      const view_only_box = view_only.box;
 
       const levels: SortLevel[] = [{ col: start?.start.col ?? 0, ascending: true }];
-      const levelList = panelSection("Sort by");
+      const level_list = panelSection("Sort by");
       const rows = document.createElement("div");
-      levelList.append(rows);
+      level_list.append(rows);
 
-      const parsedRange = (): Range | null => {
-        const result = parseRangeText(rangeInput.value, sheets, sheet);
+      const parsed_range = (): Range | null => {
+        const result = parseRangeText(range_input.value, sheets, sheet);
         return "range" in result ? result.range : null;
       };
 
-      const drawLevels = (): void => {
-        const range = parsedRange();
-        const options = range === null ? [] : columnOptions(grid, range, headerBox.checked);
+      const draw_levels = (): void => {
+        const range = parsed_range();
+        const options = range === null ? [] : column_options(grid, range, header_box.checked);
         rows.replaceChildren();
         levels.forEach((level, index) => {
           const row = document.createElement("div");
@@ -147,7 +147,7 @@ export function sortPanel(grid: Grid): GridPanel {
           });
           const remove = button("Delete level", () => {
             levels.splice(index, 1);
-            drawLevels();
+            draw_levels();
           });
           remove.setAttribute("aria-label", `Delete sort level ${index + 1}`);
           remove.disabled = levels.length === 1;
@@ -160,7 +160,7 @@ export function sortPanel(grid: Grid): GridPanel {
         if (levels.length >= MAX_LEVELS) return;
         const last = levels.at(-1);
         levels.push({ col: last?.col ?? 0, ascending: true });
-        drawLevels();
+        draw_levels();
       });
 
       const sort = document.createElement("button");
@@ -169,50 +169,50 @@ export function sortPanel(grid: Grid): GridPanel {
       sort.textContent = "Sort";
       sort.dataset.focusKey = "sort-apply";
 
-      const syncViewOnly = (): void => {
-        rangeInput.disabled = viewOnlyBox.checked;
-        headerBox.disabled = viewOnlyBox.checked;
+      const sync_view_only = (): void => {
+        range_input.disabled = view_only_box.checked;
+        header_box.disabled = view_only_box.checked;
       };
-      viewOnlyBox.addEventListener("change", syncViewOnly);
-      headerBox.addEventListener("change", drawLevels);
-      rangeInput.addEventListener("change", () => {
-        rangeField.setError(null);
-        drawLevels();
+      view_only_box.addEventListener("change", sync_view_only);
+      header_box.addEventListener("change", draw_levels);
+      range_input.addEventListener("change", () => {
+        range_field.setError(null);
+        draw_levels();
       });
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         const keys: SortKey[] = levels.map(({ col, ascending }) => ({ col, ascending }));
         if (keys.length === 0) {
-          rangeField.setError(NO_KEYS);
+          range_field.setError(NO_KEYS);
           return;
         }
 
-        if (viewOnlyBox.checked) {
-          rangeField.setError(rejectionMessage(grid.setViewSort(keys)));
+        if (view_only_box.checked) {
+          range_field.setError(rejectionMessage(grid.setViewSort(keys)));
           return;
         }
 
-        const result = parseRangeText(rangeInput.value, sheets, sheet);
+        const result = parseRangeText(range_input.value, sheets, sheet);
         if ("error" in result) {
-          rangeField.setError(result.error);
+          range_field.setError(result.error);
           return;
         }
         const outside = keys.some(
           ({ col }) => col < result.range.start.col || col > result.range.end.col,
         );
         if (outside) {
-          rangeField.setError(KEY_OUTSIDE);
+          range_field.setError(KEY_OUTSIDE);
           return;
         }
-        const outcome = grid.sortRange(result.range, keys, { hasHeader: headerBox.checked });
-        rangeField.setError(outcome.status === "noop" ? null : rejectionMessage(outcome));
+        const outcome = grid.sortRange(result.range, keys, { hasHeader: header_box.checked });
+        range_field.setError(outcome.status === "noop" ? null : rejectionMessage(outcome));
       });
 
-      form.append(rangeField.element, header.element, levelList, add, viewOnly.element, sort);
+      form.append(range_field.element, header.element, level_list, add, view_only.element, sort);
       body.append(form);
-      drawLevels();
-      syncViewOnly();
+      draw_levels();
+      sync_view_only();
       return () => form.remove();
     },
   };

@@ -13,24 +13,24 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(async () => {
   mock.restore();
-  restoreStubs();
+  restore_stubs();
   // Every test leaves a running engine behind, whether or not it stopped one.
   await initSheetwrite();
 });
 
-function mountGrid(store?: SheetwriteStore): GridImpl {
+function mount_grid(store?: SheetwriteStore): GridImpl {
   return new GridImpl(mountHost(), { workbook: makeWorkbook(5), data: makeColumnarData(5) }, store);
 }
 
-function setText(text: string): DocumentOp {
+function set_text(text: string): DocumentOp {
   return {
     op: "set",
     addr: { sheet: "s1", row: 0, col: 0 },
@@ -53,15 +53,15 @@ const STUCK_CELL_STORE = new Proxy(
 
 function poison(engine: StoreDataEngine): void {
   Reflect.set(engine, "wasm", STUCK_CELL_STORE);
-  for (const reader of [Reflect.get(engine, "view"), Reflect.get(engine, "windowReader")]) {
-    const replaceEngine: unknown = Reflect.get(reader, "replaceEngine");
-    if (typeof replaceEngine !== "function") throw new Error("Engine reader shape changed");
-    Reflect.apply(replaceEngine, reader, [STUCK_CELL_STORE]);
+  for (const reader of [Reflect.get(engine, "view"), Reflect.get(engine, "window_reader")]) {
+    const replace_engine: unknown = Reflect.get(reader, "replaceEngine");
+    if (typeof replace_engine !== "function") throw new Error("Engine reader shape changed");
+    Reflect.apply(replace_engine, reader, [STUCK_CELL_STORE]);
   }
 }
 
 /** Trap the way the engine does: the store stays stuck after the call. */
-function trapAndPoison(this: StoreDataEngine): never {
+function trap_and_poison(this: StoreDataEngine): never {
   poison(this);
   throw new WebAssembly.RuntimeError("unreachable");
 }
@@ -80,7 +80,7 @@ function caught(run: () => unknown): unknown {
   throw new Error("Expected the call to throw");
 }
 
-function expectEngineFailed(error: unknown): SheetwriteError {
+function expect_engine_failed(error: unknown): SheetwriteError {
   if (!(error instanceof SheetwriteError)) {
     throw new Error(`Expected a SheetwriteError, got ${String(error)}`);
   }
@@ -91,52 +91,52 @@ function expectEngineFailed(error: unknown): SheetwriteError {
 }
 
 /** Stop the running engine through a trap in `store`'s next edit. */
-function stopThrough(store: { applyTransaction: SheetwriteStore["applyTransaction"] }): unknown {
-  const applyPatches = spyOn(StoreDataEngine.prototype, "applyPatches").mockImplementation(
-    trapAndPoison,
+function stop_through(store: { applyTransaction: SheetwriteStore["applyTransaction"] }): unknown {
+  const apply_patches = spyOn(StoreDataEngine.prototype, "applyPatches").mockImplementation(
+    trap_and_poison,
   );
   try {
-    return caught(() => store.applyTransaction({ patches: [setText("lost")] }));
+    return caught(() => store.applyTransaction({ patches: [set_text("lost")] }));
   } finally {
-    applyPatches.mockRestore();
+    apply_patches.mockRestore();
   }
 }
 
 describe("engine failure", () => {
   it("stops the engine on a trap and makes every grid on it read-only", async () => {
-    const first = mountGrid();
-    const second = mountGrid();
-    const firstEvents: Array<GridEvents["engine-failed"]> = [];
-    const secondEvents: Array<GridEvents["engine-failed"]> = [];
-    const commandStates: Array<GridEvents["command-state-change"]> = [];
-    first.on("engine-failed", (event) => firstEvents.push(event));
-    second.on("engine-failed", (event) => secondEvents.push(event));
-    first.on("command-state-change", (event) => commandStates.push(event));
+    const first = mount_grid();
+    const second = mount_grid();
+    const first_events: Array<GridEvents["engine-failed"]> = [];
+    const second_events: Array<GridEvents["engine-failed"]> = [];
+    const command_states: Array<GridEvents["command-state-change"]> = [];
+    first.on("engine-failed", (event) => first_events.push(event));
+    second.on("engine-failed", (event) => second_events.push(event));
+    first.on("command-state-change", (event) => command_states.push(event));
 
-    const error = expectEngineFailed(stopThrough(first));
+    const error = expect_engine_failed(stop_through(first));
     expect(error.cause).toBeInstanceOf(WebAssembly.RuntimeError);
     expect(isSheetwriteReady()).toBe(false);
 
     // Edits are refused at once; the event follows one microtask later.
-    expect(first.applyTransaction({ patches: [setText("refused")] })).toMatchObject({
+    expect(first.applyTransaction({ patches: [set_text("refused")] })).toMatchObject({
       status: "noop",
       reason: "read-only",
     });
     await Promise.resolve();
 
-    expect(firstEvents).toHaveLength(1);
-    expect(firstEvents[0]?.error).toBe(error);
-    expect(secondEvents).toHaveLength(1);
+    expect(first_events).toHaveLength(1);
+    expect(first_events[0]?.error).toBe(error);
+    expect(second_events).toHaveLength(1);
     // Command state reports read-only without reading the stuck store.
-    expect(commandStates.length).toBeGreaterThan(0);
-    expect(second.applyTransaction({ patches: [setText("refused")] })).toMatchObject({
+    expect(command_states.length).toBeGreaterThan(0);
+    expect(second.applyTransaction({ patches: [set_text("refused")] })).toMatchObject({
       status: "noop",
       reason: "read-only",
     });
 
     // The host cannot switch editing back on while the engine is stopped.
     first.setReadOnly(false);
-    expect(first.applyTransaction({ patches: [setText("refused")] })).toMatchObject({
+    expect(first.applyTransaction({ patches: [set_text("refused")] })).toMatchObject({
       status: "noop",
       reason: "read-only",
     });
@@ -151,17 +151,17 @@ describe("engine failure", () => {
 
     expect(() => first.destroy()).not.toThrow();
     expect(() => second.destroy()).not.toThrow();
-    expect(firstEvents).toHaveLength(1);
+    expect(first_events).toHaveLength(1);
   });
 
   it("refuses work on stores of a stopped engine and restarts from a document", async () => {
     const stopped = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const snapshot = stopped.exportSnapshot();
 
-    expectEngineFailed(stopThrough(stopped));
-    expectEngineFailed(caught(() => stopped.applyTransaction({ patches: [setText("again")] })));
-    expectEngineFailed(caught(() => stopped.recalculateVolatile()));
-    expectEngineFailed(caught(() => stopped.loadPage("s1", 0, [], [])));
+    expect_engine_failed(stop_through(stopped));
+    expect_engine_failed(caught(() => stopped.applyTransaction({ patches: [set_text("again")] })));
+    expect_engine_failed(caught(() => stopped.recalculateVolatile()));
+    expect_engine_failed(caught(() => stopped.loadPage("s1", 0, [], [])));
     expect(() => createGrid(mountHost(), { workbook: makeWorkbook(5) })).toThrow(
       expect.objectContaining({ code: "initialization-required" }),
     );
@@ -171,21 +171,21 @@ describe("engine failure", () => {
     await initSheetwrite();
 
     const restarted = SheetwriteStore.fromSnapshot(snapshot);
-    expect(restarted.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
+    expect(restarted.applyTransaction({ patches: [set_text("kept")] }).status).toBe("applied");
     expect(restarted.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("kept");
     expect(isSheetwriteReady()).toBe(true);
     restarted.dispose();
   });
 
   it("stops the engine when the first paint traps", async () => {
-    const visibleWindow = spyOn(SheetwriteStore.prototype, "getVisibleWindow").mockImplementation(
+    const visible_window = spyOn(SheetwriteStore.prototype, "getVisibleWindow").mockImplementation(
       trap,
     );
     let grid: GridImpl;
     try {
-      grid = mountGrid();
+      grid = mount_grid();
     } finally {
-      visibleWindow.mockRestore();
+      visible_window.mockRestore();
     }
 
     const events: Array<GridEvents["engine-failed"]> = [];
@@ -193,9 +193,9 @@ describe("engine failure", () => {
     await Promise.resolve();
 
     expect(events).toHaveLength(1);
-    expectEngineFailed(events[0]?.error);
+    expect_engine_failed(events[0]?.error);
     expect(isSheetwriteReady()).toBe(false);
-    expect(grid.applyTransaction({ patches: [setText("refused")] })).toMatchObject({
+    expect(grid.applyTransaction({ patches: [set_text("refused")] })).toMatchObject({
       status: "noop",
       reason: "read-only",
     });
@@ -205,20 +205,20 @@ describe("engine failure", () => {
   it("keeps a restarted engine running when a grid uses a store from the stopped one", async () => {
     const bystander = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const stopped = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    expectEngineFailed(stopThrough(stopped));
+    expect_engine_failed(stop_through(stopped));
     await initSheetwrite();
-    const healthy = mountGrid();
+    const healthy = mount_grid();
 
     // Every frame read traps while the stale grid mounts; none may stop the running engine.
-    const visibleWindow = spyOn(SheetwriteStore.prototype, "getVisibleWindow").mockImplementation(
+    const visible_window = spyOn(SheetwriteStore.prototype, "getVisibleWindow").mockImplementation(
       trap,
     );
     let stale: GridImpl;
     try {
-      stale = mountGrid(bystander);
+      stale = mount_grid(bystander);
       stale.refresh();
     } finally {
-      visibleWindow.mockRestore();
+      visible_window.mockRestore();
     }
 
     const events: Array<GridEvents["engine-failed"]> = [];
@@ -227,11 +227,11 @@ describe("engine failure", () => {
 
     expect(events).toHaveLength(1);
     expect(isSheetwriteReady()).toBe(true);
-    expect(stale.applyTransaction({ patches: [setText("refused")] })).toMatchObject({
+    expect(stale.applyTransaction({ patches: [set_text("refused")] })).toMatchObject({
       status: "noop",
       reason: "read-only",
     });
-    expect(healthy.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
+    expect(healthy.applyTransaction({ patches: [set_text("kept")] }).status).toBe("applied");
     // The stopped engine's store is out of the live set, so release does not read it.
     await releaseEngineMemory();
     expect(healthy.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("kept");
@@ -243,7 +243,7 @@ describe("engine failure", () => {
 
   it("keeps the resource-limit error when a snapshot load traps", async () => {
     const snapshot = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5)).exportSnapshot();
-    spyOn(StoreDataEngine.prototype, "hydrateSnapshot").mockImplementation(trapAndPoison);
+    spyOn(StoreDataEngine.prototype, "hydrateSnapshot").mockImplementation(trap_and_poison);
     const failure = caught(() => SheetwriteStore.fromSnapshot(snapshot));
     mock.restore();
 
@@ -272,11 +272,11 @@ describe("engine failure", () => {
       operation: "engine",
     });
     expect(isSheetwriteReady()).toBe(true);
-    expect(store.applyTransaction({ patches: [setText("kept")] }).status).toBe("applied");
+    expect(store.applyTransaction({ patches: [set_text("kept")] }).status).toBe("applied");
 
     prepare.mockImplementation(trap);
-    expectEngineFailed(await releaseEngineMemory().catch((error: unknown) => error));
+    expect_engine_failed(await releaseEngineMemory().catch((error: unknown) => error));
     expect(isSheetwriteReady()).toBe(false);
-    expectEngineFailed(caught(() => store.applyTransaction({ patches: [setText("lost")] })));
+    expect_engine_failed(caught(() => store.applyTransaction({ patches: [set_text("lost")] })));
   });
 });

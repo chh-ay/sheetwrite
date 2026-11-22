@@ -233,7 +233,7 @@ interface SamplePlan {
   readonly gcBetween: boolean;
 }
 
-function samplePlan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
+function sample_plan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
   const smoke = mode === "smoke";
   switch (id) {
     case "row-bridge-insert":
@@ -319,7 +319,7 @@ export interface CorePathsBenchmarkArtifact {
   readonly scenarios: readonly CorePathScenarioResult[];
 }
 
-function requireValue<T>(value: T | undefined, message: string): T {
+function require_value<T>(value: T | undefined, message: string): T {
   if (value === undefined) throw new Error(message);
   return value;
 }
@@ -328,24 +328,24 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-function columnKey(index: number): string {
+function column_key(index: number): string {
   return `c${index}`;
 }
 
-function numberColumns(count: number, type: "number" | "text" = "number"): Column[] {
+function number_columns(count: number, type: "number" | "text" = "number"): Column[] {
   return Array.from({ length: count }, (_, index) => ({
-    key: columnKey(index),
+    key: column_key(index),
     header: `Column ${index + 1}`,
     width: 120,
     type,
   }));
 }
 
-function sheetRange(rows: number, columns: number, startRow = 0): Range {
+function sheet_range(rows: number, columns: number, start_row = 0): Range {
   return {
     sheet: SHEET,
-    start: { row: startRow, col: 0 },
-    end: { row: startRow + rows - 1, col: columns - 1 },
+    start: { row: start_row, col: 0 },
+    end: { row: start_row + rows - 1, col: columns - 1 },
   };
 }
 
@@ -356,13 +356,13 @@ function workbook(rows: number, columns: Column[]): Workbook {
   };
 }
 
-function numberBlock(rows: number, columns: number, base: number): PackedCellBlock {
+function number_block(rows: number, columns: number, base: number): PackedCellBlock {
   const values = new Array<CellScalar>(rows * columns);
   for (let index = 0; index < values.length; index += 1) values[index] = base + index;
   return { rowCount: rows, colCount: columns, values };
 }
 
-function cellAddress(row: number, col: number): CellAddress {
+function cell_address(row: number, col: number): CellAddress {
   return { sheet: SHEET, row, col };
 }
 
@@ -372,7 +372,7 @@ interface MountedGrid {
 }
 
 /** Create a grid without built-in chrome, then tear the host down with it. */
-function mountGrid(options: GridOptions): MountedGrid {
+function mount_grid(options: GridOptions): MountedGrid {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGrid(host, {
@@ -388,14 +388,14 @@ function mountGrid(options: GridOptions): MountedGrid {
   };
 }
 
-function assertApplied(status: string, operation: string): void {
+function assert_applied(status: string, operation: string): void {
   if (status !== "applied") {
     fail(`${operation} was not applied (status ${status})`);
   }
 }
 
-function resolvedCell(grid: Grid, row: number, col: number): CellScalar {
-  return grid.store.getCell(cellAddress(row, col)).resolved;
+function resolved_cell(grid: Grid, row: number, col: number): CellScalar {
+  return grid.store.getCell(cell_address(row, col)).resolved;
 }
 
 /**
@@ -403,11 +403,11 @@ function resolvedCell(grid: Grid, row: number, col: number): CellScalar {
  * of the last written generation. Runs after timing, in bounded row windows, so
  * a block that only wrote part of its cells fails instead of reporting a number.
  */
-function assertWindowedValues(
+function assert_windowed_values(
   grid: Grid,
   rows: number,
   columns: number,
-  expectedBase: number,
+  expected_base: number,
   label: string,
 ): void {
   const cols = Array.from({ length: columns }, (_, index) => index);
@@ -417,7 +417,7 @@ function assertWindowedValues(
     for (let row = start; row < end; row += 1) {
       for (let col = 0; col < columns; col += 1) {
         const actual = window.values[(row - start) * columns + col];
-        const expected = expectedBase + row * columns + col;
+        const expected = expected_base + row * columns + col;
         if (actual !== expected) {
           fail(`${label} cell ${row}:${col} is ${String(actual)}, expected ${expected}`);
         }
@@ -426,15 +426,15 @@ function assertWindowedValues(
   }
 }
 
-function cellLoadState(grid: Grid, row: number, col: number): CellLoadState {
-  const state = grid.store.getCellLoadState?.(cellAddress(row, col));
+function cell_load_state(grid: Grid, row: number, col: number): CellLoadState {
+  const state = grid.store.getCellLoadState?.(cell_address(row, col));
   if (state === undefined) {
     fail("paged revisit scenario requires store.getCellLoadState");
   }
   return state;
 }
 
-async function settleAsyncWork(): Promise<void> {
+async function settle_async_work(): Promise<void> {
   for (let turn = 0; turn < ASYNC_SETTLE_TURNS; turn += 1) {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
@@ -445,16 +445,16 @@ interface ScenarioExtras {
   readonly observations?: Readonly<Record<string, string>>;
 }
 
-function scenarioResult(
+function scenario_result(
   id: CorePathScenarioId,
   unit: string,
-  samplesMs: readonly number[],
+  samples_ms: readonly number[],
   counters: Readonly<Record<string, number>>,
   validation: string,
   extras: ScenarioExtras = {},
 ): CorePathScenarioResult {
-  const timing = summarize(samplesMs);
-  validateRawStat(samplesMs, timing, id);
+  const timing = summarize(samples_ms);
+  validateRawStat(samples_ms, timing, id);
   for (const [name, value] of Object.entries(counters)) {
     assertFiniteNonNegative(value, `${id}.counters.${name}`);
   }
@@ -464,7 +464,7 @@ function scenarioResult(
   return {
     id,
     unit,
-    samplesMs,
+    samplesMs: samples_ms,
     timing,
     counters,
     validation,
@@ -473,48 +473,48 @@ function scenarioResult(
   };
 }
 
-function variant(id: string, samplesMs: readonly number[]): CorePathVariantResult {
-  const timing = summarize(samplesMs);
-  validateRawStat(samplesMs, timing, id);
-  return { id, samplesMs, timing };
+function variant(id: string, samples_ms: readonly number[]): CorePathVariantResult {
+  const timing = summarize(samples_ms);
+  validateRawStat(samples_ms, timing, id);
+  return { id, samplesMs: samples_ms, timing };
 }
 
-function projectRowsIntoBridge(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
-  const defaultRows = new Array<Record<string, CellScalar>>(scale.bridgeRows).fill(EMPTY_ROW);
-  let nextRowId = scale.bridgeRows;
+function project_rows_into_bridge(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const default_rows = new Array<Record<string, CellScalar>>(scale.bridgeRows).fill(EMPTY_ROW);
+  let next_row_id = scale.bridgeRows;
   const bridge = createRowBridge<Record<string, CellScalar>, number>({
     columns: [{ key: "value" }],
-    defaultRows,
+    defaultRows: default_rows,
     getRowId: (_row, index) => index,
     sheet: SHEET,
     createRowId: () => {
-      const id = nextRowId;
-      nextRowId += 1;
+      const id = next_row_id;
+      next_row_id += 1;
       return id;
     },
   });
-  const insertAt = Math.floor(scale.bridgeRows / 2);
+  const insert_at = Math.floor(scale.bridgeRows / 2);
   let epoch = 0;
-  let lastProjection: RowBridgeProjection<number> | undefined;
-  const samplesMs = collect(
+  let last_projection: RowBridgeProjection<number> | undefined;
+  const samples_ms = collect(
     () => {
       epoch += 1;
       const event: ChangeEvent = {
         transaction: {
-          patches: [{ op: "addRows", sheet: SHEET, at: insertAt, count: scale.bridgeInsertRows }],
+          patches: [{ op: "addRows", sheet: SHEET, at: insert_at, count: scale.bridgeInsertRows }],
           epoch,
         },
         changes: [],
         commitReason: "structure",
         source: "local",
       };
-      lastProjection = bridge.project(event);
+      last_projection = bridge.project(event);
     },
     { warmup: plan.warmup, iters: plan.iters },
   );
 
-  const projection = requireValue(lastProjection, "row bridge insert timed no projection");
-  const delta = requireValue(projection.deltas[0], "row bridge insert projected no delta");
+  const projection = require_value(last_projection, "row bridge insert timed no projection");
+  const delta = require_value(projection.deltas[0], "row bridge insert projected no delta");
   if (
     projection.deltas.length !== 1 ||
     delta.kind !== "row-structure" ||
@@ -525,45 +525,45 @@ function projectRowsIntoBridge(scale: CorePathScale, plan: SamplePlan): CorePath
   if (delta.count !== scale.bridgeInsertRows || delta.inserted.length !== scale.bridgeInsertRows) {
     fail(`row bridge insert projected ${delta.inserted.length} of ${scale.bridgeInsertRows} rows`);
   }
-  const identityCount = scale.bridgeRows + (plan.warmup + plan.iters) * scale.bridgeInsertRows;
-  const rowIds = bridge.rowIds(SHEET);
-  if (rowIds.length !== identityCount) {
-    fail(`row bridge holds ${rowIds.length} identities, expected ${identityCount}`);
+  const identity_count = scale.bridgeRows + (plan.warmup + plan.iters) * scale.bridgeInsertRows;
+  const row_ids = bridge.rowIds(SHEET);
+  if (row_ids.length !== identity_count) {
+    fail(`row bridge holds ${row_ids.length} identities, expected ${identity_count}`);
   }
   if (new Set(delta.inserted).size !== delta.inserted.length) {
     fail("row bridge insert produced duplicate row identities");
   }
   for (let offset = 0; offset < delta.inserted.length; offset += 1) {
-    if (rowIds[insertAt + offset] !== delta.inserted[offset]) {
-      fail(`row bridge identity at ${insertAt + offset} does not match the projected insert`);
+    if (row_ids[insert_at + offset] !== delta.inserted[offset]) {
+      fail(`row bridge identity at ${insert_at + offset} does not match the projected insert`);
     }
   }
-  return scenarioResult(
+  return scenario_result(
     "row-bridge-insert",
     `one addRows projection of ${scale.bridgeInsertRows.toLocaleString("en-US")} rows into a ${scale.bridgeRows.toLocaleString("en-US")}-row bridge`,
-    samplesMs,
+    samples_ms,
     { bridgeRows: scale.bridgeRows, insertedRows: scale.bridgeInsertRows },
     "projected delta is one row-structure insert with every created identity present in the bridge in order",
   );
 }
 
-function selectWithCommandState(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+function select_with_command_state(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const handlers: GridControllerHandlers = {};
   const host = document.createElement("div");
   document.body.appendChild(host);
   const controller = createGridController(
     host,
     {
-      workbook: workbook(scale.selectionRows * 2, numberColumns(scale.selectionColumns)),
+      workbook: workbook(scale.selectionRows * 2, number_columns(scale.selectionColumns)),
       config: { toolbar: false, find: false, contextMenu: false },
     },
     handlers,
   );
   const grid = controller.grid;
-  const selectedCells = scale.selectionRows * scale.selectionColumns;
+  const selected_cells = scale.selectionRows * scale.selectionColumns;
   const at = (offset: number): Selection => ({
     kind: "range",
-    range: sheetRange(scale.selectionRows, scale.selectionColumns, offset * scale.selectionRows),
+    range: sheet_range(scale.selectionRows, scale.selectionColumns, offset * scale.selectionRows),
   });
   let tick = 0;
   const select = (): void => {
@@ -571,21 +571,21 @@ function selectWithCommandState(scale: CorePathScale, plan: SamplePlan): CorePat
     grid.setSelection(at(tick % 2));
   };
 
-  const withoutHandler = collect(select, { warmup: plan.warmup, iters: plan.iters });
+  const without_handler = collect(select, { warmup: plan.warmup, iters: plan.iters });
 
-  let commandStateEvents = 0;
-  let commandStateEventsTotal = 0;
-  let lastCommandState: GridCommandStateChangeEvent | undefined;
+  let command_state_events = 0;
+  let command_state_events_total = 0;
+  let last_command_state: GridCommandStateChangeEvent | undefined;
   handlers.onCommandStateChange = (event) => {
-    commandStateEvents += 1;
-    commandStateEventsTotal += 1;
-    lastCommandState = event;
+    command_state_events += 1;
+    command_state_events_total += 1;
+    last_command_state = event;
   };
-  const withHandler = collect(select, {
+  const with_handler = collect(select, {
     warmup: plan.warmup,
     iters: plan.iters,
     before: () => {
-      commandStateEvents = 0;
+      command_state_events = 0;
     },
   });
 
@@ -594,71 +594,74 @@ function selectWithCommandState(scale: CorePathScale, plan: SamplePlan): CorePat
   const bounds = selection.range;
   const selected =
     (bounds.end.row - bounds.start.row + 1) * (bounds.end.col - bounds.start.col + 1);
-  if (selected !== selectedCells) {
-    fail(`command-state selection covers ${selected} cells, expected ${selectedCells}`);
+  if (selected !== selected_cells) {
+    fail(`command-state selection covers ${selected} cells, expected ${selected_cells}`);
   }
-  if (commandStateEvents < 1) {
+  if (command_state_events < 1) {
     fail("command-state handler observed no event for the last selection");
   }
-  const states = requireValue(lastCommandState, "command-state handler observed no event").states;
+  const states = require_value(
+    last_command_state,
+    "command-state handler observed no event",
+  ).states;
   for (const command of COMMAND_STATE_SELECTED_OBSERVATIONS) {
-    const state = requireValue(states[command], `command-state event omits ${command}`);
+    const state = require_value(states[command], `command-state event omits ${command}`);
     if (state.disabled !== true) fail(`fresh sheet reports ${command} as enabled`);
   }
   controller.destroy();
   host.remove();
 
-  return scenarioResult(
+  return scenario_result(
     "command-state-select",
-    `one ${selectedCells.toLocaleString("en-US")}-cell range selection on a framework-style grid`,
-    withHandler,
+    `one ${selected_cells.toLocaleString("en-US")}-cell range selection on a framework-style grid`,
+    with_handler,
     {
-      selectedCells,
-      commandStateEvents: commandStateEventsTotal,
-      withoutHandlerMedianMs: summarize(withoutHandler).median,
+      selectedCells: selected_cells,
+      commandStateEvents: command_state_events_total,
+      withoutHandlerMedianMs: summarize(without_handler).median,
     },
-    `selection covers ${selectedCells} cells and the command-state handler observes one event per selection`,
+    `selection covers ${selected_cells} cells and the command-state handler observes one event per selection`,
     {
       variants: [
-        variant("with-command-state-handler", withHandler),
-        variant("without-command-state-handler", withoutHandler),
+        variant("with-command-state-handler", with_handler),
+        variant("without-command-state-handler", without_handler),
       ],
     },
   );
 }
 
-function applyOneBlock(
+function apply_one_block(
   scale: CorePathScale,
   plan: SamplePlan,
-  detailedCapture: boolean,
+  detailed_capture: boolean,
 ): CorePathScenarioResult {
-  const mounted = mountGrid({
-    workbook: workbook(scale.blockRows, numberColumns(scale.blockColumns)),
+  const mounted = mount_grid({
+    workbook: workbook(scale.blockRows, number_columns(scale.blockColumns)),
     transactionResourceLimits: { maxEncodedBytes: BLOCK_ENCODED_BYTES },
   });
   const { grid } = mounted;
-  const cellCount = scale.blockRows * scale.blockColumns;
-  const blockRange = sheetRange(scale.blockRows, scale.blockColumns);
-  const timedGenerations = plan.warmup + plan.iters;
+  const cell_count = scale.blockRows * scale.blockColumns;
+  const block_range = sheet_range(scale.blockRows, scale.blockColumns);
+  const timed_generations = plan.warmup + plan.iters;
   // The timed loop performs no validation reads. The listener only records how
   // many changes the engine captured; the whole-block read and the capture
   // probe that checks every captured before/after value run after it.
-  let timedCapturedChanges = 0;
-  let validatingCapture = false;
-  let probeChanges = 0;
-  let probeMismatches = 0;
-  let probeBase = 0;
-  let probePreviousBase = 0;
-  const seenCells = detailedCapture ? new Uint8Array(cellCount) : undefined;
-  const unsubscribe = detailedCapture
+  let timed_captured_changes = 0;
+  let validating_capture = false;
+  let probe_changes = 0;
+  let probe_mismatches = 0;
+  let probe_base = 0;
+  let probe_previous_base = 0;
+  const seen_cells = detailed_capture ? new Uint8Array(cell_count) : undefined;
+  const unsubscribe = detailed_capture
     ? grid.on("change", (event) => {
-        if (!validatingCapture) {
+        if (!validating_capture) {
           // Record one change count while timing and touch nothing else.
-          if (timedCapturedChanges === 0) timedCapturedChanges = event.changes.length;
+          if (timed_captured_changes === 0) timed_captured_changes = event.changes.length;
           return;
         }
-        probeChanges = event.changes.length;
-        const seen = seenCells;
+        probe_changes = event.changes.length;
+        const seen = seen_cells;
         if (seen === undefined) fail("the capture probe has no cell mask");
         for (const change of event.changes) {
           const { sheet, row, col } = change.addr;
@@ -671,105 +674,105 @@ function applyOneBlock(
             col >= scale.blockColumns ||
             seen[offset] !== 0
           ) {
-            probeMismatches += 1;
+            probe_mismatches += 1;
             continue;
           }
           seen[offset] = 1;
           if (
             change.newValue.kind !== "literal" ||
-            change.newValue.value !== probeBase + offset ||
+            change.newValue.value !== probe_base + offset ||
             change.oldValue.kind !== "literal" ||
-            change.oldValue.value !== probePreviousBase + offset
+            change.oldValue.value !== probe_previous_base + offset
           ) {
-            probeMismatches += 1;
+            probe_mismatches += 1;
           }
         }
       })
     : undefined;
-  grid.store.setDetailedChangeCapture?.(detailedCapture);
+  grid.store.setDetailedChangeCapture?.(detailed_capture);
 
   let generation = 0;
-  const samplesMs = collect(
+  const samples_ms = collect(
     () => {
       generation += 1;
       const result = grid.applyTransaction({
         patches: [
           {
             op: "setBlock",
-            range: blockRange,
-            block: numberBlock(scale.blockRows, scale.blockColumns, generation * cellCount),
+            range: block_range,
+            block: number_block(scale.blockRows, scale.blockColumns, generation * cell_count),
           },
         ],
       });
-      assertApplied(result.status, "setBlock");
+      assert_applied(result.status, "setBlock");
     },
     { warmup: plan.warmup, iters: plan.iters, gcBetween: plan.gcBetween },
   );
 
   const counters: Record<string, number> = {
-    blockCells: cellCount,
-    transactions: timedGenerations,
+    blockCells: cell_count,
+    transactions: timed_generations,
   };
   let validation =
     "every setBlock is applied and every cell of the block holds the last written value";
-  assertWindowedValues(
+  assert_windowed_values(
     grid,
     scale.blockRows,
     scale.blockColumns,
-    timedGenerations * cellCount,
+    timed_generations * cell_count,
     "setBlock",
   );
-  if (detailedCapture) {
-    if (timedCapturedChanges !== cellCount) {
-      fail(`the timed block captured ${timedCapturedChanges} of ${cellCount} cell changes`);
+  if (detailed_capture) {
+    if (timed_captured_changes !== cell_count) {
+      fail(`the timed block captured ${timed_captured_changes} of ${cell_count} cell changes`);
     }
     // One more untimed write, so every captured change is checked against the
     // values it replaced and the values it wrote.
-    probeBase = (timedGenerations + 1) * cellCount;
-    probePreviousBase = timedGenerations * cellCount;
-    validatingCapture = true;
-    assertApplied(
+    probe_base = (timed_generations + 1) * cell_count;
+    probe_previous_base = timed_generations * cell_count;
+    validating_capture = true;
+    assert_applied(
       grid.applyTransaction({
         patches: [
           {
             op: "setBlock",
-            range: blockRange,
-            block: numberBlock(scale.blockRows, scale.blockColumns, probeBase),
+            range: block_range,
+            block: number_block(scale.blockRows, scale.blockColumns, probe_base),
           },
         ],
       }).status,
       "setBlock capture probe",
     );
-    validatingCapture = false;
-    const seen = requireValue(seenCells, "the capture probe has no cell mask");
+    validating_capture = false;
+    const seen = require_value(seen_cells, "the capture probe has no cell mask");
     const distinct = seen.reduce((total, entry) => total + entry, 0);
-    if (probeChanges !== cellCount || distinct !== cellCount || probeMismatches !== 0) {
+    if (probe_changes !== cell_count || distinct !== cell_count || probe_mismatches !== 0) {
       fail(
-        `the capture probe reported ${probeChanges} changes, ${distinct} distinct cells, and ${probeMismatches} mismatched before/after values`,
+        `the capture probe reported ${probe_changes} changes, ${distinct} distinct cells, and ${probe_mismatches} mismatched before/after values`,
       );
     }
-    counters.capturedChanges = timedCapturedChanges;
-    counters.validatedCapturedChanges = probeChanges;
+    counters.capturedChanges = timed_captured_changes;
+    counters.validatedCapturedChanges = probe_changes;
     validation +=
       ", and its change capture reports every cell's address, previous value, and new value exactly once";
   }
   unsubscribe?.();
   mounted.destroy();
 
-  return scenarioResult(
-    detailedCapture ? "setblock-detailed-capture" : "setblock-admission",
-    `one Grid.applyTransaction of a ${cellCount.toLocaleString("en-US")}-cell setBlock${
-      detailedCapture ? " observed through a change listener with detailed capture" : ""
+  return scenario_result(
+    detailed_capture ? "setblock-detailed-capture" : "setblock-admission",
+    `one Grid.applyTransaction of a ${cell_count.toLocaleString("en-US")}-cell setBlock${
+      detailed_capture ? " observed through a change listener with detailed capture" : ""
     }`,
-    samplesMs,
+    samples_ms,
     counters,
     validation,
   );
 }
 
-function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+function queue_offline_commits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const rows = Math.min(scale.offlineCommits, COMMIT_ROW_COUNT);
-  const mounted = mountGrid({ workbook: workbook(rows, numberColumns(4)) });
+  const mounted = mount_grid({ workbook: workbook(rows, number_columns(4)) });
   const { grid } = mounted;
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
@@ -782,7 +785,7 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
         name: "Core paths",
         order: 0,
         rowCount: rows,
-        columns: numberColumns(4),
+        columns: number_columns(4),
         cells: [],
       },
     ],
@@ -795,13 +798,13 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
 
   let commit = 0;
   let rejected = 0;
-  const samplesMs = collect(
+  const samples_ms = collect(
     () => {
       const row = commit % rows;
       commit += 1;
       const result = grid.applyTransaction({
         patches: [
-          { op: "set", addr: cellAddress(row, 0), value: { kind: "literal", value: commit } },
+          { op: "set", addr: cell_address(row, 0), value: { kind: "literal", value: commit } },
         ],
       });
       if (result.status !== "applied") rejected += 1;
@@ -818,8 +821,8 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
     fail(`offline queue reports capacity ${coordinator.state.pendingCapacity}`);
   }
   const records = coordinator.pendingCommits();
-  const first = requireValue(records[0], "offline queue holds no commit");
-  const last = requireValue(records[records.length - 1], "offline queue holds no commit");
+  const first = require_value(records[0], "offline queue holds no commit");
+  const last = require_value(records[records.length - 1], "offline queue holds no commit");
   if (first.status !== "pending" || first.baseVersion !== 0) {
     fail(`offline queue first record is ${first.status} at version ${first.baseVersion}`);
   }
@@ -831,33 +834,33 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
   if (new Set(records.map((record) => record.clientMutationId)).size !== queued) {
     fail("offline queue reused a mutation identity");
   }
-  const lastOperation = requireValue(
+  const last_operation = require_value(
     last.operations[0],
     "offline queue record carries no operation",
   );
   if (
-    lastOperation.op !== "set" ||
-    lastOperation.value.kind !== "literal" ||
-    lastOperation.value.value !== queued
+    last_operation.op !== "set" ||
+    last_operation.value.kind !== "literal" ||
+    last_operation.value.value !== queued
   ) {
     fail("offline queue does not carry the last committed value");
   }
   coordinator.destroy();
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "sync-offline-queue",
     "one grid commit admitted into an offline sync queue with no listeners",
-    samplesMs,
+    samples_ms,
     { queuedCommits: queued, admittedOperations: queued },
     "every commit is applied, the queue holds every commit at server version 0, and capacity stays available",
   );
 }
 
 /** A grid whose `rows` rows hold 1 to 8 in columns A-H and their SUM in column I. */
-function mountRowSums(rows: number): MountedGrid & { readonly columns: Column[] } {
-  const columns = numberColumns(REMOTE_NUMBER_COLUMNS + 1);
-  const mounted = mountGrid({ workbook: workbook(rows, columns) });
+function mount_row_sums(rows: number): MountedGrid & { readonly columns: Column[] } {
+  const columns = number_columns(REMOTE_NUMBER_COLUMNS + 1);
+  const mounted = mount_grid({ workbook: workbook(rows, columns) });
   const values = new Array<CellScalar>(rows * columns.length).fill(null);
   const formulas: Array<[number, string]> = [];
   for (let row = 0; row < rows; row += 1) {
@@ -867,9 +870,9 @@ function mountRowSums(rows: number): MountedGrid & { readonly columns: Column[] 
     formulas.push([row * columns.length + REMOTE_NUMBER_COLUMNS, `=SUM(A${row + 1}:H${row + 1})`]);
   }
   const block: PackedCellBlock = { rowCount: rows, colCount: columns.length, values, formulas };
-  assertApplied(
+  assert_applied(
     mounted.grid.applyTransaction({
-      patches: [{ op: "setBlock", range: sheetRange(rows, columns.length), block }],
+      patches: [{ op: "setBlock", range: sheet_range(rows, columns.length), block }],
     }).status,
     "row-sum sheet setup",
   );
@@ -881,12 +884,12 @@ function mountRowSums(rows: number): MountedGrid & { readonly columns: Column[] 
  * a sheet whose every row sums its number columns. Only the edited row's sum
  * reads the edit, so a version should cost about what a local edit costs.
  */
-async function applyRemoteVersions(
+async function apply_remote_versions(
   scale: CorePathScale,
   plan: SamplePlan,
 ): Promise<CorePathScenarioResult> {
   const rows = scale.remoteRows;
-  const mounted = mountRowSums(rows);
+  const mounted = mount_row_sums(rows);
   const { grid, columns } = mounted;
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
@@ -901,40 +904,40 @@ async function applyRemoteVersions(
   });
 
   // Each version writes a new value to column A of a different row.
-  const editedRow = (version: number): number => (version * 7) % rows;
-  const samplesMs: number[] = [];
+  const edited_row = (version: number): number => (version * 7) % rows;
+  const samples_ms: number[] = [];
   let version = 0;
   for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
     version += 1;
     const operation: DocumentOp = {
       op: "set",
-      addr: cellAddress(editedRow(version), 0),
+      addr: cell_address(edited_row(version), 0),
       value: { kind: "literal", value: version },
     };
     const started = now();
     await coordinator.applyVersionedOperation({ version, operations: [operation] });
     const elapsed = now() - started;
-    if (iteration >= plan.warmup) samplesMs.push(elapsed);
+    if (iteration >= plan.warmup) samples_ms.push(elapsed);
   }
 
   if (coordinator.serverVersion !== version) {
     fail(`the grid reached server version ${coordinator.serverVersion}, expected ${version}`);
   }
   // Columns B-H hold 2 to 8, so a row sums to its column A value plus 35.
-  const lastRow = editedRow(version);
-  if (resolvedCell(grid, lastRow, REMOTE_NUMBER_COLUMNS) !== version + 35) {
-    fail(`row ${lastRow} does not sum the last remote value`);
+  const last_row = edited_row(version);
+  if (resolved_cell(grid, last_row, REMOTE_NUMBER_COLUMNS) !== version + 35) {
+    fail(`row ${last_row} does not sum the last remote value`);
   }
-  if (resolvedCell(grid, rows - 1, REMOTE_NUMBER_COLUMNS) !== 36) {
+  if (resolved_cell(grid, rows - 1, REMOTE_NUMBER_COLUMNS) !== 36) {
     fail("a row that no version edited does not keep its sum");
   }
   coordinator.destroy();
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "sync-remote-versions",
     `one remote version of one cell edit applied to a sheet of ${rows.toLocaleString("en-US")} SUM formulas`,
-    samplesMs,
+    samples_ms,
     { remoteVersions: plan.iters, formulas: rows },
     "every version is applied in order, the last edited row sums its new value, and an unedited row keeps its sum",
   );
@@ -946,18 +949,18 @@ async function applyRemoteVersions(
  * one reader, so the transaction should cost about its cells' readers, not
  * the sheet.
  */
-function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+function apply_scattered_edits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const rows = scale.remoteRows;
   const cells = Math.min(SCATTERED_EDIT_CELLS, rows);
-  const mounted = mountRowSums(rows);
+  const mounted = mount_row_sums(rows);
   const { grid } = mounted;
   // 37 is prime to the row count, so the rows of one transaction differ.
-  const editedRow = (generation: number, cell: number): number => (cell * 37 + generation) % rows;
-  const editedColumn = (cell: number): number => cell % REMOTE_NUMBER_COLUMNS;
+  const edited_row = (generation: number, cell: number): number => (cell * 37 + generation) % rows;
+  const edited_column = (cell: number): number => cell % REMOTE_NUMBER_COLUMNS;
   let generation = 0;
   let patches: DocumentOp[] = [];
-  const samplesMs = collect(
-    () => assertApplied(grid.applyTransaction({ patches }).status, "scattered edits"),
+  const samples_ms = collect(
+    () => assert_applied(grid.applyTransaction({ patches }).status, "scattered edits"),
     {
       warmup: plan.warmup,
       iters: plan.iters,
@@ -965,7 +968,7 @@ function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathSc
         generation += 1;
         patches = Array.from({ length: cells }, (_, cell) => ({
           op: "set" as const,
-          addr: cellAddress(editedRow(generation, cell), editedColumn(cell)),
+          addr: cell_address(edited_row(generation, cell), edited_column(cell)),
           value: { kind: "literal" as const, value: generation },
         }));
       },
@@ -974,24 +977,24 @@ function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathSc
 
   // Each checked row holds the last value and sums its columns A-H.
   for (const cell of [0, cells - 1]) {
-    const row = editedRow(generation, cell);
+    const row = edited_row(generation, cell);
     let sum = 0;
     for (let col = 0; col < REMOTE_NUMBER_COLUMNS; col += 1) {
-      sum += Number(resolvedCell(grid, row, col));
+      sum += Number(resolved_cell(grid, row, col));
     }
     if (
-      resolvedCell(grid, row, editedColumn(cell)) !== generation ||
-      resolvedCell(grid, row, REMOTE_NUMBER_COLUMNS) !== sum
+      resolved_cell(grid, row, edited_column(cell)) !== generation ||
+      resolved_cell(grid, row, REMOTE_NUMBER_COLUMNS) !== sum
     ) {
       fail(`row ${row} does not sum the last scattered edit`);
     }
   }
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "local-scattered-edits",
     `one transaction of ${cells} one-cell edits on scattered rows of a sheet of ${rows.toLocaleString("en-US")} SUM formulas`,
-    samplesMs,
+    samples_ms,
     { editedCells: cells, formulas: rows },
     "the first and last edited rows of the last transaction sum their new values",
   );
@@ -1003,10 +1006,10 @@ function applyScatteredEdits(scale: CorePathScale, plan: SamplePlan): CorePathSc
  * `linkCells` cached values in column A; a formula reads each value, and every
  * row of the sheet also sums its own cells, so most formulas read no link.
  */
-function refreshExternalLinks(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+function refresh_external_links(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const rows = scale.linkRows;
   const book = (link: number): string => `Book${link}.xlsx`;
-  const linkValue = (generation: number, link: number, row: number): number =>
+  const link_value = (generation: number, link: number, row: number): number =>
     generation * 100_000 + link * 1_000 + row;
   const links = (generation: number): ExternalLink[] =>
     Array.from({ length: scale.links }, (_, link) => ({
@@ -1018,13 +1021,13 @@ function refreshExternalLinks(scale: CorePathScale, plan: SamplePlan): CorePathS
           cells: Array.from({ length: scale.linkCells }, (_, row) => ({
             row,
             col: 0,
-            value: linkValue(generation, link, row),
+            value: link_value(generation, link, row),
           })),
         },
       ],
     }));
-  const columns = numberColumns(4);
-  const mounted = mountGrid({
+  const columns = number_columns(4);
+  const mounted = mount_grid({
     workbook: { ...workbook(rows, columns), externalLinks: links(0) },
     transactionResourceLimits: { maxEncodedBytes: BLOCK_ENCODED_BYTES },
   });
@@ -1042,16 +1045,16 @@ function refreshExternalLinks(scale: CorePathScale, plan: SamplePlan): CorePathS
     }
   }
   const block: PackedCellBlock = { rowCount: rows, colCount: 4, values, formulas };
-  assertApplied(
-    grid.applyTransaction({ patches: [{ op: "setBlock", range: sheetRange(rows, 4), block }] })
+  assert_applied(
+    grid.applyTransaction({ patches: [{ op: "setBlock", range: sheet_range(rows, 4), block }] })
       .status,
     "linked-workbook sheet setup",
   );
 
   let generation = 0;
   let patch: DocumentOp = { op: "setExternalLinks", links: [] };
-  const samplesMs = collect(
-    () => assertApplied(grid.applyTransaction({ patches: [patch] }).status, "link refresh"),
+  const samples_ms = collect(
+    () => assert_applied(grid.applyTransaction({ patches: [patch] }).status, "link refresh"),
     {
       warmup: plan.warmup,
       iters: plan.iters,
@@ -1063,47 +1066,50 @@ function refreshExternalLinks(scale: CorePathScale, plan: SamplePlan): CorePathS
   );
 
   for (const row of [0, readers - 1]) {
-    const expected = linkValue(generation, row % scale.links, Math.floor(row / scale.links)) * 2;
-    if (resolvedCell(grid, row, 3) !== expected) {
+    const expected = link_value(generation, row % scale.links, Math.floor(row / scale.links)) * 2;
+    if (resolved_cell(grid, row, 3) !== expected) {
       fail(`row ${row} does not read the last link values`);
     }
   }
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "external-links-refresh",
     `one change that gives ${scale.links} linked workbooks new values, read by ${readers.toLocaleString("en-US")} formulas`,
-    samplesMs,
+    samples_ms,
     { links: scale.links, linkCells: scale.links * scale.linkCells, formulas: rows + readers },
     "the first and last formulas that read a link show the last values",
   );
 }
 
-function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
-  const blockStartRow = 5_000;
-  const blockRange: Range = {
+function rebase_block_across_inserts(
+  scale: CorePathScale,
+  plan: SamplePlan,
+): CorePathScenarioResult {
+  const block_start_row = 5_000;
+  const block_range: Range = {
     sheet: SHEET,
-    start: { row: blockStartRow, col: 0 },
-    end: { row: blockStartRow + scale.rebaseBlockRows - 1, col: scale.rebaseBlockColumns - 1 },
+    start: { row: block_start_row, col: 0 },
+    end: { row: block_start_row + scale.rebaseBlockRows - 1, col: scale.rebaseBlockColumns - 1 },
   };
-  const localBlock = numberBlock(scale.rebaseBlockRows, scale.rebaseBlockColumns, 0);
-  const localOperations: readonly DocumentOp[] = [
-    { op: "setBlock", range: blockRange, block: localBlock },
+  const local_block = number_block(scale.rebaseBlockRows, scale.rebaseBlockColumns, 0);
+  const local_operations: readonly DocumentOp[] = [
+    { op: "setBlock", range: block_range, block: local_block },
   ];
-  const sourceValues = localBlock.values.slice();
+  const source_values = local_block.values.slice();
   let generation = 0;
-  let remoteOperations: DocumentOp[] = [];
-  let lastResult: DocumentRebaseResult | undefined;
-  const samplesMs = collect(
+  let remote_operations: DocumentOp[] = [];
+  let last_result: DocumentRebaseResult | undefined;
+  const samples_ms = collect(
     () => {
-      lastResult = rebaseDocumentOperations(localOperations, remoteOperations);
+      last_result = rebaseDocumentOperations(local_operations, remote_operations);
     },
     {
       warmup: plan.warmup,
       iters: plan.iters,
       before: () => {
         generation += 1;
-        remoteOperations = Array.from({ length: scale.rebaseInsertOperations }, (_, index) => ({
+        remote_operations = Array.from({ length: scale.rebaseInsertOperations }, (_, index) => ({
           op: "addRows" as const,
           sheet: SHEET,
           at: 200 + index * 2 + (generation % 3),
@@ -1113,26 +1119,26 @@ function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CoreP
     },
   );
 
-  const result = requireValue(lastResult, "rebase timed no result");
+  const result = require_value(last_result, "rebase timed no result");
   if (result.status !== "rebased") {
     fail(`rebase of a non-overlapping block reported ${result.status}`);
   }
-  const rebased = requireValue(result.operations[0], "rebase returned no operation");
+  const rebased = require_value(result.operations[0], "rebase returned no operation");
   if (rebased.op !== "setBlock") fail(`rebase returned ${rebased.op} instead of setBlock`);
   const shift = scale.rebaseInsertOperations;
-  if (rebased.range.start.row !== blockRange.start.row + shift) {
+  if (rebased.range.start.row !== block_range.start.row + shift) {
     fail(
-      `rebased block starts at row ${rebased.range.start.row}, expected ${blockRange.start.row + shift}`,
+      `rebased block starts at row ${rebased.range.start.row}, expected ${block_range.start.row + shift}`,
     );
   }
-  if (rebased.range.end.row !== blockRange.end.row + shift) {
+  if (rebased.range.end.row !== block_range.end.row + shift) {
     fail(
-      `rebased block ends at row ${rebased.range.end.row}, expected ${blockRange.end.row + shift}`,
+      `rebased block ends at row ${rebased.range.end.row}, expected ${block_range.end.row + shift}`,
     );
   }
-  const blockCells = scale.rebaseBlockRows * scale.rebaseBlockColumns;
+  const block_cells = scale.rebaseBlockRows * scale.rebaseBlockColumns;
   if (
-    rebased.block.values.length !== blockCells ||
+    rebased.block.values.length !== block_cells ||
     rebased.block.rowCount !== scale.rebaseBlockRows ||
     rebased.block.colCount !== scale.rebaseBlockColumns
   ) {
@@ -1140,39 +1146,39 @@ function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CoreP
   }
   // Every rebased value must equal its source value, and the rebase must leave
   // both the caller's operation array and the block it owns untouched.
-  const input = requireValue(localOperations[0], "rebase input operation is missing");
+  const input = require_value(local_operations[0], "rebase input operation is missing");
   if (input.op !== "setBlock") fail(`rebase input operation is ${input.op}`);
   if (
-    input.range.start.row !== blockRange.start.row ||
-    input.range.end.row !== blockRange.end.row ||
-    input.range.start.col !== blockRange.start.col ||
-    input.range.end.col !== blockRange.end.col
+    input.range.start.row !== block_range.start.row ||
+    input.range.end.row !== block_range.end.row ||
+    input.range.start.col !== block_range.start.col ||
+    input.range.end.col !== block_range.end.col
   ) {
     fail("rebase modified its input range");
   }
-  if (localOperations.length !== 1) fail("rebase changed the input operation count");
-  for (let offset = 0; offset < blockCells; offset += 1) {
-    if (rebased.block.values[offset] !== sourceValues[offset]) {
+  if (local_operations.length !== 1) fail("rebase changed the input operation count");
+  for (let offset = 0; offset < block_cells; offset += 1) {
+    if (rebased.block.values[offset] !== source_values[offset]) {
       fail(`rebased block value ${offset} does not match the source value`);
     }
-    if (input.block.values[offset] !== sourceValues[offset]) {
+    if (input.block.values[offset] !== source_values[offset]) {
       fail(`rebase modified its input block at offset ${offset}`);
     }
   }
 
   // Sync recovery rebases pending work only across remote cell edits; a
   // structural remote reloads instead. Time that path on the same block.
-  let cellResult: DocumentRebaseResult | undefined;
-  const cellEditSamplesMs = collect(
+  let cell_result: DocumentRebaseResult | undefined;
+  const cell_edit_samples_ms = collect(
     () => {
-      cellResult = rebaseDocumentOperations(localOperations, remoteOperations);
+      cell_result = rebaseDocumentOperations(local_operations, remote_operations);
     },
     {
       warmup: plan.warmup,
       iters: plan.iters,
       before: () => {
         generation += 1;
-        remoteOperations = Array.from({ length: scale.rebaseInsertOperations }, (_, index) => ({
+        remote_operations = Array.from({ length: scale.rebaseInsertOperations }, (_, index) => ({
           op: "set" as const,
           addr: { sheet: SHEET, row: 200 + index * 2 + (generation % 3), col: 0 },
           value: { kind: "literal" as const, value: generation },
@@ -1180,41 +1186,44 @@ function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CoreP
       },
     },
   );
-  const cellRebase = requireValue(cellResult, "cell-edit rebase timed no result");
-  if (cellRebase.status !== "rebased") fail(`cell-edit rebase reported ${cellRebase.status}`);
-  const kept = requireValue(cellRebase.operations[0], "cell-edit rebase returned no operation");
-  if (kept.op !== "setBlock" || kept.range.start.row !== blockRange.start.row) {
+  const cell_rebase = require_value(cell_result, "cell-edit rebase timed no result");
+  if (cell_rebase.status !== "rebased") fail(`cell-edit rebase reported ${cell_rebase.status}`);
+  const kept = require_value(cell_rebase.operations[0], "cell-edit rebase returned no operation");
+  if (kept.op !== "setBlock" || kept.range.start.row !== block_range.start.row) {
     fail("cell-edit rebase moved the block");
   }
-  for (let offset = 0; offset < blockCells; offset += 1) {
-    if (kept.block.values[offset] !== sourceValues[offset]) {
+  for (let offset = 0; offset < block_cells; offset += 1) {
+    if (kept.block.values[offset] !== source_values[offset]) {
       fail(`cell-edit rebase value ${offset} does not match the source value`);
     }
   }
 
-  return scenarioResult(
+  return scenario_result(
     "rebase-large",
-    `one rebase of a ${blockCells.toLocaleString("en-US")}-cell block across ${shift} single-row inserts`,
-    samplesMs,
+    `one rebase of a ${block_cells.toLocaleString("en-US")}-cell block across ${shift} single-row inserts`,
+    samples_ms,
     {
-      blockCells,
+      blockCells: block_cells,
       insertOperations: shift,
-      verifiedValues: blockCells,
-      cellEditMedianMs: summarize(cellEditSamplesMs).median,
+      verifiedValues: block_cells,
+      cellEditMedianMs: summarize(cell_edit_samples_ms).median,
     },
     "the block rebases without conflict, shifts down by exactly the inserted row count across the inserts and stays in place across the cell edits, keeps every source value, and leaves the caller's operations untouched",
     {
       variants: [
-        variant("across-row-inserts", samplesMs),
-        variant("across-cell-edits", cellEditSamplesMs),
+        variant("across-row-inserts", samples_ms),
+        variant("across-cell-edits", cell_edit_samples_ms),
       ],
     },
   );
 }
 
-function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
-  const filledRows = scale.sparseCells / SPARSE_COLUMNS;
-  const rangeRows = filledRows * SPARSE_ROW_STRIDE;
+function write_sparse_range_with_rules(
+  scale: CorePathScale,
+  plan: SamplePlan,
+): CorePathScenarioResult {
+  const filled_rows = scale.sparseCells / SPARSE_COLUMNS;
+  const range_rows = filled_rows * SPARSE_ROW_STRIDE;
   const rules: DataValidationRule[] = Array.from({ length: scale.validationRules }, (_, index) => ({
     id: `rule-${index}`,
     range: {
@@ -1225,17 +1234,17 @@ function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): Core
     condition: { kind: "number", min: 0, max: 10 },
     policy: "reject",
   }));
-  const mounted = mountGrid({
-    workbook: workbook(SPARSE_RANGE_START_ROW + rangeRows, numberColumns(SPARSE_COLUMNS)),
+  const mounted = mount_grid({
+    workbook: workbook(SPARSE_RANGE_START_ROW + range_rows, number_columns(SPARSE_COLUMNS)),
     transactionResourceLimits: { maxEncodedBytes: BLOCK_ENCODED_BYTES },
   });
   const { grid } = mounted;
   for (const rule of rules) grid.setValidationRule(rule);
 
-  const range = sheetRange(rangeRows, SPARSE_COLUMNS, SPARSE_RANGE_START_ROW);
-  const buildCells = (base: number): SnapshotCell[] => {
+  const range = sheet_range(range_rows, SPARSE_COLUMNS, SPARSE_RANGE_START_ROW);
+  const build_cells = (base: number): SnapshotCell[] => {
     const cells: SnapshotCell[] = [];
-    for (let row = 0; row < filledRows; row += 1) {
+    for (let row = 0; row < filled_rows; row += 1) {
       for (let col = 0; col < SPARSE_COLUMNS; col += 1) {
         cells.push({
           rowOffset: row * SPARSE_ROW_STRIDE,
@@ -1248,13 +1257,13 @@ function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): Core
   };
 
   let generation = 0;
-  const samplesMs = collect(
+  const samples_ms = collect(
     () => {
       generation += 1;
       const result = grid.applyTransaction({
-        patches: [{ op: "setRange", range, cells: buildCells(generation * scale.sparseCells) }],
+        patches: [{ op: "setRange", range, cells: build_cells(generation * scale.sparseCells) }],
       });
-      assertApplied(result.status, "sparse setRange");
+      assert_applied(result.status, "sparse setRange");
     },
     { warmup: plan.warmup, iters: plan.iters },
   );
@@ -1264,16 +1273,16 @@ function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): Core
   for (const index of probes) {
     const row = SPARSE_RANGE_START_ROW + Math.floor(index / SPARSE_COLUMNS) * SPARSE_ROW_STRIDE;
     const col = index % SPARSE_COLUMNS;
-    if (resolvedCell(grid, row, col) !== expected + index) {
+    if (resolved_cell(grid, row, col) !== expected + index) {
       fail(`sparse setRange cell ${row}:${col} does not hold the last written value`);
     }
   }
-  const storedRules = grid.store.getWorkbook().sheets[0]?.validationRules?.length ?? 0;
-  if (storedRules !== scale.validationRules) {
-    fail(`sheet holds ${storedRules} validation rules, expected ${scale.validationRules}`);
+  const stored_rules = grid.store.getWorkbook().sheets[0]?.validationRules?.length ?? 0;
+  if (stored_rules !== scale.validationRules) {
+    fail(`sheet holds ${stored_rules} validation rules, expected ${scale.validationRules}`);
   }
   const violated = grid.applyTransaction({
-    patches: [{ op: "set", addr: cellAddress(0, 0), value: { kind: "literal", value: 999 } }],
+    patches: [{ op: "set", addr: cell_address(0, 0), value: { kind: "literal", value: 999 } }],
   });
   if (violated.status !== "rejected") {
     fail(`a value outside the rule bounds was ${violated.status} instead of rejected`);
@@ -1283,20 +1292,20 @@ function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): Core
   }
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "validation-sparse",
     `one ${scale.sparseCells.toLocaleString("en-US")}-cell sparse setRange with ${scale.validationRules} rules outside the range`,
-    samplesMs,
+    samples_ms,
     {
       writtenCells: scale.sparseCells,
-      logicalRangeCells: rangeRows * SPARSE_COLUMNS,
+      logicalRangeCells: range_rows * SPARSE_COLUMNS,
       validationRules: scale.validationRules,
     },
     "every write is applied, probe cells hold the last written values, every rule is retained, and a rule violation is still rejected",
   );
 }
 
-function buildCsvText(rows: number, columns: number): string {
+function build_csv_text(rows: number, columns: number): string {
   const lines = new Array<string>(rows + 1);
   const header = new Array<string>(columns);
   for (let col = 0; col < columns; col += 1) header[col] = `Header ${col + 1}`;
@@ -1311,35 +1320,35 @@ function buildCsvText(rows: number, columns: number): string {
   return lines.join("\n");
 }
 
-function importCsvText(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
-  const text = buildCsvText(scale.csvRows, scale.csvColumns);
+function import_csv_text(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const text = build_csv_text(scale.csvRows, scale.csvColumns);
   const columns: Column[] = Array.from({ length: scale.csvColumns }, (_, index) => ({
-    key: columnKey(index),
+    key: column_key(index),
     header: `Header ${index + 1}`,
     width: 120,
     type: index % 2 === 0 ? "number" : "text",
   }));
   const options = { resourceLimits: CSV_RESOURCE_LIMITS };
   let last: ColumnarData | undefined;
-  const samplesMs = collect(
+  const samples_ms = collect(
     () => {
       last = fromCsv(text, columns, options);
     },
     { warmup: plan.warmup, iters: plan.iters, gcBetween: plan.gcBetween },
   );
 
-  const data = requireValue(last, "csv import timed no result");
+  const data = require_value(last, "csv import timed no result");
   if (data.rowCount !== scale.csvRows) {
     fail(`csv import produced ${data.rowCount} rows, expected ${scale.csvRows}`);
   }
   // Every row and column is compared against the generator formula, so a wrong
   // parse, a shifted column, or a lost row fails instead of reporting a number.
   for (let col = 0; col < columns.length; col += 1) {
-    const column = requireValue(columns[col], `csv import lost column ${col}`);
-    const source = requireValue(data.columns[column.key], `csv import lost column ${column.key}`);
-    const expectedColumn = col % 2 === 0;
+    const column = require_value(columns[col], `csv import lost column ${col}`);
+    const source = require_value(data.columns[column.key], `csv import lost column ${column.key}`);
+    const expected_column = col % 2 === 0;
     for (let row = 0; row < scale.csvRows; row += 1) {
-      const expected = expectedColumn ? row * scale.csvColumns + col : `row-${row}-c${col}`;
+      const expected = expected_column ? row * scale.csvColumns + col : `row-${row}-c${col}`;
       if (source[row] !== expected) {
         fail(
           `csv import cell ${row}:${col} is ${String(source[row])}, expected ${String(expected)}`,
@@ -1347,10 +1356,10 @@ function importCsvText(scale: CorePathScale, plan: SamplePlan): CorePathScenario
       }
     }
   }
-  return scenarioResult(
+  return scenario_result(
     "csv-import",
     `one fromCsv import of ${scale.csvRows.toLocaleString("en-US")} rows by ${scale.csvColumns} columns`,
-    samplesMs,
+    samples_ms,
     {
       importedRows: scale.csvRows,
       importedColumns: scale.csvColumns,
@@ -1363,27 +1372,27 @@ function importCsvText(scale: CorePathScale, plan: SamplePlan): CorePathScenario
 
 // A repetitive 60 MiB decoded payload is valid under both restore ceilings.
 // Encoding and initial sheet construction are deliberately outside the samples.
-function restoreNearCeiling(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+function restore_near_ceiling(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const rows = scale === FULL_SCALE ? 4_000 : 100;
   const columns = scale === FULL_SCALE ? 1_000 : 100;
   const value = "restore-text";
-  const operation = encodeRestoreBlock(sheetRange(rows, columns), {
+  const operation = encodeRestoreBlock(sheet_range(rows, columns), {
     rowCount: rows,
     colCount: columns,
     values: new Array<CellScalar>(rows * columns).fill(value),
   });
-  const mounted = mountGrid({ workbook: workbook(rows, numberColumns(columns)) });
-  const samplesMs = collect(() => {
-    assertApplied(mounted.grid.applyRemoteOperations([operation]).status, "restoreBlock");
+  const mounted = mount_grid({ workbook: workbook(rows, number_columns(columns)) });
+  const samples_ms = collect(() => {
+    assert_applied(mounted.grid.applyRemoteOperations([operation]).status, "restoreBlock");
   }, plan);
-  if (resolvedCell(mounted.grid, rows - 1, columns - 1) !== value) {
+  if (resolved_cell(mounted.grid, rows - 1, columns - 1) !== value) {
     fail("near-ceiling restore did not apply the final cell");
   }
   mounted.destroy();
-  return scenarioResult(
+  return scenario_result(
     "restore-near-ceiling",
     `one restoreBlock with ${operation.decodedBytes} decoded bytes`,
-    samplesMs,
+    samples_ms,
     {
       restoredCells: rows * columns,
       decodedBytes: operation.decodedBytes,
@@ -1393,51 +1402,51 @@ function restoreNearCeiling(scale: CorePathScale, plan: SamplePlan): CorePathSce
   );
 }
 
-function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
-  const cellCount = scale.clearRows * scale.clearColumns;
+function undo_large_clear(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const cell_count = scale.clearRows * scale.clearColumns;
   const data: ColumnarData = {
     rowCount: scale.clearRows,
     columns: Object.fromEntries(
       Array.from({ length: scale.clearColumns }, (_, col) => [
-        columnKey(col),
+        column_key(col),
         Float64Array.from({ length: scale.clearRows }, (_, row) => row * scale.clearColumns + col),
       ]),
     ),
   };
-  const mounted = mountGrid({
-    workbook: workbook(scale.clearRows, numberColumns(scale.clearColumns)),
+  const mounted = mount_grid({
+    workbook: workbook(scale.clearRows, number_columns(scale.clearColumns)),
     data,
   });
   const { grid } = mounted;
-  let compactRestores = 0;
+  let compact_restores = 0;
   grid.on("change", (event) => {
     if (event.commitReason === "undo") {
-      compactRestores += event.transaction.patches.filter(
+      compact_restores += event.transaction.patches.filter(
         (operation) => operation.op === "restoreBlock",
       ).length;
     }
   });
-  const clearOperation: DocumentOp = {
+  const clear_operation: DocumentOp = {
     op: "clearRange",
-    range: sheetRange(scale.clearRows, scale.clearColumns),
+    range: sheet_range(scale.clearRows, scale.clearColumns),
     contents: true,
     style: false,
   };
-  const lastRow = scale.clearRows - 1;
-  const lastColumn = scale.clearColumns - 1;
-  const expectedLast = lastRow * scale.clearColumns + lastColumn;
+  const last_row = scale.clearRows - 1;
+  const last_column = scale.clearColumns - 1;
+  const expected_last = last_row * scale.clearColumns + last_column;
 
-  assertApplied(grid.applyTransaction({ patches: [clearOperation] }).status, "clearRange");
-  if (resolvedCell(grid, lastRow, lastColumn) !== null) {
+  assert_applied(grid.applyTransaction({ patches: [clear_operation] }).status, "clearRange");
+  if (resolved_cell(grid, last_row, last_column) !== null) {
     fail("clearRange left contents behind");
   }
   grid.undo();
-  if (resolvedCell(grid, lastRow, lastColumn) !== expectedLast) {
+  if (resolved_cell(grid, last_row, last_column) !== expected_last) {
     fail("undo of a clearRange did not restore the cleared block");
   }
 
   let clears = 0;
-  const samplesMs = collect(
+  const samples_ms = collect(
     () => {
       grid.undo();
     },
@@ -1447,26 +1456,26 @@ function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenari
       gcBetween: plan.gcBetween,
       before: () => {
         clears += 1;
-        assertApplied(grid.applyTransaction({ patches: [clearOperation] }).status, "clearRange");
+        assert_applied(grid.applyTransaction({ patches: [clear_operation] }).status, "clearRange");
       },
     },
   );
 
   // Every cell is compared against its original value after timing: a partial
   // restore fails here even though each undo returned normally.
-  assertWindowedValues(grid, scale.clearRows, scale.clearColumns, 0, "undo restore");
-  if (scale === FULL_SCALE && compactRestores === 0) fail("large-clear undo did not compact");
+  assert_windowed_values(grid, scale.clearRows, scale.clearColumns, 0, "undo restore");
+  if (scale === FULL_SCALE && compact_restores === 0) fail("large-clear undo did not compact");
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "undo-large-clear",
-    `one undo of a ${cellCount.toLocaleString("en-US")}-cell clearRange`,
-    samplesMs,
+    `one undo of a ${cell_count.toLocaleString("en-US")}-cell clearRange`,
+    samples_ms,
     {
-      clearedCells: cellCount,
+      clearedCells: cell_count,
       clears,
-      restoredCells: cellCount,
-      compactRestores,
+      restoredCells: cell_count,
+      compactRestores: compact_restores,
       peakRssBytes: process.resourceUsage().maxRSS * 1024,
     },
     "the clear empties the block and the undos restore every original cell value",
@@ -1482,7 +1491,7 @@ interface ColumnLoadProbe {
   ): boolean;
 }
 
-async function revisitEvictedBand(
+async function revisit_evicted_band(
   scale: CorePathScale,
   plan: SamplePlan,
 ): Promise<CorePathScenarioResult> {
@@ -1494,7 +1503,7 @@ async function revisitEvictedBand(
         const data: RowData = {};
         for (const band of request.columns) {
           for (let index = 0; index < band.keys.length; index += 1) {
-            const key = requireValue(band.keys[index], "datasource band key");
+            const key = require_value(band.keys[index], "datasource band key");
             data[key] = row + Number(key.slice(1));
           }
         }
@@ -1508,84 +1517,84 @@ async function revisitEvictedBand(
     chunkRows: PAGED_CHUNK_ROWS,
     cacheBytes: PAGED_CACHE_BYTES,
   };
-  const mounted = mountGrid({
-    workbook: workbook(scale.pagedRows, numberColumns(PAGED_COLUMNS)),
+  const mounted = mount_grid({
+    workbook: workbook(scale.pagedRows, number_columns(PAGED_COLUMNS)),
     datasource,
     datasourceStorage: storage,
   });
   const { grid } = mounted;
   const probe = grid.store as typeof grid.store & ColumnLoadProbe;
-  const fullyLoaded = probe.areColumnsFullyLoaded.bind(probe);
-  let fullyLoadedCalls = 0;
-  probe.areColumnsFullyLoaded = (sheet, startRow, endRow, requested) => {
-    fullyLoadedCalls += 1;
-    return fullyLoaded(sheet, startRow, endRow, requested);
+  const fully_loaded = probe.areColumnsFullyLoaded.bind(probe);
+  let fully_loaded_calls = 0;
+  probe.areColumnsFullyLoaded = (sheet, start_row, end_row, requested) => {
+    fully_loaded_calls += 1;
+    return fully_loaded(sheet, start_row, end_row, requested);
   };
 
-  const bandRow = PAGED_BAND_ROW;
+  const band_row = PAGED_BAND_ROW;
   const visit = async (row: number): Promise<void> => {
-    grid.scrollToCell(cellAddress(row, 0));
-    await settleAsyncWork();
+    grid.scrollToCell(cell_address(row, 0));
+    await settle_async_work();
   };
-  await visit(bandRow);
-  if (cellLoadState(grid, bandRow, 0) !== "loaded-value") {
+  await visit(band_row);
+  if (cell_load_state(grid, band_row, 0) !== "loaded-value") {
     fail("the first band did not load");
   }
-  const expectedValue = bandRow + 1;
-  if (resolvedCell(grid, bandRow, 1) !== expectedValue) {
+  const expected_value = band_row + 1;
+  if (resolved_cell(grid, band_row, 1) !== expected_value) {
     fail("the loaded band carries unexpected values");
   }
 
-  const evictionSpan = scale.pagedRows - PAGED_BAND_ROW - PAGED_CHUNK_ROWS * 3;
-  let evictionCursor = 0;
+  const eviction_span = scale.pagedRows - PAGED_BAND_ROW - PAGED_CHUNK_ROWS * 3;
+  let eviction_cursor = 0;
   const evict = async (): Promise<number> => {
     for (let attempt = 1; attempt <= PAGED_EVICTION_ATTEMPTS; attempt += 1) {
       // Walk away from the band in single-chunk steps and never restart the walk:
       // a walk that returns to rows near the band re-loads its chunks through
       // speculative prefetch, so the band never ages out of the cache.
-      const step = evictionCursor * PAGED_CHUNK_ROWS;
-      const distantRow = PAGED_BAND_ROW + PAGED_CHUNK_ROWS * 2 + (step % evictionSpan);
-      evictionCursor += 1;
-      await visit(distantRow);
-      if (cellLoadState(grid, bandRow, 0) === "unloaded") return attempt;
+      const step = eviction_cursor * PAGED_CHUNK_ROWS;
+      const distant_row = PAGED_BAND_ROW + PAGED_CHUNK_ROWS * 2 + (step % eviction_span);
+      eviction_cursor += 1;
+      await visit(distant_row);
+      if (cell_load_state(grid, band_row, 0) === "unloaded") return attempt;
     }
     return FAILED_EVICTION;
   };
 
-  const samplesMs: number[] = [];
-  let evictionVisits = 0;
-  let revisitCalls = 0;
+  const samples_ms: number[] = [];
+  let eviction_visits = 0;
+  let revisit_calls = 0;
   for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
     const attempts = await evict();
     if (attempts === FAILED_EVICTION) {
       fail(`the band was still loaded after ${PAGED_EVICTION_ATTEMPTS} distant visits`);
     }
-    const callsBefore = fullyLoadedCalls;
+    const calls_before = fully_loaded_calls;
     const started = now();
-    await visit(bandRow);
+    await visit(band_row);
     const elapsed = now() - started;
     if (iteration >= plan.warmup) {
-      samplesMs.push(elapsed);
-      revisitCalls += fullyLoadedCalls - callsBefore;
-      evictionVisits += attempts;
+      samples_ms.push(elapsed);
+      revisit_calls += fully_loaded_calls - calls_before;
+      eviction_visits += attempts;
     }
-    if (cellLoadState(grid, bandRow, 0) !== "loaded-value") {
+    if (cell_load_state(grid, band_row, 0) !== "loaded-value") {
       fail("the revisiting round did not reload the evicted band");
     }
-    if (resolvedCell(grid, bandRow, 1) !== expectedValue) {
+    if (resolved_cell(grid, band_row, 1) !== expected_value) {
       fail("the reloaded band carries unexpected values");
     }
   }
   mounted.destroy();
 
-  return scenarioResult(
+  return scenario_result(
     "paged-evicted-revisit",
     "one revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric)",
-    samplesMs,
+    samples_ms,
     {
       revisitedRows: plan.iters,
-      areColumnsFullyLoadedCalls: revisitCalls,
-      evictionVisits,
+      areColumnsFullyLoadedCalls: revisit_calls,
+      evictionVisits: eviction_visits,
       pagedRows: scale.pagedRows,
     },
     "the band is unloaded before each revisit, the revisit reloads it with the source values, and the revisit asks areColumnsFullyLoaded at least once; areColumnsFullyLoadedCalls per revisit is the accept metric",
@@ -1651,33 +1660,33 @@ export interface NodeLoadSample {
   readonly nodeVersion: string;
 }
 
-function parseNodeLoadSample(stdout: string, stderr: string, exitCode: number): NodeLoadSample {
+function parse_node_load_sample(stdout: string, stderr: string, exit_code: number): NodeLoadSample {
   const line = stdout.trim();
   if (line.length === 0) {
-    throw new Error(`node cold init produced no output (exit ${exitCode}): ${stderr.trim()}`);
+    throw new Error(`node cold init produced no output (exit ${exit_code}): ${stderr.trim()}`);
   }
   const parsed: unknown = JSON.parse(line);
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error("node cold init output is not an object");
   }
   const record = parsed as Record<string, unknown>;
-  const loadMs = record.loadMs;
-  const largestGapMs = record.largestGapMs;
-  const heartbeatTicks = record.heartbeatTicks;
+  const load_ms = record.loadMs;
+  const largest_gap_ms = record.largestGapMs;
+  const heartbeat_ticks = record.heartbeatTicks;
   if (
-    typeof loadMs !== "number" ||
-    typeof largestGapMs !== "number" ||
-    typeof heartbeatTicks !== "number" ||
+    typeof load_ms !== "number" ||
+    typeof largest_gap_ms !== "number" ||
+    typeof heartbeat_ticks !== "number" ||
     typeof record.nodeVersion !== "string" ||
     record.nodeVersion.length === 0
   ) {
     throw new Error("node cold init output is missing numbers or the runtime version");
   }
   return {
-    loadMs,
-    largestGapMs,
+    loadMs: load_ms,
+    largestGapMs: largest_gap_ms,
     loaded: record.loaded === true,
-    heartbeatTicks,
+    heartbeatTicks: heartbeat_ticks,
     engineStatus: String(record.engineStatus),
     engineValue: record.engineValue as CellScalar,
     nodeVersion: record.nodeVersion,
@@ -1702,45 +1711,45 @@ export function checkNodeLoadSample(sample: NodeLoadSample): void {
   }
 }
 
-async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioResult> {
-  const samplesMs: number[] = [];
-  let largestGapMs = 0;
-  let minimalHeartbeatTicks = Number.POSITIVE_INFINITY;
-  let nodeVersion = "";
+async function load_wasm_in_fresh_node(plan: SamplePlan): Promise<CorePathScenarioResult> {
+  const samples_ms: number[] = [];
+  let largest_gap_ms = 0;
+  let minimal_heartbeat_ticks = Number.POSITIVE_INFINITY;
+  let node_version = "";
   for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
     const child = Bun.spawn(["node", "--input-type=module", "-e", NODE_CHILD_PROGRAM], {
       cwd: BENCH_ROOT,
       stdout: "pipe",
       stderr: "pipe",
     });
-    const [stdout, stderr, exitCode] = await Promise.all([
+    const [stdout, stderr, exit_code] = await Promise.all([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
       child.exited,
     ]);
-    const sample = parseNodeLoadSample(stdout, stderr, exitCode);
+    const sample = parse_node_load_sample(stdout, stderr, exit_code);
     checkNodeLoadSample(sample);
-    if (nodeVersion.length === 0) nodeVersion = sample.nodeVersion;
-    else if (nodeVersion !== sample.nodeVersion) {
+    if (node_version.length === 0) node_version = sample.nodeVersion;
+    else if (node_version !== sample.nodeVersion) {
       fail(`the fresh Node processes disagree on their runtime version`);
     }
-    largestGapMs = Math.max(largestGapMs, sample.largestGapMs);
-    minimalHeartbeatTicks = Math.min(minimalHeartbeatTicks, sample.heartbeatTicks);
-    if (iteration >= plan.warmup) samplesMs.push(sample.loadMs);
+    largest_gap_ms = Math.max(largest_gap_ms, sample.largestGapMs);
+    minimal_heartbeat_ticks = Math.min(minimal_heartbeat_ticks, sample.heartbeatTicks);
+    if (iteration >= plan.warmup) samples_ms.push(sample.loadMs);
   }
-  return scenarioResult(
+  return scenario_result(
     "node-cold-init",
     `one cold initSheetwrite() through first store in a fresh Node process (${
       plan.warmup + plan.iters
     } processes)`,
-    samplesMs,
+    samples_ms,
     {
-      largestHeartbeatGapMs: largestGapMs,
-      minimalHeartbeatTicks,
+      largestHeartbeatGapMs: largest_gap_ms,
+      minimalHeartbeatTicks: minimal_heartbeat_ticks,
       freshProcesses: plan.warmup + plan.iters,
     },
     "every fresh process loads the module, produces the expected engine result, and reports a plausible heartbeat gap",
-    { observations: { nodeVersion } },
+    { observations: { nodeVersion: node_version } },
   );
 }
 
@@ -1755,24 +1764,24 @@ async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioRe
  * The counter is the backing store a standalone row index keeps after its
  * first resize at this sheet size.
  */
-function resizeFirstRow(id: RowResizeScenarioId, plan: SamplePlan): CorePathScenarioResult {
+function resize_first_row(id: RowResizeScenarioId, plan: SamplePlan): CorePathScenarioResult {
   const rows = ROW_RESIZE_ROWS[id];
   const host = document.createElement("div");
   // happy-dom has no layout: give the viewport room for the first row.
   Object.defineProperties(host, { clientWidth: { value: 800 }, clientHeight: { value: 400 } });
   document.body.appendChild(host);
-  const book = workbook(rows, numberColumns(2));
+  const book = workbook(rows, number_columns(2));
   const grid = createGrid(host, {
     workbook: book,
     config: { toolbar: false, tabs: false, find: false, contextMenu: false },
   });
   const scroller = host.querySelector(".sheetwrite-scroller");
-  const borderY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
-  const resizedHeight = DEFAULT_THEME.rowHeight + ROW_RESIZE_DRAG_STEPS;
-  const firstRowHeight = (): number | undefined => book.sheets[0]?.rowHeights?.get(0);
-  const commitMs: number[] = [];
-  const undoMs: number[] = [];
-  const cancelMs: number[] = [];
+  const border_y = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
+  const resized_height = DEFAULT_THEME.rowHeight + ROW_RESIZE_DRAG_STEPS;
+  const first_row_height = (): number | undefined => book.sheets[0]?.rowHeights?.get(0);
+  const commit_ms: number[] = [];
+  const undo_ms: number[] = [];
+  const cancel_ms: number[] = [];
   try {
     if (!(scroller instanceof HTMLElement)) fail(`${id} found no grid scroller`);
     const pointer = (type: string, y: number): void => {
@@ -1781,34 +1790,36 @@ function resizeFirstRow(id: RowResizeScenarioId, plan: SamplePlan): CorePathScen
       );
     };
     const drag = (release: "pointerup" | "pointercancel"): void => {
-      pointer("pointerdown", borderY);
+      pointer("pointerdown", border_y);
       for (let step = 1; step <= ROW_RESIZE_DRAG_STEPS; step += 1) {
-        pointer("pointermove", borderY + step);
+        pointer("pointermove", border_y + step);
       }
-      pointer(release, borderY + ROW_RESIZE_DRAG_STEPS);
+      pointer(release, border_y + ROW_RESIZE_DRAG_STEPS);
     };
     for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
       if (plan.gcBetween) forceGc();
       let started = now();
       drag("pointerup");
       const committed = now() - started;
-      if (firstRowHeight() !== resizedHeight) {
-        fail(`${id} drag committed height ${String(firstRowHeight())}, expected ${resizedHeight}`);
+      if (first_row_height() !== resized_height) {
+        fail(
+          `${id} drag committed height ${String(first_row_height())}, expected ${resized_height}`,
+        );
       }
       if (plan.gcBetween) forceGc();
       started = now();
       grid.undo();
       const undone = now() - started;
-      if (firstRowHeight() !== undefined) fail(`${id} undo kept the first row's height`);
+      if (first_row_height() !== undefined) fail(`${id} undo kept the first row's height`);
       if (plan.gcBetween) forceGc();
       started = now();
       drag("pointercancel");
       const cancelled = now() - started;
-      if (firstRowHeight() !== undefined) fail(`${id} cancelled drag committed a height`);
+      if (first_row_height() !== undefined) fail(`${id} cancelled drag committed a height`);
       if (iteration >= plan.warmup) {
-        commitMs.push(committed);
-        undoMs.push(undone);
-        cancelMs.push(cancelled);
+        commit_ms.push(committed);
+        undo_ms.push(undone);
+        cancel_ms.push(cancelled);
       }
     }
   } finally {
@@ -1817,25 +1828,25 @@ function resizeFirstRow(id: RowResizeScenarioId, plan: SamplePlan): CorePathScen
   }
 
   const index = new OffsetIndex(rows, DEFAULT_THEME.rowHeight);
-  index.setHeight(0, resizedHeight);
+  index.setHeight(0, resized_height);
   if (index.offsetOf(rows) !== rows * DEFAULT_THEME.rowHeight + ROW_RESIZE_DRAG_STEPS) {
     fail(`${id} row index total disagrees with one resized row`);
   }
-  return scenarioResult(
+  return scenario_result(
     id,
     `one ${ROW_RESIZE_DRAG_STEPS}-move drag of row 1's border, released to commit, on a ${rows.toLocaleString("en-US")}-row sheet`,
-    commitMs,
+    commit_ms,
     {
       rows,
       dragSteps: ROW_RESIZE_DRAG_STEPS,
       rowIndexBytesAfterFirstResize: index.backingStoreBytes,
     },
-    `each drag commits row 1 at ${resizedHeight} px, its undo removes the height, and a cancelled drag commits nothing`,
+    `each drag commits row 1 at ${resized_height} px, its undo removes the height, and a cancelled drag commits nothing`,
     {
       variants: [
-        variant("drag-commit", commitMs),
-        variant("undo", undoMs),
-        variant("drag-cancel", cancelMs),
+        variant("drag-commit", commit_ms),
+        variant("undo", undo_ms),
+        variant("drag-cancel", cancel_ms),
       ],
     },
   );
@@ -1850,24 +1861,24 @@ export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
     ) => Promise<CorePathScenarioResult> | CorePathScenarioResult
   >
 > = {
-  "row-bridge-insert": projectRowsIntoBridge,
-  "command-state-select": selectWithCommandState,
-  "setblock-admission": (scale, plan) => applyOneBlock(scale, plan, false),
-  "setblock-detailed-capture": (scale, plan) => applyOneBlock(scale, plan, true),
-  "sync-offline-queue": queueOfflineCommits,
-  "sync-remote-versions": applyRemoteVersions,
-  "local-scattered-edits": applyScatteredEdits,
-  "external-links-refresh": refreshExternalLinks,
-  "rebase-large": rebaseBlockAcrossInserts,
-  "validation-sparse": writeSparseRangeWithRules,
-  "csv-import": importCsvText,
-  "undo-large-clear": undoLargeClear,
-  "restore-near-ceiling": restoreNearCeiling,
-  "paged-evicted-revisit": revisitEvictedBand,
-  "node-cold-init": (_scale, plan) => loadWasmInFreshNode(plan),
-  "row-resize-100": (_scale, plan) => resizeFirstRow("row-resize-100", plan),
-  "row-resize-100k": (_scale, plan) => resizeFirstRow("row-resize-100k", plan),
-  "row-resize-1m": (_scale, plan) => resizeFirstRow("row-resize-1m", plan),
+  "row-bridge-insert": project_rows_into_bridge,
+  "command-state-select": select_with_command_state,
+  "setblock-admission": (scale, plan) => apply_one_block(scale, plan, false),
+  "setblock-detailed-capture": (scale, plan) => apply_one_block(scale, plan, true),
+  "sync-offline-queue": queue_offline_commits,
+  "sync-remote-versions": apply_remote_versions,
+  "local-scattered-edits": apply_scattered_edits,
+  "external-links-refresh": refresh_external_links,
+  "rebase-large": rebase_block_across_inserts,
+  "validation-sparse": write_sparse_range_with_rules,
+  "csv-import": import_csv_text,
+  "undo-large-clear": undo_large_clear,
+  "restore-near-ceiling": restore_near_ceiling,
+  "paged-evicted-revisit": revisit_evicted_band,
+  "node-cold-init": (_scale, plan) => load_wasm_in_fresh_node(plan),
+  "row-resize-100": (_scale, plan) => resize_first_row("row-resize-100", plan),
+  "row-resize-100k": (_scale, plan) => resize_first_row("row-resize-100k", plan),
+  "row-resize-1m": (_scale, plan) => resize_first_row("row-resize-1m", plan),
 };
 
 /** Fail-closed validation of a completed artifact, mirroring the raw evidence. */
@@ -1930,9 +1941,9 @@ export async function runCorePathsBenchmark(
   await initSheetwrite({ source: bytes });
   const memory = getEngine().getMemory();
 
-  const restoreCanvas = installCanvasTestStubs();
-  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const restore_canvas = installCanvasTestStubs();
+  const original_request_animation_frame = globalThis.requestAnimationFrame;
+  const original_cancel_animation_frame = globalThis.cancelAnimationFrame;
 
   // Run scheduled paints inside the call that schedules them, so selection
   // scenarios do not depend on happy-dom's animation-frame timing.
@@ -1945,19 +1956,19 @@ export async function runCorePathsBenchmark(
   const scenarios: CorePathScenarioResult[] = [];
   try {
     for (const id of scenarioIds) {
-      const plan = samplePlan(id, mode);
+      const plan = sample_plan(id, mode);
 
       forceGc();
       scenarios.push(await CORE_PATH_SCENARIO_RUNNERS[id](scale, plan));
       forceGc();
     }
   } finally {
-    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-    restoreCanvas();
+    globalThis.requestAnimationFrame = original_request_animation_frame;
+    globalThis.cancelAnimationFrame = original_cancel_animation_frame;
+    restore_canvas();
   }
 
-  const nodeLoaderVersion = scenarios.find((scenario) => scenario.id === "node-cold-init")
+  const node_loader_version = scenarios.find((scenario) => scenario.id === "node-cold-init")
     ?.observations?.nodeVersion;
   const artifact: CorePathsBenchmarkArtifact = {
     schemaVersion: CORE_PATHS_BENCHMARK_SCHEMA_VERSION,
@@ -1967,7 +1978,7 @@ export async function runCorePathsBenchmark(
     toolchain: {
       bun: Bun.version,
       nodeCompat: process.version,
-      ...(nodeLoaderVersion === undefined ? {} : { nodeLoader: nodeLoaderVersion }),
+      ...(node_loader_version === undefined ? {} : { nodeLoader: node_loader_version }),
       platform: process.platform,
       arch: process.arch,
       cpu: cpus()[0]?.model ?? "unknown",
@@ -1987,7 +1998,7 @@ export async function runCorePathsBenchmark(
   return artifact;
 }
 
-function parseScenarioIds(value: string | undefined): readonly CorePathScenarioId[] {
+function parse_scenario_ids(value: string | undefined): readonly CorePathScenarioId[] {
   if (value === undefined) return CORE_PATH_SCENARIOS;
   const requested = value
     .split(",")
@@ -2003,7 +2014,7 @@ function parseScenarioIds(value: string | undefined): readonly CorePathScenarioI
   return requested as readonly CorePathScenarioId[];
 }
 
-function reportTable(scenarios: readonly CorePathScenarioResult[]): string {
+function report_table(scenarios: readonly CorePathScenarioResult[]): string {
   const lines = ["| scenario | unit | median ms | p95 ms | samples |", "|:--|:--|---:|---:|---:|"];
   for (const scenario of scenarios) {
     lines.push(
@@ -2023,9 +2034,9 @@ if (import.meta.main) {
   const mode: BenchmarkMode = args.includes("--smoke") ? "smoke" : "full";
   const artifact = await runCorePathsBenchmark(
     mode,
-    parseScenarioIds(optionValue(args, "--scenario")),
+    parse_scenario_ids(optionValue(args, "--scenario")),
   );
-  process.stdout.write(`${reportTable(artifact.scenarios)}\n`);
+  process.stdout.write(`${report_table(artifact.scenarios)}\n`);
   const output = optionValue(args, "--output");
   if (output !== undefined) await Bun.write(output, `${JSON.stringify(artifact, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(artifact)}\n`);

@@ -12,12 +12,12 @@ const PANEL_ID = "popover-undo";
 const AFTER_CLOSE_DELAY_MS = 150;
 
 /** Mutation observers report in a microtask after the DOM change. */
-async function flushMutations(): Promise<void> {
+async function flush_mutations(): Promise<void> {
   await Promise.resolve();
 }
 
 /** Resolves when the panel with `id` enters the document. */
-function panelOpened(id: string): Promise<HTMLElement> {
+function panel_opened(id: string): Promise<HTMLElement> {
   const { promise, resolve } = Promise.withResolvers<HTMLElement>();
   const observer = new MutationObserver(() => {
     const panel = document.getElementById(id);
@@ -30,7 +30,7 @@ function panelOpened(id: string): Promise<HTMLElement> {
 }
 
 /** One code block with a hover trigger and its panel in the page's store. */
-function mountCodeBlock(): { page: HTMLElement; trigger: HTMLElement } {
+function mount_code_block(): { page: HTMLElement; trigger: HTMLElement } {
   const page = document.createElement("article");
   page.innerHTML = `
     <div class="expressive-code"><pre><code><span tabindex="0" data-sw-code-popover-trigger="${PANEL_ID}" aria-describedby="${PANEL_ID}">undo</span>();</code></pre></div>
@@ -44,15 +44,15 @@ function mountCodeBlock(): { page: HTMLElement; trigger: HTMLElement } {
 }
 
 /** True when the panel is in the document and shown. */
-function isOpen(): boolean {
+function is_open(): boolean {
   return document.getElementById(PANEL_ID)?.hasAttribute("data-open") ?? false;
 }
 
-function pointer(type: "pointerover" | "pointerout", target: Element, relatedTarget?: Element) {
-  target.dispatchEvent(new PointerEvent(type, { bubbles: true, relatedTarget }));
+function pointer(type: "pointerover" | "pointerout", target: Element, related_target?: Element) {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, relatedTarget: related_target }));
 }
 
-function pressKey(target: Element, key: string) {
+function press_key(target: Element, key: string) {
   target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 }
 
@@ -71,9 +71,9 @@ afterEach(() => {
 
 describe("code enhancements", () => {
   it("opens the panel of a trigger focused before the popover runtime loaded", async () => {
-    const { trigger } = mountCodeBlock();
+    const { trigger } = mount_code_block();
     uninstall = initializeCodeEnhancements();
-    const opened = panelOpened(PANEL_ID);
+    const opened = panel_opened(PANEL_ID);
 
     trigger.focus();
 
@@ -83,29 +83,29 @@ describe("code enhancements", () => {
   });
 
   it("stops observing a code block that a route removes, and removes its open panel", async () => {
-    const restoreResizeObserver = installRecordingResizeObserver();
+    const restore_resize_observer = installRecordingResizeObserver();
     try {
       uninstall = initializeCodeEnhancements();
-      const { page, trigger } = mountCodeBlock();
-      await flushMutations();
+      const { page, trigger } = mount_code_block();
+      await flush_mutations();
       expect(RecordingResizeObserver.observed.size).toBe(1);
       trigger.focus();
 
       page.remove();
-      await flushMutations();
+      await flush_mutations();
 
       expect(RecordingResizeObserver.observed.size).toBe(0);
       expect(document.getElementById(PANEL_ID)).toBeNull();
     } finally {
       uninstall();
       uninstall = () => {};
-      restoreResizeObserver();
+      restore_resize_observer();
     }
   });
 
   it("closes a hovered panel after the pointer leaves the trigger, not on the way into the panel", () => {
     vi.useFakeTimers();
-    const { trigger, page } = mountCodeBlock();
+    const { trigger, page } = mount_code_block();
     uninstall = installCodePopovers();
     pointer("pointerover", trigger);
     const panel = document.getElementById(PANEL_ID);
@@ -114,13 +114,13 @@ describe("code enhancements", () => {
     pointer("pointerout", trigger, panel);
     pointer("pointerover", panel, trigger);
     vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
-    expect(isOpen()).toBe(true);
+    expect(is_open()).toBe(true);
 
     pointer("pointerout", panel, page);
     pointer("pointerover", trigger, page);
     pointer("pointerout", trigger, page);
     vi.advanceTimersByTime(AFTER_CLOSE_DELAY_MS);
-    expect(isOpen()).toBe(false);
+    expect(is_open()).toBe(false);
     expect(trigger.hasAttribute("data-popover-open")).toBe(false);
   });
 
@@ -138,11 +138,11 @@ describe("code enhancements", () => {
     uninstall = initializeCodeEnhancements();
     first.focus();
 
-    pressKey(first, "ArrowRight");
+    press_key(first, "ArrowRight");
     expect(document.activeElement === second).toBe(true);
     expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, 0, -1]);
 
-    pressKey(second, "End");
+    press_key(second, "End");
     expect(document.activeElement === third).toBe(true);
     expect([first.tabIndex, second.tabIndex, third.tabIndex]).toEqual([-1, -1, 0]);
   });

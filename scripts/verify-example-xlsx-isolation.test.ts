@@ -9,10 +9,10 @@ import {
   relativeImports,
 } from "./verify-example-xlsx-isolation.js";
 
-const fixtureRoots: string[] = [];
+const fixture_roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(fixtureRoots.splice(0).map((root) => rm(root, { recursive: true })));
+  await Promise.all(fixture_roots.splice(0).map((root) => rm(root, { recursive: true })));
 });
 
 // Built Svelte chunks keep the doc comment of `mount()`, whose example is
@@ -32,7 +32,7 @@ const ENTRY = [
 
 it("follows only real module imports, not import text in comments or strings", async () => {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-xlsx-isolation-"));
-  fixtureRoots.push(root);
+  fixture_roots.push(root);
   await writeFile(join(root, "entry.js"), ENTRY);
   await writeFile(join(root, "grid.js"), "export const grid = 1;\n");
 
@@ -44,7 +44,7 @@ it("follows only real module imports, not import text in comments or strings", a
 
 it("follows lazy imports of lazy modules, but not the router's lazy routes", async () => {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-xlsx-isolation-"));
-  fixtureRoots.push(root);
+  fixture_roots.push(root);
   const files: Readonly<Record<string, string>> = {
     "router.js": `import "./page.js";\nexport const route = () => import("./other-route.js");\n`,
     "page.js": `export const action = () => import("./addon.js");\n`,

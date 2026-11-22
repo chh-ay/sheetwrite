@@ -111,12 +111,16 @@ export function createBulkSalesCsv(): { text: string; columns: Column[] } {
   return { text: records.join("\n"), columns };
 }
 
-function literal(rowOffset: number, colOffset: number, value: string | number) {
-  return { rowOffset, colOffset, value: { kind: "literal", value } as const };
+function literal(row_offset: number, col_offset: number, value: string | number) {
+  return {
+    rowOffset: row_offset,
+    colOffset: col_offset,
+    value: { kind: "literal", value } as const,
+  };
 }
 
-function formula(rowOffset: number, colOffset: number, src: string) {
-  return { rowOffset, colOffset, value: { kind: "formula", src } as const };
+function formula(row_offset: number, col_offset: number, src: string) {
+  return { rowOffset: row_offset, colOffset: col_offset, value: { kind: "formula", src } as const };
 }
 
 /** A literal attack sample is loaded only from the security lab. */
@@ -456,8 +460,8 @@ export async function importWorkbook(
     ...options,
     onWarning: (warning) => warnings.push(warning),
   });
-  const inputBytes = bytes instanceof Uint8Array ? bytes.byteLength : bytes.byteLength;
-  return { snapshot, warnings, inputBytes };
+  const input_bytes = bytes instanceof Uint8Array ? bytes.byteLength : bytes.byteLength;
+  return { snapshot, warnings, inputBytes: input_bytes };
 }
 
 export interface WorkbookExportOutcome {
@@ -476,7 +480,7 @@ export async function exportWorkbook(
 
 type SnapshotValue = WorkbookSnapshot["sheets"][number]["cells"][number]["cells"][number]["value"];
 
-function cellsByAddress(snapshot: WorkbookSnapshot): Map<string, SnapshotValue> {
+function cells_by_address(snapshot: WorkbookSnapshot): Map<string, SnapshotValue> {
   const values = new Map<string, SnapshotValue>();
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {
@@ -540,16 +544,16 @@ class ZipCursor {
 }
 
 /** Offset of the trailing end-of-central-directory record. */
-function findEndOfCentralDirectory(view: DataView, byteLength: number): number {
-  const earliest = Math.max(0, byteLength - ZIP_MAX_COMMENT - ZIP_END_MIN_SIZE);
-  for (let offset = byteLength - ZIP_END_MIN_SIZE; offset >= earliest; offset--) {
+function find_end_of_central_directory(view: DataView, byte_length: number): number {
+  const earliest = Math.max(0, byte_length - ZIP_MAX_COMMENT - ZIP_END_MIN_SIZE);
+  for (let offset = byte_length - ZIP_END_MIN_SIZE; offset >= earliest; offset--) {
     if (view.getUint32(offset, true) === ZIP_END_SIGNATURE) return offset;
   }
   throw new Error("Exported workbook is not a ZIP package");
 }
 
 /** Inflate one stored ZIP member with the browser's own decompressor. */
-async function inflateStoredPart(compressed: Uint8Array, method: number): Promise<string> {
+async function inflate_stored_part(compressed: Uint8Array, method: number): Promise<string> {
   if (method === 0) return STORED_UTF8.decode(compressed);
   if (method !== 8) throw new Error(`Exported workbook uses unsupported compression ${method}`);
   const stream = new Blob([compressed.slice()])
@@ -559,7 +563,7 @@ async function inflateStoredPart(compressed: Uint8Array, method: number): Promis
 }
 
 /** The `<f>` texts of one worksheet part, decoded to source text. */
-function storedFormulasOf(xml: string): string[] {
+function stored_formulas_of(xml: string): string[] {
   const texts: string[] = [];
   for (const match of xml.matchAll(FORMULA_ELEMENT)) {
     texts.push(
@@ -580,52 +584,55 @@ function storedFormulasOf(xml: string): string[] {
  * reads its own .xlsx bytes so the `_xlfn.ANCHORARRAY` claim is shown from the
  * file instead of being asserted in prose. Only worksheet parts are touched.
  */
-async function storedFormulaTexts(bytes: Uint8Array): Promise<string[]> {
+async function stored_formula_texts(bytes: Uint8Array): Promise<string[]> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const directory = new ZipCursor(view, findEndOfCentralDirectory(view, bytes.byteLength));
+  const directory = new ZipCursor(view, find_end_of_central_directory(view, bytes.byteLength));
   if (directory.u32() !== ZIP_END_SIGNATURE)
     throw new Error("Exported workbook lost its end record");
   directory.offset += ZIP_END_DISK_FIELDS_SIZE;
-  const diskEntries = directory.u16();
-  const entryCount = directory.u16();
-  if (diskEntries !== entryCount) throw new Error("Exported workbook spans multiple disks");
-  const centralSize = directory.u32();
-  const entryCursor = new ZipCursor(view, directory.u32());
+  const disk_entries = directory.u16();
+  const entry_count = directory.u16();
+  if (disk_entries !== entry_count) throw new Error("Exported workbook spans multiple disks");
+  const central_size = directory.u32();
+  const entry_cursor = new ZipCursor(view, directory.u32());
   const texts: string[] = [];
-  for (let index = 0; index < entryCount; index++) {
-    const entryStart = entryCursor.offset;
-    if (entryCursor.u32() !== ZIP_CENTRAL_SIGNATURE) {
+  for (let index = 0; index < entry_count; index++) {
+    const entry_start = entry_cursor.offset;
+    if (entry_cursor.u32() !== ZIP_CENTRAL_SIGNATURE) {
       throw new Error("Exported workbook has an unreadable central directory");
     }
-    entryCursor.offset += ZIP_CENTRAL_PREFIX_SIZE;
-    const method = entryCursor.u16();
-    entryCursor.offset += ZIP_TIMESTAMP_SIZE + ZIP_CRC_SIZE;
-    const compressedSize = entryCursor.u32();
-    entryCursor.offset += ZIP_SIZE_FIELD;
-    const nameLength = entryCursor.u16();
-    const extraLength = entryCursor.u16();
-    const commentLength = entryCursor.u16();
-    entryCursor.offset += ZIP_CENTRAL_TAIL_SIZE;
-    const localOffset = entryCursor.u32();
+    entry_cursor.offset += ZIP_CENTRAL_PREFIX_SIZE;
+    const method = entry_cursor.u16();
+    entry_cursor.offset += ZIP_TIMESTAMP_SIZE + ZIP_CRC_SIZE;
+    const compressed_size = entry_cursor.u32();
+    entry_cursor.offset += ZIP_SIZE_FIELD;
+    const name_length = entry_cursor.u16();
+    const extra_length = entry_cursor.u16();
+    const comment_length = entry_cursor.u16();
+    entry_cursor.offset += ZIP_CENTRAL_TAIL_SIZE;
+    const local_offset = entry_cursor.u32();
     const name = STORED_UTF8.decode(
-      bytes.subarray(entryCursor.offset, entryCursor.offset + nameLength),
+      bytes.subarray(entry_cursor.offset, entry_cursor.offset + name_length),
     );
-    entryCursor.offset += nameLength + extraLength + commentLength;
-    if (entryCursor.offset - entryStart > centralSize) {
+    entry_cursor.offset += name_length + extra_length + comment_length;
+    if (entry_cursor.offset - entry_start > central_size) {
       throw new Error("Exported workbook central directory overran its declared size");
     }
     if (!WORKSHEET_PART.test(name)) continue;
-    const local = new ZipCursor(view, localOffset);
+    const local = new ZipCursor(view, local_offset);
     if (local.u32() !== ZIP_LOCAL_SIGNATURE) {
       throw new Error(`Exported worksheet part ${name} is unreadable`);
     }
     local.offset += ZIP_LOCAL_PREFIX_SIZE + ZIP_TIMESTAMP_SIZE + ZIP_CRC_SIZE + ZIP_SIZE_FIELD * 2;
-    const localNameLength = local.u16();
-    const localExtraLength = local.u16();
-    const dataOffset = local.offset + localNameLength + localExtraLength;
+    const local_name_length = local.u16();
+    const local_extra_length = local.u16();
+    const data_offset = local.offset + local_name_length + local_extra_length;
     texts.push(
-      ...storedFormulasOf(
-        await inflateStoredPart(bytes.subarray(dataOffset, dataOffset + compressedSize), method),
+      ...stored_formulas_of(
+        await inflate_stored_part(
+          bytes.subarray(data_offset, data_offset + compressed_size),
+          method,
+        ),
       ),
     );
   }
@@ -643,7 +650,7 @@ interface StoredFormula {
  * converter owns Excel's prefixes (`_xlfn.`, `_xlws.`, `_xlpm.`) and the
  * `_xlfn.ANCHORARRAY(A1)` form of `A1#`, so the page applies no second rule.
  */
-async function withEditorSpelling(stored: string[]): Promise<StoredFormula[]> {
+async function with_editor_spelling(stored: string[]): Promise<StoredFormula[]> {
   const editor = await withXlsxFormulaEngine((engine) =>
     engine.convert(
       stored.map((text) => `=${text}`),
@@ -655,7 +662,7 @@ async function withEditorSpelling(stored: string[]): Promise<StoredFormula[]> {
 }
 
 /** Claim the stored text that belongs to one source formula. */
-function takeStoredFormula(stored: StoredFormula[], source: string): string | null {
+function take_stored_formula(stored: StoredFormula[], source: string): string | null {
   const index = stored.findIndex((formula) => formula.editor === source);
   return index === -1 ? null : (stored.splice(index, 1)[0]?.stored ?? null);
 }
@@ -691,8 +698,8 @@ export async function roundTripWorkbook(
   const before = grid.exportSnapshot();
   const exported = await exportWorkbook(before);
   const imported = await importWorkbook(exported.bytes);
-  const storedFormulas = await storedFormulaTexts(exported.bytes)
-    .then(withEditorSpelling)
+  const stored_formulas = await stored_formula_texts(exported.bytes)
+    .then(with_editor_spelling)
     .catch((error: unknown): StoredFormula[] => {
       // The proof table shows "not found in the exported file" per row, so an
       // unreadable package reports itself there instead of failing the exchange.
@@ -700,46 +707,46 @@ export async function roundTripWorkbook(
       return [];
     });
 
-  const beforeCells = cellsByAddress(before);
-  const afterCells = cellsByAddress(imported.snapshot);
-  let formulasBefore = 0;
-  let formulasPreserved = 0;
-  let cellsMatched = 0;
-  const formulaExamples: RoundTripReport["formulaExamples"] = [];
-  for (const [address, value] of beforeCells) {
-    const after = afterCells.get(address);
+  const before_cells = cells_by_address(before);
+  const after_cells = cells_by_address(imported.snapshot);
+  let formulas_before = 0;
+  let formulas_preserved = 0;
+  let cells_matched = 0;
+  const formula_examples: RoundTripReport["formulaExamples"] = [];
+  for (const [address, value] of before_cells) {
+    const after = after_cells.get(address);
     if (value.kind === "formula" && (value.src.includes("#") || value.src.startsWith("={"))) {
       const [sheet = "", row = "0", col = "0"] = address.split("\0");
-      formulaExamples.push({
+      formula_examples.push({
         sheet,
         row: Number(row),
         col: Number(col),
         before: value.src,
-        exported: takeStoredFormula(storedFormulas, value.src),
+        exported: take_stored_formula(stored_formulas, value.src),
         after: after?.kind === "formula" ? after.src : null,
       });
     }
     if (value.kind === "formula") {
-      formulasBefore++;
+      formulas_before++;
       if (after?.kind === "formula" && after.src === value.src) {
-        formulasPreserved++;
-        cellsMatched++;
+        formulas_preserved++;
+        cells_matched++;
       }
     } else if (
       value.kind === "literal" &&
       after?.kind === "literal" &&
       Object.is(after.value, value.value)
     ) {
-      cellsMatched++;
+      cells_matched++;
     } else if (
       value.kind === "ref" &&
       after?.kind === "ref" &&
       JSON.stringify(value.target) === JSON.stringify(after.target)
     ) {
-      cellsMatched++;
+      cells_matched++;
     }
   }
-  const structureMatches = (
+  const structure_matches = (
     matches: (
       before: WorkbookSnapshot["sheets"][number],
       after: WorkbookSnapshot["sheets"][number],
@@ -755,23 +762,23 @@ export async function roundTripWorkbook(
     exportWarnings: exported.warnings,
     importWarnings: imported.warnings,
     sheetsPreserved:
-      imported.snapshot.sheets.length === before.sheets.length && structureMatches(() => true),
-    formulasBefore,
-    formulasPreserved,
-    mergePreserved: structureMatches(
+      imported.snapshot.sheets.length === before.sheets.length && structure_matches(() => true),
+    formulasBefore: formulas_before,
+    formulasPreserved: formulas_preserved,
+    mergePreserved: structure_matches(
       (sheet, after) => JSON.stringify(sheet.merges ?? []) === JSON.stringify(after.merges ?? []),
     ),
-    frozenRowsPreserved: structureMatches(
+    frozenRowsPreserved: structure_matches(
       (sheet, after) => (sheet.frozenRows ?? 0) === (after.frozenRows ?? 0),
     ),
-    cellsCompared: beforeCells.size,
-    cellsMatched,
+    cellsCompared: before_cells.size,
+    cellsMatched: cells_matched,
     elapsedMs: performance.now() - started,
-    formulaExamples,
+    formulaExamples: formula_examples,
   };
 }
 
-function activeSheetOf(grid: Grid): Sheet {
+function active_sheet_of(grid: Grid): Sheet {
   const active = grid.getActiveSheet();
   const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === active);
   if (!sheet) throw new Error("Sheetwrite grid lost its active sheet");
@@ -780,15 +787,15 @@ function activeSheetOf(grid: Grid): Sheet {
 
 /** CSV of the active sheet through the hardened public export path. */
 export function csvOfActiveSheet(grid: Grid): string {
-  return toCsv(activeSheetOf(grid), grid.store);
+  return toCsv(active_sheet_of(grid), grid.store);
 }
 
 /** TSV of the current selection (normalized to one rectangle), or null. */
 export function tsvOfSelection(grid: Grid): string | null {
   const selection = grid.getSelection();
-  const sheet = activeSheetOf(grid);
-  const lastRow = sheet.rowCount - 1;
-  const lastCol = sheet.columns.length - 1;
+  const sheet = active_sheet_of(grid);
+  const last_row = sheet.rowCount - 1;
+  const last_col = sheet.columns.length - 1;
   let range: Range | null = null;
   switch (selection?.kind) {
     case "cell":
@@ -801,14 +808,14 @@ export function tsvOfSelection(grid: Grid): string | null {
       range = {
         sheet: selection.sheet,
         start: { row: selection.row, col: 0 },
-        end: { row: selection.row, col: lastCol },
+        end: { row: selection.row, col: last_col },
       };
       break;
     case "column":
       range = {
         sheet: selection.sheet,
         start: { row: 0, col: selection.col },
-        end: { row: lastRow, col: selection.col },
+        end: { row: last_row, col: selection.col },
       };
       break;
     case "multi":
@@ -836,17 +843,17 @@ export interface DelimitedImport {
  */
 export function importDelimitedText(text: string): DelimitedImport {
   const newline = text.indexOf("\n");
-  const firstLine = text.slice(0, newline === -1 ? text.length : newline);
+  const first_line = text.slice(0, newline === -1 ? text.length : newline);
   let delimiter: "," | "\t" = ",";
-  let csvText = text;
-  if (firstLine.includes("\t")) {
+  let csv_text = text;
+  if (first_line.includes("\t")) {
     if (text.includes(",") || text.includes('"')) {
       throw new Error("Tab-separated paste with quoting is not supported here — paste CSV instead");
     }
     delimiter = "\t";
-    csvText = text.replaceAll("\t", ",");
+    csv_text = text.replaceAll("\t", ",");
   }
-  const rows = parseCsv(csvText);
+  const rows = parseCsv(csv_text);
   const header = rows[0];
   if (!header || header.length === 0 || rows.length < 2) {
     throw new Error("Provide a header row plus at least one data row");
@@ -865,7 +872,7 @@ export function importDelimitedText(text: string): DelimitedImport {
     };
   });
   // fromCsv consumes the original text: first record is the positional header.
-  const data = fromCsv(csvText, columns);
+  const data = fromCsv(csv_text, columns);
   return { columns, data, delimiter, rows: body.length };
 }
 
@@ -888,7 +895,7 @@ const NOT_REJECTED: RejectionReport = {
   message: null,
 };
 
-function rejectionReport(error: unknown): RejectionReport {
+function rejection_report(error: unknown): RejectionReport {
   const typed = isSheetwriteError(error) ? error : null;
   const resource = typed?.context?.resource;
   return {
@@ -910,7 +917,7 @@ export async function expectRejection(
     await fromXlsxWorkbook(bytes, options);
     return NOT_REJECTED;
   } catch (error) {
-    return rejectionReport(error);
+    return rejection_report(error);
   }
 }
 
@@ -929,6 +936,6 @@ export function delimitedCeilingDemo(): RejectionReport {
     parseCsv(big, { resourceLimits: { maxCells: 1_000 } });
     return NOT_REJECTED;
   } catch (error) {
-    return rejectionReport(error);
+    return rejection_report(error);
   }
 }

@@ -51,27 +51,27 @@ const COMMAND_COUNT = COMMAND_GROUPS.reduce((count, group) => count + group.comm
 /** With Ctrl or ⌘, these keys edit the search text, so they never search by keys. */
 const TEXT_EDITING_KEYS = /^(a|c|v|x|y|z|arrow.*|home|end|backspace|delete)$/;
 
-let panelCount = 0;
+let panel_count = 0;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className: string,
+  class_name: string,
   text?: string,
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
-  if (className !== "") node.className = className;
+  if (class_name !== "") node.className = class_name;
   if (text !== undefined) node.textContent = text;
   return node;
 }
 
-function button(className: string, text: string, label?: string): HTMLButtonElement {
-  const node = element("button", className, text);
+function button(class_name: string, text: string, label?: string): HTMLButtonElement {
+  const node = element("button", class_name, text);
   node.type = "button";
   if (label !== undefined) node.setAttribute("aria-label", label);
   return node;
 }
 
-function keysList(action: KeyboardAction, bindings: KeyBindings): string {
+function keys_list(action: KeyboardAction, bindings: KeyBindings): string {
   return keysOf(action, bindings).map(keysLabel).join(", ") || "no keys";
 }
 
@@ -98,21 +98,21 @@ class KeyboardSettingsPanel {
   private query = "";
   /** Keys pressed in the search box; the list shows the commands they run. */
   private pressed: KeyShortcut | null = null;
-  private changedOnly = false;
+  private changed_only = false;
   private recording: Recording | null = null;
   private conflict: Conflict | null = null;
   /** The bindings the toast's Undo restores. */
-  private undoTo: KeyBindings | null = null;
+  private undo_to: KeyBindings | null = null;
 
   private readonly body: HTMLDivElement;
   private readonly search: HTMLInputElement;
   private readonly count: HTMLSpanElement;
   private readonly rows: HTMLTableSectionElement;
   private readonly prompt: HTMLDivElement;
-  private readonly promptText: HTMLParagraphElement;
-  private readonly promptButtons: HTMLDivElement;
+  private readonly prompt_text: HTMLParagraphElement;
+  private readonly prompt_buttons: HTMLDivElement;
   private readonly message: HTMLParagraphElement;
-  private readonly undoButton: HTMLButtonElement;
+  private readonly undo_button: HTMLButtonElement;
   private readonly file: HTMLInputElement;
 
   constructor(host: KeyboardSettingsHost) {
@@ -124,7 +124,7 @@ class KeyboardSettingsPanel {
     this.fixed = options === null;
     this.bindings = normalizeBindings(options?.bindings ?? {});
 
-    const id = `sheetwrite-keys-${++panelCount}`;
+    const id = `sheetwrite-keys-${++panel_count}`;
     this.body = element("div", "sheetwrite-keys");
 
     const toolbar = element("div", "sheetwrite-keys-toolbar");
@@ -142,17 +142,17 @@ class KeyboardSettingsPanel {
       this.render();
     });
 
-    const changedLabel = element("label", "sheetwrite-keys-filter");
-    const changedOnly = element("input", "");
-    changedOnly.type = "checkbox";
-    changedOnly.setAttribute("aria-label", "Show changed only");
-    changedOnly.addEventListener("change", () => {
-      this.changedOnly = changedOnly.checked;
+    const changed_label = element("label", "sheetwrite-keys-filter");
+    const changed_only = element("input", "");
+    changed_only.type = "checkbox";
+    changed_only.setAttribute("aria-label", "Show changed only");
+    changed_only.addEventListener("change", () => {
+      this.changed_only = changed_only.checked;
       this.render();
     });
-    changedLabel.append(changedOnly, " Show changed only");
+    changed_label.append(changed_only, " Show changed only");
     this.count = element("span", "sheetwrite-keys-count");
-    toolbar.append(this.search, changedLabel, this.count);
+    toolbar.append(this.search, changed_label, this.count);
 
     const hint = element(
       "p",
@@ -167,17 +167,17 @@ class KeyboardSettingsPanel {
     this.prompt.setAttribute("role", "group");
     this.prompt.setAttribute("aria-labelledby", `${id}-conflict`);
     this.prompt.hidden = true;
-    this.promptText = element("p", "sheetwrite-keys-conflict-text");
-    this.promptText.id = `${id}-conflict`;
-    this.promptButtons = element("div", "sheetwrite-keys-conflict-buttons");
-    this.prompt.append(this.promptText, this.promptButtons);
+    this.prompt_text = element("p", "sheetwrite-keys-conflict-text");
+    this.prompt_text.id = `${id}-conflict`;
+    this.prompt_buttons = element("div", "sheetwrite-keys-conflict-buttons");
+    this.prompt.append(this.prompt_text, this.prompt_buttons);
 
     const scroll = element("div", "sheetwrite-keys-scroll");
     const table = element("table", "sheetwrite-keys-table");
     table.id = `${id}-table`;
     table.setAttribute("aria-label", "Commands and their keys");
     const head = element("thead", "");
-    const headRow = element("tr", "");
+    const head_row = element("tr", "");
     for (const [text, hidden] of [
       ["Command", false],
       ["Keys", false],
@@ -186,9 +186,9 @@ class KeyboardSettingsPanel {
     ] as const) {
       const cell = element("th", hidden ? "sheetwrite-keys-hidden-label" : "", text);
       cell.scope = "col";
-      headRow.append(cell);
+      head_row.append(cell);
     }
-    head.append(headRow);
+    head.append(head_row);
     this.rows = element("tbody", "");
     table.append(head, this.rows);
     scroll.append(table);
@@ -196,26 +196,26 @@ class KeyboardSettingsPanel {
     const toast = element("div", "sheetwrite-keys-toast");
     this.message = element("p", "sheetwrite-keys-message");
     this.message.setAttribute("role", "status");
-    this.undoButton = button("sheetwrite-dialog-button sheetwrite-keys-undo", "Undo");
-    this.undoButton.hidden = true;
-    this.undoButton.addEventListener("click", () => {
-      if (this.undoTo !== null) this.commit(this.undoTo, "Undid the last change.", null, false);
+    this.undo_button = button("sheetwrite-dialog-button sheetwrite-keys-undo", "Undo");
+    this.undo_button.hidden = true;
+    this.undo_button.addEventListener("click", () => {
+      if (this.undo_to !== null) this.commit(this.undo_to, "Undid the last change.", null, false);
     });
-    toast.append(this.message, this.undoButton);
+    toast.append(this.message, this.undo_button);
 
     this.file = element("input", "");
     this.file.type = "file";
     this.file.accept = ".json,application/json";
     this.file.hidden = true;
-    this.file.addEventListener("change", () => void this.importFile());
+    this.file.addEventListener("change", () => void this.import_file());
 
     this.body.append(toolbar, hint, this.prompt, scroll, toast, this.file);
-    this.body.addEventListener("keydown", this.onKeydown);
-    this.body.addEventListener("focusout", this.onFocusout);
+    this.body.addEventListener("keydown", this.on_keydown);
+    this.body.addEventListener("focusout", this.on_focusout);
     this.render();
 
     const dialog = openDialog(
-      { ...host.dialogs, returnFocus: () => this.returnFocus() },
+      { ...host.dialogs, returnFocus: () => this.return_focus() },
       {
         title: "Keyboard shortcuts",
         body: this.body,
@@ -244,9 +244,9 @@ class KeyboardSettingsPanel {
     } else if (value === "import") {
       this.file.click();
     } else if (value === "export") {
-      this.exportFile();
+      this.export_file();
     } else if (value === "reset") {
-      this.resetAll();
+      this.reset_all();
     }
   }
 
@@ -263,22 +263,22 @@ class KeyboardSettingsPanel {
       title.colSpan = 4;
       header.append(title);
       rows.push(header);
-      let groupShown = 0;
+      let group_shown = 0;
       for (const [action, label] of group.commands) {
-        const isActionChanged = isChanged(action, this.bindings);
-        if (isActionChanged) changed += 1;
+        const is_action_changed = isChanged(action, this.bindings);
+        if (is_action_changed) changed += 1;
         const visible =
           (owners === null
             ? matchesQuery(action, group.label, this.bindings, this.query)
             : owners.has(action)) &&
-          (!this.changedOnly || isActionChanged);
-        const row = this.renderRow(action, label, isActionChanged);
+          (!this.changed_only || is_action_changed);
+        const row = this.render_row(action, label, is_action_changed);
         row.hidden = !visible;
-        if (visible) groupShown += 1;
+        if (visible) group_shown += 1;
         rows.push(row);
       }
-      header.hidden = groupShown === 0;
-      shown += groupShown;
+      header.hidden = group_shown === 0;
+      shown += group_shown;
     }
     if (shown === 0) {
       const empty = element("tr", "sheetwrite-keys-empty");
@@ -287,7 +287,7 @@ class KeyboardSettingsPanel {
         "",
         this.pressed !== null
           ? `No command uses ${keysLabel(this.pressed)}.`
-          : this.changedOnly && this.query.trim() === ""
+          : this.changed_only && this.query.trim() === ""
             ? "No command has changed keys."
             : `No command matches “${this.query.trim()}”.`,
       );
@@ -301,13 +301,13 @@ class KeyboardSettingsPanel {
     this.count.textContent = `${total}, ${changed} changed`;
   }
 
-  private renderRow(action: KeyboardAction, label: string, changed: boolean): HTMLTableRowElement {
+  private render_row(action: KeyboardAction, label: string, changed: boolean): HTMLTableRowElement {
     const row = element("tr", "");
     row.dataset.action = action;
     const name = element("th", "", label);
     name.scope = "row";
 
-    const keysCell = element("td", "sheetwrite-keys-current");
+    const keys_cell = element("td", "sheetwrite-keys-current");
     const keys = keysOf(action, this.bindings);
     const editable = !this.fixed && !this.locked.has(action);
     keys.forEach((key, index) => {
@@ -316,26 +316,27 @@ class KeyboardSettingsPanel {
       if (editable) {
         const change = button("sheetwrite-keys-change", text, `Change ${text} for ${label}`);
         change.dataset.focus = `${action}:${index}`;
-        change.addEventListener("click", () => this.startRecording(action, index, change));
+        change.addEventListener("click", () => this.start_recording(action, index, change));
         const remove = button("sheetwrite-keys-remove", "×", `Remove ${text} from ${label}`);
         remove.dataset.focus = `${action}:${index}:remove`;
-        remove.addEventListener("click", () => this.removeKey(action, index));
+        remove.addEventListener("click", () => this.remove_key(action, index));
         chip.append(change, remove);
       } else {
         chip.append(element("kbd", "", text));
       }
-      keysCell.append(chip);
+      keys_cell.append(chip);
     });
-    if (keys.length === 0) keysCell.append(element("span", "sheetwrite-keys-none", "None"));
+    if (keys.length === 0) keys_cell.append(element("span", "sheetwrite-keys-none", "None"));
     if (editable) {
       const add = button("sheetwrite-keys-add", "+", `Add keys for ${label}`);
       add.dataset.focus = `${action}:add`;
       add.title = `Add keys for ${label}`;
-      add.addEventListener("click", () => this.startRecording(action, null, add));
-      keysCell.append(add);
+      add.addEventListener("click", () => this.start_recording(action, null, add));
+      keys_cell.append(add);
     }
     const unreachable = unreachableKeys(action, this.bindings);
-    if (unreachable !== null) keysCell.append(element("p", "sheetwrite-keys-warning", unreachable));
+    if (unreachable !== null)
+      keys_cell.append(element("p", "sheetwrite-keys-warning", unreachable));
 
     const defaults = element(
       "td",
@@ -348,17 +349,17 @@ class KeyboardSettingsPanel {
     if (!editable) {
       reset.textContent = "Set by your app";
     } else if (changed) {
-      const resetButton = button("sheetwrite-keys-reset-button", "Reset", `Reset ${label}`);
-      resetButton.dataset.focus = `${action}:reset`;
-      resetButton.addEventListener("click", () => this.resetAction(action));
-      reset.append(resetButton);
+      const reset_button = button("sheetwrite-keys-reset-button", "Reset", `Reset ${label}`);
+      reset_button.dataset.focus = `${action}:reset`;
+      reset_button.addEventListener("click", () => this.reset_action(action));
+      reset.append(reset_button);
     }
 
-    row.append(name, keysCell, defaults, reset);
+    row.append(name, keys_cell, defaults, reset);
     return row;
   }
 
-  private focusSlot(key: string | null): void {
+  private focus_slot(key: string | null): void {
     const target =
       (key === null ? null : this.rows.querySelector<HTMLElement>(`[data-focus="${key}"]`)) ??
       this.search;
@@ -367,16 +368,16 @@ class KeyboardSettingsPanel {
 
   private say(message: string, undo = false): void {
     this.message.textContent = message;
-    this.undoButton.hidden = !undo;
+    this.undo_button.hidden = !undo;
   }
 
-  private startRecording(
+  private start_recording(
     action: KeyboardAction,
     index: number | null,
     field: HTMLButtonElement,
   ): void {
-    if (this.recording !== null) this.stopRecording(null);
-    this.closeConflict();
+    if (this.recording !== null) this.stop_recording(null);
+    this.close_conflict();
     const label = commandLabel(action);
     this.recording = { action, index, field };
     field.textContent = "Press keys…";
@@ -387,33 +388,33 @@ class KeyboardSettingsPanel {
   }
 
   /** Leave recording mode; the row shows its keys again and keeps the focus. */
-  private stopRecording(message: string | null): void {
+  private stop_recording(message: string | null): void {
     const recording = this.recording;
     if (recording === null) return;
     this.recording = null;
     this.render();
-    this.focusSlot(`${recording.action}:${recording.index ?? "add"}`);
+    this.focus_slot(`${recording.action}:${recording.index ?? "add"}`);
     if (message !== null) this.say(message);
   }
 
-  private readonly onFocusout = (event: FocusEvent): void => {
+  private readonly on_focusout = (event: FocusEvent): void => {
     // Focus left the field being recorded, as a click elsewhere moves it.
     if (this.recording !== null && event.target === this.recording.field) {
       const recording = this.recording;
       queueMicrotask(() => {
         if (this.recording === recording && document.activeElement !== recording.field) {
-          this.stopRecording(null);
+          this.stop_recording(null);
         }
       });
     }
   };
 
-  private readonly onKeydown = (event: KeyboardEvent): void => {
+  private readonly on_keydown = (event: KeyboardEvent): void => {
     if (event.isComposing) return;
     if (this.recording !== null && event.target === this.recording.field) {
-      this.recordKey(event, this.recording);
+      this.record_key(event, this.recording);
     } else if (event.target === this.search) {
-      this.searchKey(event);
+      this.search_key(event);
     } else if (
       this.conflict !== null &&
       event.key === "Escape" &&
@@ -422,15 +423,15 @@ class KeyboardSettingsPanel {
     ) {
       event.preventDefault();
       event.stopPropagation();
-      this.resolveConflict(null);
+      this.resolve_conflict(null);
     }
   };
 
-  private recordKey(event: KeyboardEvent, recording: Recording): void {
+  private record_key(event: KeyboardEvent, recording: Recording): void {
     // Tab leaves recording and moves on from the slot, so the keyboard is
     // never trapped; the browser moves focus after this handler.
     if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      this.stopRecording(null);
+      this.stop_recording(null);
       return;
     }
     // Every other key belongs to the recording, not to the browser or the dialog.
@@ -445,7 +446,7 @@ class KeyboardSettingsPanel {
       !event.altKey &&
       !event.shiftKey
     ) {
-      this.stopRecording(`Stopped recording. ${label} keeps ${keysList(action, this.bindings)}.`);
+      this.stop_recording(`Stopped recording. ${label} keeps ${keys_list(action, this.bindings)}.`);
       return;
     }
     const read = readKeys(event);
@@ -470,14 +471,14 @@ class KeyboardSettingsPanel {
     }
     if (owner !== null) {
       field.textContent = keysLabel(read.shortcut);
-      this.askConflict({ action, index, shortcut: read.shortcut, owner });
+      this.ask_conflict({ action, index, shortcut: read.shortcut, owner });
       return;
     }
     this.assign(action, index, read.shortcut, "replace");
   }
 
   /** Keys pressed in the search box find their command; text-editing keys still edit. */
-  private searchKey(event: KeyboardEvent): void {
+  private search_key(event: KeyboardEvent): void {
     if (event.key === "Escape" && this.search.value !== "") {
       event.preventDefault();
       event.stopPropagation();
@@ -487,9 +488,9 @@ class KeyboardSettingsPanel {
       this.render();
       return;
     }
-    const functionKey = /^F\d+$/.test(event.key);
+    const function_key = /^F\d+$/.test(event.key);
     const mod = event.ctrlKey || event.metaKey;
-    if (!mod && !event.altKey && !functionKey) return;
+    if (!mod && !event.altKey && !function_key) return;
     if (mod && !event.altKey && TEXT_EDITING_KEYS.test(event.key.toLowerCase())) return;
     const read = readKeys(event);
     if (read.kind === "pending") return;
@@ -501,52 +502,52 @@ class KeyboardSettingsPanel {
     this.render();
   }
 
-  private askConflict(conflict: Conflict): void {
+  private ask_conflict(conflict: Conflict): void {
     this.recording = null;
     this.conflict = conflict;
     const keys = keysLabel(conflict.shortcut);
     const other = commandLabel(conflict.owner.action);
-    const lockedOwner = this.locked.has(conflict.owner.action);
-    this.promptText.textContent = lockedOwner
+    const locked_owner = this.locked.has(conflict.owner.action);
+    this.prompt_text.textContent = locked_owner
       ? `${keys} is assigned to ${other}, which your app keeps fixed.`
       : `${keys} is assigned to ${other}.`;
     const choices: HTMLButtonElement[] = [];
-    if (!lockedOwner && conflict.index !== null) {
+    if (!locked_owner && conflict.index !== null) {
       const swap = button("sheetwrite-dialog-button sheetwrite-dialog-default", "Swap");
       swap.title = `${other} takes ${keysLabel(keysOf(conflict.action, this.bindings)[conflict.index]!)}`;
-      swap.addEventListener("click", () => this.resolveConflict("swap"));
+      swap.addEventListener("click", () => this.resolve_conflict("swap"));
       choices.push(swap);
     }
-    if (!lockedOwner) {
+    if (!locked_owner) {
       const replace = button("sheetwrite-dialog-button", "Replace");
       replace.title = `${other} loses ${keys}`;
-      replace.addEventListener("click", () => this.resolveConflict("replace"));
+      replace.addEventListener("click", () => this.resolve_conflict("replace"));
       choices.push(replace);
     }
     const cancel = button("sheetwrite-dialog-button", "Cancel");
-    cancel.addEventListener("click", () => this.resolveConflict(null));
+    cancel.addEventListener("click", () => this.resolve_conflict(null));
     choices.push(cancel);
-    this.promptButtons.replaceChildren(...choices);
+    this.prompt_buttons.replaceChildren(...choices);
     this.prompt.hidden = false;
     choices[0]!.focus();
   }
 
-  private closeConflict(): Conflict | null {
+  private close_conflict(): Conflict | null {
     const conflict = this.conflict;
     this.conflict = null;
     this.prompt.hidden = true;
-    this.promptButtons.replaceChildren();
+    this.prompt_buttons.replaceChildren();
     return conflict;
   }
 
-  private resolveConflict(resolution: "swap" | "replace" | null): void {
-    const conflict = this.closeConflict();
+  private resolve_conflict(resolution: "swap" | "replace" | null): void {
+    const conflict = this.close_conflict();
     if (conflict === null) return;
     if (resolution === null) {
       this.render();
-      this.focusSlot(`${conflict.action}:${conflict.index ?? "add"}`);
+      this.focus_slot(`${conflict.action}:${conflict.index ?? "add"}`);
       this.say(
-        `${commandLabel(conflict.action)} keeps ${keysList(conflict.action, this.bindings)}.`,
+        `${commandLabel(conflict.action)} keeps ${keys_list(conflict.action, this.bindings)}.`,
       );
       return;
     }
@@ -562,19 +563,19 @@ class KeyboardSettingsPanel {
   ): void {
     const next = assignKeys(this.bindings, action, index, shortcut, resolution);
     const label = commandLabel(action);
-    let message = `${label} now uses ${keysList(action, next)}.`;
+    let message = `${label} now uses ${keys_list(action, next)}.`;
     if (owner !== undefined) {
       const other = commandLabel(owner.action);
       message +=
         resolution === "swap"
-          ? ` ${other} now uses ${keysList(owner.action, next)}.`
+          ? ` ${other} now uses ${keys_list(owner.action, next)}.`
           : ` ${other} no longer uses ${keysLabel(shortcut)}.`;
     }
     const slot = index ?? keysOf(action, next).length - 1;
     this.commit(next, message, `${action}:${slot}`);
   }
 
-  private removeKey(action: KeyboardAction, index: number): void {
+  private remove_key(action: KeyboardAction, index: number): void {
     const keys = [...keysOf(action, this.bindings)];
     const [removed] = keys.splice(index, 1);
     const label = commandLabel(action);
@@ -587,17 +588,17 @@ class KeyboardSettingsPanel {
     );
   }
 
-  private resetAction(action: KeyboardAction): void {
+  private reset_action(action: KeyboardAction): void {
     const next: Partial<Record<KeyboardAction, unknown>> = { ...this.bindings };
     delete next[action];
     this.commit(
       normalizeBindings(next as KeyBindings),
-      `${commandLabel(action)} is back to Excel's ${keysList(action, {})}.`,
+      `${commandLabel(action)} is back to Excel's ${keys_list(action, {})}.`,
       `${action}:0`,
     );
   }
 
-  private resetAll(): void {
+  private reset_all(): void {
     const next: Partial<Record<KeyboardAction, unknown>> = {};
     for (const action of this.locked) {
       if (this.bindings[action] !== undefined) next[action] = this.bindings[action];
@@ -610,7 +611,7 @@ class KeyboardSettingsPanel {
     this.commit(kept, "Every command is back to Excel's keys.", null);
   }
 
-  private async importFile(): Promise<void> {
+  private async import_file(): Promise<void> {
     const file = this.file.files?.[0];
     if (file === undefined) return;
     const text = await file.text();
@@ -628,7 +629,7 @@ class KeyboardSettingsPanel {
     );
   }
 
-  private exportFile(): void {
+  private export_file(): void {
     const name = "keyboard-shortcuts.json";
     const link = element("a", "");
     link.href = `data:application/json;charset=utf-8,${encodeURIComponent(exportBindings(this.bindings))}`;
@@ -660,9 +661,9 @@ class KeyboardSettingsPanel {
     this.recording = null;
     this.host.grid.setConfig(withBindings(config, next));
     this.host.changed(next);
-    this.undoTo = undoable ? previous : null;
+    this.undo_to = undoable ? previous : null;
     this.render();
-    if (focus !== null) this.focusSlot(focus);
+    if (focus !== null) this.focus_slot(focus);
     this.say(message, undoable);
   }
 
@@ -670,7 +671,7 @@ class KeyboardSettingsPanel {
    * Focus goes back where it came from. A ribbon rebuilt by the change has a
    * new button for the same command, which takes the focus instead.
    */
-  private returnFocus(): void {
+  private return_focus(): void {
     const opener = this.host.opener;
     if (
       opener instanceof HTMLElement &&

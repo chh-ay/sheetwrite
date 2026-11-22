@@ -35,7 +35,7 @@ export interface ExternalLinkUpdate {
   readonly error?: SheetwriteError;
 }
 
-function sameBook(left: string, right: string): boolean {
+function same_book(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
 
@@ -94,7 +94,7 @@ export function listExternalLinks(grid: Grid): readonly ExternalLink[] {
 }
 
 /** Every formula cell of the workbook that names one of `books`, with its source. */
-function formulasNaming(
+function formulas_naming(
   grid: Grid,
   books: readonly string[],
 ): { addr: CellAddress; source: string }[] {
@@ -106,7 +106,7 @@ function formulasNaming(
         if (cell.value.kind !== "formula") continue;
         let names = false;
         rewriteExternalSheets(cell.value.src, ({ book }) => {
-          names ||= books.some((candidate) => sameBook(book, candidate));
+          names ||= books.some((candidate) => same_book(book, candidate));
           return "";
         });
         if (!names) continue;
@@ -143,7 +143,7 @@ export async function updateExternalLinks(
   books?: readonly string[],
 ): Promise<ExternalLinkUpdate[]> {
   const selected = listExternalLinks(grid).filter(
-    (link) => books === undefined || books.some((book) => sameBook(book, link.book)),
+    (link) => books === undefined || books.some((book) => same_book(book, link.book)),
   );
   const results: ExternalLinkUpdate[] = [];
   const values = new Map<string, ExternalLinkSheet[]>();
@@ -216,24 +216,24 @@ export function changeExternalLinkSource(
   next: { readonly book: string; readonly target: string },
 ): boolean {
   const links = listExternalLinks(grid);
-  if (!links.some((link) => sameBook(link.book, book))) return false;
+  if (!links.some((link) => same_book(link.book, book))) return false;
 
-  const patches: DocumentOp[] = formulasNaming(grid, [book]).map(({ addr, source }) => ({
+  const patches: DocumentOp[] = formulas_naming(grid, [book]).map(({ addr, source }) => ({
     op: "set",
     addr,
     value: {
       kind: "formula",
       src:
         rewriteExternalSheets(source, (name) =>
-          sameBook(name.book, book) ? externalSheetText(next.book, name.sheet) : name.text,
+          same_book(name.book, book) ? externalSheetText(next.book, name.sheet) : name.text,
         ) ?? source,
     },
   }));
   patches.push({
     op: "setExternalLinks",
     links: links
-      .filter((link) => sameBook(link.book, book) || !sameBook(link.book, next.book))
-      .map((link) => (sameBook(link.book, book) ? { ...link, ...next } : link)),
+      .filter((link) => same_book(link.book, book) || !same_book(link.book, next.book))
+      .map((link) => (same_book(link.book, book) ? { ...link, ...next } : link)),
   });
   return grid.applyTransaction({ patches }).status === "applied";
 }
@@ -249,7 +249,7 @@ export function changeExternalLinkSource(
  * @returns `false` when the document refused the change.
  */
 export function breakExternalLinks(grid: Grid, books: readonly string[]): boolean {
-  const patches: DocumentOp[] = formulasNaming(grid, books).map(({ addr }) => ({
+  const patches: DocumentOp[] = formulas_naming(grid, books).map(({ addr }) => ({
     op: "set",
     addr,
     value: { kind: "literal", value: grid.store.getCell(addr).resolved },
@@ -257,7 +257,7 @@ export function breakExternalLinks(grid: Grid, books: readonly string[]): boolea
   patches.push({
     op: "setExternalLinks",
     links: listExternalLinks(grid).filter(
-      (link) => !books.some((book) => sameBook(book, link.book)),
+      (link) => !books.some((book) => same_book(book, link.book)),
     ),
   });
   return grid.applyTransaction({ patches }).status === "applied";

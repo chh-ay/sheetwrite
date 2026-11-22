@@ -42,7 +42,7 @@ import "@sheetwrite/vue/styles.css";
 import type { RenderingMode } from "./ui/rendering-mode.js";
 
 /** A decorative icon from the Sheetwrite sprite; the text beside it carries the meaning. */
-function sheetwriteIcon(name: IconName) {
+function sheetwrite_icon(name: IconName) {
   return h("svg", { class: "sw-icon", "aria-hidden": "true", focusable: "false" }, [
     h("use", { href: iconHref(name) }),
   ]);
@@ -122,7 +122,7 @@ const TASKS: ReadonlyArray<{ id: TaskId; label: string }> = [
 
 const integer = new Intl.NumberFormat("en-US");
 
-function describeValue(value: unknown): string {
+function describe_value(value: unknown): string {
   if (value === null || value === undefined || value === "") return "(blank)";
   if (typeof value === "number") return integer.format(value);
   return String(value);
@@ -137,12 +137,12 @@ const STAGE_COLUMN_WIDTHS: ReadonlyArray<ReadonlyArray<number>> = [
 ];
 const ARCHIVE_COLUMN_WIDTHS = [380, 380] as const;
 
-function createWorkbenchWorkbook() {
+function create_workbench_workbook() {
   const workbook = createBusinessWorkbook();
-  for (const [sheetIndex, sheet] of workbook.sheets.entries()) {
-    const widths = STAGE_COLUMN_WIDTHS[sheetIndex];
-    for (const [columnIndex, column] of sheet.columns.entries()) {
-      column.width = widths?.[columnIndex] ?? column.width;
+  for (const [sheet_index, sheet] of workbook.sheets.entries()) {
+    const widths = STAGE_COLUMN_WIDTHS[sheet_index];
+    for (const [column_index, column] of sheet.columns.entries()) {
+      column.width = widths?.[column_index] ?? column.width;
     }
   }
   return workbook;
@@ -152,62 +152,62 @@ function createWorkbenchWorkbook() {
  * Workbench state and lifetime: the Grid handle, reset-bound adapter inputs,
  * sync, permissions and every task panel's controls. Call it from `setup()`.
  */
-function useVueWorkbench() {
-  const gridComponent = shallowRef<VueGridHandle | null>(null);
+function use_vue_workbench() {
+  const grid_component = shallowRef<VueGridHandle | null>(null);
 
   // Reset-bound adapter inputs. Replacing any of them rebuilds the Grid, so
   // they are regenerated together and only while nothing is pending.
-  const workbook = shallowRef(createWorkbenchWorkbook());
+  const workbook = shallowRef(create_workbench_workbook());
   const data = shallowRef(createBusinessData());
-  const mutationPolicy = ref<"atomic" | "partial">("atomic");
-  const rendererMode = ref<RenderingMode>("canvas");
+  const mutation_policy = ref<"atomic" | "partial">("atomic");
+  const renderer_mode = ref<RenderingMode>("canvas");
 
   // Live adapter inputs — plain reactive state, no Grid replacement.
-  const readOnly = ref(false);
+  const read_only = ref(false);
   const role = ref<HostRole>("reviewer");
 
   // Adapter lifecycle state published by @ready.
   const ready = ref(false);
   const generation = ref(0);
-  const readyReason = ref("—");
-  const bootError = ref<string | null>(null);
-  const resetState = shallowRef<ActionState>({ pending: false, error: null });
-  const resetAction = createActionGuard((state) => {
-    resetState.value = state;
+  const ready_reason = ref("—");
+  const boot_error = ref<string | null>(null);
+  const reset_state = shallowRef<ActionState>({ pending: false, error: null });
+  const reset_action = createActionGuard((state) => {
+    reset_state.value = state;
   });
-  let completeReset: (() => void) | undefined;
-  let failReset: ((cause: unknown) => void) | undefined;
+  let complete_reset: (() => void) | undefined;
+  let fail_reset: ((cause: unknown) => void) | undefined;
 
   // Inspector state for the focused cell.
   const selected = shallowRef<CellAddress | null>(null);
-  const selectedValue = ref("(blank)");
-  const selectedRule = shallowRef<DataValidationRule | null>(null);
-  const selectedProtection = shallowRef<ProtectedRange | null>(null);
-  const noteDraft = ref("");
-  const noteStored = ref<string | null>(null);
+  const selected_value = ref("(blank)");
+  const selected_rule = shallowRef<DataValidationRule | null>(null);
+  const selected_protection = shallowRef<ProtectedRange | null>(null);
+  const note_draft = ref("");
+  const note_stored = ref<string | null>(null);
 
   // Workbook state mirrored from the document model.
   const sheets = ref<ReadonlyArray<{ id: string; name: string }>>([]);
-  const activeSheet = ref("");
-  const renameDraft = ref("");
+  const active_sheet = ref("");
+  const rename_draft = ref("");
 
   // Host persistence state mirrored from the sync pipeline.
-  const pendingCount = ref(0);
-  const serverVersion = ref(0);
-  const lastAck = ref("—");
-  const syncBusy = ref(false);
+  const pending_count = ref(0);
+  const server_version = ref(0);
+  const last_ack = ref("—");
+  const sync_busy = ref(false);
 
   const feed = ref<FeedEntry[]>([]);
-  const activeTask = ref<TaskId>("protection");
-  const challengeState = ref<ChallengeState>("ready");
-  const challengeIssue = ref("Protected totals require the finance-lead role.");
+  const active_task = ref<TaskId>("protection");
+  const challenge_state = ref<ChallengeState>("ready");
+  const challenge_issue = ref("Protected totals require the finance-lead role.");
 
-  const gridOf = () => gridComponent.value?.grid ?? null;
+  const grid_of = () => grid_component.value?.grid ?? null;
   let sync: SyncCoordinator | null = null;
-  let offSync: (() => void) | null = null;
-  let offRejected: (() => void) | null = null;
-  let mutationSequence = 0;
-  let feedSequence = 0;
+  let off_sync: (() => void) | null = null;
+  let off_rejected: (() => void) | null = null;
+  let mutation_sequence = 0;
+  let feed_sequence = 0;
 
   /**
    * Host permission policy: stable identity, reactive decision. The barrier
@@ -215,7 +215,7 @@ function useVueWorkbench() {
    * chrome remains available to reviewers, while protected cell content
    * requires the finance-lead role.
    */
-  const protectionResolver: ProtectionResolver = (request) => {
+  const protection_resolver: ProtectionResolver = (request) => {
     switch (request.operation.op) {
       case "addSheet":
       case "renameSheet":
@@ -228,37 +228,37 @@ function useVueWorkbench() {
     }
   };
 
-  function pushFeed(kind: FeedKind, code: string, detail: string): void {
-    feed.value = [{ key: ++feedSequence, kind, code, detail }, ...feed.value].slice(0, FEED_LIMIT);
+  function push_feed(kind: FeedKind, code: string, detail: string): void {
+    feed.value = [{ key: ++feed_sequence, kind, code, detail }, ...feed.value].slice(0, FEED_LIMIT);
   }
 
-  function refreshSync(): void {
-    pendingCount.value = sync?.pendingCount ?? 0;
-    serverVersion.value = sync?.serverVersion ?? 0;
+  function refresh_sync(): void {
+    pending_count.value = sync?.pendingCount ?? 0;
+    server_version.value = sync?.serverVersion ?? 0;
   }
 
-  function refreshWorkbook(): void {
-    const grid = gridOf();
+  function refresh_workbook(): void {
+    const grid = grid_of();
     if (!grid) return;
     const model = grid.store.getWorkbook();
     sheets.value = model.sheets.map((sheet) => ({ id: String(sheet.id), name: sheet.name }));
-    activeSheet.value = String(grid.getActiveSheet());
-    const active = model.sheets.find((sheet) => String(sheet.id) === activeSheet.value);
-    renameDraft.value = active?.name ?? "";
+    active_sheet.value = String(grid.getActiveSheet());
+    const active = model.sheets.find((sheet) => String(sheet.id) === active_sheet.value);
+    rename_draft.value = active?.name ?? "";
   }
 
-  function refreshInspector(): void {
-    const grid = gridOf();
+  function refresh_inspector(): void {
+    const grid = grid_of();
     const addr = selected.value;
     if (!grid || !addr) {
-      selectedValue.value = "(blank)";
-      selectedRule.value = null;
-      selectedProtection.value = null;
-      noteStored.value = null;
-      noteDraft.value = "";
+      selected_value.value = "(blank)";
+      selected_rule.value = null;
+      selected_protection.value = null;
+      note_stored.value = null;
+      note_draft.value = "";
       return;
     }
-    selectedValue.value = describeValue(grid.store.getCell(addr).resolved);
+    selected_value.value = describe_value(grid.store.getCell(addr).resolved);
     const sheet = grid.store.getWorkbook().sheets.find((entry) => entry.id === addr.sheet);
     const covers = (range: Range) =>
       range.sheet === addr.sheet &&
@@ -266,44 +266,45 @@ function useVueWorkbench() {
       addr.row <= Math.max(range.start.row, range.end.row) &&
       addr.col >= Math.min(range.start.col, range.end.col) &&
       addr.col <= Math.max(range.start.col, range.end.col);
-    selectedRule.value = sheet?.validationRules?.find((rule) => covers(rule.range)) ?? null;
-    selectedProtection.value = sheet?.protectedRanges?.find((range) => covers(range.range)) ?? null;
-    noteStored.value = grid.getNote(addr);
-    noteDraft.value = noteStored.value ?? "";
+    selected_rule.value = sheet?.validationRules?.find((rule) => covers(rule.range)) ?? null;
+    selected_protection.value =
+      sheet?.protectedRanges?.find((range) => covers(range.range)) ?? null;
+    note_stored.value = grid.getNote(addr);
+    note_draft.value = note_stored.value ?? "";
   }
 
-  const selectedLabel = computed(() =>
+  const selected_label = computed(() =>
     selected.value === null
       ? "none"
       : `${String(selected.value.sheet)}!${cellA1(selected.value.row, selected.value.col)}`,
   );
 
-  const accessLabel = computed(() => {
+  const access_label = computed(() => {
     if (selected.value === null) return { text: "—", tone: "allow" as const };
-    if (readOnly.value) return { text: "read-only grid", tone: "deny" as const };
-    if (selectedProtection.value === null) return { text: "editable", tone: "allow" as const };
+    if (read_only.value) return { text: "read-only grid", tone: "deny" as const };
+    if (selected_protection.value === null) return { text: "editable", tone: "allow" as const };
     return role.value === "finance-lead"
       ? { text: "override allowed (finance lead)", tone: "allow" as const }
       : {
-          text: `locked · ${selectedProtection.value.label ?? "protected"}`,
+          text: `locked · ${selected_protection.value.label ?? "protected"}`,
           tone: "deny" as const,
         };
   });
 
-  const persistState = computed(() => {
-    if (syncBusy.value) {
-      return { text: `Committing to host · v${serverVersion.value}`, state: "pending" as const };
+  const persist_state = computed(() => {
+    if (sync_busy.value) {
+      return { text: `Committing to host · v${server_version.value}`, state: "pending" as const };
     }
-    return pendingCount.value === 0
-      ? { text: `All changes on host · v${serverVersion.value}`, state: "synced" as const }
+    return pending_count.value === 0
+      ? { text: `All changes on host · v${server_version.value}`, state: "synced" as const }
       : {
-          text: `${pendingCount.value} pending commit(s) · host v${serverVersion.value}`,
+          text: `${pending_count.value} pending commit(s) · host v${server_version.value}`,
           state: "pending" as const,
         };
   });
 
-  function bindHostPersistence(grid: Grid): void {
-    offSync?.();
+  function bind_host_persistence(grid: Grid): void {
+    off_sync?.();
     sync?.destroy();
     // The suppliers directory and row metadata are part of the seed, not
     // local work: apply them as remote input, then hand the identical
@@ -317,36 +318,36 @@ function useVueWorkbench() {
     sync = new SyncCoordinator(grid, adapter, {
       documentId: BUSINESS_DOCUMENT_ID,
       serverVersion: 0,
-      createMutationId: () => `vue-biz-${++mutationSequence}`,
+      createMutationId: () => `vue-biz-${++mutation_sequence}`,
     });
-    offSync = sync.on((event) => {
-      refreshSync();
+    off_sync = sync.on((event) => {
+      refresh_sync();
       if (event.type === "pending") {
-        pushFeed(
+        push_feed(
           "sync",
           "sync",
           `queued ${event.mutation.clientMutationId} at v${event.mutation.baseVersion}`,
         );
       } else if (event.type === "acknowledged") {
-        lastAck.value = `${event.clientMutationId} → v${event.version}${event.duplicate ? " (duplicate)" : ""}`;
-        pushFeed("sync", "sync", `acknowledged ${lastAck.value}`);
+        last_ack.value = `${event.clientMutationId} → v${event.version}${event.duplicate ? " (duplicate)" : ""}`;
+        push_feed("sync", "sync", `acknowledged ${last_ack.value}`);
       } else if (event.type === "conflict") {
-        pushFeed("rejected", "sync", `conflict · host v${event.response.currentVersion}`);
+        push_feed("rejected", "sync", `conflict · host v${event.response.currentVersion}`);
       }
     });
-    lastAck.value = "—";
-    refreshSync();
+    last_ack.value = "—";
+    refresh_sync();
   }
 
-  function onReady(event: GridReadyEvent): void {
+  function on_ready(event: GridReadyEvent): void {
     const grid = event.grid;
     generation.value = event.generation;
-    readyReason.value = event.reason;
+    ready_reason.value = event.reason;
     ready.value = true;
-    bootError.value = null;
+    boot_error.value = null;
     window.__sheetwriteVueWorkbench = { grid };
-    offRejected?.();
-    offRejected = grid.on("mutation-rejected", ({ issues }) => {
+    off_rejected?.();
+    off_rejected = grid.on("mutation-rejected", ({ issues }) => {
       for (const issue of issues) {
         const detail =
           issue.kind === "validation"
@@ -354,33 +355,33 @@ function useVueWorkbench() {
             : issue.kind === "protection"
               ? `${issue.protectedRangeId} · ${issue.message}`
               : issue.message;
-        pushFeed("rejected", "mutation-rejected", detail);
-        challengeIssue.value = detail;
+        push_feed("rejected", "mutation-rejected", detail);
+        challenge_issue.value = detail;
       }
-      challengeState.value = "rejected";
-      activeTask.value = "protection";
-      refreshInspector();
+      challenge_state.value = "rejected";
+      active_task.value = "protection";
+      refresh_inspector();
     });
-    bindHostPersistence(grid);
-    refreshWorkbook();
+    bind_host_persistence(grid);
+    refresh_workbook();
     grid.setSelection({ kind: "cell", addr: CHALLENGE_CELL });
-    refreshInspector();
-    completeReset?.();
-    completeReset = undefined;
-    failReset = undefined;
-    pushFeed("lifecycle", "@ready", `generation ${event.generation} (${event.reason})`);
+    refresh_inspector();
+    complete_reset?.();
+    complete_reset = undefined;
+    fail_reset = undefined;
+    push_feed("lifecycle", "@ready", `generation ${event.generation} (${event.reason})`);
   }
 
-  function onGridChange(event: ChangeEvent): void {
-    pushFeed(
+  function on_grid_change(event: ChangeEvent): void {
+    push_feed(
       "event",
       "@grid-change",
       `${event.source} · ${event.commitReason} · ${event.transaction.patches.length} op(s)`,
     );
-    refreshSync();
-    refreshWorkbook();
-    refreshInspector();
-    const committedChallenge = event.transaction.patches.some(
+    refresh_sync();
+    refresh_workbook();
+    refresh_inspector();
+    const committed_challenge = event.transaction.patches.some(
       (patch) =>
         patch.op === "set" &&
         patch.addr.sheet === CHALLENGE_CELL.sheet &&
@@ -389,30 +390,30 @@ function useVueWorkbench() {
         patch.value.kind === "literal" &&
         patch.value.value === CHALLENGE_VALUE,
     );
-    if (role.value === "finance-lead" && committedChallenge) {
-      challengeState.value = "accepted";
-      challengeIssue.value = `orders!G1 now ${CHALLENGE_VALUE}; host commit queued.`;
-      activeTask.value = "protection";
+    if (role.value === "finance-lead" && committed_challenge) {
+      challenge_state.value = "accepted";
+      challenge_issue.value = `orders!G1 now ${CHALLENGE_VALUE}; host commit queued.`;
+      active_task.value = "protection";
     }
   }
 
-  function onSelectionChange(value: Selection | null): void {
+  function on_selection_change(value: Selection | null): void {
     selected.value = value?.kind === "cell" ? value.addr : null;
-    refreshInspector();
+    refresh_inspector();
   }
 
-  function setRole(next: HostRole): void {
+  function set_role(next: HostRole): void {
     role.value = next;
-    if (next === "finance-lead" && challengeState.value === "rejected") {
-      challengeState.value = "authorized";
-      challengeIssue.value =
+    if (next === "finance-lead" && challenge_state.value === "rejected") {
+      challenge_state.value = "authorized";
+      challenge_issue.value =
         "Finance lead authorized. Commit the same G1 override to prove the policy changed.";
     }
-    refreshInspector();
+    refresh_inspector();
   }
 
-  function commitChallenge(): void {
-    const grid = gridOf();
+  function commit_challenge(): void {
+    const grid = grid_of();
     if (!grid || !ready.value) return;
     grid.setActiveSheet("orders");
     grid.setSelection({ kind: "cell", addr: CHALLENGE_CELL });
@@ -428,9 +429,9 @@ function useVueWorkbench() {
     });
   }
 
-  async function syncToHost(): Promise<void> {
-    if (!sync || syncBusy.value) return;
-    syncBusy.value = true;
+  async function sync_to_host(): Promise<void> {
+    if (!sync || sync_busy.value) return;
+    sync_busy.value = true;
     try {
       for (let guard = 0; guard < 64; guard++) {
         const head = sync.pendingCommits().find((record) => record.status === "pending");
@@ -438,30 +439,30 @@ function useVueWorkbench() {
         await sync.send(head.clientMutationId);
       }
     } catch (error) {
-      pushFeed("rejected", "sync", `send failed: ${String(error)}`);
+      push_feed("rejected", "sync", `send failed: ${String(error)}`);
     } finally {
-      syncBusy.value = false;
-      refreshSync();
+      sync_busy.value = false;
+      refresh_sync();
     }
   }
 
-  function saveNote(clear: boolean): void {
-    const grid = gridOf();
+  function save_note(clear: boolean): void {
+    const grid = grid_of();
     const addr = selected.value;
     if (!grid || !addr) return;
-    const text = clear ? null : noteDraft.value.trim() === "" ? null : noteDraft.value.trim();
+    const text = clear ? null : note_draft.value.trim() === "" ? null : note_draft.value.trim();
     grid.setNote(addr, text);
   }
 
-  function renameActiveSheet(): void {
-    const grid = gridOf();
-    const name = renameDraft.value.trim();
+  function rename_active_sheet(): void {
+    const grid = grid_of();
+    const name = rename_draft.value.trim();
     if (!grid || name === "") return;
     grid.renameSheet(grid.getActiveSheet(), name);
   }
 
-  function addArchiveSheet(): void {
-    const grid = gridOf();
+  function add_archive_sheet(): void {
+    const grid = grid_of();
     if (!grid || sheets.value.some((sheet) => sheet.id === ARCHIVE_SHEET_ID)) return;
     const result = grid.addSheet({
       id: ARCHIVE_SHEET_ID,
@@ -475,75 +476,75 @@ function useVueWorkbench() {
     if (result.status === "applied") grid.setActiveSheet(result.sheet);
   }
 
-  function openSuppliers(): void {
-    gridOf()?.setActiveSheet("suppliers");
+  function open_suppliers(): void {
+    grid_of()?.setActiveSheet("suppliers");
   }
 
-  function resetGridInput(code: string, detail: string): void {
-    void resetAction.run(
+  function reset_grid_input(code: string, detail: string): void {
+    void reset_action.run(
       () =>
         new Promise<void>((resolve, reject) => {
-          completeReset = resolve;
-          failReset = reject;
+          complete_reset = resolve;
+          fail_reset = reject;
           ready.value = false;
-          bootError.value = null;
-          challengeState.value = "ready";
-          challengeIssue.value = "Protected totals require the finance-lead role.";
-          workbook.value = createWorkbenchWorkbook();
+          boot_error.value = null;
+          challenge_state.value = "ready";
+          challenge_issue.value = "Protected totals require the finance-lead role.";
+          workbook.value = create_workbench_workbook();
           data.value = createBusinessData();
-          pushFeed("lifecycle", code, detail);
+          push_feed("lifecycle", code, detail);
         }),
       () => "Cannot rebuild the workbook. Try loading it again.",
     );
   }
 
-  function togglePolicy(): void {
-    if (!ready.value || pendingCount.value > 0) return;
-    mutationPolicy.value = mutationPolicy.value === "atomic" ? "partial" : "atomic";
-    resetGridInput(
+  function toggle_policy(): void {
+    if (!ready.value || pending_count.value > 0) return;
+    mutation_policy.value = mutation_policy.value === "atomic" ? "partial" : "atomic";
+    reset_grid_input(
       ":mutation-policy",
-      `${mutationPolicy.value} — reset-bound input, grid rebuilds`,
+      `${mutation_policy.value} — reset-bound input, grid rebuilds`,
     );
   }
 
-  function setRenderer(next: RenderingMode): void {
-    if (!ready.value || pendingCount.value > 0 || rendererMode.value === next) return;
-    rendererMode.value = next;
-    resetGridInput(":renderer", `${next} — reset-bound input, grid rebuilds`);
+  function set_renderer(next: RenderingMode): void {
+    if (!ready.value || pending_count.value > 0 || renderer_mode.value === next) return;
+    renderer_mode.value = next;
+    reset_grid_input(":renderer", `${next} — reset-bound input, grid rebuilds`);
   }
 
-  let stopObservingTheme: (() => void) | null = null;
+  let stop_observing_theme: (() => void) | null = null;
   onMounted(() => {
-    stopObservingTheme = observeSiteTheme(() => gridOf()?.replaceTheme(BUSINESS_THEME));
+    stop_observing_theme = observeSiteTheme(() => grid_of()?.replaceTheme(BUSINESS_THEME));
   });
 
   onBeforeUnmount(() => {
-    stopObservingTheme?.();
-    offSync?.();
-    offRejected?.();
+    stop_observing_theme?.();
+    off_sync?.();
+    off_rejected?.();
     sync?.destroy();
     sync = null;
     delete window.__sheetwriteVueWorkbench;
   });
 
-  const inspectorRows = () => [
-    h("div", [h("dt", "Cell"), h("dd", selectedLabel.value)]),
-    h("div", [h("dt", "Value"), h("dd", selectedValue.value)]),
+  const inspector_rows = () => [
+    h("div", [h("dt", "Cell"), h("dd", selected_label.value)]),
+    h("div", [h("dt", "Value"), h("dd", selected_value.value)]),
     h("div", [
       h("dt", "Rule"),
       h(
         "dd",
-        selectedRule.value ? `${selectedRule.value.id} · ${selectedRule.value.policy}` : "none",
+        selected_rule.value ? `${selected_rule.value.id} · ${selected_rule.value.policy}` : "none",
       ),
     ]),
     h("div", [
       h("dt", "Access"),
-      h("dd", { "data-tone": accessLabel.value.tone }, accessLabel.value.text),
+      h("dd", { "data-tone": access_label.value.tone }, access_label.value.text),
     ]),
   ];
 
-  function taskTab(task: (typeof TASKS)[number], index: number) {
-    const active = activeTask.value === task.id;
+  function task_tab(task: (typeof TASKS)[number], index: number) {
+    const active = active_task.value === task.id;
     return h(
       "button",
       {
@@ -554,7 +555,7 @@ function useVueWorkbench() {
         "aria-selected": active,
         "aria-controls": `vue-panel-${task.id}`,
         onClick: () => {
-          activeTask.value = task.id;
+          active_task.value = task.id;
         },
         onKeydown: (event: KeyboardEvent) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -565,28 +566,28 @@ function useVueWorkbench() {
               : event.key === "End"
                 ? TASKS.length - 1
                 : (index + (event.key === "ArrowRight" ? 1 : -1) + TASKS.length) % TASKS.length;
-          const nextTask = TASKS[next];
-          if (!nextTask) return;
+          const next_task = TASKS[next];
+          if (!next_task) return;
 
-          activeTask.value = nextTask.id;
-          requestAnimationFrame(() => document.getElementById(`vue-task-${nextTask.id}`)?.focus());
+          active_task.value = next_task.id;
+          requestAnimationFrame(() => document.getElementById(`vue-task-${next_task.id}`)?.focus());
         },
       },
       task.label,
     );
   }
 
-  function panelAttrs(id: TaskId) {
+  function panel_attrs(id: TaskId) {
     return {
       id: `vue-panel-${id}`,
       class: "sw-vuewb-taskpanel",
       role: "tabpanel",
       "aria-labelledby": `vue-task-${id}`,
-      hidden: activeTask.value !== id,
+      hidden: active_task.value !== id,
     };
   }
 
-  const eventFeed = () =>
+  const event_feed = () =>
     h(
       "ol",
       { class: "sw-vuewb-feed", "data-testid": "feed", "aria-label": "Adapter events" },
@@ -605,95 +606,99 @@ function useVueWorkbench() {
           ],
     );
 
-  function onInitializationError(error: unknown): void {
+  function on_initialization_error(error: unknown): void {
     ready.value = false;
-    bootError.value = "Cannot load the workbook. Try loading it again.";
-    failReset?.(error);
-    completeReset = undefined;
-    failReset = undefined;
-    pushFeed("rejected", "@initialization-error", String(error));
+    boot_error.value = "Cannot load the workbook. Try loading it again.";
+    fail_reset?.(error);
+    complete_reset = undefined;
+    fail_reset = undefined;
+    push_feed("rejected", "@initialization-error", String(error));
   }
 
   return {
-    gridComponent,
+    gridComponent: grid_component,
     workbook,
     data,
-    mutationPolicy,
-    rendererMode,
-    readOnly,
+    mutationPolicy: mutation_policy,
+    rendererMode: renderer_mode,
+    readOnly: read_only,
     role,
     ready,
     generation,
-    bootError,
-    resetState,
-    onInitializationError,
-    pendingCount,
-    serverVersion,
+    bootError: boot_error,
+    resetState: reset_state,
+    onInitializationError: on_initialization_error,
+    pendingCount: pending_count,
+    serverVersion: server_version,
     feed,
-    challengeState,
-    protectionResolver,
-    pushFeed,
-    refreshWorkbook,
-    selectedLabel,
-    onReady,
-    onGridChange,
-    onSelectionChange,
-    setRole,
-    commitChallenge,
-    resetGridInput,
-    taskTab,
-    eventFeed,
-    selectedRule,
-    inspectorRows,
-    panelAttrs,
-    challengeIssue,
+    challengeState: challenge_state,
+    protectionResolver: protection_resolver,
+    pushFeed: push_feed,
+    refreshWorkbook: refresh_workbook,
+    selectedLabel: selected_label,
+    onReady: on_ready,
+    onGridChange: on_grid_change,
+    onSelectionChange: on_selection_change,
+    setRole: set_role,
+    commitChallenge: commit_challenge,
+    resetGridInput: reset_grid_input,
+    taskTab: task_tab,
+    eventFeed: event_feed,
+    selectedRule: selected_rule,
+    inspectorRows: inspector_rows,
+    panelAttrs: panel_attrs,
+    challengeIssue: challenge_issue,
     selected,
-    noteDraft,
-    noteStored,
-    accessLabel,
-    saveNote,
+    noteDraft: note_draft,
+    noteStored: note_stored,
+    accessLabel: access_label,
+    saveNote: save_note,
     sheets,
-    activeSheet,
-    renameDraft,
-    renameActiveSheet,
-    addArchiveSheet,
-    openSuppliers,
-    readyReason,
-    lastAck,
-    syncBusy,
-    persistState,
-    syncToHost,
-    togglePolicy,
-    setRenderer,
+    activeSheet: active_sheet,
+    renameDraft: rename_draft,
+    renameActiveSheet: rename_active_sheet,
+    addArchiveSheet: add_archive_sheet,
+    openSuppliers: open_suppliers,
+    readyReason: ready_reason,
+    lastAck: last_ack,
+    syncBusy: sync_busy,
+    persistState: persist_state,
+    syncToHost: sync_to_host,
+    togglePolicy: toggle_policy,
+    setRenderer: set_renderer,
   };
 }
 
-type VueWorkbench = ReturnType<typeof useVueWorkbench>;
+type VueWorkbench = ReturnType<typeof use_vue_workbench>;
 
 /** The validation task panel. */
 const ValidationPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
-  const { selectedRule, inspectorRows, panelAttrs } = workbench;
+  const {
+    selectedRule: selected_rule,
+    inspectorRows: inspector_rows,
+    panelAttrs: panel_attrs,
+  } = workbench;
 
-  return h("section", panelAttrs("validation"), [
+  return h("section", panel_attrs("validation"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Validation"),
         h("p", "The selected cell resolves its workbook rule before any commit."),
       ]),
     ]),
-    h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
+    h("dl", { class: "sw-vuewb-inspector" }, inspector_rows()),
     h(
       "div",
       {
         class: "sw-vuewb-task-summary",
-        "data-state": selectedRule.value ? "active" : "idle",
+        "data-state": selected_rule.value ? "active" : "idle",
       },
       [
-        h("strong", selectedRule.value ? selectedRule.value.id : "No rule on this cell"),
+        h("strong", selected_rule.value ? selected_rule.value.id : "No rule on this cell"),
         h(
           "span",
-          selectedRule.value
-            ? `${selectedRule.value.policy} validation is enforced at the mutation barrier.`
+          selected_rule.value
+            ? `${selected_rule.value.policy} validation is enforced at the mutation barrier.`
             : "Select a Status or Quantity cell to inspect its validation contract.",
         ),
       ],
@@ -703,39 +708,46 @@ const ValidationPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
 
 /** The protection task panel. */
 const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
-  const { role, challengeState, challengeIssue, setRole, inspectorRows, panelAttrs } = workbench;
+  const {
+    role,
+    challengeState: challenge_state,
+    challengeIssue: challenge_issue,
+    setRole: set_role,
+    inspectorRows: inspector_rows,
+    panelAttrs: panel_attrs,
+  } = workbench;
 
-  return h("section", panelAttrs("protection"), [
+  return h("section", panel_attrs("protection"), [
     h("div", { class: "sw-vuewb-challenge__head" }, [
       h("span", "PROTECTED EDIT"),
       h("strong", "Override the protected G1 total"),
     ]),
-    h("dl", { class: "sw-vuewb-inspector", "data-testid": "inspector" }, inspectorRows()),
+    h("dl", { class: "sw-vuewb-inspector", "data-testid": "inspector" }, inspector_rows()),
     h(
       "output",
       {
         class: "sw-vuewb-policy-result",
         "data-testid": "policy-result",
-        "data-state": challengeState.value,
-        role: challengeState.value === "rejected" ? "alert" : "status",
+        "data-state": challenge_state.value,
+        role: challenge_state.value === "rejected" ? "alert" : "status",
         "aria-live": "polite",
       },
       [
         h(
           "strong",
-          challengeState.value === "accepted"
+          challenge_state.value === "accepted"
             ? "Accepted"
-            : challengeState.value === "rejected"
+            : challenge_state.value === "rejected"
               ? "Rejected"
-              : challengeState.value === "authorized"
+              : challenge_state.value === "authorized"
                 ? "Role changed"
                 : "Protected",
         ),
-        h("span", challengeIssue.value),
+        h("span", challenge_issue.value),
       ],
     ),
     h("ol", { class: "sw-vuewb-steps", "aria-label": "Protected edit workflow" }, [
-      h("li", { "data-state": challengeState.value === "ready" ? "current" : "done" }, [
+      h("li", { "data-state": challenge_state.value === "ready" ? "current" : "done" }, [
         h("span", "1"),
         h("div", [h("strong", "Attempt"), h("small", "G1 = 999")]),
       ]),
@@ -743,15 +755,15 @@ const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
         "li",
         {
           "data-state":
-            challengeState.value === "rejected"
+            challenge_state.value === "rejected"
               ? "current"
-              : challengeState.value === "authorized" || challengeState.value === "accepted"
+              : challenge_state.value === "authorized" || challenge_state.value === "accepted"
                 ? "done"
                 : "waiting",
         },
         [h("span", "2"), h("div", [h("strong", "Authorize"), h("small", "Finance lead")])],
       ),
-      h("li", { "data-state": challengeState.value === "accepted" ? "done" : "waiting" }, [
+      h("li", { "data-state": challenge_state.value === "accepted" ? "done" : "waiting" }, [
         h("span", "3"),
         h("div", [h("strong", "Commit"), h("small", "Queue mutation")]),
       ]),
@@ -762,8 +774,8 @@ const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
         {
           type: "button",
           "data-testid": "challenge-authorize",
-          disabled: role.value === "finance-lead" || challengeState.value === "accepted",
-          onClick: () => setRole("finance-lead"),
+          disabled: role.value === "finance-lead" || challenge_state.value === "accepted",
+          onClick: () => set_role("finance-lead"),
         },
         "Authorize finance lead",
       ),
@@ -773,28 +785,34 @@ const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
 
 /** The change task panel. */
 const ChangePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
-  const { pendingCount, serverVersion, challengeState, challengeIssue, selectedLabel, panelAttrs } =
-    workbench;
+  const {
+    pendingCount: pending_count,
+    serverVersion: server_version,
+    challengeState: challenge_state,
+    challengeIssue: challenge_issue,
+    selectedLabel: selected_label,
+    panelAttrs: panel_attrs,
+  } = workbench;
 
-  return h("section", panelAttrs("change"), [
+  return h("section", panel_attrs("change"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [h("h3", "Change"), h("p", "Policy outcome and host work stay causally adjacent.")]),
     ]),
-    h("div", { class: "sw-vuewb-task-summary", "data-state": challengeState.value }, [
+    h("div", { class: "sw-vuewb-task-summary", "data-state": challenge_state.value }, [
       h(
         "strong",
-        challengeState.value === "accepted"
+        challenge_state.value === "accepted"
           ? "Mutation queued"
-          : challengeState.value === "rejected"
+          : challenge_state.value === "rejected"
             ? "Mutation rejected"
             : "Awaiting governed edit",
       ),
-      h("span", challengeIssue.value),
+      h("span", challenge_issue.value),
     ]),
     h("dl", { class: "sw-vuewb-change-meters" }, [
-      h("div", [h("dt", "Cell"), h("dd", selectedLabel.value)]),
-      h("div", [h("dt", "Pending"), h("dd", String(pendingCount.value))]),
-      h("div", [h("dt", "Host"), h("dd", `v${serverVersion.value}`)]),
+      h("div", [h("dt", "Cell"), h("dd", selected_label.value)]),
+      h("div", [h("dt", "Pending"), h("dd", String(pending_count.value))]),
+      h("div", [h("dt", "Host"), h("dd", `v${server_version.value}`)]),
     ]),
     h(
       "p",
@@ -807,35 +825,35 @@ const ChangePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
 /** The notes task panel. */
 const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
-    readOnly,
+    readOnly: read_only,
     selected,
-    noteDraft,
-    noteStored,
-    selectedLabel,
-    accessLabel,
-    saveNote,
-    inspectorRows,
-    panelAttrs,
+    noteDraft: note_draft,
+    noteStored: note_stored,
+    selectedLabel: selected_label,
+    accessLabel: access_label,
+    saveNote: save_note,
+    inspectorRows: inspector_rows,
+    panelAttrs: panel_attrs,
   } = workbench;
 
-  return h("section", panelAttrs("notes"), [
+  return h("section", panel_attrs("notes"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Notes"),
-        h("p", `Selected ${selectedLabel.value} · ${accessLabel.value.text}`),
+        h("p", `Selected ${selected_label.value} · ${access_label.value.text}`),
       ]),
     ]),
-    h("dl", { class: "sw-vuewb-inspector sw-vuewb-inspector--compact" }, inspectorRows()),
+    h("dl", { class: "sw-vuewb-inspector sw-vuewb-inspector--compact" }, inspector_rows()),
     h("div", { class: "sw-vuewb-note" }, [
       h("label", { for: "vue-cell-note" }, "Selected-cell note"),
       h("textarea", {
         id: "vue-cell-note",
         "data-testid": "note-input",
         placeholder: selected.value === null ? "Select a cell to annotate" : "Add a note…",
-        disabled: selected.value === null || readOnly.value,
-        value: noteDraft.value,
+        disabled: selected.value === null || read_only.value,
+        value: note_draft.value,
         onInput: (event: Event) => {
-          noteDraft.value = (event.target as HTMLTextAreaElement).value;
+          note_draft.value = (event.target as HTMLTextAreaElement).value;
         },
       }),
       h("div", { class: "sw-vuewb-note__actions" }, [
@@ -844,8 +862,8 @@ const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbenc
           {
             type: "button",
             "data-testid": "note-save",
-            disabled: selected.value === null || readOnly.value,
-            onClick: () => saveNote(false),
+            disabled: selected.value === null || read_only.value,
+            onClick: () => save_note(false),
           },
           "Save note",
         ),
@@ -854,8 +872,8 @@ const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbenc
           {
             type: "button",
             "data-testid": "note-clear",
-            disabled: selected.value === null || readOnly.value || noteStored.value === null,
-            onClick: () => saveNote(true),
+            disabled: selected.value === null || read_only.value || note_stored.value === null,
+            onClick: () => save_note(true),
           },
           "Clear",
         ),
@@ -866,16 +884,16 @@ const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbenc
 
 /** The formatting task panel. */
 const FormattingPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
-  const { inspectorRows, panelAttrs } = workbench;
+  const { inspectorRows: inspector_rows, panelAttrs: panel_attrs } = workbench;
 
-  return h("section", panelAttrs("formatting"), [
+  return h("section", panel_attrs("formatting"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Format the live selection"),
         h("p", "Use the Grid toolbar above the rows; style commits enter the same host queue."),
       ]),
     ]),
-    h("dl", { class: "sw-vuewb-inspector" }, inspectorRows()),
+    h("dl", { class: "sw-vuewb-inspector" }, inspector_rows()),
     h("p", { class: "sw-vuewb-taskhint" }, [
       h("strong", "Try this: "),
       "select Supplier, press Bold, then inspect Pending in the Persistence task.",
@@ -886,18 +904,18 @@ const FormattingPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
 /** The sheets task panel. */
 const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
-    readOnly,
+    readOnly: read_only,
     ready,
     sheets,
-    activeSheet,
-    renameDraft,
-    renameActiveSheet,
-    addArchiveSheet,
-    openSuppliers,
-    panelAttrs,
+    activeSheet: active_sheet,
+    renameDraft: rename_draft,
+    renameActiveSheet: rename_active_sheet,
+    addArchiveSheet: add_archive_sheet,
+    openSuppliers: open_suppliers,
+    panelAttrs: panel_attrs,
   } = workbench;
 
-  return h("section", panelAttrs("sheets"), [
+  return h("section", panel_attrs("sheets"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Sheet operations"),
@@ -908,20 +926,20 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
       h(
         "p",
         { class: "sw-vuewb-workbook__state", "data-testid": "workbook-state" },
-        `${sheets.value.length} sheet(s) · active ${activeSheet.value || "—"}`,
+        `${sheets.value.length} sheet(s) · active ${active_sheet.value || "—"}`,
       ),
       h("div", { class: "sw-vuewb-workbook__rename" }, [
         h("input", {
           type: "text",
           "data-testid": "rename-input",
           "aria-label": "Active sheet name",
-          disabled: !ready.value || readOnly.value,
-          value: renameDraft.value,
+          disabled: !ready.value || read_only.value,
+          value: rename_draft.value,
           onInput: (event: Event) => {
-            renameDraft.value = (event.target as HTMLInputElement).value;
+            rename_draft.value = (event.target as HTMLInputElement).value;
           },
           onKeydown: (event: KeyboardEvent) => {
-            if (event.key === "Enter") renameActiveSheet();
+            if (event.key === "Enter") rename_active_sheet();
           },
         }),
         h(
@@ -929,8 +947,8 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
           {
             type: "button",
             "data-testid": "rename-apply",
-            disabled: !ready.value || readOnly.value,
-            onClick: renameActiveSheet,
+            disabled: !ready.value || read_only.value,
+            onClick: rename_active_sheet,
           },
           "Rename",
         ),
@@ -943,9 +961,9 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
             "data-testid": "add-sheet",
             disabled:
               !ready.value ||
-              readOnly.value ||
+              read_only.value ||
               sheets.value.some((sheet) => sheet.id === ARCHIVE_SHEET_ID),
-            onClick: addArchiveSheet,
+            onClick: add_archive_sheet,
           },
           sheets.value.some((sheet) => sheet.id === ARCHIVE_SHEET_ID)
             ? "Archive added"
@@ -957,7 +975,7 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
             type: "button",
             "data-testid": "open-suppliers",
             disabled: !ready.value,
-            onClick: openSuppliers,
+            onClick: open_suppliers,
           },
           "Open suppliers",
         ),
@@ -975,52 +993,52 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
 const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     generation,
-    readyReason,
-    pendingCount,
-    serverVersion,
-    lastAck,
-    syncBusy,
-    persistState,
-    syncToHost,
-    panelAttrs,
+    readyReason: ready_reason,
+    pendingCount: pending_count,
+    serverVersion: server_version,
+    lastAck: last_ack,
+    syncBusy: sync_busy,
+    persistState: persist_state,
+    syncToHost: sync_to_host,
+    panelAttrs: panel_attrs,
   } = workbench;
 
-  return h("section", panelAttrs("persistence"), [
+  return h("section", panel_attrs("persistence"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Host persistence"),
         h("p", "Local document changes stay pending until acknowledged."),
       ]),
-      h("a", { href: "/showcases/database/" }, ["Durable proof", sheetwriteIcon("arrow-right")]),
+      h("a", { href: "/showcases/database/" }, ["Durable proof", sheetwrite_icon("arrow-right")]),
     ]),
     h("div", { class: "sw-vuewb-persist" }, [
       h(
         "output",
         {
           "data-testid": "persistence",
-          "data-state": persistState.value.state,
+          "data-state": persist_state.value.state,
           "aria-live": "polite",
         },
-        persistState.value.text,
+        persist_state.value.text,
       ),
       h("dl", { class: "sw-vuewb-persist__meters" }, [
         h("div", [
           h("dt", "Pending"),
-          h("dd", { "data-testid": "pending-count" }, String(pendingCount.value)),
+          h("dd", { "data-testid": "pending-count" }, String(pending_count.value)),
         ]),
         h("div", [
           h("dt", "Host version"),
-          h("dd", { "data-testid": "server-version" }, `v${serverVersion.value}`),
+          h("dd", { "data-testid": "server-version" }, `v${server_version.value}`),
         ]),
         h("div", [
           h("dt", "Generation"),
-          h("dd", { "data-testid": "generation" }, `${generation.value} · ${readyReason.value}`),
+          h("dd", { "data-testid": "generation" }, `${generation.value} · ${ready_reason.value}`),
         ]),
       ]),
       h(
         "p",
         { class: "sw-vuewb-persist__ack", "data-testid": "last-ack" },
-        `Last acknowledgement: ${lastAck.value}`,
+        `Last acknowledgement: ${last_ack.value}`,
       ),
       h(
         "button",
@@ -1028,10 +1046,10 @@ const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wo
           type: "button",
           "data-testid": "sync",
           "data-variant": "primary",
-          disabled: pendingCount.value === 0 || syncBusy.value,
-          onClick: () => void syncToHost(),
+          disabled: pending_count.value === 0 || sync_busy.value,
+          onClick: () => void sync_to_host(),
         },
-        syncBusy.value ? "Committing…" : "Sync to host",
+        sync_busy.value ? "Committing…" : "Sync to host",
       ),
     ]),
     h(
@@ -1045,20 +1063,20 @@ const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wo
 /** The renderer task panel. */
 const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
-    mutationPolicy,
-    rendererMode,
-    readOnly,
+    mutationPolicy: mutation_policy,
+    rendererMode: renderer_mode,
+    readOnly: read_only,
     role,
     ready,
     generation,
-    pendingCount,
-    pushFeed,
-    togglePolicy,
-    setRenderer,
-    panelAttrs,
+    pendingCount: pending_count,
+    pushFeed: push_feed,
+    togglePolicy: toggle_policy,
+    setRenderer: set_renderer,
+    panelAttrs: panel_attrs,
   } = workbench;
 
-  return h("section", panelAttrs("renderer"), [
+  return h("section", panel_attrs("renderer"), [
     h("div", { class: "sw-vuewb-section__head" }, [
       h("div", [
         h("h3", "Renderer and adapter"),
@@ -1070,9 +1088,9 @@ const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workb
         "button",
         {
           type: "button",
-          "aria-pressed": rendererMode.value === "canvas",
-          disabled: !ready.value || pendingCount.value > 0,
-          onClick: () => setRenderer("canvas"),
+          "aria-pressed": renderer_mode.value === "canvas",
+          disabled: !ready.value || pending_count.value > 0,
+          onClick: () => set_renderer("canvas"),
         },
         "Canvas · main thread",
       ),
@@ -1080,9 +1098,9 @@ const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workb
         "button",
         {
           type: "button",
-          "aria-pressed": rendererMode.value === "worker",
-          disabled: !ready.value || pendingCount.value > 0,
-          onClick: () => setRenderer("worker"),
+          "aria-pressed": renderer_mode.value === "worker",
+          disabled: !ready.value || pending_count.value > 0,
+          onClick: () => set_renderer("worker"),
         },
         "Worker · off thread",
       ),
@@ -1095,10 +1113,10 @@ const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workb
           {
             type: "button",
             "data-testid": "readonly",
-            "aria-pressed": readOnly.value,
+            "aria-pressed": read_only.value,
             onClick: () => {
-              readOnly.value = !readOnly.value;
-              pushFeed("event", ":read-only", String(readOnly.value));
+              read_only.value = !read_only.value;
+              push_feed("event", ":read-only", String(read_only.value));
             },
           },
           "Read only",
@@ -1108,24 +1126,24 @@ const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workb
           {
             type: "button",
             "data-testid": "mutation-policy",
-            disabled: !ready.value || pendingCount.value > 0,
+            disabled: !ready.value || pending_count.value > 0,
             title:
-              pendingCount.value > 0
+              pending_count.value > 0
                 ? "Sync pending commits first — this input rebuilds the Grid."
                 : "Reset-bound adapter input: toggling replaces the Grid.",
-            onClick: togglePolicy,
+            onClick: toggle_policy,
           },
-          `Policy: ${mutationPolicy.value}`,
+          `Policy: ${mutation_policy.value}`,
         ),
       ]),
     ]),
     h("details", { class: "sw-vuewb-disclosure" }, [
       h("summary", "Vue bindings"),
       h("dl", { class: "sw-vuewb-props", "data-testid": "props" }, [
-        h("div", [h("dt", ":read-only"), h("dd", String(readOnly.value))]),
-        h("div", [h("dt", ":mutation-policy"), h("dd", mutationPolicy.value)]),
+        h("div", [h("dt", ":read-only"), h("dd", String(read_only.value))]),
+        h("div", [h("dt", ":mutation-policy"), h("dd", mutation_policy.value)]),
         h("div", [h("dt", ":protection-resolver"), h("dd", role.value)]),
-        h("div", [h("dt", ":renderer"), h("dd", rendererMode.value)]),
+        h("div", [h("dt", ":renderer"), h("dd", renderer_mode.value)]),
         h("div", [h("dt", ":workbook"), h("dd", `generation ${generation.value}`)]),
       ]),
     ]),
@@ -1139,36 +1157,36 @@ const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workb
 
 const App = defineComponent({
   setup() {
-    const workbench = useVueWorkbench();
+    const workbench = use_vue_workbench();
     const {
-      gridComponent,
+      gridComponent: grid_component,
       workbook,
       data,
-      mutationPolicy,
-      rendererMode,
-      readOnly,
+      mutationPolicy: mutation_policy,
+      rendererMode: renderer_mode,
+      readOnly: read_only,
       role,
       ready,
       generation,
-      bootError,
-      resetState,
-      onInitializationError,
-      pendingCount,
-      serverVersion,
+      bootError: boot_error,
+      resetState: reset_state,
+      onInitializationError: on_initialization_error,
+      pendingCount: pending_count,
+      serverVersion: server_version,
       feed,
-      challengeState,
-      protectionResolver,
-      pushFeed,
-      refreshWorkbook,
-      selectedLabel,
-      onReady,
-      onGridChange,
-      onSelectionChange,
-      setRole,
-      commitChallenge,
-      resetGridInput,
-      taskTab,
-      eventFeed,
+      challengeState: challenge_state,
+      protectionResolver: protection_resolver,
+      pushFeed: push_feed,
+      refreshWorkbook: refresh_workbook,
+      selectedLabel: selected_label,
+      onReady: on_ready,
+      onGridChange: on_grid_change,
+      onSelectionChange: on_selection_change,
+      setRole: set_role,
+      commitChallenge: commit_challenge,
+      resetGridInput: reset_grid_input,
+      taskTab: task_tab,
+      eventFeed: event_feed,
     } = workbench;
 
     return () =>
@@ -1177,7 +1195,7 @@ const App = defineComponent({
           h("header", { class: "sw-demo-controlbar sw-vuewb-controlbar" }, [
             h("div", { class: "sw-demo-controlbar__identity" }, [
               h("span", { class: "sw-demo-product__mark", "aria-hidden": "true" }, [
-                sheetwriteIcon("sheet"),
+                sheetwrite_icon("sheet"),
               ]),
               h("div", [
                 h("h2", "Purchase order review"),
@@ -1201,7 +1219,7 @@ const App = defineComponent({
                         type: "button",
                         "aria-pressed": role.value === candidate,
                         "data-testid": `role-${candidate}`,
-                        onClick: () => setRole(candidate),
+                        onClick: () => set_role(candidate),
                       },
                       candidate === "reviewer" ? "Reviewer" : "Finance lead",
                     ),
@@ -1213,13 +1231,13 @@ const App = defineComponent({
               "output",
               {
                 class: "sw-workbench-readout sw-vuewb-readout",
-                "data-state": challengeState.value,
+                "data-state": challenge_state.value,
                 "aria-live": "polite",
               },
               [
-                sheetwriteIcon("shield"),
+                sheetwrite_icon("shield"),
                 h("span", { class: "sw-vuewb-readout__label" }, "Challenge"),
-                h("strong", CHALLENGE_LABELS[challengeState.value]),
+                h("strong", CHALLENGE_LABELS[challenge_state.value]),
               ],
             ),
             h(
@@ -1228,8 +1246,8 @@ const App = defineComponent({
                 type: "button",
                 class: "sw-workbench-primary",
                 "data-testid": "challenge-attempt",
-                disabled: !ready.value || readOnly.value || challengeState.value === "accepted",
-                onClick: commitChallenge,
+                disabled: !ready.value || read_only.value || challenge_state.value === "accepted",
+                onClick: commit_challenge,
               },
               role.value === "reviewer" ? "Attempt 999 as reviewer" : "Commit 999 override",
             ),
@@ -1240,58 +1258,58 @@ const App = defineComponent({
               class: "sw-action-error",
               role: "alert",
               "data-action-error": "",
-              hidden: bootError.value === null && resetState.value.error === null,
+              hidden: boot_error.value === null && reset_state.value.error === null,
             },
-            bootError.value ?? resetState.value.error ?? "",
+            boot_error.value ?? reset_state.value.error ?? "",
           ),
-          bootError.value !== null || resetState.value.pending
+          boot_error.value !== null || reset_state.value.pending
             ? h(
                 "button",
                 {
                   type: "button",
-                  disabled: resetState.value.pending,
-                  "aria-busy": resetState.value.pending || undefined,
-                  onClick: () => resetGridInput("retry", "Retrying workbook initialization"),
+                  disabled: reset_state.value.pending,
+                  "aria-busy": reset_state.value.pending || undefined,
+                  onClick: () => reset_grid_input("retry", "Retrying workbook initialization"),
                 },
-                resetState.value.pending ? "Loading workbook…" : "Retry loading",
+                reset_state.value.pending ? "Loading workbook…" : "Retry loading",
               )
             : null,
           h("div", { class: "sw-vuewb-workspace" }, [
             h("div", { class: "sw-demo-grid sw-vuewb-grid" }, [
               h(SheetwriteGrid, {
-                ref: gridComponent,
+                ref: grid_component,
                 workbook: workbook.value,
                 data: data.value,
                 presentation: "data-grid",
                 theme: BUSINESS_THEME,
-                readOnly: readOnly.value,
-                mutationPolicy: mutationPolicy.value,
-                protectionResolver,
-                renderer: rendererMode.value,
-                workerUrl: rendererMode.value === "worker" ? workerUrl : undefined,
+                readOnly: read_only.value,
+                mutationPolicy: mutation_policy.value,
+                protectionResolver: protection_resolver,
+                renderer: renderer_mode.value,
+                workerUrl: renderer_mode.value === "worker" ? workerUrl : undefined,
                 config: GRID_CONFIG,
                 style: "height: 100%",
-                onReady,
-                onGridChange,
-                onSelectionChange,
+                onReady: on_ready,
+                onGridChange: on_grid_change,
+                onSelectionChange: on_selection_change,
                 onEditBegin: (event: GridEvents["edit-begin"]) => {
-                  pushFeed("event", "@edit-begin", cellA1(event.addr.row, event.addr.col));
+                  push_feed("event", "@edit-begin", cellA1(event.addr.row, event.addr.col));
                 },
                 onEditCommit: (event: GridEvents["edit-commit"]) => {
-                  pushFeed("event", "@edit-commit", cellA1(event.addr.row, event.addr.col));
+                  push_feed("event", "@edit-commit", cellA1(event.addr.row, event.addr.col));
                 },
                 onActiveSheetChange: (event: GridEvents["active-sheet"]) => {
-                  pushFeed("event", "@active-sheet-change", String(event.sheet));
-                  refreshWorkbook();
+                  push_feed("event", "@active-sheet-change", String(event.sheet));
+                  refresh_workbook();
                 },
-                onInitializationError,
+                onInitializationError: on_initialization_error,
               }),
             ]),
             h("aside", { class: "sw-vuewb-panel", "aria-label": "Policy and workbook tasks" }, [
               h(
                 "nav",
                 { class: "sw-vuewb-tasktabs", role: "tablist", "aria-label": "Workbook tasks" },
-                [...TASKS.map(taskTab)],
+                [...TASKS.map(task_tab)],
               ),
               h(ValidationPanel, { workbench }),
               h(ProtectionPanel, { workbench }),
@@ -1306,19 +1324,19 @@ const App = defineComponent({
                   h("strong", "Adapter events"),
                   h("span", `${feed.value.length} recent · Vue + Grid`),
                 ]),
-                eventFeed(),
+                event_feed(),
               ]),
             ]),
           ]),
           h("footer", { class: "sw-demo-status sw-demo-status--metrics" }, [
-            h("span", `Selection · ${selectedLabel.value}`),
+            h("span", `Selection · ${selected_label.value}`),
             h("span", { class: "sw-vuewb-status--role" }, `Role · ${role.value}`),
-            h("span", `Pending · ${pendingCount.value}`),
-            h("span", { class: "sw-vuewb-status--host" }, `Host · v${serverVersion.value}`),
+            h("span", `Pending · ${pending_count.value}`),
+            h("span", { class: "sw-vuewb-status--host" }, `Host · v${server_version.value}`),
             h(
               "span",
               { class: "sw-vuewb-status--renderer" },
-              `${rendererMode.value} · gen ${generation.value}`,
+              `${renderer_mode.value} · gen ${generation.value}`,
             ),
           ]),
         ]),

@@ -24,11 +24,11 @@ export interface ChangesetComparison {
 export function changesetComparisonFromBaseRef(
   githubBaseRef: string | undefined,
 ): ChangesetComparison {
-  const baseRef = `origin/${githubBaseRef?.trim() || "develop"}`;
+  const base_ref = `origin/${githubBaseRef?.trim() || "develop"}`;
   return {
-    baseRef,
-    diffRange: `${baseRef}...HEAD`,
-    sinceArgument: `--since=${baseRef}`,
+    baseRef: base_ref,
+    diffRange: `${base_ref}...HEAD`,
+    sinceArgument: `--since=${base_ref}`,
   };
 }
 
@@ -47,15 +47,15 @@ export function packageSizeHistoryVersionFromHeadRef(
   return STABLE_VERSION.test(version) ? version : undefined;
 }
 export function isGeneratedPackageSizeHistoryChange(paths: readonly string[]): boolean {
-  const uniquePaths = new Set(paths);
+  const unique_paths = new Set(paths);
   return (
-    uniquePaths.size === paths.length &&
-    [...REQUIRED_PACKAGE_SIZE_HISTORY_FILES].every((path) => uniquePaths.has(path)) &&
+    unique_paths.size === paths.length &&
+    [...REQUIRED_PACKAGE_SIZE_HISTORY_FILES].every((path) => unique_paths.has(path)) &&
     paths.every((path) => ALLOWED_PACKAGE_SIZE_HISTORY_FILES.has(path))
   );
 }
 
-async function changedFilesSince(comparison: ChangesetComparison): Promise<string[]> {
+async function changed_files_since(comparison: ChangesetComparison): Promise<string[]> {
   const stdout = await captureProcess(["git", "diff", "--name-only", comparison.diffRange], {
     cwd: REPOSITORY_ROOT,
     failure: ({ stderr }) => `Unable to inspect package size history diff: ${stderr}`,
@@ -99,7 +99,7 @@ export function unpublishedChangesetPackages(
   });
 }
 
-function assertChangesetsNamePublishedPackages(root = REPOSITORY_ROOT): void {
+function assert_changesets_name_published_packages(root = REPOSITORY_ROOT): void {
   const directory = resolve(root, ".changeset");
   const problems = readdirSync(directory)
     .filter((file) => file.endsWith(".md") && file !== "README.md")
@@ -115,21 +115,21 @@ function assertChangesetsNamePublishedPackages(root = REPOSITORY_ROOT): void {
 }
 
 async function main(): Promise<void> {
-  const releaseVersion = releaseVersionFromHeadRef(process.env.GITHUB_HEAD_REF);
-  if (releaseVersion !== undefined) {
-    validateReleasePackageVersions(releaseVersion);
-    console.log(`Release package versions match branch ${releaseVersion}`);
+  const release_version = releaseVersionFromHeadRef(process.env.GITHUB_HEAD_REF);
+  if (release_version !== undefined) {
+    validateReleasePackageVersions(release_version);
+    console.log(`Release package versions match branch ${release_version}`);
     return;
   }
-  assertChangesetsNamePublishedPackages();
+  assert_changesets_name_published_packages();
   const comparison = changesetComparisonFromBaseRef(process.env.GITHUB_BASE_REF);
-  const packageSizeHistoryVersion = packageSizeHistoryVersionFromHeadRef(
+  const package_size_history_version = packageSizeHistoryVersionFromHeadRef(
     process.env.GITHUB_HEAD_REF,
   );
-  if (packageSizeHistoryVersion !== undefined) {
-    validateReleasePackageVersions(packageSizeHistoryVersion);
-    if (isGeneratedPackageSizeHistoryChange(await changedFilesSince(comparison))) {
-      console.log(`Package size history versions match branch ${packageSizeHistoryVersion}`);
+  if (package_size_history_version !== undefined) {
+    validateReleasePackageVersions(package_size_history_version);
+    if (isGeneratedPackageSizeHistoryChange(await changed_files_since(comparison))) {
+      console.log(`Package size history versions match branch ${package_size_history_version}`);
       return;
     }
     console.log(

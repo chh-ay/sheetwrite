@@ -55,7 +55,10 @@ function ChangeList(props: {
 /** The version history showcase's island: a shared budget, its versions and restores. */
 export function VersionHistoryStage(props: VersionHistoryStageProps) {
   const live = createLiveScenario<HistoryScenario, HistorySnapshot>(() =>
-    import("./boot.js").then(({ createVersionHistoryScenario }) => createVersionHistoryScenario),
+    import("./boot.js").then(
+      ({ createVersionHistoryScenario: create_version_history_scenario }) =>
+        create_version_history_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
   // Before the archive opens, the row its baseline version fills waits with "…".

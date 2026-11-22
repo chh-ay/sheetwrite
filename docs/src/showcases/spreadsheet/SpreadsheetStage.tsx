@@ -41,14 +41,14 @@ export interface SpreadsheetStageProps {
 }
 
 /** The walkthrough; the last step gets its fold control at render. */
-function spreadsheetSteps(
-  salesLastRow: number,
-  foldRibbon: ShowcaseStep["control"],
+function spreadsheet_steps(
+  sales_last_row: number,
+  fold_ribbon: ShowcaseStep["control"],
 ): ShowcaseStep[] {
   return [
     {
       action: "Total a column",
-      how: `Select Sales!G2:G${salesLastRow}, then Home › Editing › AutoSum.`,
+      how: `Select Sales!G2:G${sales_last_row}, then Home › Editing › AutoSum.`,
       result: "A SUM lands under the last row.",
     },
     {
@@ -76,7 +76,7 @@ function spreadsheetSteps(
       how: "Switch between a wide and a narrow window.",
       result:
         "The ribbon turns compact, one row like Excel's simplified ribbon, and groups fold into dropdowns.",
-      control: foldRibbon,
+      control: fold_ribbon,
     },
   ];
 }
@@ -84,18 +84,18 @@ function spreadsheetSteps(
 /** The spreadsheet showcase's island: the shell around one grid, and its walkthrough. */
 export function SpreadsheetStage(props: SpreadsheetStageProps) {
   let host!: HTMLDivElement;
-  const [error, setError] = createSignal<string | null>(null);
-  const [ready, setReady] = createSignal(false);
-  const [width, setWidth] = createSignal<WidthId>("wide");
+  const [error, set_error] = createSignal<string | null>(null);
+  const [ready, set_ready] = createSignal(false);
+  const [width, set_width] = createSignal<WidthId>("wide");
 
   onMount(() => {
     let disposed = false;
     let dispose: (() => void) | undefined;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       import("./boot.js")
-        .then(({ createSpreadsheetScenario }) => {
+        .then(({ createSpreadsheetScenario: create_spreadsheet_scenario }) => {
           if (disposed) return;
-          const scenario = createSpreadsheetScenario(host);
+          const scenario = create_spreadsheet_scenario(host);
           dispose = () => {
             scenario.dispose();
             delete window.__sheetwriteSpreadsheetGrid;
@@ -104,22 +104,22 @@ export function SpreadsheetStage(props: SpreadsheetStageProps) {
             if (disposed) return;
             const grid = scenario.grid();
             if (grid) window.__sheetwriteSpreadsheetGrid = grid;
-            setReady(true);
+            set_ready(true);
           });
         })
         .catch((cause: unknown) => {
-          if (!disposed) setError(errorText(cause));
+          if (!disposed) set_error(errorText(cause));
         });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       dispose?.();
     });
   });
 
-  const frameWidth = () => WIDTHS.find((option) => option.id === width())?.width ?? null;
-  const toggle = () => setWidth(width() === "narrow" ? "wide" : "narrow");
+  const frame_width = () => WIDTHS.find((option) => option.id === width())?.width ?? null;
+  const toggle = () => set_width(width() === "narrow" ? "wide" : "narrow");
 
   return (
     <ShowcaseStage
@@ -127,7 +127,7 @@ export function SpreadsheetStage(props: SpreadsheetStageProps) {
         <>
           <ShowcaseControlGroup title="Try it">
             <ShowcaseSteps
-              steps={spreadsheetSteps(
+              steps={spreadsheet_steps(
                 props.salesLastRow,
                 <Button disabled={!ready()} onClick={toggle}>
                   <Icon name={width() === "narrow" ? "monitor" : "laptop"} />
@@ -149,7 +149,7 @@ export function SpreadsheetStage(props: SpreadsheetStageProps) {
           <div
             class="sw-spreadsheet-window"
             data-testid="spreadsheet-window"
-            style={frameWidth() === null ? undefined : { "max-width": `${frameWidth()}px` }}
+            style={frame_width() === null ? undefined : { "max-width": `${frame_width()}px` }}
           >
             <div
               class="sw-showcase__grid"
@@ -169,7 +169,7 @@ export function SpreadsheetStage(props: SpreadsheetStageProps) {
                 aria-pressed={width() === option.id}
                 data-size="sm"
                 disabled={!ready()}
-                onClick={() => setWidth(option.id)}
+                onClick={() => set_width(option.id)}
                 variant="quiet"
               >
                 {option.label}

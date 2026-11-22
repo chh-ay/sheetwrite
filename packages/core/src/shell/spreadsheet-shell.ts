@@ -41,14 +41,14 @@ interface ShellChromeOptions {
  * arrives after destroy is dropped. If the chunk fails, `fallback` (when
  * given) takes its place and the error is still reported.
  */
-function mountWhenLoaded(
+function mount_when_loaded(
   host: HTMLElement,
-  reservedHeight: number,
+  reserved_height: number,
   load: () => Promise<() => ShellPiece>,
   fallback?: () => ShellPiece,
 ): ShellPiece {
   const lifetime = new Scope();
-  host.style.minHeight = `${reservedHeight}px`;
+  host.style.minHeight = `${reserved_height}px`;
 
   void load().then(
     (mount) => {
@@ -76,11 +76,11 @@ function mountWhenLoaded(
   };
 }
 
-function mountToolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions): ShellPiece {
-  return mountWhenLoaded(host, TOOLBAR_HEIGHT, async () => {
-    const { createToolbar } = await import("./toolbar-factory.js");
+function mount_toolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions): ShellPiece {
+  return mount_when_loaded(host, TOOLBAR_HEIGHT, async () => {
+    const { createToolbar: create_toolbar } = await import("./toolbar-factory.js");
     return () =>
-      createToolbar(host, grid, {
+      create_toolbar(host, grid, {
         focusGrid: chrome.focusGrid,
         flags: chrome.flags,
         ...(chrome.items === undefined ? {} : { items: chrome.items }),
@@ -90,27 +90,27 @@ function mountToolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions)
 }
 
 /** The ribbon renders the same commands as the toolbar, which replaces it if its chunk fails. */
-function mountRibbon(
+function mount_ribbon(
   host: HTMLElement,
   grid: Grid,
   chrome: ShellChromeOptions,
   layout: RibbonConfig,
 ): ShellPiece {
-  return mountWhenLoaded(
+  return mount_when_loaded(
     host,
     // The ribbon spans its row, so the row's width decides its layout now.
     ribbonHeight(layout, host.clientWidth),
     async () => {
-      const { createRibbon } = await import("./ribbon-factory.js");
+      const { createRibbon: create_ribbon } = await import("./ribbon-factory.js");
       return () =>
-        createRibbon(host, grid, {
+        create_ribbon(host, grid, {
           focusGrid: chrome.focusGrid,
           flags: chrome.flags,
           ...layout,
           ...(chrome.icons === undefined ? {} : { icons: chrome.icons }),
         });
     },
-    () => mountToolbar(host, grid, chrome),
+    () => mount_toolbar(host, grid, chrome),
   );
 }
 
@@ -149,7 +149,7 @@ export interface SpreadsheetShell {
 }
 
 /** Force the duplicate built-in chrome off while preserving everything else. */
-function shellGridConfig(config: GridConfig | undefined): GridConfig {
+function shell_grid_config(config: GridConfig | undefined): GridConfig {
   return { ...(config ?? {}), toolbar: false, tabs: false };
 }
 
@@ -173,25 +173,25 @@ export function createSpreadsheetShell(
   const root = document.createElement("div");
   root.className = "sheetwrite-shell";
 
-  const toolbarRow = document.createElement("div");
-  toolbarRow.className = "sheetwrite-shell-row sheetwrite-shell-toolbar-row";
+  const toolbar_row = document.createElement("div");
+  toolbar_row.className = "sheetwrite-shell-row sheetwrite-shell-toolbar-row";
 
-  const formulaRow = document.createElement("div");
-  formulaRow.className = "sheetwrite-shell-row sheetwrite-shell-formula-row";
+  const formula_row = document.createElement("div");
+  formula_row.className = "sheetwrite-shell-row sheetwrite-shell-formula-row";
 
   const fx = document.createElement("span");
   fx.className = "sheetwrite-shell-fx";
   fx.textContent = "fx";
   fx.setAttribute("aria-hidden", "true");
 
-  const gridHost = document.createElement("div");
-  gridHost.className = "sheetwrite-shell-grid";
-  gridHost.setAttribute("aria-label", "Spreadsheet grid");
+  const grid_host = document.createElement("div");
+  grid_host.className = "sheetwrite-shell-grid";
+  grid_host.setAttribute("aria-label", "Spreadsheet grid");
 
-  const bottomRow = document.createElement("div");
-  bottomRow.className = "sheetwrite-shell-row sheetwrite-shell-bottom-row";
+  const bottom_row = document.createElement("div");
+  bottom_row.className = "sheetwrite-shell-row sheetwrite-shell-bottom-row";
 
-  root.append(toolbarRow, formulaRow, gridHost, bottomRow);
+  root.append(toolbar_row, formula_row, grid_host, bottom_row);
   host.appendChild(root);
   // Disposers run in reverse: grid listeners, then the pieces, the grid, and the root last.
   const lifetime = new Scope();
@@ -199,14 +199,14 @@ export function createSpreadsheetShell(
 
   // Seed the widget CSS custom properties on the shell root so chrome outside
   // the grid host (toolbar/formula/bottom rows) themes identically.
-  let baseTheme: Theme = { ...DEFAULT_THEME, ...options.grid.theme };
-  seedWidgetTheme(root, baseTheme);
+  let base_theme: Theme = { ...DEFAULT_THEME, ...options.grid.theme };
+  seedWidgetTheme(root, base_theme);
 
   let controller: GridController;
   try {
     controller = createGridController(
-      gridHost,
-      { ...options.grid, config: shellGridConfig(options.grid.config) },
+      grid_host,
+      { ...options.grid, config: shell_grid_config(options.grid.config) },
       {
         onGridChange: (event) => options.onChange?.(event),
         onSelectionChange: (selection) => options.onSelectionChange?.(selection),
@@ -228,92 +228,92 @@ export function createSpreadsheetShell(
   // The shell's own chrome honours the grid's glyph overrides and command
   // flags, like the grid's built-in chrome. The shell toolbar shows Export
   // unless the config turns it off.
-  const gridConfig = options.grid.config ?? {};
+  const grid_config = options.grid.config ?? {};
   const chrome: ShellChromeOptions = {
-    focusGrid: () => gridHost.focus(),
+    focusGrid: () => grid_host.focus(),
     items: options.toolbar,
-    flags: { export: true, ...gridConfig },
-    icons: gridConfig.icons,
+    flags: { export: true, ...grid_config },
+    icons: grid_config.icons,
   };
-  const focusGrid = chrome.focusGrid;
+  const focus_grid = chrome.focusGrid;
 
   const toolbar = options.ribbon
-    ? mountRibbon(
-        toolbarRow,
+    ? mount_ribbon(
+        toolbar_row,
         grid,
-        { ...chrome, flags: gridConfig },
+        { ...chrome, flags: grid_config },
         typeof options.ribbon === "object" ? options.ribbon : {},
       )
-    : mountToolbar(toolbarRow, grid, chrome);
+    : mount_toolbar(toolbar_row, grid, chrome);
   lifetime.add(() => toolbar.destroy());
-  const nameBox = createNameBox(formulaRow, grid, { focusGrid });
-  lifetime.add(() => nameBox.destroy());
-  formulaRow.appendChild(fx);
-  const formulaBar = createFormulaBar(formulaRow, grid, { focusGrid });
-  lifetime.add(() => formulaBar.destroy());
-  let readOnly = options.grid.readOnly ?? false;
-  formulaBar.setReadOnly(readOnly);
+  const name_box = createNameBox(formula_row, grid, { focusGrid: focus_grid });
+  lifetime.add(() => name_box.destroy());
+  formula_row.appendChild(fx);
+  const formula_bar = createFormulaBar(formula_row, grid, { focusGrid: focus_grid });
+  lifetime.add(() => formula_bar.destroy());
+  let read_only = options.grid.readOnly ?? false;
+  formula_bar.setReadOnly(read_only);
 
-  let tabsEnabled = options.grid.config?.tabs !== false;
-  let tabHost: HTMLDivElement | null = null;
+  let tabs_enabled = options.grid.config?.tabs !== false;
+  let tab_host: HTMLDivElement | null = null;
   let tabs: SheetTabs | null = null;
   lifetime.add(() => tabs?.destroy());
   // The tab strip's own width sets its floor beside the status (shell.css):
   // half the row, or its own width if that is less. Measured once a frame at
   // most, after the tabs change or the strip is resized.
-  let measureFrame = 0;
-  const measureTabs = (): void => {
-    measureFrame = 0;
-    tabHost?.style.setProperty("--sheetwrite-shell-tabs-width", `${tabHost.scrollWidth}px`);
+  let measure_frame = 0;
+  const measure_tabs = (): void => {
+    measure_frame = 0;
+    tab_host?.style.setProperty("--sheetwrite-shell-tabs-width", `${tab_host.scrollWidth}px`);
   };
-  const scheduleMeasure = (): void => {
-    if (measureFrame === 0) measureFrame = requestAnimationFrame(measureTabs);
+  const schedule_measure = (): void => {
+    if (measure_frame === 0) measure_frame = requestAnimationFrame(measure_tabs);
   };
   lifetime.add(() => {
-    if (measureFrame !== 0) cancelAnimationFrame(measureFrame);
+    if (measure_frame !== 0) cancelAnimationFrame(measure_frame);
   });
-  const tabsResized =
-    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasure);
-  lifetime.add(() => tabsResized?.disconnect());
-  const createTabs = (): void => {
-    if (!tabsEnabled || tabs) return;
-    tabHost = document.createElement("div");
-    tabHost.className = "sheetwrite-shell-tabs";
-    bottomRow.prepend(tabHost);
-    tabsResized?.observe(tabHost);
-    tabs = new SheetTabs(tabHost, {
+  const tabs_resized =
+    typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule_measure);
+  lifetime.add(() => tabs_resized?.disconnect());
+  const create_tabs = (): void => {
+    if (!tabs_enabled || tabs) return;
+    tab_host = document.createElement("div");
+    tab_host.className = "sheetwrite-shell-tabs";
+    bottom_row.prepend(tab_host);
+    tabs_resized?.observe(tab_host);
+    tabs = new SheetTabs(tab_host, {
       onActivate: (id) => grid.setActiveSheet(id),
-      focusSheet: focusGrid,
+      focusSheet: focus_grid,
       onAdd: (index) => insertSheet(grid, index),
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
-      onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
+      onMove: (id, to_index) => grid.moveSheet(id, to_index),
       // The same chunk Grid loads for its own tab bar.
       onCommand: (command, id) =>
-        void import("../sheet-tab-panels.js").then(({ openTabPanel }) => {
-          if (tabs) openTabPanel(grid, tabs, command, id);
+        void import("../sheet-tab-panels.js").then(({ openTabPanel: open_tab_panel }) => {
+          if (tabs) open_tab_panel(grid, tabs, command, id);
         }),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
       icons: () => chrome.icons,
     });
-    tabs.setReadOnly(readOnly);
+    tabs.setReadOnly(read_only);
   };
-  const refreshTabs = (): void => {
-    if (!tabsEnabled) {
+  const refresh_tabs = (): void => {
+    if (!tabs_enabled) {
       tabs?.destroy();
       tabs = null;
-      tabHost?.remove();
-      tabHost = null;
+      tab_host?.remove();
+      tab_host = null;
       return;
     }
-    createTabs();
+    create_tabs();
     tabs?.update(grid.store.getWorkbook().sheets, grid.getActiveSheet());
-    scheduleMeasure();
+    schedule_measure();
   };
-  refreshTabs();
+  refresh_tabs();
 
-  const status = createSelectionStatus(bottomRow, grid);
+  const status = createSelectionStatus(bottom_row, grid);
   lifetime.add(() => status.destroy());
 
   // F6 and Shift+F6 move between the shell's parts, as Excel's F6 moves
@@ -322,17 +322,17 @@ export function createSpreadsheetShell(
   // inside the sheet, so F6 is also the sheet's way out. The status bar takes
   // the focus only this way.
   status.element.tabIndex = -1;
-  const regionKey = (event: KeyboardEvent): void => {
+  const region_key = (event: KeyboardEvent): void => {
     if (event.key !== "F6" || event.ctrlKey || event.metaKey || event.altKey) return;
     // The cell editor, the find bar and the grid's dialogs keep their keys.
     const target = event.target;
-    if (target instanceof Node && target !== gridHost && gridHost.contains(target)) return;
-    const regions = [toolbarRow, formulaBar.element, gridHost, tabHost, status.element].filter(
+    if (target instanceof Node && target !== grid_host && grid_host.contains(target)) return;
+    const regions = [toolbar_row, formula_bar.element, grid_host, tab_host, status.element].filter(
       (region): region is HTMLElement => region !== null,
     );
     const at = regions.findIndex((region) => region.contains(document.activeElement));
     const step = event.shiftKey ? -1 : 1;
-    const from = at === -1 ? regions.indexOf(gridHost) : at;
+    const from = at === -1 ? regions.indexOf(grid_host) : at;
     for (let offset = 1; offset < regions.length; offset++) {
       const index = (((from + step * offset) % regions.length) + regions.length) % regions.length;
       const region = regions[index];
@@ -346,13 +346,13 @@ export function createSpreadsheetShell(
     event.preventDefault();
     event.stopPropagation();
   };
-  root.addEventListener("keydown", regionKey, true);
-  lifetime.add(() => root.removeEventListener("keydown", regionKey, true));
-  lifetime.add(grid.on("active-sheet", () => refreshTabs()));
+  root.addEventListener("keydown", region_key, true);
+  lifetime.add(() => root.removeEventListener("keydown", region_key, true));
+  lifetime.add(grid.on("active-sheet", () => refresh_tabs()));
   // A tab update closes an open tab menu; a collaborator's cell edit must not.
   lifetime.add(
     grid.on("change", (event) => {
-      if (event.transaction.patches.some(changesSheetTabs)) refreshTabs();
+      if (event.transaction.patches.some(changesSheetTabs)) refresh_tabs();
     }),
   );
 
@@ -361,22 +361,22 @@ export function createSpreadsheetShell(
     element: root,
 
     setTheme(theme: Partial<Theme>) {
-      baseTheme = { ...baseTheme, ...theme };
-      seedWidgetTheme(root, baseTheme);
+      base_theme = { ...base_theme, ...theme };
+      seedWidgetTheme(root, base_theme);
       controller.setTheme(theme);
     },
 
-    setReadOnly(nextReadOnly: boolean) {
-      readOnly = nextReadOnly;
-      controller.setReadOnly(nextReadOnly);
-      formulaBar.setReadOnly(nextReadOnly);
-      tabs?.setReadOnly(nextReadOnly);
+    setReadOnly(next_read_only: boolean) {
+      read_only = next_read_only;
+      controller.setReadOnly(next_read_only);
+      formula_bar.setReadOnly(next_read_only);
+      tabs?.setReadOnly(next_read_only);
     },
 
     setGridConfig(config: GridConfig | undefined) {
-      tabsEnabled = config?.tabs !== false;
-      controller.setConfig(shellGridConfig(config));
-      refreshTabs();
+      tabs_enabled = config?.tabs !== false;
+      controller.setConfig(shell_grid_config(config));
+      refresh_tabs();
     },
 
     setActiveSheet(id: SheetId) {

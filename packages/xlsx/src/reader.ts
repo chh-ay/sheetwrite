@@ -27,10 +27,10 @@ import { expandSharedFormulas, type SharedFormulaGroup } from "./shared-formula.
 import { xmlChild } from "./xml.js";
 
 /** Excel links customXml items from the workbook part; other writers may link them from the root. */
-function hasCustomXml(packageFile: OpcPackage): boolean {
+function has_custom_xml(package_file: OpcPackage): boolean {
   return [
-    ...packageFile.relationships(packageFile.officeDocumentPart()),
-    ...packageFile.relationships(""),
+    ...package_file.relationships(package_file.officeDocumentPart()),
+    ...package_file.relationships(""),
   ].some(
     (relationship) =>
       !relationship.external && relationshipTypeMatches(relationship.type, "customXml"),
@@ -42,15 +42,15 @@ function hasCustomXml(packageFile: OpcPackage): boolean {
  * spelling, in one engine session. A workbook without formulas leaves the
  * engine unloaded.
  */
-async function importWorkbookFormulas(
+async function import_workbook_formulas(
   snapshot: WorkbookSnapshot,
-  sharedFormulas: readonly SharedFormulaGroup[],
+  shared_formulas: readonly SharedFormulaGroup[],
   context: XlsxCodecContext,
 ): Promise<void> {
-  if (sharedFormulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
+  if (shared_formulas.length === 0 && workbookFormulaSources(snapshot).length === 0) return;
 
   const converted = await withXlsxFormulaEngine((engine) => {
-    expandSharedFormulas(engine, sharedFormulas, context);
+    expandSharedFormulas(engine, shared_formulas, context);
     return convertFormulaSources(engine, workbookFormulaSources(snapshot), "import");
   });
   for (const sheet of snapshot.sheets) {
@@ -71,73 +71,77 @@ async function importWorkbookFormulas(
   }
 }
 
-async function workbookDataModel(
+async function workbook_data_model(
   loaded: LoadedWorkbookPackage,
   metadata: WorkbookSnapshot | null,
   sheets: readonly SheetSnapshot[],
   context: XlsxCodecContext,
 ) {
-  const { packageFile, workbookRoot, workbookRelationships } = loaded;
+  const {
+    packageFile: package_file,
+    workbookRoot: workbook_root,
+    workbookRelationships: workbook_relationships,
+  } = loaded;
   // Sheetwrite's own metadata holds relationships by stable IDs; a file
   // without it may hold Excel's data model relationships.
-  let dataModel = metadata?.workbook.dataModel;
-  if (dataModel === undefined && hasExcelDataModel(workbookRoot)) {
-    const connectionsPart = workbookRelationships.find(
+  let data_model = metadata?.workbook.dataModel;
+  if (data_model === undefined && hasExcelDataModel(workbook_root)) {
+    const connections_part = workbook_relationships.find(
       (relationship) =>
         relationshipTypeMatches(relationship.type, "connections") && !relationship.external,
     )?.target;
     // A relationship can name a part the package lacks; such a file has no connections to read.
     const readable =
-      connectionsPart !== undefined && packageFile.contentType(connectionsPart) !== undefined;
-    if (readable) await packageFile.load([connectionsPart]);
-    const connections = readable ? packageFile.readXml(connectionsPart) : undefined;
-    if (readable) packageFile.release([connectionsPart]);
-    dataModel = readExcelDataModel(workbookRoot, connections, sheets, context);
+      connections_part !== undefined && package_file.contentType(connections_part) !== undefined;
+    if (readable) await package_file.load([connections_part]);
+    const connections = readable ? package_file.readXml(connections_part) : undefined;
+    if (readable) package_file.release([connections_part]);
+    data_model = readExcelDataModel(workbook_root, connections, sheets, context);
   }
-  return dataModel;
+  return data_model;
 }
 
-async function loadWorkbookObjects(
+async function load_workbook_objects(
   loaded: LoadedWorkbookPackage,
   snapshot: WorkbookSnapshot,
-  sourceReferences: readonly WorkbookSheetReference[],
+  source_references: readonly WorkbookSheetReference[],
   metadata: WorkbookSnapshot | null,
   context: XlsxCodecContext,
-  readOptions: { readonly preserveOpaqueParts?: boolean },
+  read_options: { readonly preserveOpaqueParts?: boolean },
 ): Promise<void> {
-  const { packageFile, styles, externalLinks } = loaded;
-  const sheetParts = sourceReferences.map((reference) => reference.relationship.target);
-  const modelledPivotParts = await readPivots(
-    packageFile,
+  const { packageFile: package_file, styles, externalLinks: external_links } = loaded;
+  const sheet_parts = source_references.map((reference) => reference.relationship.target);
+  const modelled_pivot_parts = await readPivots(
+    package_file,
     {
       snapshot,
-      sheetParts,
+      sheetParts: sheet_parts,
       metadata,
       extendSheet,
-      numberFormat: (numFmtId) => styles.numberFormat(numFmtId),
+      numberFormat: (num_fmt_id) => styles.numberFormat(num_fmt_id),
     },
     context,
   );
-  const chartParts = await readCharts(
-    packageFile,
-    { snapshot, sheetParts, metadata: metadata ?? undefined, extendSheet },
+  const chart_parts = await readCharts(
+    package_file,
+    { snapshot, sheetParts: sheet_parts, metadata: metadata ?? undefined, extendSheet },
     context,
   );
-  if (readOptions.preserveOpaqueParts !== false)
+  if (read_options.preserveOpaqueParts !== false)
     await capturePreserved(
-      packageFile,
+      package_file,
       snapshot,
       context,
-      new Set([...modelledPivotParts, ...chartParts.modelled]),
-      chartParts.replacements,
-      externalLinks.parts,
+      new Set([...modelled_pivot_parts, ...chart_parts.modelled]),
+      chart_parts.replacements,
+      external_links.parts,
     );
   // The Power Query module loads only for workbooks that can hold queries:
   // saved definitions in the hidden metadata, or a customXml item.
-  const sidecarQueries = metadata?.workbook.queries;
-  if (sidecarQueries?.length || hasCustomXml(packageFile)) {
-    const { readPowerQuery } = await import("./power-query.js");
-    await readPowerQuery(packageFile, snapshot, sidecarQueries, context);
+  const sidecar_queries = metadata?.workbook.queries;
+  if (sidecar_queries?.length || has_custom_xml(package_file)) {
+    const { readPowerQuery: read_power_query } = await import("./power-query.js");
+    await read_power_query(package_file, snapshot, sidecar_queries, context);
   }
 }
 
@@ -148,57 +152,58 @@ export async function readWorkbook(
   readOptions: { readonly preserveOpaqueParts?: boolean } = {},
 ): Promise<WorkbookSnapshot> {
   const loaded = await loadWorkbookPackage(data, context);
-  const { workbookRoot, externalLinks } = loaded;
-  const { references, sourceReferences, sourceSheets, metadata } = await readSourceSheets(
-    loaded,
-    context,
-  );
-
-  const { sheets, sheetIds, resolvedMetadata } = buildWorkbookSheets(
-    sourceSheets,
+  const { workbookRoot: workbook_root, externalLinks: external_links } = loaded;
+  const {
+    references,
+    sourceReferences: source_references,
+    sourceSheets: source_sheets,
     metadata,
-    loaded.styles,
-    context,
-  );
-  const activeSheet = workbookActiveSheet(workbookRoot, references, sourceReferences, sheets);
-  const nativeNamedRanges = parseNativeDefinedNames(
-    workbookRoot,
-    sheetIds,
-    sourceReferences,
-    context,
-  );
-  const namedRanges = xmlChild(workbookRoot, "definedNames")
-    ? nativeNamedRanges
-    : metadata?.workbook.namedRanges;
-  reconcileDefinedNames(namedRanges, sheets, context);
+  } = await readSourceSheets(loaded, context);
 
-  const calculation = workbookCalculation(workbookRoot);
-  const dataModel = await workbookDataModel(loaded, metadata, sheets, context);
+  const {
+    sheets,
+    sheetIds: sheet_ids,
+    resolvedMetadata: resolved_metadata,
+  } = buildWorkbookSheets(source_sheets, metadata, loaded.styles, context);
+  const active_sheet = workbookActiveSheet(workbook_root, references, source_references, sheets);
+  const native_named_ranges = parseNativeDefinedNames(
+    workbook_root,
+    sheet_ids,
+    source_references,
+    context,
+  );
+  const named_ranges = xmlChild(workbook_root, "definedNames")
+    ? native_named_ranges
+    : metadata?.workbook.namedRanges;
+  reconcileDefinedNames(named_ranges, sheets, context);
+
+  const calculation = workbookCalculation(workbook_root);
+  const data_model = await workbook_data_model(loaded, metadata, sheets, context);
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     ...(metadata?.documentId ? { documentId: metadata.documentId } : {}),
     ...(metadata?.version !== undefined ? { version: metadata.version } : {}),
     workbook: {
-      activeSheet,
-      ...(namedRanges?.length ? { namedRanges: structuredClone(namedRanges) } : {}),
+      activeSheet: active_sheet,
+      ...(named_ranges?.length ? { namedRanges: structuredClone(named_ranges) } : {}),
       ...(calculation ? { calculation } : {}),
       // A model with only measures is still a model.
-      ...(dataModel?.relationships.length || dataModel?.measures?.length
-        ? { dataModel: structuredClone(dataModel) }
+      ...(data_model?.relationships.length || data_model?.measures?.length
+        ? { dataModel: structuredClone(data_model) }
         : {}),
-      ...(externalLinks.links.length ? { externalLinks: externalLinks.links } : {}),
+      ...(external_links.links.length ? { externalLinks: external_links.links } : {}),
     },
     sheets,
   };
 
-  await importWorkbookFormulas(
+  await import_workbook_formulas(
     snapshot,
-    sourceSheets.flatMap((source) => source.sharedFormulas),
+    source_sheets.flatMap((source) => source.sharedFormulas),
     context,
   );
-  restoreSidecarFields(snapshot, resolvedMetadata);
+  restoreSidecarFields(snapshot, resolved_metadata);
 
-  await loadWorkbookObjects(loaded, snapshot, sourceReferences, metadata, context, readOptions);
+  await load_workbook_objects(loaded, snapshot, source_references, metadata, context, readOptions);
 
   const checked = validateReadSnapshot(snapshot, context);
   if (!checked.ok) {

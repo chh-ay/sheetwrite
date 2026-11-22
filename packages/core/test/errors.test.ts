@@ -19,9 +19,9 @@ import { createRowBridge } from "../src/row-bridge.js";
 import type { Workbook } from "../src/types/document.js";
 
 const MAX_ERROR_TEXT_BYTES = 8 * 1024;
-const utf8Bytes = (text: string): number => new TextEncoder().encode(text).length;
+const utf8_bytes = (text: string): number => new TextEncoder().encode(text).length;
 
-function thrownBy(run: () => unknown): unknown {
+function thrown_by(run: () => unknown): unknown {
   try {
     run();
   } catch (error) {
@@ -71,7 +71,7 @@ describe("SheetwriteError", () => {
 
 describe("isSheetwriteError", () => {
   it("rejects values without the failure shape", () => {
-    const throwingProxy = new Proxy(
+    const throwing_proxy = new Proxy(
       {},
       {
         get() {
@@ -79,7 +79,7 @@ describe("isSheetwriteError", () => {
         },
       },
     );
-    const lookAlikes: unknown[] = [
+    const look_alikes: unknown[] = [
       null,
       "SheetwriteError",
       new Error("plain"),
@@ -102,10 +102,10 @@ describe("isSheetwriteError", () => {
         operation: "store",
         context: { owner: new Map() },
       },
-      throwingProxy,
+      throwing_proxy,
     ];
 
-    for (const value of lookAlikes) expect(isSheetwriteError(value)).toBe(false);
+    for (const value of look_alikes) expect(isSheetwriteError(value)).toBe(false);
   });
 });
 
@@ -120,16 +120,16 @@ describe("SheetwriteError size", () => {
   });
 
   it("cuts host text in the message and context to 8 KiB", () => {
-    const hostText = `start${"é".repeat(50_000)}end`;
-    const failure = new SheetwriteError("not-found", "store", hostText, {
-      context: { first: hostText, second: hostText, count: 3 },
+    const host_text = `start${"é".repeat(50_000)}end`;
+    const failure = new SheetwriteError("not-found", "store", host_text, {
+      context: { first: host_text, second: host_text, count: 3 },
     });
     const context = failure.context as { first: string; second: string; count: number };
 
-    expect(utf8Bytes(failure.message)).toBeLessThanOrEqual(MAX_ERROR_TEXT_BYTES);
+    expect(utf8_bytes(failure.message)).toBeLessThanOrEqual(MAX_ERROR_TEXT_BYTES);
     expect(failure.message.startsWith("start")).toBe(true);
     expect(failure.message.endsWith("end")).toBe(true);
-    expect(utf8Bytes(context.first) + utf8Bytes(context.second)).toBeLessThanOrEqual(
+    expect(utf8_bytes(context.first) + utf8_bytes(context.second)).toBeLessThanOrEqual(
       MAX_ERROR_TEXT_BYTES,
     );
     expect(context.count).toBe(3);
@@ -203,7 +203,7 @@ describe("typed failures on public paths", () => {
     ];
 
     for (const [run, code, operation] of cases) {
-      const failure = thrownBy(run);
+      const failure = thrown_by(run);
       expect(failure).toBeInstanceOf(SheetwriteError);
       expect(failure).toMatchObject({ code, operation });
     }

@@ -11,10 +11,10 @@ import type { Grid, SheetwriteAddonSettings } from "./types/grid.js";
 // adds bytes to the first chunk.
 
 /** XLSX parts given during setup that are still being written to their slots. */
-const pendingXlsx: Promise<void>[] = [];
+const pending_xlsx: Promise<void>[] = [];
 
 /** Core's page-wide registration methods, which write the chart and XLSX backends. */
-const setupContext: SheetwriteAddonContext = {
+const setup_context: SheetwriteAddonContext = {
   charts(parts) {
     setChartViewProviderFactory(parts.views);
     setChartRendererFactory(parts.renderer);
@@ -27,7 +27,7 @@ const setupContext: SheetwriteAddonContext = {
 
       if (parts.tableExport) slots.setXlsxTableExportBackend(parts.tableExport);
     });
-    pendingXlsx.push(written);
+    pending_xlsx.push(written);
   },
 };
 
@@ -53,10 +53,10 @@ export class AddonRegistry {
    * kept, so repeated `initSheetwrite` calls are no-ops for it.
    */
   async install(addons: readonly SheetwriteAddon[]): Promise<void> {
-    const listedNames = new Set<string>();
+    const listed_names = new Set<string>();
 
     for (const addon of addons) {
-      if (listedNames.has(addon.name)) {
+      if (listed_names.has(addon.name)) {
         throw new SheetwriteError(
           "invalid-argument",
           "initialize",
@@ -65,18 +65,18 @@ export class AddonRegistry {
         );
       }
 
-      listedNames.add(addon.name);
+      listed_names.add(addon.name);
     }
 
     for (const addon of addons) {
       if (this.installed.has(addon.name)) continue;
 
-      addon.setup?.(setupContext);
+      addon.setup?.(setup_context);
       this.installed.set(addon.name, addon);
     }
 
     // `initSheetwrite` resolves once every XLSX part is in its slot.
-    await Promise.all(pendingXlsx.splice(0));
+    await Promise.all(pending_xlsx.splice(0));
   }
 
   /** Whether an add-on with this name is installed. */

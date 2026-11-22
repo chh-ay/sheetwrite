@@ -26,7 +26,7 @@ export function formulaHeadingTargets(
   formulaPages: readonly FormulaReferencePage[],
 ): Record<string, string> {
   const targets: Record<string, string> = {};
-  const overviewAnchors = headingAnchors(
+  const overview_anchors = headingAnchors(
     formulaPages.find((page) => page.route === FORMULA_OVERVIEW_ROUTE)?.content ?? "",
   );
   const holders = new Map<string, string[]>();
@@ -34,24 +34,24 @@ export function formulaHeadingTargets(
     if (page.route === FORMULA_OVERVIEW_ROUTE) continue;
     const href = `/docs/${page.route.replace(/\.md$/, "/")}`;
     for (const heading of headingAnchors(page.content)) {
-      if (overviewAnchors.has(heading)) continue;
+      if (overview_anchors.has(heading)) continue;
       holders.set(heading, [...(holders.get(heading) ?? []), `${href}#${heading}`]);
     }
   }
-  for (const [heading, headingTargets] of holders) {
-    if (headingTargets.length === 1 && headingTargets[0] !== undefined)
-      targets[heading] = headingTargets[0];
+  for (const [heading, heading_targets] of holders) {
+    if (heading_targets.length === 1 && heading_targets[0] !== undefined)
+      targets[heading] = heading_targets[0];
   }
   // The old single-page table used a heading for each family's title.
   for (const family of formulaFamilyNavigation(formulaPages)) {
-    const oldHeading = [...headingAnchors(`### ${family.label}`)][0];
-    if (oldHeading !== undefined) targets[oldHeading] = family.href;
+    const old_heading = [...headingAnchors(`### ${family.label}`)][0];
+    if (old_heading !== undefined) targets[old_heading] = family.href;
   }
   return targets;
 }
 
 /** The API package links of the sidebar, one per package with an entry point. */
-function apiNavigation(manifest: PublicApiManifest): { label: string; href: string }[] {
+function api_navigation(manifest: PublicApiManifest): { label: string; href: string }[] {
   return manifest.packages.map((pkg) => ({
     label: pkg.name,
     href: `/docs/api/${entrySlug(pkg.name, ".")}/`,
@@ -64,7 +64,10 @@ export function siteDataFiles(
   formulaPages: readonly FormulaReferencePage[],
 ): ExpectedFile[] {
   return [
-    { path: join(generatedDataRoot, "api-nav.json"), content: stableJson(apiNavigation(manifest)) },
+    {
+      path: join(generatedDataRoot, "api-nav.json"),
+      content: stableJson(api_navigation(manifest)),
+    },
     {
       path: join(generatedDataRoot, "formula-heading-targets.json"),
       content: stableJson(formulaHeadingTargets(formulaPages)),

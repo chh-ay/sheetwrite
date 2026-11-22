@@ -49,20 +49,20 @@ export function computeColumnWindow(
 
   const left = Math.max(0, scrollLeft);
   const right = left + Math.max(0, viewportWidth);
-  const firstColumn = index.columnAtX(left);
-  const lastColumn = index.columnAtX(right);
+  const first_column = index.columnAtX(left);
+  const last_column = index.columnAtX(right);
   let first = 0;
-  if (firstColumn === -1) {
+  if (first_column === -1) {
     if (left >= index.totalWidth) first = count - 1;
   } else {
-    first = index.positionOf(firstColumn);
+    first = index.positionOf(first_column);
   }
 
   let last = 0;
-  if (lastColumn === -1) {
+  if (last_column === -1) {
     if (right >= index.totalWidth) last = count - 1;
   } else {
-    last = index.positionOf(lastColumn);
+    last = index.positionOf(last_column);
   }
   const start = Math.max(0, first - overscan);
   const end = Math.min(count, last + 1 + overscan);

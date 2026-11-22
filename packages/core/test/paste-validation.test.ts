@@ -24,10 +24,10 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   let items: FakeClipboardItem[] = [];
   let text = "";
   Object.defineProperty(globalThis, "ClipboardItem", {
@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -68,33 +68,37 @@ const regions: DataValidationRule = {
   policy: "reject",
 };
 
-function mount(keepValidation = false) {
+function mount(keep_validation = false) {
   const workbook = makeWorkbook(10);
   workbook.sheets[0]!.validationRules = [regions];
   const store = new SheetwriteStore(workbook, makeColumnarData(10));
   const host = mountHost();
-  const grid = new GridImpl(host, { workbook, config: { paste: { keepValidation } } }, store);
+  const grid = new GridImpl(
+    host,
+    { workbook, config: { paste: { keepValidation: keep_validation } } },
+    store,
+  );
   const rules = () => store.getWorkbook().sheets[0]?.validationRules ?? [];
   const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col }).resolved;
-  const copyAndPaste = async (from: Range, to: Range): Promise<void> => {
+  const copy_and_paste = async (from: Range, to: Range): Promise<void> => {
     grid.setSelection({ kind: "range", range: from });
     await grid.actions.copy();
     grid.setSelection({ kind: "range", range: to });
     await grid.actions.paste();
   };
-  return { grid, store, host, rules, cell, copyAndPaste };
+  return { grid, store, host, rules, cell, copyAndPaste: copy_and_paste };
 }
 
 describe("paste and data validation", () => {
   it("lands the values and gives the cells the copied cells' rules, as Excel does", async () => {
-    const { grid, store, rules, cell, copyAndPaste } = mount();
+    const { grid, store, rules, cell, copyAndPaste: copy_and_paste } = mount();
     // A2 (no rule) over C4: the value lands and C4 leaves the list rule.
-    await copyAndPaste(range(1, 0, 1, 0), range(3, 2, 3, 2));
+    await copy_and_paste(range(1, 0, 1, 0), range(3, 2, 3, 2));
     expect(cell(3, 2)).toBe("Customer 1");
     expect(rules().map((rule) => rule.range)).toEqual([range(0, 2, 2, 2), range(4, 2, 9, 2)]);
 
     // C5 (with the rule) over B1: B1 gets the rule.
-    await copyAndPaste(range(4, 2, 4, 2), range(0, 1, 0, 1));
+    await copy_and_paste(range(4, 2, 4, 2), range(0, 1, 0, 1));
     expect(rules().find((rule) => rule.range.start.col === 1)).toMatchObject({
       range: range(0, 1, 0, 1),
       condition: regions.condition,
@@ -120,8 +124,8 @@ describe("paste and data validation", () => {
   });
 
   it("keeps the rules with paste.keepValidation and names the refused cells", async () => {
-    const { grid, store, host, rules, cell, copyAndPaste } = mount(true);
-    await copyAndPaste(range(1, 0, 4, 0), range(1, 2, 4, 2));
+    const { grid, store, host, rules, cell, copyAndPaste: copy_and_paste } = mount(true);
+    await copy_and_paste(range(1, 0, 4, 0), range(1, 2, 4, 2));
     expect(rules()).toEqual([regions]);
     expect([1, 2, 3, 4].map((row) => cell(row, 2))).toEqual([
       "Tokyo",

@@ -29,18 +29,18 @@ export interface DataModelIssueSink {
   push(...issues: DataModelIssue[]): number;
 }
 
-function isBoundedId(value: unknown, max: number): value is string {
+function is_bounded_id(value: unknown, max: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= max;
 }
 
-function validateColumnRefShape(value: unknown, path: string, issues: DataModelIssueSink): void {
+function validate_column_ref_shape(value: unknown, path: string, issues: DataModelIssueSink): void {
   if (!isPlainRecord(value)) {
     issues.push({ path, code: "invalid-value", message: `${path} must be an object` });
     return;
   }
 
   for (const key of ["table", "column"]) {
-    if (!isBoundedId(ownValue(value, key), MAX_REFERENCE_ID_LENGTH)) {
+    if (!is_bounded_id(ownValue(value, key), MAX_REFERENCE_ID_LENGTH)) {
       issues.push({
         path: `${path}.${key}`,
         code: "invalid-value",
@@ -61,7 +61,7 @@ export function validateRelationshipShape(
     return;
   }
 
-  if (!isBoundedId(ownValue(value, "id"), MAX_RELATIONSHIP_ID_LENGTH)) {
+  if (!is_bounded_id(ownValue(value, "id"), MAX_RELATIONSHIP_ID_LENGTH)) {
     issues.push({
       path: `${path}.id`,
       code: "invalid-value",
@@ -69,12 +69,12 @@ export function validateRelationshipShape(
     });
   }
 
-  validateColumnRefShape(ownValue(value, "from"), `${path}.from`, issues);
-  validateColumnRefShape(ownValue(value, "to"), `${path}.to`, issues);
+  validate_column_ref_shape(ownValue(value, "from"), `${path}.from`, issues);
+  validate_column_ref_shape(ownValue(value, "to"), `${path}.to`, issues);
 }
 
 /** Key of the unordered pair of tables that a relationship joins. */
-function tablePairKey(relationship: TableRelationship): string {
+function table_pair_key(relationship: TableRelationship): string {
   const { from, to } = relationship;
   return from.table < to.table
     ? JSON.stringify([from.table, to.table])
@@ -82,7 +82,7 @@ function tablePairKey(relationship: TableRelationship): string {
 }
 
 /** The root of `table` in a union-find forest, with path halving. */
-function findRoot(parents: Map<string, string>, table: string): string {
+function find_root(parents: Map<string, string>, table: string): string {
   let current = table;
   let parent = parents.get(current) ?? current;
   while (parent !== current) {
@@ -100,7 +100,7 @@ function findRoot(parents: Map<string, string>, table: string): string {
  * direction is ignored. The last rule gives one path between two related
  * tables, so a pivot never chooses between paths.
  */
-function validateRelationshipStructure(
+function validate_relationship_structure(
   relationships: readonly TableRelationship[],
   path: string,
   issues: DataModelIssueSink,
@@ -118,10 +118,10 @@ function validateRelationshipStructure(
   const pairs = new Set<string>();
   const parents = new Map<string, string>();
   relationships.forEach((relationship, index) => {
-    const itemPath = `${path}[${index}]`;
+    const item_path = `${path}[${index}]`;
     if (ids.has(relationship.id)) {
       issues.push({
-        path: `${itemPath}.id`,
+        path: `${item_path}.id`,
         code: "duplicate-id",
         message: "Relationship IDs must be unique in the workbook",
       });
@@ -130,17 +130,17 @@ function validateRelationshipStructure(
 
     if (relationship.from.table === relationship.to.table) {
       issues.push({
-        path: itemPath,
+        path: item_path,
         code: "invalid-value",
         message: "A relationship must join two different tables",
       });
       return;
     }
 
-    const pair = tablePairKey(relationship);
+    const pair = table_pair_key(relationship);
     if (pairs.has(pair)) {
       issues.push({
-        path: itemPath,
+        path: item_path,
         code: "invalid-value",
         message: "At most one relationship may join two tables",
       });
@@ -148,17 +148,17 @@ function validateRelationshipStructure(
     }
     pairs.add(pair);
 
-    const fromRoot = findRoot(parents, relationship.from.table);
-    const toRoot = findRoot(parents, relationship.to.table);
-    if (fromRoot === toRoot) {
+    const from_root = find_root(parents, relationship.from.table);
+    const to_root = find_root(parents, relationship.to.table);
+    if (from_root === to_root) {
       issues.push({
-        path: itemPath,
+        path: item_path,
         code: "invalid-value",
         message: "Relationships must not form a cycle between tables",
       });
       return;
     }
-    parents.set(fromRoot, toRoot);
+    parents.set(from_root, to_root);
   });
 }
 
@@ -175,14 +175,14 @@ export function validateDataModelShape(
 
   const measures = ownValue(value, "measures");
   if (measures !== undefined) {
-    validateMeasures(measures, `${path}.measures`, issues);
+    validate_measures(measures, `${path}.measures`, issues);
   }
 
-  const relationshipsPath = `${path}.relationships`;
+  const relationships_path = `${path}.relationships`;
   const relationships = ownValue(value, "relationships");
   if (!Array.isArray(relationships)) {
     issues.push({
-      path: relationshipsPath,
+      path: relationships_path,
       code: "invalid-value",
       message: "relationships must be an array",
     });
@@ -191,28 +191,28 @@ export function validateDataModelShape(
 
   if (relationships.length > MAX_RELATIONSHIPS) {
     issues.push({
-      path: relationshipsPath,
+      path: relationships_path,
       code: "resource-limit",
       message: `Workbook relationship limit ${MAX_RELATIONSHIPS} exceeded`,
     });
     return;
   }
 
-  const shapeIssues: DataModelIssue[] = [];
+  const shape_issues: DataModelIssue[] = [];
   relationships.forEach((entry, index) => {
-    validateRelationshipShape(entry, `${relationshipsPath}[${index}]`, shapeIssues);
+    validateRelationshipShape(entry, `${relationships_path}[${index}]`, shape_issues);
   });
-  if (shapeIssues.length > 0) {
-    issues.push(...shapeIssues);
+  if (shape_issues.length > 0) {
+    issues.push(...shape_issues);
     return;
   }
 
   // The shape checks above prove every entry is a relationship.
-  validateRelationshipStructure(relationships as TableRelationship[], relationshipsPath, issues);
+  validate_relationship_structure(relationships as TableRelationship[], relationships_path, issues);
 }
 
 /** Whether `ref` names an existing table and one of its columns. */
-function columnExists(sheets: readonly Sheet[], ref: TableColumnRef): boolean {
+function column_exists(sheets: readonly Sheet[], ref: TableColumnRef): boolean {
   for (const sheet of sheets) {
     const table = sheet.tables?.find((candidate) => candidate.id === ref.table);
     if (table) return table.columns.some((column) => column.id === ref.column);
@@ -233,7 +233,7 @@ export function validateRelationshipAdmission(
   issues: DataModelIssueSink,
 ): void {
   for (const side of ["from", "to"] as const) {
-    if (!columnExists(sheets, relationship[side])) {
+    if (!column_exists(sheets, relationship[side])) {
       issues.push({
         path: `relationship.${side}`,
         code: "missing-reference",
@@ -242,7 +242,7 @@ export function validateRelationshipAdmission(
     }
   }
 
-  validateRelationshipStructure(
+  validate_relationship_structure(
     withRelationship(model, relationship).relationships,
     "dataModel.relationships",
     issues,
@@ -298,8 +298,8 @@ export function findRelationship(
 }
 
 /** Whether `name` can name a measure: not blank, and no `[` or `]`. */
-function isMeasureName(name: unknown): name is string {
-  return isBoundedId(name, MAX_REFERENCE_ID_LENGTH) && name.trim() !== "" && !/[[\]]/u.test(name);
+function is_measure_name(name: unknown): name is string {
+  return is_bounded_id(name, MAX_REFERENCE_ID_LENGTH) && name.trim() !== "" && !/[[\]]/u.test(name);
 }
 
 /** Shape checks for a saved measure; formula parsing belongs to Rust. */
@@ -311,9 +311,9 @@ export function validateMeasureShape(
   const formula = isPlainRecord(value) ? ownValue(value, "formula") : undefined;
   const valid =
     isPlainRecord(value) &&
-    isBoundedId(ownValue(value, "id"), MAX_REFERENCE_ID_LENGTH) &&
-    isBoundedId(ownValue(value, "table"), MAX_REFERENCE_ID_LENGTH) &&
-    isMeasureName(ownValue(value, "name")) &&
+    is_bounded_id(ownValue(value, "id"), MAX_REFERENCE_ID_LENGTH) &&
+    is_bounded_id(ownValue(value, "table"), MAX_REFERENCE_ID_LENGTH) &&
+    is_measure_name(ownValue(value, "name")) &&
     typeof formula === "string" &&
     formula.startsWith("=") &&
     formula.length <= MAX_MEASURE_FORMULA_LENGTH;
@@ -326,7 +326,7 @@ export function validateMeasureShape(
   }
 }
 
-function validateMeasures(value: unknown, path: string, issues: DataModelIssueSink): void {
+function validate_measures(value: unknown, path: string, issues: DataModelIssueSink): void {
   if (!Array.isArray(value) || value.length > MAX_MEASURES) {
     issues.push({ path, code: "resource-limit", message: "Invalid measure list" });
     return;
@@ -334,16 +334,16 @@ function validateMeasures(value: unknown, path: string, issues: DataModelIssueSi
 
   const keys = new Set<string>();
   value.forEach((measure, index) => {
-    const itemPath = `${path}[${index}]`;
+    const item_path = `${path}[${index}]`;
     const before = keys.size;
-    validateMeasureShape(measure, itemPath, issues);
+    validateMeasureShape(measure, item_path, issues);
     if (!isPlainRecord(measure)) return;
 
     // IDs and case-folded names share one set; the prefixes keep them apart.
     keys.add(`id:${String(ownValue(measure, "id"))}`);
     keys.add(`name:${String(ownValue(measure, "name")).toLowerCase()}`);
     if (keys.size !== before + 2) {
-      issues.push({ path: itemPath, code: "duplicate-id", message: "Duplicate measure" });
+      issues.push({ path: item_path, code: "duplicate-id", message: "Duplicate measure" });
     }
   });
 }
@@ -391,7 +391,7 @@ export function validateMeasureAdmission(
   sheets: readonly Sheet[],
   issues: DataModelIssueSink,
 ): void {
-  validateMeasures(withMeasure(model, measure).measures, "dataModel.measures", issues);
+  validate_measures(withMeasure(model, measure).measures, "dataModel.measures", issues);
   const name = measure.name.toLowerCase();
   const table = findTable(sheets, measure.table);
   if (!table || table.columns.some((column) => column.name.toLowerCase() === name)) {

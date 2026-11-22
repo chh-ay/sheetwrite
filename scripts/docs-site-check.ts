@@ -22,8 +22,8 @@ import { join, resolve } from "node:path";
 
 import { SITE_URL } from "../docs/src/lib/seo.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const PUBLISHED_URLS = join(repositoryRoot, "docs/published-urls.txt");
+const repository_root = resolve(import.meta.dir, "..");
+const PUBLISHED_URLS = join(repository_root, "docs/published-urls.txt");
 /** Routes that must never be indexed. */
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\//, /^\/404\/$/];
 /** Fewer characters of main text than this is a page whose content renders only in the browser. */
@@ -93,11 +93,11 @@ interface Answer {
 }
 
 /** Answers a request path the way the host applies `config.json` routes. */
-function routeRequest(routes: readonly Route[], staticRoot: string, pathname: string): Answer {
+function route_request(routes: readonly Route[], static_root: string, pathname: string): Answer {
   for (const route of routes) {
     if ("handle" in route) {
       if (route.handle !== "filesystem") continue;
-      const file = join(staticRoot, decodeURIComponent(pathname));
+      const file = join(static_root, decodeURIComponent(pathname));
       if (existsSync(file) && statSync(file).isFile()) return { status: 200, file };
       continue;
     }
@@ -105,7 +105,7 @@ function routeRequest(routes: readonly Route[], staticRoot: string, pathname: st
     const match = new RegExp(route.src, "i").exec(pathname);
     if (match === null || "continue" in route) continue;
     if ("dest" in route) {
-      return { status: route.status ?? 200, file: join(staticRoot, route.dest) };
+      return { status: route.status ?? 200, file: join(static_root, route.dest) };
     }
     const location = route.headers.Location?.replace(
       /\$(\d)/g,
@@ -136,7 +136,7 @@ interface Page {
 }
 
 /** Reads what a crawler reads from a page's static HTML. */
-async function readPage(path: string, html: string): Promise<Page> {
+async function read_page(path: string, html: string): Promise<Page> {
   const page: Page = {
     path,
     title: "",
@@ -154,11 +154,11 @@ async function readPage(path: string, html: string): Promise<Page> {
     hasMain: false,
     links: [],
   };
-  let inHead = false;
-  let inMain = 0;
-  let inScript = 0;
-  let headTitle = false;
-  let jsonLd: string | null = null;
+  let in_head = false;
+  let in_main = 0;
+  let in_script = 0;
+  let head_title = false;
+  let json_ld: string | null = null;
   const meta = (name: string | null, content: string): void => {
     if (name === "description") page.description = content;
     if (name === "robots") page.robots = content;
@@ -168,23 +168,23 @@ async function readPage(path: string, html: string): Promise<Page> {
     .on("html", { element: (element) => void (page.lang = element.getAttribute("lang") ?? "") })
     .on("head", {
       element(element) {
-        inHead = true;
-        element.onEndTag(() => void (inHead = false));
+        in_head = true;
+        element.onEndTag(() => void (in_head = false));
       },
     })
     .on("title", {
       element(element) {
-        if (!inHead || page.title !== "") return;
-        headTitle = true;
-        element.onEndTag(() => void (headTitle = false));
+        if (!in_head || page.title !== "") return;
+        head_title = true;
+        element.onEndTag(() => void (head_title = false));
       },
       text(text) {
-        if (headTitle) page.title += text.text;
+        if (head_title) page.title += text.text;
       },
     })
     .on("meta", {
       element(element) {
-        if (!inHead) return;
+        if (!in_head) return;
         meta(
           element.getAttribute("name") ?? element.getAttribute("property"),
           element.getAttribute("content") ?? "",
@@ -196,28 +196,28 @@ async function readPage(path: string, html: string): Promise<Page> {
     })
     .on('script[type="application/ld+json"]', {
       element(element) {
-        jsonLd = "";
+        json_ld = "";
         element.onEndTag(() => {
-          page.jsonLd.push(jsonLd ?? "");
-          jsonLd = null;
+          page.jsonLd.push(json_ld ?? "");
+          json_ld = null;
         });
       },
       text(text) {
-        if (jsonLd !== null) jsonLd += text.text;
+        if (json_ld !== null) json_ld += text.text;
       },
     })
     .on("h1", { element: () => void page.h1++ })
     .on("main", {
       element(element) {
         page.hasMain = true;
-        inMain++;
-        element.onEndTag(() => void inMain--);
+        in_main++;
+        element.onEndTag(() => void in_main--);
       },
     })
     .on("main script, main style, main template", {
       element(element) {
-        inScript++;
-        element.onEndTag(() => void inScript--);
+        in_script++;
+        element.onEndTag(() => void in_script--);
       },
     })
     .on("main h2, main h3", { element: () => void page.mainHeadings++ })
@@ -226,12 +226,12 @@ async function readPage(path: string, html: string): Promise<Page> {
       element(element) {
         const href = element.getAttribute("href") ?? "";
         page.links.push(href);
-        if (inMain > 0 && (href.startsWith("/") || href.startsWith(SITE_URL))) page.mainLinks++;
+        if (in_main > 0 && (href.startsWith("/") || href.startsWith(SITE_URL))) page.mainLinks++;
       },
     })
     .onDocument({
       text(text) {
-        if (inMain > 0 && inScript === 0)
+        if (in_main > 0 && in_script === 0)
           page.mainText += text.text.replace(/\s+/g, " ").trim().length;
       },
     })
@@ -240,51 +240,54 @@ async function readPage(path: string, html: string): Promise<Page> {
   return page;
 }
 
-function htmlPages(staticRoot: string, directory = ""): string[] {
+function html_pages(static_root: string, directory = ""): string[] {
   const paths: string[] = [];
-  for (const entry of readdirSync(join(staticRoot, directory), { withFileTypes: true })) {
+  for (const entry of readdirSync(join(static_root, directory), { withFileTypes: true })) {
     const relative = directory === "" ? entry.name : `${directory}/${entry.name}`;
-    if (entry.isDirectory()) paths.push(...htmlPages(staticRoot, relative));
+    if (entry.isDirectory()) paths.push(...html_pages(static_root, relative));
     else if (entry.name === "index.html") paths.push(`/${relative.slice(0, -"index.html".length)}`);
   }
   return paths;
 }
 
 /** `item` of a ListItem: a URL string or a Thing with `@id`. */
-function crumbUrl(item: unknown): string | undefined {
+function crumb_url(item: unknown): string | undefined {
   if (typeof item === "string") return item;
   if (typeof item === "object" && item !== null && "@id" in item && typeof item["@id"] === "string")
     return item["@id"];
   return undefined;
 }
 
-function structuredItems(value: unknown): Record<string, unknown>[] {
-  if (Array.isArray(value)) return value.flatMap(structuredItems);
+function structured_items(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.flatMap(structured_items);
   if (typeof value !== "object" || value === null) return [];
   const record = value as Record<string, unknown>;
-  return "@graph" in record ? structuredItems(record["@graph"]) : [record];
+  return "@graph" in record ? structured_items(record["@graph"]) : [record];
 }
 
-async function siteIssues(outputRoot: string, publishedUrls: readonly string[]): Promise<string[]> {
-  const staticRoot = join(outputRoot, "static");
-  const { routes } = JSON.parse(readFileSync(join(outputRoot, "config.json"), "utf8")) as {
+async function site_issues(
+  output_root: string,
+  published_urls: readonly string[],
+): Promise<string[]> {
+  const static_root = join(output_root, "static");
+  const { routes } = JSON.parse(readFileSync(join(output_root, "config.json"), "utf8")) as {
     routes: Route[];
   };
   const answers = new Map<string, Answer>();
   const answer = (pathname: string): Answer => {
     let known = answers.get(pathname);
     if (known === undefined) {
-      known = routeRequest(routes, staticRoot, pathname);
+      known = route_request(routes, static_root, pathname);
       answers.set(pathname, known);
     }
     return known;
   };
   const issues: string[] = [];
   const pages = new Map<string, Page>();
-  for (const path of htmlPages(staticRoot)) {
+  for (const path of html_pages(static_root)) {
     pages.set(
       path,
-      await readPage(path, readFileSync(join(staticRoot, path, "index.html"), "utf8")),
+      await read_page(path, readFileSync(join(static_root, path, "index.html"), "utf8")),
     );
   }
   const indexable = (path: string): boolean => {
@@ -315,13 +318,13 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
     for (const tag of SOCIAL_TAGS) {
       if ((page.social.get(tag) ?? "").trim() === "") issues.push(`${where}: no ${tag}`);
     }
-    const ogUrl = page.social.get("og:url") ?? "";
-    if (ogUrl !== url) issues.push(`${where}: og:url is "${ogUrl}", not ${url}`);
-    const ogImage = page.social.get("og:image") ?? "";
-    if (!ogImage.startsWith(`${SITE_URL}/`))
-      issues.push(`${where}: og:image "${ogImage}" is not an absolute site URL`);
-    else if (answer(new URL(ogImage).pathname).status !== 200)
-      issues.push(`${where}: og:image ${ogImage} does not answer 200`);
+    const og_url = page.social.get("og:url") ?? "";
+    if (og_url !== url) issues.push(`${where}: og:url is "${og_url}", not ${url}`);
+    const og_image = page.social.get("og:image") ?? "";
+    if (!og_image.startsWith(`${SITE_URL}/`))
+      issues.push(`${where}: og:image "${og_image}" is not an absolute site URL`);
+    else if (answer(new URL(og_image).pathname).status !== 200)
+      issues.push(`${where}: og:image ${og_image} does not answer 200`);
     if (page.lang === "") issues.push(`${where}: <html> has no lang`);
     if (page.h1 !== 1) issues.push(`${where}: ${page.h1} h1 headings, not 1`);
     if (!page.hasMain || page.mainText < MIN_MAIN_TEXT) {
@@ -339,7 +342,7 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
         issues.push(`${where}: JSON-LD does not parse`);
         continue;
       }
-      for (const item of structuredItems(data)) {
+      for (const item of structured_items(data)) {
         if (item["@type"] !== "BreadcrumbList") continue;
         breadcrumbs++;
         const elements = item.itemListElement;
@@ -354,7 +357,7 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
             issues.push(`${crumb} has position ${String(element.position)}`);
           if (typeof element.name !== "string" || element.name.trim() === "")
             issues.push(`${crumb} has no name`);
-          const target = crumbUrl(element.item);
+          const target = crumb_url(element.item);
           // Google requires `item` on every crumb but the last.
           if (target === undefined) {
             if (index < elements.length - 1) issues.push(`${crumb} has no item URL`);
@@ -364,8 +367,8 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
             issues.push(`${crumb} item "${target}" is not an absolute site URL`);
             return;
           }
-          const targetPath = new URL(target).pathname;
-          if (!opens(targetPath) || !indexable(targetPath)) {
+          const target_path = new URL(target).pathname;
+          if (!opens(target_path) || !indexable(target_path)) {
             issues.push(`${crumb} item ${target} is not an indexable page that answers 200`);
           }
         });
@@ -409,7 +412,7 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
     );
   }
 
-  const sitemap = readFileSync(join(staticRoot, "sitemap.xml"), "utf8");
+  const sitemap = readFileSync(join(static_root, "sitemap.xml"), "utf8");
   const listed = new Set<string>();
   const lastmods = new Set<string>();
   for (const entry of sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? []) {
@@ -434,15 +437,15 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
     if (indexable(path) && !listed.has(path))
       issues.push(`sitemap omits the indexable page ${path}`);
   }
-  const robots = readFileSync(join(staticRoot, "robots.txt"), "utf8");
+  const robots = readFileSync(join(static_root, "robots.txt"), "utf8");
   if (/^\s*Disallow:\s*\/\s*$/im.test(robots)) issues.push("robots.txt disallows the whole site");
   if (!robots.includes(`Sitemap: ${SITE_URL}/sitemap.xml`))
     issues.push("robots.txt does not name the sitemap");
-  if (!existsSync(join(staticRoot, "llms.txt"))) issues.push("llms.txt is missing");
-  const notFound = answer("/sheetwrite-missing-page/");
-  if (notFound.status !== 404) issues.push(`a missing page answers ${notFound.status}, not 404`);
+  if (!existsSync(join(static_root, "llms.txt"))) issues.push("llms.txt is missing");
+  const not_found = answer("/sheetwrite-missing-page/");
+  if (not_found.status !== 404) issues.push(`a missing page answers ${not_found.status}, not 404`);
 
-  for (const published of publishedUrls) {
+  for (const published of published_urls) {
     let path = published;
     const hops: string[] = [];
     let status = answer(path);
@@ -480,7 +483,7 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
 }
 
 /** The paths of the published site's sitemap, one per line; `#` starts a comment. */
-function readPublishedUrls(path = PUBLISHED_URLS): string[] {
+function read_published_urls(path = PUBLISHED_URLS): string[] {
   return readFileSync(path, "utf8")
     .split("\n")
     .map((line) => line.trim())
@@ -488,8 +491,8 @@ function readPublishedUrls(path = PUBLISHED_URLS): string[] {
 }
 
 if (import.meta.main) {
-  const outputRoot = resolve(process.argv[2] ?? join(repositoryRoot, ".vercel/output"));
-  const issues = await siteIssues(outputRoot, readPublishedUrls());
+  const output_root = resolve(process.argv[2] ?? join(repository_root, ".vercel/output"));
+  const issues = await site_issues(output_root, read_published_urls());
   if (issues.length > 0) {
     process.stderr.write(`${issues.join("\n")}\n`);
     throw new Error(`Docs site check failed: ${issues.length} issues`);

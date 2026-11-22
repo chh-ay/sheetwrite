@@ -21,13 +21,13 @@ interface Tool {
 export const TYPOS_VERSION = "1.52.1";
 export const CARGO_DENY_VERSION = "0.20.2";
 
-const typosRelease = (target: string, sha256: string): ToolRelease => ({
+const typos_release = (target: string, sha256: string): ToolRelease => ({
   url: `https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-${target}.tar.gz`,
   sha256,
   member: "./typos",
 });
 
-const cargoDenyRelease = (target: string, sha256: string): ToolRelease => ({
+const cargo_deny_release = (target: string, sha256: string): ToolRelease => ({
   url: `https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-${target}.tar.gz`,
   sha256,
   member: `cargo-deny-${CARGO_DENY_VERSION}-${target}/cargo-deny`,
@@ -37,11 +37,11 @@ export const RUST_CHECK_TOOLS: readonly Tool[] = [
   {
     name: "typos",
     releases: {
-      "darwin-arm64": typosRelease(
+      "darwin-arm64": typos_release(
         "aarch64-apple-darwin",
         "e342c1ec32ea6f60a8b557cd75f30e7c604745131754acff295402a0a3d43263",
       ),
-      "linux-x64": typosRelease(
+      "linux-x64": typos_release(
         "x86_64-unknown-linux-musl",
         "c034dbec8797cfa0c4548b3726c1eebbafcf703b8a17f15a961b037788eebcdd",
       ),
@@ -50,11 +50,11 @@ export const RUST_CHECK_TOOLS: readonly Tool[] = [
   {
     name: "cargo-deny",
     releases: {
-      "darwin-arm64": cargoDenyRelease(
+      "darwin-arm64": cargo_deny_release(
         "aarch64-apple-darwin",
         "fe67d82a10d8597a3549364cb733a3f9cc1bfff9031b7ae46384a9f2a72090c3",
       ),
-      "linux-x64": cargoDenyRelease(
+      "linux-x64": cargo_deny_release(
         "x86_64-unknown-linux-musl",
         "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f",
       ),
@@ -64,11 +64,11 @@ export const RUST_CHECK_TOOLS: readonly Tool[] = [
 
 async function run(command: readonly [string, ...string[]]): Promise<void> {
   const child = Bun.spawn([...command], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${command.join(" ")} failed with exit code ${exit_code}`);
 }
 
-async function installTool(tool: Tool, cargoBin: string): Promise<void> {
+async function install_tool(tool: Tool, cargo_bin: string): Promise<void> {
   const platform = `${process.platform}-${process.arch}`;
   const release = tool.releases[platform];
   if (release === undefined) throw new Error(`No reviewed ${tool.name} binary for ${platform}`);
@@ -83,24 +83,24 @@ async function installTool(tool: Tool, cargoBin: string): Promise<void> {
     );
   }
 
-  const temporaryRoot = await mkdtemp(join(tmpdir(), `sheetwrite-${tool.name}-`));
+  const temporary_root = await mkdtemp(join(tmpdir(), `sheetwrite-${tool.name}-`));
   try {
-    const archivePath = join(temporaryRoot, "release.tar.gz");
-    await writeFile(archivePath, archive);
-    await run(["tar", "-xzf", archivePath, "-C", temporaryRoot, release.member]);
-    const destination = join(cargoBin, tool.name);
-    await copyFile(join(temporaryRoot, release.member), destination);
+    const archive_path = join(temporary_root, "release.tar.gz");
+    await writeFile(archive_path, archive);
+    await run(["tar", "-xzf", archive_path, "-C", temporary_root, release.member]);
+    const destination = join(cargo_bin, tool.name);
+    await copyFile(join(temporary_root, release.member), destination);
     await chmod(destination, 0o755);
     await run([destination, "--version"]);
   } finally {
-    await rm(temporaryRoot, { recursive: true, force: true });
+    await rm(temporary_root, { recursive: true, force: true });
   }
 }
 
 export async function installRustChecks(): Promise<void> {
-  const cargoBin = join(process.env.CARGO_HOME ?? join(homedir(), ".cargo"), "bin");
-  await mkdir(cargoBin, { recursive: true });
-  for (const tool of RUST_CHECK_TOOLS) await installTool(tool, cargoBin);
+  const cargo_bin = join(process.env.CARGO_HOME ?? join(homedir(), ".cargo"), "bin");
+  await mkdir(cargo_bin, { recursive: true });
+  for (const tool of RUST_CHECK_TOOLS) await install_tool(tool, cargo_bin);
 }
 
 if (import.meta.main) {

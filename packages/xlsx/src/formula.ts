@@ -77,22 +77,23 @@ export async function exportWorkbookFormulas(snapshot: WorkbookSnapshot): Promis
   const pending = sources.filter(
     (source) => source.includes(":") || !PLAIN_XLSX_FORMULA.test(source),
   );
-  const arrayFormulas = new Set<string>();
+  const array_formulas = new Set<string>();
   const converted =
     pending.length === 0
       ? new Map<string, string>()
       : await withXlsxFormulaEngine((engine) => {
           for (const index of engine.arrayFormulas(pending)) {
             const source = pending[index];
-            if (source !== undefined) arrayFormulas.add(source);
+            if (source !== undefined) array_formulas.add(source);
           }
           return convertFormulaSources(engine, pending, "export");
         });
-  if (pending.length === sources.length) return { formulas: converted, arrayFormulas };
+  if (pending.length === sources.length)
+    return { formulas: converted, arrayFormulas: array_formulas };
 
   const formulas = new Map(converted);
   for (const source of sources) {
     if (!formulas.has(source)) formulas.set(source, source);
   }
-  return { formulas, arrayFormulas };
+  return { formulas, arrayFormulas: array_formulas };
 }

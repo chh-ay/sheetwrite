@@ -18,18 +18,18 @@ export function thinToPixels(
 ): number[] {
   const buckets = new Map<number, PixelBucket>();
   const kept: number[] = [];
-  let previousWasNull = false;
+  let previous_was_null = false;
 
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index] ?? null;
     const pixel = pixels[index];
 
     if (value === null || pixel === undefined || !Number.isFinite(pixel)) {
-      if (!previousWasNull) kept.push(index);
-      previousWasNull = true;
+      if (!previous_was_null) kept.push(index);
+      previous_was_null = true;
       continue;
     }
-    previousWasNull = false;
+    previous_was_null = false;
 
     const column = Math.floor(pixel);
     const bucket = buckets.get(column);

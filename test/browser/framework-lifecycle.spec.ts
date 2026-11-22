@@ -13,16 +13,16 @@ for (const framework of ["react", "vue", "svelte"] as const) {
     await page.goto(`/test/framework-lifecycle/${framework}/`);
     const fallback = page.locator("[data-lifecycle-fallback]");
     const status = page.locator("[data-lifecycle-status]");
-    const errorCount = page.locator("[data-lifecycle-errors]");
+    const error_count = page.locator("[data-lifecycle-errors]");
     const ready = page.locator("[data-lifecycle-ready]");
     await expect(fallback).toBeVisible();
     await expect(status).toHaveText("error", { timeout: 15_000 });
-    await expect(errorCount).toHaveText("1");
+    await expect(error_count).toHaveText("1");
 
     await page.locator("[data-lifecycle-retry]").click();
     await expect(status).toHaveText("ready", { timeout: 15_000 });
     await expect(ready).toHaveText("1:initial");
-    await expect(errorCount).toHaveText("1");
+    await expect(error_count).toHaveText("1");
     await expect(fallback).toHaveCount(0);
     await expect.poll(() => gridCellTexts(page), { timeout: 15_000 }).toContain(LIFECYCLE_CELL);
     await expect

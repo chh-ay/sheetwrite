@@ -68,41 +68,44 @@ interface OpenPopover {
 }
 
 /** Prepared panels by the store they were cloned from. */
-const panelsByStore = new Map<HTMLTemplateElement, Map<string, HTMLElement>>();
+const panels_by_store = new Map<HTMLTemplateElement, Map<string, HTMLElement>>();
 /**
  * Each prepared panel's size before any height limit; the viewport width
  * bounds a panel's width, so a resize starts a new map.
  */
-let naturalSizes = new WeakMap<HTMLElement, PanelSize>();
+let natural_sizes = new WeakMap<HTMLElement, PanelSize>();
 /** Prepared panels, oldest first, with where each came from. */
-const preparedOrder: { panel: HTMLElement; store: HTMLTemplateElement; id: string }[] = [];
-let activePopover: OpenPopover | null = null;
-let closeTimer: number | undefined;
+const prepared_order: { panel: HTMLElement; store: HTMLTemplateElement; id: string }[] = [];
+let active_popover: OpenPopover | null = null;
+let close_timer: number | undefined;
 // Escape returns focus to the trigger; that focus must not open the panel again.
-let triggerRefocusing: HTMLElement | null = null;
-let uninstallListeners: (() => void) | null = null;
+let trigger_refocusing: HTMLElement | null = null;
+let uninstall_listeners: (() => void) | null = null;
 
-function closestElement(target: EventTarget | null, selector: string): HTMLElement | null {
+function closest_element(target: EventTarget | null, selector: string): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>(selector) : null;
 }
 
 /** True when `target` is the open trigger or inside the open panel. */
-function isInsideActivePopover(target: EventTarget | null): boolean {
-  if (activePopover === null || !(target instanceof Node)) return false;
-  return activePopover.trigger.contains(target) || activePopover.panel.contains(target);
+function is_inside_active_popover(target: EventTarget | null): boolean {
+  if (active_popover === null || !(target instanceof Node)) return false;
+  return active_popover.trigger.contains(target) || active_popover.panel.contains(target);
 }
 
 /** Drops the oldest prepared panels beyond the cap, never the open one. */
-function evictOldPanels(): void {
-  for (let index = 0; preparedOrder.length > MAX_PREPARED_PANELS && index < preparedOrder.length;) {
-    const entry = preparedOrder[index];
-    if (entry === undefined || entry.panel === activePopover?.panel) {
+function evict_old_panels(): void {
+  for (
+    let index = 0;
+    prepared_order.length > MAX_PREPARED_PANELS && index < prepared_order.length;
+  ) {
+    const entry = prepared_order[index];
+    if (entry === undefined || entry.panel === active_popover?.panel) {
       index += 1;
       continue;
     }
-    preparedOrder.splice(index, 1);
+    prepared_order.splice(index, 1);
     entry.panel.remove();
-    panelsByStore.get(entry.store)?.delete(entry.id);
+    panels_by_store.get(entry.store)?.delete(entry.id);
   }
 }
 
@@ -110,101 +113,102 @@ function evictOldPanels(): void {
  * The prepared panel for `id`, cloned from the page's store and added to the
  * document, hidden, on first use. Its size is final from then on.
  */
-function panelFor(id: string): HTMLElement | null {
+function panel_for(id: string): HTMLElement | null {
   for (const store of document.querySelectorAll<HTMLTemplateElement>(STORE_SELECTOR)) {
-    const cached = panelsByStore.get(store)?.get(id);
+    const cached = panels_by_store.get(store)?.get(id);
     if (cached !== undefined) return cached;
     const source = store.content.getElementById(id);
     if (source === null) continue;
     const panel = document.importNode(source, true);
     panel.style.position = "fixed";
     Object.assign(panel.style, { left: "0px", top: "0px" });
-    let panels = panelsByStore.get(store);
+    let panels = panels_by_store.get(store);
     if (panels === undefined) {
       panels = new Map();
-      panelsByStore.set(store, panels);
+      panels_by_store.set(store, panels);
     }
     panels.set(id, panel);
-    preparedOrder.push({ panel, store, id });
+    prepared_order.push({ panel, store, id });
     document.body.append(panel);
-    evictOldPanels();
+    evict_old_panels();
     return panel;
   }
   return null;
 }
 
 /** Removes the prepared panels of pages that left the document. */
-function pruneDetachedStores(): void {
-  for (const [store, panels] of panelsByStore) {
+function prune_detached_stores(): void {
+  for (const [store, panels] of panels_by_store) {
     if (store.isConnected) continue;
     for (const panel of panels.values()) panel.remove();
-    panelsByStore.delete(store);
+    panels_by_store.delete(store);
   }
-  for (let index = preparedOrder.length - 1; index >= 0; index -= 1) {
-    if (!preparedOrder[index]?.store.isConnected) preparedOrder.splice(index, 1);
+  for (let index = prepared_order.length - 1; index >= 0; index -= 1) {
+    if (!prepared_order[index]?.store.isConnected) prepared_order.splice(index, 1);
   }
 }
 
 /** Other mentions of the same symbol in the trigger's code block. */
-function relatedTriggers(trigger: HTMLElement, panelId: string): HTMLElement[] {
+function related_triggers(trigger: HTMLElement, panel_id: string): HTMLElement[] {
   const block = trigger.closest("pre");
   if (block === null) return [];
-  const selector = `[data-sw-code-popover-trigger="${CSS.escape(panelId)}"]`;
+  const selector = `[data-sw-code-popover-trigger="${CSS.escape(panel_id)}"]`;
   return [...block.querySelectorAll<HTMLElement>(selector)].filter(
     (mention) => mention !== trigger,
   );
 }
 
-function cancelScheduledClose(): void {
-  if (closeTimer === undefined) return;
-  window.clearTimeout(closeTimer);
-  closeTimer = undefined;
+function cancel_scheduled_close(): void {
+  if (close_timer === undefined) return;
+  window.clearTimeout(close_timer);
+  close_timer = undefined;
 }
 
-function closePopover(): void {
-  cancelScheduledClose();
-  if (activePopover === null) return;
+function close_popover(): void {
+  cancel_scheduled_close();
+  if (active_popover === null) return;
 
-  const { trigger, panel, related, stopFollowing } = activePopover;
-  activePopover = null;
-  stopFollowing();
+  const { trigger, panel, related, stopFollowing: stop_following } = active_popover;
+  active_popover = null;
+  stop_following();
   panel.removeAttribute(PANEL_OPEN_ATTRIBUTE);
   trigger.removeAttribute(OPEN_ATTRIBUTE);
   for (const mention of related) mention.removeAttribute(RELATED_ATTRIBUTE);
 }
 
 /** Close with Escape and give focus back to the trigger that opened the panel. */
-function dismissPopover(trigger: HTMLElement): void {
-  closePopover();
-  triggerRefocusing = trigger;
+function dismiss_popover(trigger: HTMLElement): void {
+  close_popover();
+  trigger_refocusing = trigger;
   try {
     trigger.focus();
   } finally {
-    triggerRefocusing = null;
+    trigger_refocusing = null;
   }
 }
 
-function scheduleClose(): void {
-  cancelScheduledClose();
-  closeTimer = window.setTimeout(() => {
-    closeTimer = undefined;
-    if (activePopover === null) return;
+function schedule_close(): void {
+  cancel_scheduled_close();
+  close_timer = window.setTimeout(() => {
+    close_timer = undefined;
+    if (active_popover === null) return;
     // The panel holds links: keep it open while the reader points at it or
     // keyboard focus is on the trigger or inside the panel.
-    const { trigger, panel } = activePopover;
-    const isFocused =
+    const { trigger, panel } = active_popover;
+    const is_focused =
       trigger.contains(document.activeElement) || panel.contains(document.activeElement);
-    if (isFocused || trigger.matches(":hover") || panel.matches(":hover")) return;
-    closePopover();
+    if (is_focused || trigger.matches(":hover") || panel.matches(":hover")) return;
+    close_popover();
   }, CLOSE_DELAY_MS);
 }
 
 /** The area a panel may cover: the viewport below the sticky site header. */
-function panelArea(): Box {
-  const headerBottom = document.querySelector(HEADER_SELECTOR)?.getBoundingClientRect().bottom ?? 0;
+function panel_area(): Box {
+  const header_bottom =
+    document.querySelector(HEADER_SELECTOR)?.getBoundingClientRect().bottom ?? 0;
   return {
     left: VIEWPORT_PADDING_PX,
-    top: Math.max(0, headerBottom) + VIEWPORT_PADDING_PX,
+    top: Math.max(0, header_bottom) + VIEWPORT_PADDING_PX,
     right: window.innerWidth - VIEWPORT_PADDING_PX,
     bottom: window.innerHeight - VIEWPORT_PADDING_PX,
   };
@@ -214,23 +218,23 @@ function panelArea(): Box {
  * A panel's size without a height limit. Read once per panel and viewport
  * width; a prepared panel is already laid out, so the read forces no layout.
  */
-function naturalSize(panel: HTMLElement): PanelSize {
-  const known = naturalSizes.get(panel);
+function natural_size(panel: HTMLElement): PanelSize {
+  const known = natural_sizes.get(panel);
   if (known !== undefined) return known;
   panel.style.removeProperty("max-height");
   const size = { width: panel.offsetWidth, height: panel.offsetHeight };
-  naturalSizes.set(panel, size);
+  natural_sizes.set(panel, size);
   return size;
 }
 
 /** Everything placement needs, read from the page in one pass. */
 function measure(trigger: HTMLElement, panel: PanelSize): PlacementInput {
-  return { trigger: boxOf(trigger), panel, viewport: panelArea(), gap: PANEL_OFFSET_PX };
+  return { trigger: box_of(trigger), panel, viewport: panel_area(), gap: PANEL_OFFSET_PX };
 }
 
-function positionPanel(panel: HTMLElement, side: PanelSide, input: PlacementInput): void {
-  const { left, top, maxHeight } = panelFrame(side, input);
-  Object.assign(panel.style, { left: `${left}px`, top: `${top}px`, maxHeight: `${maxHeight}px` });
+function position_panel(panel: HTMLElement, side: PanelSide, input: PlacementInput): void {
+  const { left, top, maxHeight: max_height } = panelFrame(side, input);
+  Object.assign(panel.style, { left: `${left}px`, top: `${top}px`, maxHeight: `${max_height}px` });
 }
 
 /**
@@ -238,20 +242,20 @@ function positionPanel(panel: HTMLElement, side: PanelSide, input: PlacementInpu
  * and while the window resizes, at most once per frame, on the side chosen
  * when it opened. Returns the stopper.
  */
-function followTrigger(): () => void {
+function follow_trigger(): () => void {
   let frame: number | undefined;
   const reposition = (): void => {
     frame = undefined;
-    if (activePopover === null) return;
-    const { trigger, panel, side, size } = activePopover;
-    positionPanel(panel, side, measure(trigger, size));
+    if (active_popover === null) return;
+    const { trigger, panel, side, size } = active_popover;
+    position_panel(panel, side, measure(trigger, size));
   };
   const schedule = (): void => {
     frame ??= window.requestAnimationFrame(reposition);
   };
   const resize = (): void => {
-    naturalSizes = new WeakMap();
-    if (activePopover !== null) activePopover.size = naturalSize(activePopover.panel);
+    natural_sizes = new WeakMap();
+    if (active_popover !== null) active_popover.size = natural_size(active_popover.panel);
     schedule();
   };
   const options = { capture: true, passive: true } as const;
@@ -264,77 +268,78 @@ function followTrigger(): () => void {
   };
 }
 
-function boxOf(element: Element): Box {
+function box_of(element: Element): Box {
   const { left, top, right, bottom } = element.getBoundingClientRect();
   return { left, top, right, bottom };
 }
 
 /** Opens the panel of `trigger`, closing any other open panel. */
 export function openCodePopover(trigger: HTMLElement): void {
-  cancelScheduledClose();
-  if (activePopover?.trigger === trigger) return;
-  const panelId = trigger.dataset.swCodePopoverTrigger;
-  const panel = panelId === undefined ? null : panelFor(panelId);
-  if (panelId === undefined || panel === null) return;
+  cancel_scheduled_close();
+  if (active_popover?.trigger === trigger) return;
+  const panel_id = trigger.dataset.swCodePopoverTrigger;
+  const panel = panel_id === undefined ? null : panel_for(panel_id);
+  if (panel_id === undefined || panel === null) return;
 
   // Every layout read before the first write. A prepared panel is already
   // laid out, so these reads force no layout of its content.
-  const related = relatedTriggers(trigger, panelId);
-  const size = naturalSize(panel);
+  const related = related_triggers(trigger, panel_id);
+  const size = natural_size(panel);
   const input = measure(trigger, size);
   const side = choosePanelSide(input);
 
-  closePopover();
+  close_popover();
   trigger.setAttribute(OPEN_ATTRIBUTE, "true");
   for (const mention of related) mention.setAttribute(RELATED_ATTRIBUTE, "");
-  positionPanel(panel, side, input);
+  position_panel(panel, side, input);
   panel.setAttribute(PANEL_OPEN_ATTRIBUTE, "");
-  activePopover = { trigger, panel, related, side, size, stopFollowing: followTrigger() };
+  active_popover = { trigger, panel, related, side, size, stopFollowing: follow_trigger() };
 }
 
-function handlePointerOver(event: PointerEvent): void {
-  if (event.target instanceof Node && activePopover?.panel.contains(event.target)) {
-    cancelScheduledClose();
+function handle_pointer_over(event: PointerEvent): void {
+  if (event.target instanceof Node && active_popover?.panel.contains(event.target)) {
+    cancel_scheduled_close();
     return;
   }
   // A touch opens the panel on its tap, so a tap can tell a first touch from a second.
   if (event.pointerType === "touch") return;
-  const trigger = closestElement(event.target, TRIGGER_SELECTOR);
+  const trigger = closest_element(event.target, TRIGGER_SELECTOR);
   if (trigger !== null) openCodePopover(trigger);
 }
 
-function handlePointerOut(event: PointerEvent): void {
-  if (!isInsideActivePopover(event.target) || isInsideActivePopover(event.relatedTarget)) return;
-  scheduleClose();
+function handle_pointer_out(event: PointerEvent): void {
+  if (!is_inside_active_popover(event.target) || is_inside_active_popover(event.relatedTarget))
+    return;
+  schedule_close();
 }
 
-function handleFocusIn(event: FocusEvent): void {
-  if (isInsideActivePopover(event.target)) {
-    cancelScheduledClose();
+function handle_focus_in(event: FocusEvent): void {
+  if (is_inside_active_popover(event.target)) {
+    cancel_scheduled_close();
     return;
   }
-  const trigger = closestElement(event.target, TRIGGER_SELECTOR);
-  if (trigger !== null && trigger !== triggerRefocusing) openCodePopover(trigger);
+  const trigger = closest_element(event.target, TRIGGER_SELECTOR);
+  if (trigger !== null && trigger !== trigger_refocusing) openCodePopover(trigger);
 }
 
-function handleFocusOut(event: FocusEvent): void {
-  if (isInsideActivePopover(event.target)) scheduleClose();
+function handle_focus_out(event: FocusEvent): void {
+  if (is_inside_active_popover(event.target)) schedule_close();
 }
 
-function handleKeyDown(event: KeyboardEvent): void {
-  if (event.key !== "Escape" || activePopover === null) return;
+function handle_key_down(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || active_popover === null) return;
   event.preventDefault();
-  if (activePopover.panel.contains(event.target instanceof Node ? event.target : null)) {
-    dismissPopover(activePopover.trigger);
+  if (active_popover.panel.contains(event.target instanceof Node ? event.target : null)) {
+    dismiss_popover(active_popover.trigger);
   } else {
-    closePopover();
+    close_popover();
   }
 }
 
 /** A tap or click outside the open trigger and its panel closes the panel. */
-function handleClick(event: MouseEvent): void {
-  if (closestElement(event.target, TRIGGER_SELECTOR) !== null) return;
-  if (!isInsideActivePopover(event.target)) closePopover();
+function handle_click(event: MouseEvent): void {
+  if (closest_element(event.target, TRIGGER_SELECTOR) !== null) return;
+  if (!is_inside_active_popover(event.target)) close_popover();
 }
 
 /**
@@ -343,23 +348,23 @@ function handleClick(event: MouseEvent): void {
  * next frame and the first hover have nothing left to do; and drops the
  * panels of pages that leave the document.
  */
-function installPanelPreparation(): () => void {
+function install_panel_preparation(): () => void {
   const pending = new Set<string>();
-  let idleHandle: number | undefined;
+  let idle_handle: number | undefined;
   const drain = (deadline?: IdleDeadline): void => {
-    idleHandle = undefined;
+    idle_handle = undefined;
     for (const id of pending) {
       if (deadline !== undefined && deadline.timeRemaining() < PREPARE_SLICE_MS) break;
       pending.delete(id);
       // Reading the size lays the new panel out now, inside the idle time.
-      void panelFor(id)?.offsetHeight;
+      void panel_for(id)?.offsetHeight;
       if (deadline === undefined) break;
     }
-    if (pending.size > 0) scheduleDrain();
+    if (pending.size > 0) schedule_drain();
   };
-  const scheduleDrain = (): void => {
-    if (idleHandle !== undefined) return;
-    idleHandle =
+  const schedule_drain = (): void => {
+    if (idle_handle !== undefined) return;
+    idle_handle =
       typeof window.requestIdleCallback === "function"
         ? window.requestIdleCallback(drain)
         : window.setTimeout(drain, 0);
@@ -369,36 +374,36 @@ function installPanelPreparation(): () => void {
       if (!entry.isIntersecting) continue;
       intersections.unobserve(entry.target);
       for (const trigger of entry.target.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR)) {
-        const panelId = trigger.dataset.swCodePopoverTrigger;
-        if (panelId !== undefined) pending.add(panelId);
+        const panel_id = trigger.dataset.swCodePopoverTrigger;
+        if (panel_id !== undefined) pending.add(panel_id);
       }
     }
-    if (pending.size > 0) scheduleDrain();
+    if (pending.size > 0) schedule_drain();
   });
-  const observeBlocks = (root: ParentNode): void => {
+  const observe_blocks = (root: ParentNode): void => {
     for (const block of root.querySelectorAll("pre")) {
       if (block.querySelector(TRIGGER_SELECTOR) !== null) intersections.observe(block);
     }
   };
-  observeBlocks(document);
+  observe_blocks(document);
   const mutations = new MutationObserver((records) => {
     for (const record of records) {
       for (const node of record.addedNodes) {
-        if (node instanceof Element) observeBlocks(node);
+        if (node instanceof Element) observe_blocks(node);
       }
     }
-    pruneDetachedStores();
+    prune_detached_stores();
     // The open panel lives in `document.body`, outside the page, so close it
     // when its trigger leaves the page.
-    if (activePopover !== null && !activePopover.trigger.isConnected) closePopover();
+    if (active_popover !== null && !active_popover.trigger.isConnected) close_popover();
   });
   mutations.observe(document.body, { childList: true, subtree: true });
   return () => {
     mutations.disconnect();
     intersections.disconnect();
-    if (idleHandle !== undefined) {
-      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idleHandle);
-      else window.clearTimeout(idleHandle);
+    if (idle_handle !== undefined) {
+      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle_handle);
+      else window.clearTimeout(idle_handle);
     }
   };
 }
@@ -410,31 +415,31 @@ function installPanelPreparation(): () => void {
  * is a no-op that returns a no-op.
  */
 export function installCodePopovers(): () => void {
-  if (uninstallListeners !== null) return () => {};
+  if (uninstall_listeners !== null) return () => {};
   const listeners = [
-    ["pointerover", handlePointerOver],
-    ["pointerout", handlePointerOut],
-    ["focusin", handleFocusIn],
-    ["focusout", handleFocusOut],
-    ["keydown", handleKeyDown],
-    ["click", handleClick],
+    ["pointerover", handle_pointer_over],
+    ["pointerout", handle_pointer_out],
+    ["focusin", handle_focus_in],
+    ["focusout", handle_focus_out],
+    ["keydown", handle_key_down],
+    ["click", handle_click],
   ] as const;
   for (const [type, listener] of listeners) {
     document.addEventListener(type, listener as EventListener);
   }
-  const uninstallPreparation = installPanelPreparation();
-  uninstallListeners = () => {
-    closePopover();
-    uninstallPreparation();
+  const uninstall_preparation = install_panel_preparation();
+  uninstall_listeners = () => {
+    close_popover();
+    uninstall_preparation();
     for (const [type, listener] of listeners) {
       document.removeEventListener(type, listener as EventListener);
     }
-    for (const panels of panelsByStore.values()) {
+    for (const panels of panels_by_store.values()) {
       for (const panel of panels.values()) panel.remove();
     }
-    panelsByStore.clear();
-    preparedOrder.length = 0;
-    uninstallListeners = null;
+    panels_by_store.clear();
+    prepared_order.length = 0;
+    uninstall_listeners = null;
   };
-  return uninstallListeners;
+  return uninstall_listeners;
 }

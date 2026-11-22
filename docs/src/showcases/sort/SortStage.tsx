@@ -25,7 +25,7 @@ export interface SortStageProps {
 }
 
 /** How the side panel names the commit reasons a sort or an undo can produce. */
-function reasonLabel(reason: CommitReason | null): string {
+function reason_label(reason: CommitReason | null): string {
   if (reason === null) return "None yet";
   if (reason === "sort") return "Sort (cells moved)";
   if (reason === "structure") return "View sort";
@@ -53,7 +53,7 @@ function FormulaReadout(props: { readonly snapshot: SortSnapshot; readonly order
             value: <span data-testid={`sort-watch-${reading.label}`}>{reading.value}</span>,
           })),
           { label: "View sort", value: props.snapshot.viewSort ?? "None" },
-          { label: "Last change", value: reasonLabel(props.snapshot.lastReason) },
+          { label: "Last change", value: reason_label(props.snapshot.lastReason) },
         ]}
       />
     </>
@@ -63,10 +63,12 @@ function FormulaReadout(props: { readonly snapshot: SortSnapshot; readonly order
 /** The sort showcase's island: the order list, its sorts and what the formulas read. */
 export function SortStage(props: SortStageProps) {
   const live = createLiveScenario<SortScenario, SortSnapshot>(() =>
-    import("./boot.js").then(({ createSortScenario }) => createSortScenario),
+    import("./boot.js").then(
+      ({ createSortScenario: create_sort_scenario }) => create_sort_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
-  const firstSort = () => props.sorts[0]?.id;
+  const first_sort = () => props.sorts[0]?.id;
 
   return (
     <ShowcaseStage
@@ -85,7 +87,7 @@ export function SortStage(props: SortStageProps) {
                     onClick={() =>
                       void action.run("Sort", (current) => current.sortInPlace(sort.id))
                     }
-                    variant={sort.id === firstSort() ? "primary" : "default"}
+                    variant={sort.id === first_sort() ? "primary" : "default"}
                   >
                     {sort.label}
                   </ControlButton>

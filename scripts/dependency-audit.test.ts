@@ -10,12 +10,12 @@ import {
 
 const TODAY = "2026-07-14";
 
-function auditResult(
+function audit_result(
   severity: "low" | "moderate" | "high" | "critical",
-  exitCode = 1,
+  exit_code = 1,
 ): AuditCommandResult {
   return {
-    exitCode,
+    exitCode: exit_code,
     stderr: "bun audit v1.3.14",
     stdout: JSON.stringify({
       vulnerable: [
@@ -76,10 +76,10 @@ describe("JavaScript dependency audit policy", () => {
 
   it("requires a reviewed allowance for a finding of every severity", () => {
     for (const severity of ["low", "moderate", "high", "critical"] as const) {
-      expect(() => evaluateAuditPolicy(auditResult(severity), [], TODAY)).toThrow(
+      expect(() => evaluateAuditPolicy(audit_result(severity), [], TODAY)).toThrow(
         "vulnerable/GHSA-AAAA-BBBB-CCCC",
       );
-      const result = evaluateAuditPolicy(auditResult(severity), [REVIEWED_ALLOWANCE], TODAY);
+      const result = evaluateAuditPolicy(audit_result(severity), [REVIEWED_ALLOWANCE], TODAY);
       const blocking = severity === "high" || severity === "critical";
       expect(result.allowedBlockingFindings).toHaveLength(blocking ? 1 : 0);
       expect(result.nonBlockingFindings).toHaveLength(blocking ? 0 : 1);
@@ -98,13 +98,13 @@ describe("JavaScript dependency audit policy", () => {
     ];
     for (const severity of ["moderate", "high"] as const) {
       expect(() =>
-        evaluateAuditPolicy(auditResult(severity), [REVIEWED_ALLOWANCE], TODAY),
+        evaluateAuditPolicy(audit_result(severity), [REVIEWED_ALLOWANCE], TODAY),
       ).not.toThrow();
       for (const [label, change] of invalid) {
         expect(
           () =>
             evaluateAuditPolicy(
-              auditResult(severity),
+              audit_result(severity),
               [{ ...REVIEWED_ALLOWANCE, ...change }],
               TODAY,
             ),

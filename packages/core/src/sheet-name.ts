@@ -4,7 +4,7 @@ import type { SheetNameIssueCode, SheetNameValidationResult } from "./types/docu
 /** Excel reserves History, in any case, for its change-tracking sheet. */
 const RESERVED_KEY = sheetNameKey("History");
 
-function hasForbiddenSheetNameCharacter(name: string): boolean {
+function has_forbidden_sheet_name_character(name: string): boolean {
   for (let index = 0; index < name.length; index++) {
     const code = name.charCodeAt(index);
     if (code <= 0x1f || "\\/*?:[]".includes(name[index]!)) return true;
@@ -28,7 +28,7 @@ export function validateSheetName(
   if (normalized.trim().length === 0) code = "blank";
   else if (normalized.length > 31) code = "too-long";
   else if (normalized.startsWith("'") || normalized.endsWith("'")) code = "edge-apostrophe";
-  else if (hasForbiddenSheetNameCharacter(normalized)) code = "forbidden-character";
+  else if (has_forbidden_sheet_name_character(normalized)) code = "forbidden-character";
   else if (existingNames.some((existing) => sheetNameKey(existing) === key)) code = "duplicate";
   else if (key === RESERVED_KEY) code = "reserved";
   return code === null

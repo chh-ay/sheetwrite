@@ -44,10 +44,10 @@ const OPERATORS: Readonly<Record<string, FilterCondition["op"]>> = {
   lessThanOrEqual: "lte",
 };
 
-const hasWildcard = (text: string): boolean => /[*?~]/.test(text);
+const has_wildcard = (text: string): boolean => /[*?~]/.test(text);
 
 /** A number when the text is one, as Excel's dialog stores a typed number. */
-function conditionValue(text: string): number | string {
+function condition_value(text: string): number | string {
   const number = Number(text);
   return text.trim() !== "" && Number.isFinite(number) ? number : text;
 }
@@ -57,34 +57,34 @@ function conditionValue(text: string): number | string {
  * `equal ab*`, "contains ab" as `equal *ab*` and "does not contain ab" as
  * `notEqual *ab*`; those read back as the named conditions.
  */
-function customFilterCondition(operator: string, val: string): FilterCondition | null {
+function custom_filter_condition(operator: string, val: string): FilterCondition | null {
   // An own key only: "constructor" and the like are not operators.
   const op = Object.hasOwn(OPERATORS, operator) ? OPERATORS[operator] : undefined;
   if (op === undefined) return null;
 
   if (op === "eq" || op === "neq") {
     const inner = val.slice(1, -1);
-    if (val.length > 2 && val.startsWith("*") && val.endsWith("*") && !hasWildcard(inner)) {
+    if (val.length > 2 && val.startsWith("*") && val.endsWith("*") && !has_wildcard(inner)) {
       return { op: op === "eq" ? "contains" : "notContains", value: inner };
     }
-    if (op === "eq" && val.length > 1 && val.endsWith("*") && !hasWildcard(val.slice(0, -1))) {
+    if (op === "eq" && val.length > 1 && val.endsWith("*") && !has_wildcard(val.slice(0, -1))) {
       return { op: "beginsWith", value: val.slice(0, -1) };
     }
-    if (op === "eq" && val.length > 1 && val.startsWith("*") && !hasWildcard(val.slice(1))) {
+    if (op === "eq" && val.length > 1 && val.startsWith("*") && !has_wildcard(val.slice(1))) {
       return { op: "endsWith", value: val.slice(1) };
     }
   }
 
-  return { op, value: conditionValue(val) };
+  return { op, value: condition_value(val) };
 }
 
-function parseCustomFilters(element: XmlElement): ColumnFilter | null {
+function parse_custom_filters(element: XmlElement): ColumnFilter | null {
   const entries = xmlChildren(element, "customFilter");
   if (entries.length < 1 || entries.length > 2) return null;
 
   const conditions: FilterCondition[] = [];
   for (const entry of entries) {
-    const condition = customFilterCondition(
+    const condition = custom_filter_condition(
       xmlAttribute(entry, "operator") ?? "equal",
       xmlAttribute(entry, "val") ?? "",
     );
@@ -108,7 +108,7 @@ function parseCustomFilters(element: XmlElement): ColumnFilter | null {
   };
 }
 
-function parseFilterColumn(element: XmlElement, col: number): ParsedFilterColumn | null {
+function parse_filter_column(element: XmlElement, col: number): ParsedFilterColumn | null {
   const filters = xmlChild(element, "filters");
   if (filters) {
     if (xmlChildren(filters, "dateGroupItem").length > 0) return null;
@@ -130,7 +130,7 @@ function parseFilterColumn(element: XmlElement, col: number): ParsedFilterColumn
   }
 
   const custom = xmlChild(element, "customFilters");
-  const filter = custom ? parseCustomFilters(custom) : null;
+  const filter = custom ? parse_custom_filters(custom) : null;
   return filter ? { col, kind: "filter", filter } : null;
 }
 
@@ -151,25 +151,25 @@ export function parseAutoFilter(
 
   const columns: ParsedFilterColumn[] = [];
   const seen = new Set<number>();
-  for (const filterColumn of xmlChildren(element, "filterColumn")) {
-    const colId = Number(xmlAttribute(filterColumn, "colId"));
-    const col = range.c0 + colId;
-    if (!Number.isInteger(colId) || colId < 0 || col > range.c1) continue;
-    const kinds = filterColumn.children.map((child) => xmlLocalName(child.name));
+  for (const filter_column of xmlChildren(element, "filterColumn")) {
+    const col_id = Number(xmlAttribute(filter_column, "colId"));
+    const col = range.c0 + col_id;
+    if (!Number.isInteger(col_id) || col_id < 0 || col > range.c1) continue;
+    const kinds = filter_column.children.map((child) => xmlLocalName(child.name));
     if (kinds.length === 0) continue;
     // One filter per column, as Excel writes: a repeated column is dropped, so
     // the filters stay bounded by the range's width.
     if (seen.has(col)) {
       emitWarning(context, {
         code: "unsupported-feature",
-        message: `A second AutoFilter filter for column ${colId + 1} of the range was dropped`,
+        message: `A second AutoFilter filter for column ${col_id + 1} of the range was dropped`,
         sheet: sheetName,
       });
       continue;
     }
     seen.add(col);
 
-    const parsed = parseFilterColumn(filterColumn, col);
+    const parsed = parse_filter_column(filter_column, col);
     if (parsed) {
       columns.push(parsed);
       continue;
@@ -200,7 +200,7 @@ export function rowMetaShownByFilter<Meta extends { readonly hidden?: boolean }>
 }
 
 /** The text a cell shows, which Excel's value lists name it by. */
-function displayText(cell: SnapshotCell, column: Column | undefined): string | null {
+function display_text(cell: SnapshotCell, column: Column | undefined): string | null {
   if (cell.value.kind !== "literal") return null;
   const { value } = cell.value;
   if (value === null) return null;
@@ -218,23 +218,23 @@ function displayText(cell: SnapshotCell, column: Column | undefined): string | n
  * the sheet's cells however many filtered columns there are; a long pass
  * stops when the import is aborted.
  */
-function bodyCellsByColumn(
+function body_cells_by_column(
   parsed: ParsedAutoFilter,
   body: { start: number; end: number },
   cells: readonly SnapshotCell[],
   context: XlsxCodecContext,
 ): Map<number, SnapshotCell[]> {
-  const byColumn = new Map<number, SnapshotCell[]>();
-  for (const column of parsed.columns) if (column.kind === "values") byColumn.set(column.col, []);
-  if (byColumn.size === 0) return byColumn;
+  const by_column = new Map<number, SnapshotCell[]>();
+  for (const column of parsed.columns) if (column.kind === "values") by_column.set(column.col, []);
+  if (by_column.size === 0) return by_column;
 
   for (let index = 0; index < cells.length; index++) {
     if ((index & 4_095) === 0) checkAbort(context);
     const cell = cells[index]!;
     if (cell.rowOffset < body.start || cell.rowOffset > body.end) continue;
-    byColumn.get(cell.colOffset)?.push(cell);
+    by_column.get(cell.colOffset)?.push(cell);
   }
-  return byColumn;
+  return by_column;
 }
 
 /**
@@ -243,7 +243,7 @@ function bodyCellsByColumn(
  * text is on it, compared without case as Excel does. Text that names no
  * cell (a formula's result, say) stays as text, or as a number when it is one.
  */
-function valuesShowing(
+function values_showing(
   texts: readonly string[],
   blanks: boolean,
   cells: readonly SnapshotCell[],
@@ -253,7 +253,7 @@ function valuesShowing(
   const named = new Set<string>();
   const values = new Map<string, CellScalar>();
   for (const cell of cells) {
-    const text = displayText(cell, column)?.toLowerCase();
+    const text = display_text(cell, column)?.toLowerCase();
     if (text === undefined || !wanted.has(text) || cell.value.kind !== "literal") continue;
     named.add(text);
     const { value } = cell.value;
@@ -300,15 +300,15 @@ export function snapshotAutoFilter(
     end: { row: r1, col: c1 },
   };
   const saved = meta?.autoFilter?.range;
-  const savedColumns = new Set(meta?.filters?.map(([col]) => col) ?? []);
+  const saved_columns = new Set(meta?.filters?.map(([col]) => col) ?? []);
   if (
     saved &&
     saved.start.row === range.start.row &&
     saved.start.col === range.start.col &&
     saved.end.row === range.end.row &&
     saved.end.col === range.end.col &&
-    savedColumns.size === parsed.columns.length &&
-    parsed.columns.every((column) => savedColumns.has(column.col))
+    saved_columns.size === parsed.columns.length &&
+    parsed.columns.every((column) => saved_columns.has(column.col))
   ) {
     return {
       autoFilter: { range },
@@ -317,7 +317,7 @@ export function snapshotAutoFilter(
   }
 
   const body = { start: range.start.row + 1, end: range.end.row };
-  const cellsByColumn = bodyCellsByColumn(parsed, body, cells, context);
+  const cells_by_column = body_cells_by_column(parsed, body, cells, context);
   const filters: [number, ColumnFilter][] = parsed.columns
     .filter((column) => column.col <= c1)
     .map((column) => [
@@ -326,10 +326,10 @@ export function snapshotAutoFilter(
         ? column.filter
         : {
             kind: "values",
-            values: valuesShowing(
+            values: values_showing(
               column.texts,
               column.blanks,
-              cellsByColumn.get(column.col) ?? [],
+              cells_by_column.get(column.col) ?? [],
               columns[column.col],
             ),
           },

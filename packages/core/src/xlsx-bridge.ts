@@ -80,15 +80,15 @@ export class XlsxResourceError extends SheetwriteError {
   }
 }
 
-function missingXlsxBackend(
-  functionName: string,
+function missing_xlsx_backend(
+  function_name: string,
   operation: "xlsx-import" | "xlsx-export",
 ): SheetwriteError {
   return new SheetwriteError(
     "optional-backend-unavailable",
     operation,
-    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsxAddon()] }) before calling ${functionName}.`,
-    { context: { backend: "xlsx", functionName }, retryable: false },
+    `Sheetwrite: XLSX add-on not installed. Install @sheetwrite/xlsx and call initSheetwrite({ addons: [xlsxAddon()] }) before calling ${function_name}.`,
+    { context: { backend: "xlsx", functionName: function_name }, retryable: false },
   );
 }
 
@@ -109,7 +109,7 @@ interface XlsxCallSite {
  * The rejection of a failed XLSX call. An abort is not a failure: once the
  * caller's signal fired, the result is `signal.reason`, unwrapped.
  */
-function xlsxCallFailure(
+function xlsx_call_failure(
   error: unknown,
   signal: AbortSignal | undefined,
   site: XlsxCallSite,
@@ -149,12 +149,12 @@ export async function toXlsxTable(
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
   const backend = xlsxTableExportBackend();
-  if (!backend) throw missingXlsxBackend("toXlsxTable", "xlsx-export");
+  if (!backend) throw missing_xlsx_backend("toXlsxTable", "xlsx-export");
   try {
     options?.signal?.throwIfAborted();
     return await backend.toXlsxTable(workbook, store, options);
   } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
+    throw xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxTable",
@@ -174,9 +174,9 @@ export function toXlsxTableStream(
   options?: XlsxWorkbookOptions,
 ): ReadableStream<Uint8Array> {
   const backend = xlsxTableExportBackend();
-  if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
+  if (!backend?.toXlsxTableStream) throw missing_xlsx_backend("toXlsxTableStream", "xlsx-export");
   return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
-    xlsxCallFailure(error, options?.signal, {
+    xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxTableStream",
@@ -210,12 +210,12 @@ export async function fromXlsxTable(
   options?: XlsxWorkbookOptions,
 ): Promise<ColumnarData> {
   const backend = xlsxTableImportBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxTable", "xlsx-import");
+  if (!backend) throw missing_xlsx_backend("fromXlsxTable", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();
     return await backend.fromXlsxTable(data, options);
   } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
+    throw xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxTable",
@@ -234,7 +234,7 @@ export function hasXlsxWorkbookBackend(): boolean {
  * the class method that a caller cannot replace per instance. Custom stores,
  * look-alike objects and plain snapshots take the backend's fingerprint check.
  */
-function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">): {
+function workbook_snapshot_of(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">): {
   snapshot: WorkbookSnapshot;
   context: XlsxWorkbookExportContext;
   /** The store with an engine that built the snapshot, if any. */
@@ -248,17 +248,17 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
 
   const snapshot = SheetwriteStore.prototype.exportSnapshot.call(store);
   // A Grid may show a different tab than the store's stored active sheet.
-  const activeSheet: unknown =
+  const active_sheet: unknown =
     "getActiveSheet" in input && typeof input.getActiveSheet === "function"
       ? input.getActiveSheet()
       : undefined;
   const switched =
-    typeof activeSheet === "string" &&
-    activeSheet !== snapshot.workbook.activeSheet &&
-    snapshot.sheets.some((sheet) => sheet.id === activeSheet);
+    typeof active_sheet === "string" &&
+    active_sheet !== snapshot.workbook.activeSheet &&
+    snapshot.sheets.some((sheet) => sheet.id === active_sheet);
   return {
     snapshot: switched
-      ? { ...snapshot, workbook: { ...snapshot.workbook, activeSheet } }
+      ? { ...snapshot, workbook: { ...snapshot.workbook, activeSheet: active_sheet } }
       : snapshot,
     context: { sourceTracked: hasAdmittedXlsxSource(store) },
     store,
@@ -271,25 +271,25 @@ function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot
  * the static content of dashboards and the values of charts over pivots. The
  * pivot module loads only for a workbook with a pivot or a dashboard.
  */
-async function withEngineContent(
-  source: ReturnType<typeof workbookSnapshotOf>,
+async function with_engine_content(
+  source: ReturnType<typeof workbook_snapshot_of>,
 ): Promise<XlsxWorkbookExportContext> {
   const store = source.store;
   if (store === undefined) return source.context;
   const sheets = source.snapshot.sheets;
-  const filteredRows = autoFilteredRows(store, sheets);
+  const filtered_rows = auto_filtered_rows(store, sheets);
   const engine = storeEngine(store);
-  const spills = engine ? sheetSpills(engine, sheets) : new Map<SheetId, XlsxSpillExport[]>();
+  const spills = engine ? sheet_spills(engine, sheets) : new Map<SheetId, XlsxSpillExport[]>();
   const context = {
     ...source.context,
-    ...(filteredRows.size > 0 ? { filteredRows } : {}),
+    ...(filtered_rows.size > 0 ? { filteredRows: filtered_rows } : {}),
     ...(spills.size > 0 ? { spills } : {}),
   };
   const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
   const dashboards = sheets.some(isDashboard);
   if (!pivots && !dashboards) return context;
   const charts = sheets.some((sheet) => sheet.charts?.some((chart) => chart.pivot !== undefined));
-  const { pivotViewExports, worksheetPivotExports } =
+  const { pivotViewExports: pivot_view_exports, worksheetPivotExports: worksheet_pivot_exports } =
     await import("./dashboard/dashboard-export.js");
   // The store can be disposed, with its grid, while the module loads.
   if (storeEngine(store)?.isDisposed) {
@@ -297,13 +297,13 @@ async function withEngineContent(
   }
   return {
     ...context,
-    ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
-    ...(dashboards || charts ? pivotViewExports(store) : {}),
+    ...(pivots ? { pivotOutputs: worksheet_pivot_exports(store) } : {}),
+    ...(dashboards || charts ? pivot_view_exports(store) : {}),
   };
 }
 
 /** The rows each sheet's AutoFilter hides now, which Excel stores as hidden rows. */
-function autoFilteredRows(
+function auto_filtered_rows(
   store: SheetwriteStore,
   sheets: readonly SheetSnapshot[],
 ): Map<SheetId, number[]> {
@@ -321,7 +321,7 @@ function autoFilteredRows(
 }
 
 /** Each worksheet's installed spills and their values, which Excel files keep in the covered cells. */
-function sheetSpills(
+function sheet_spills(
   engine: StoreDataEngine,
   sheets: readonly SheetSnapshot[],
 ): Map<SheetId, XlsxSpillExport[]> {
@@ -332,14 +332,14 @@ function sheetSpills(
     if (ranges.length === 0) continue;
     const entries: XlsxSpillExport[] = [];
     for (let index = 0; index < ranges.length; index += 4) {
-      const [row = 0, col = 0, rowEnd = 0, colEnd = 0] = ranges.subarray(index, index + 4);
+      const [row = 0, col = 0, row_end = 0, col_end = 0] = ranges.subarray(index, index + 4);
       const cells: { row: number; col: number }[] = [];
-      for (let r = row; r <= rowEnd; r++)
-        for (let c = col; c <= colEnd; c++) cells.push({ row: r, col: c });
+      for (let r = row; r <= row_end; r++)
+        for (let c = col; c <= col_end; c++) cells.push({ row: r, col: c });
       const values: CellScalar[] = engine
         .captureResolvedCells(sheet.id, cells)
         .map((cell) => cell.resolved);
-      entries.push({ row, col, rows: rowEnd - row + 1, cols: colEnd - col + 1, values });
+      entries.push({ row, col, rows: row_end - row + 1, cols: col_end - col + 1, values });
     }
     spills.set(sheet.id, entries);
   }
@@ -371,14 +371,18 @@ export async function toXlsxWorkbook(
   options?: XlsxWorkbookOptions,
 ): Promise<Uint8Array> {
   const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
+  if (!backend) throw missing_xlsx_backend("toXlsxWorkbook", "xlsx-export");
   try {
     // Checked before the snapshot is built, which is the largest step on this side.
     options?.signal?.throwIfAborted();
-    const source = workbookSnapshotOf(input);
-    return await backend.toXlsxWorkbook(source.snapshot, options, await withEngineContent(source));
+    const source = workbook_snapshot_of(input);
+    return await backend.toXlsxWorkbook(
+      source.snapshot,
+      options,
+      await with_engine_content(source),
+    );
   } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
+    throw xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxWorkbook",
@@ -401,14 +405,14 @@ export function toXlsxWorkbookStream(
 ): ReadableStream<Uint8Array> {
   const backend = xlsxWorkbookBackend();
   if (!backend?.toXlsxWorkbookStream)
-    throw missingXlsxBackend("toXlsxWorkbookStream", "xlsx-export");
-  const source = workbookSnapshotOf(input);
+    throw missing_xlsx_backend("toXlsxWorkbookStream", "xlsx-export");
+  const source = workbook_snapshot_of(input);
   const stream = backend.toXlsxWorkbookStream.bind(backend);
   async function* chunks(): AsyncGenerator<Uint8Array> {
-    yield* stream(source.snapshot, options, await withEngineContent(source));
+    yield* stream(source.snapshot, options, await with_engine_content(source));
   }
   return readableBytes(chunks(), (error) =>
-    xlsxCallFailure(error, options?.signal, {
+    xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-export",
       backend: backend.name,
       functionName: "toXlsxWorkbookStream",
@@ -429,7 +433,7 @@ export async function fromXlsxWorkbookFile(
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
   const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
+  if (!backend) throw missing_xlsx_backend("fromXlsxWorkbookFile", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();
     if (backend.fromXlsxWorkbookFile) return await backend.fromXlsxWorkbookFile(file, options);
@@ -439,7 +443,7 @@ export async function fromXlsxWorkbookFile(
     options?.signal?.throwIfAborted();
     return await backend.fromXlsxWorkbook(bytes, options);
   } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
+    throw xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxWorkbookFile",
@@ -472,12 +476,12 @@ export async function fromXlsxWorkbook(
   options?: XlsxWorkbookOptions,
 ): Promise<WorkbookSnapshot> {
   const backend = xlsxWorkbookBackend();
-  if (!backend) throw missingXlsxBackend("fromXlsxWorkbook", "xlsx-import");
+  if (!backend) throw missing_xlsx_backend("fromXlsxWorkbook", "xlsx-import");
   try {
     options?.signal?.throwIfAborted();
     return await backend.fromXlsxWorkbook(data, options);
   } catch (error) {
-    throw xlsxCallFailure(error, options?.signal, {
+    throw xlsx_call_failure(error, options?.signal, {
       operation: "xlsx-import",
       backend: backend.name,
       functionName: "fromXlsxWorkbook",

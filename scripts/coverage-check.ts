@@ -45,13 +45,13 @@ const COVERAGE_METRICS = ["lines", "functions", "regions"] as const;
 const CONTAMINATED_SEGMENTS = new Set(["dist", "test", "tests", "node_modules", "examples"]);
 const INTEGER = /^\d+$/;
 
-function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
+function assert_record(value: unknown, label: string): asserts value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
 }
 
-function finiteNonNegativeInteger(value: unknown, label: string): number {
+function finite_non_negative_integer(value: unknown, label: string): number {
   if (
     typeof value !== "number" ||
     !Number.isFinite(value) ||
@@ -63,43 +63,43 @@ function finiteNonNegativeInteger(value: unknown, label: string): number {
   return value;
 }
 
-function lcovInteger(raw: string, label: string): number {
+function lcov_integer(raw: string, label: string): number {
   if (!INTEGER.test(raw)) throw new Error(`${label} must be a finite non-negative integer`);
   const value = Number(raw);
-  return finiteNonNegativeInteger(value, label);
+  return finite_non_negative_integer(value, label);
 }
 
 export function normalizeSourcePath(path: string, root: string): string {
   if (typeof path !== "string" || path.trim() === "")
     throw new Error("Coverage source path is empty");
-  const normalizedInput = path.replaceAll("\\", "/");
-  const absolute = normalizedInput.startsWith("/")
-    ? resolve(normalizedInput)
-    : resolve(root, normalizedInput);
-  const repositoryRoot = resolve(root);
-  const repositoryPath = relative(repositoryRoot, absolute);
+  const normalized_input = path.replaceAll("\\", "/");
+  const absolute = normalized_input.startsWith("/")
+    ? resolve(normalized_input)
+    : resolve(root, normalized_input);
+  const repository_root = resolve(root);
+  const repository_path = relative(repository_root, absolute);
   if (
-    repositoryPath === "" ||
-    repositoryPath === ".." ||
-    repositoryPath.startsWith(`..${sep}`) ||
-    repositoryPath.startsWith("/")
+    repository_path === "" ||
+    repository_path === ".." ||
+    repository_path.startsWith(`..${sep}`) ||
+    repository_path.startsWith("/")
   ) {
     throw new Error(`Coverage source escapes repository root: ${path}`);
   }
-  return repositoryPath.split(sep).join("/");
+  return repository_path.split(sep).join("/");
 }
 
-function finaliseLcovRecord(
-  rawPath: string | undefined,
+function finalise_lcov_record(
+  raw_path: string | undefined,
   root: string,
-  lineCounts: Map<number, number>,
+  line_counts: Map<number, number>,
   fields: Map<string, number>,
 ): LcovRecord {
-  if (!rawPath) throw new Error("LCOV record is missing SF");
-  const path = normalizeSourcePath(rawPath, root);
+  if (!raw_path) throw new Error("LCOV record is missing SF");
+  const path = normalizeSourcePath(raw_path, root);
   const lines = {
-    covered: [...lineCounts.values()].filter((count) => count > 0).length,
-    total: lineCounts.size,
+    covered: [...line_counts.values()].filter((count) => count > 0).length,
+    total: line_counts.size,
   };
   const functions = {
     covered: fields.get("FNH") ?? 0,
@@ -118,11 +118,11 @@ function finaliseLcovRecord(
     path,
     lines,
     functions,
-    uncoveredLines: [...lineCounts]
+    uncoveredLines: [...line_counts]
       .filter(([, count]) => count === 0)
       .map(([line]) => line)
       .sort((left, right) => left - right),
-    lineCounts,
+    lineCounts: line_counts,
   };
 }
 
@@ -135,63 +135,64 @@ export function parseLcov(
   if (typeof text !== "string" || text.trim() === "") throw new Error("LCOV report is empty");
   const records: LcovRecord[] = [];
   const paths = new Set<string>();
-  let rawPath: string | undefined;
-  let lineCounts = new Map<number, number>();
+  let raw_path: string | undefined;
+  let line_counts = new Map<number, number>();
   let fields = new Map<string, number>();
   let active = false;
 
-  for (const [zeroBasedLine, rawLine] of text.split(/\r?\n/).entries()) {
-    const reportLine = zeroBasedLine + 1;
-    if (rawLine === "") continue;
-    if (rawLine.startsWith("TN:")) {
-      if (active) throw new Error(`Unexpected TN inside LCOV record at line ${reportLine}`);
+  for (const [zero_based_line, raw_line] of text.split(/\r?\n/).entries()) {
+    const report_line = zero_based_line + 1;
+    if (raw_line === "") continue;
+    if (raw_line.startsWith("TN:")) {
+      if (active) throw new Error(`Unexpected TN inside LCOV record at line ${report_line}`);
       continue;
     }
-    if (rawLine.startsWith("SF:")) {
-      if (active) throw new Error(`Duplicate/nested SF at LCOV line ${reportLine}`);
+    if (raw_line.startsWith("SF:")) {
+      if (active) throw new Error(`Duplicate/nested SF at LCOV line ${report_line}`);
       active = true;
-      rawPath = rawLine.slice(3);
-      lineCounts = new Map();
+      raw_path = raw_line.slice(3);
+      line_counts = new Map();
       fields = new Map();
       continue;
     }
-    if (!active) throw new Error(`LCOV data outside a source record at line ${reportLine}`);
-    if (rawLine.startsWith("DA:")) {
-      const fieldsRaw = rawLine.slice(3).split(",");
-      if (fieldsRaw.length < 2) throw new Error(`Malformed LCOV DA at line ${reportLine}`);
-      const line = lcovInteger(fieldsRaw[0]!, `LCOV DA line at report line ${reportLine}`);
-      if (line === 0) throw new Error(`LCOV DA source line must be positive at line ${reportLine}`);
-      const count = lcovInteger(fieldsRaw[1]!, `LCOV DA count at report line ${reportLine}`);
-      if (lineCounts.has(line)) throw new Error(`Duplicate LCOV DA source line ${line}`);
-      lineCounts.set(line, count);
+    if (!active) throw new Error(`LCOV data outside a source record at line ${report_line}`);
+    if (raw_line.startsWith("DA:")) {
+      const fields_raw = raw_line.slice(3).split(",");
+      if (fields_raw.length < 2) throw new Error(`Malformed LCOV DA at line ${report_line}`);
+      const line = lcov_integer(fields_raw[0]!, `LCOV DA line at report line ${report_line}`);
+      if (line === 0)
+        throw new Error(`LCOV DA source line must be positive at line ${report_line}`);
+      const count = lcov_integer(fields_raw[1]!, `LCOV DA count at report line ${report_line}`);
+      if (line_counts.has(line)) throw new Error(`Duplicate LCOV DA source line ${line}`);
+      line_counts.set(line, count);
       continue;
     }
-    const summary = rawLine.match(/^(FNF|FNH|LF|LH):(.*)$/);
+    const summary = raw_line.match(/^(FNF|FNH|LF|LH):(.*)$/);
     if (summary) {
       const key = summary[1]!;
       if (fields.has(key)) throw new Error(`Duplicate LCOV ${key} field`);
-      fields.set(key, lcovInteger(summary[2]!, `LCOV ${key}`));
+      fields.set(key, lcov_integer(summary[2]!, `LCOV ${key}`));
       continue;
     }
-    if (rawLine.startsWith("FN:") || rawLine.startsWith("FNDA:") || rawLine.startsWith("BR")) {
+    if (raw_line.startsWith("FN:") || raw_line.startsWith("FNDA:") || raw_line.startsWith("BR")) {
       // Function names and branches are not used for Bun scoring. Their counters are
       // represented by FNF/FNH; Rust region data comes from LLVM JSON.
       continue;
     }
-    if (rawLine === "end_of_record") {
+    if (raw_line === "end_of_record") {
       if (lineSummary === "recompute") {
         fields.delete("LF");
         fields.delete("LH");
       }
-      const record = finaliseLcovRecord(rawPath, root, lineCounts, fields);
+      const record = finalise_lcov_record(raw_path, root, line_counts, fields);
       if (paths.has(record.path)) throw new Error(`Duplicate LCOV source record: ${record.path}`);
       paths.add(record.path);
       records.push(record);
       active = false;
-      rawPath = undefined;
+      raw_path = undefined;
       continue;
     }
-    throw new Error(`Unknown LCOV field at line ${reportLine}: ${rawLine}`);
+    throw new Error(`Unknown LCOV field at line ${report_line}: ${raw_line}`);
   }
   if (active) throw new Error("LCOV report ended before end_of_record");
   if (records.length === 0) throw new Error("LCOV report contains no source records");
@@ -207,49 +208,49 @@ export function mergeLcovRecords(
   reports: readonly (readonly LcovRecord[])[],
 ): readonly LcovRecord[] {
   if (reports.length === 0) throw new Error("No LCOV reports to merge");
-  const byPath = new Map<string, LcovRecord[]>();
+  const by_path = new Map<string, LcovRecord[]>();
   for (const report of reports) {
     for (const record of report) {
-      const records = byPath.get(record.path) ?? [];
+      const records = by_path.get(record.path) ?? [];
       records.push(record);
-      byPath.set(record.path, records);
+      by_path.set(record.path, records);
     }
   }
-  return [...byPath]
+  return [...by_path]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([path, records]) => {
-      const lineCounts = new Map<number, number>();
+      const line_counts = new Map<number, number>();
       for (const record of records) {
         for (const [line, count] of record.lineCounts) {
-          lineCounts.set(line, (lineCounts.get(line) ?? 0) + count);
+          line_counts.set(line, (line_counts.get(line) ?? 0) + count);
         }
       }
-      const orderedLineCounts = new Map([...lineCounts].sort(([left], [right]) => left - right));
+      const ordered_line_counts = new Map([...line_counts].sort(([left], [right]) => left - right));
       return {
         path,
         lines: {
-          covered: [...orderedLineCounts.values()].filter((count) => count > 0).length,
-          total: orderedLineCounts.size,
+          covered: [...ordered_line_counts.values()].filter((count) => count > 0).length,
+          total: ordered_line_counts.size,
         },
         functions: {
           covered: Math.max(...records.map((record) => record.functions.covered)),
           total: Math.max(...records.map((record) => record.functions.total)),
         },
-        uncoveredLines: [...orderedLineCounts]
+        uncoveredLines: [...ordered_line_counts]
           .filter(([, count]) => count === 0)
           .map(([line]) => line),
-        lineCounts: orderedLineCounts,
+        lineCounts: ordered_line_counts,
       };
     });
 }
 
-function isRustInlineTestSymbol(name: string): boolean {
+function is_rust_inline_test_symbol(name: string): boolean {
   // Rust 1.96's v0 mangling encodes the path segment `tests` as `5tests`.
   // cargo-llvm-cov drops a separate tests.rs, but not inline #[cfg(test)] modules.
   return name.includes("5tests");
 }
 
-function rustRegion(
+function rust_region(
   value: unknown,
   label: string,
 ): readonly [number, number, number, number, number, number, number, number] {
@@ -257,7 +258,7 @@ function rustRegion(
   return value
     .slice(0, 8)
     .map((item, index) =>
-      finiteNonNegativeInteger(item, `${label}[${index}]`),
+      finite_non_negative_integer(item, `${label}[${index}]`),
     ) as unknown as readonly [number, number, number, number, number, number, number, number];
 }
 
@@ -272,28 +273,28 @@ export function normalizeRustCoverage(
   lcovRecords: readonly LcovRecord[],
   root: string,
 ): readonly CoverageRecord[] {
-  assertRecord(raw, "LLVM JSON");
+  assert_record(raw, "LLVM JSON");
   if (!Array.isArray(raw.data) || raw.data.length !== 1) {
     throw new Error("LLVM JSON must contain exactly one data report");
   }
   const data = raw.data[0];
-  assertRecord(data, "LLVM JSON data report");
+  assert_record(data, "LLVM JSON data report");
   if (!Array.isArray(data.files) || !Array.isArray(data.functions)) {
     throw new Error("LLVM JSON is missing files/functions arrays");
   }
 
-  const reportedFilenames = new Set<string>();
-  for (const [fileIndex, value] of data.files.entries()) {
-    assertRecord(value, `LLVM file ${fileIndex}`);
+  const reported_filenames = new Set<string>();
+  for (const [file_index, value] of data.files.entries()) {
+    assert_record(value, `LLVM file ${file_index}`);
     if (typeof value.filename !== "string") {
-      throw new Error(`LLVM file ${fileIndex} filename is invalid`);
+      throw new Error(`LLVM file ${file_index} filename is invalid`);
     }
-    reportedFilenames.add(value.filename);
+    reported_filenames.add(value.filename);
   }
 
-  const lcovByPath = new Map(lcovRecords.map((record) => [record.path, record]));
+  const lcov_by_path = new Map(lcovRecords.map((record) => [record.path, record]));
   const functions = data.functions.map((value, index) => {
-    assertRecord(value, `LLVM function ${index}`);
+    assert_record(value, `LLVM function ${index}`);
     if (
       typeof value.name !== "string" ||
       !Array.isArray(value.filenames) ||
@@ -301,52 +302,54 @@ export function normalizeRustCoverage(
     ) {
       throw new Error(`LLVM function ${index} has an invalid schema`);
     }
-    const count = finiteNonNegativeInteger(value.count, `LLVM function ${index} count`);
+    const count = finite_non_negative_integer(value.count, `LLVM function ${index} count`);
     const filenames = value.filenames
-      .filter((filename, filenameIndex) => {
+      .filter((filename, filename_index) => {
         if (typeof filename !== "string") {
-          throw new Error(`LLVM function ${index} filename ${filenameIndex} is invalid`);
+          throw new Error(`LLVM function ${index} filename ${filename_index} is invalid`);
         }
-        return reportedFilenames.has(filename);
+        return reported_filenames.has(filename);
       })
       .map((filename) => normalizeSourcePath(filename as string, root));
     return {
       name: value.name,
       count,
       filenames,
-      regions: value.regions.map((region, regionIndex) =>
-        rustRegion(region, `LLVM function ${index} region ${regionIndex}`),
+      regions: value.regions.map((region, region_index) =>
+        rust_region(region, `LLVM function ${index} region ${region_index}`),
       ),
     };
   });
 
   const result: CoverageRecord[] = [];
   const seen = new Set<string>();
-  for (const [fileIndex, value] of data.files.entries()) {
-    assertRecord(value, `LLVM file ${fileIndex}`);
+  for (const [file_index, value] of data.files.entries()) {
+    assert_record(value, `LLVM file ${file_index}`);
     if (typeof value.filename !== "string")
-      throw new Error(`LLVM file ${fileIndex} filename is invalid`);
+      throw new Error(`LLVM file ${file_index} filename is invalid`);
     const path = normalizeSourcePath(value.filename, root);
     if (seen.has(path)) throw new Error(`Duplicate LLVM source record: ${path}`);
     seen.add(path);
-    const lcov = lcovByPath.get(path);
+    const lcov = lcov_by_path.get(path);
     if (!lcov) throw new Error(`LLVM JSON source is missing from LCOV: ${path}`);
 
-    const fileFunctions = functions.filter((fn) => fn.filenames.includes(path));
-    const testFunctions = fileFunctions.filter((fn) => isRustInlineTestSymbol(fn.name));
-    const productionFunctions = fileFunctions.filter((fn) => !isRustInlineTestSymbol(fn.name));
-    const testRanges = testFunctions.flatMap((fn) =>
+    const file_functions = functions.filter((fn) => fn.filenames.includes(path));
+    const test_functions = file_functions.filter((fn) => is_rust_inline_test_symbol(fn.name));
+    const production_functions = file_functions.filter(
+      (fn) => !is_rust_inline_test_symbol(fn.name),
+    );
+    const test_ranges = test_functions.flatMap((fn) =>
       fn.regions.map((region) => ({ start: region[0], end: region[2] })),
     );
-    const lineCounts = new Map(
+    const line_counts = new Map(
       [...lcov.lineCounts].filter(
-        ([line]) => !testRanges.some((range) => line >= range.start && line <= range.end),
+        ([line]) => !test_ranges.some((range) => line >= range.start && line <= range.end),
       ),
     );
 
     const definitions = new Map<string, number[]>();
     const regions = new Map<string, number[]>();
-    for (const fn of productionFunctions) {
+    for (const fn of production_functions) {
       const first = fn.regions[0];
       if (first) {
         const key = `${first[0]}:${first[1]}`;
@@ -366,8 +369,8 @@ export function normalizeRustCoverage(
     result.push({
       path,
       lines: {
-        covered: [...lineCounts.values()].filter((count) => count > 0).length,
-        total: lineCounts.size,
+        covered: [...line_counts.values()].filter((count) => count > 0).length,
+        total: line_counts.size,
       },
       functions: {
         covered: [...definitions.values()].filter((counts) => counts.some((count) => count > 0))
@@ -378,17 +381,17 @@ export function normalizeRustCoverage(
         covered: [...regions.values()].filter((counts) => counts.some((count) => count > 0)).length,
         total: regions.size,
       },
-      uncoveredLines: [...lineCounts]
+      uncoveredLines: [...line_counts]
         .filter(([, count]) => count === 0)
         .map(([line]) => line)
         .sort((left, right) => left - right),
-      lineCounts,
+      lineCounts: line_counts,
     });
   }
   return result;
 }
 
-function isCoverageContamination(path: string): boolean {
+function is_coverage_contamination(path: string): boolean {
   const segments = path.split("/");
   return (
     segments.some((segment) => CONTAMINATED_SEGMENTS.has(segment)) ||
@@ -418,7 +421,7 @@ const METRIC_KEYS: Readonly<Record<string, true>> = {
 };
 const EXCLUSION_KEYS: Readonly<Record<string, true>> = { path: true, reason: true };
 
-function validateKeys(
+function validate_keys(
   value: Record<string, unknown>,
   allowed: Readonly<Record<string, true>>,
   label: string,
@@ -428,59 +431,59 @@ function validateKeys(
   }
 }
 
-function validateText(value: unknown, label: string): asserts value is string {
+function validate_text(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || value.trim() === "")
     throw new Error(`${label} must be non-empty`);
 }
 
-function validateRepositoryPath(value: unknown, label: string): asserts value is string {
-  validateText(value, label);
+function validate_repository_path(value: unknown, label: string): asserts value is string {
+  validate_text(value, label);
   if (value.startsWith("/") || value.includes("\\") || value.includes("..")) {
     throw new Error(`${label} must be repository-relative`);
   }
 }
 
-function parsePercent(value: unknown, label: string): number {
+function parse_percent(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
     throw new Error(`${label} must be an integer percentage`);
   }
   return value;
 }
 
-function parseFloor(raw: unknown, language: CoverageLanguage): CoverageFloor {
+function parse_floor(raw: unknown, language: CoverageLanguage): CoverageFloor {
   const label = `Coverage ${language} floor`;
-  assertRecord(raw, label);
-  validateKeys(raw, METRIC_KEYS, label);
-  const lines = parsePercent(raw.lines, `${label} lines`);
-  const functions = parsePercent(raw.functions, `${label} functions`);
+  assert_record(raw, label);
+  validate_keys(raw, METRIC_KEYS, label);
+  const lines = parse_percent(raw.lines, `${label} lines`);
+  const functions = parse_percent(raw.functions, `${label} functions`);
   if (raw.regions === undefined) return { lines, functions };
-  return { lines, functions, regions: parsePercent(raw.regions, `${label} regions`) };
+  return { lines, functions, regions: parse_percent(raw.regions, `${label} regions`) };
 }
 
 export function parseCoveragePolicy(raw: unknown): CoveragePolicy {
-  assertRecord(raw, "Coverage policy");
-  validateKeys(raw, POLICY_KEYS, "Coverage policy");
+  assert_record(raw, "Coverage policy");
+  validate_keys(raw, POLICY_KEYS, "Coverage policy");
   if (raw.schemaVersion !== COVERAGE_SCHEMA_VERSION) {
     throw new Error(`Unsupported coverage policy schema version: ${String(raw.schemaVersion)}`);
   }
-  assertRecord(raw.floors, "Coverage policy floors");
-  validateKeys(raw.floors, FLOOR_LANGUAGE_KEYS, "Coverage policy floors");
+  assert_record(raw.floors, "Coverage policy floors");
+  validate_keys(raw.floors, FLOOR_LANGUAGE_KEYS, "Coverage policy floors");
   const floors = {
-    typescript: parseFloor(raw.floors.typescript, "typescript"),
-    rust: parseFloor(raw.floors.rust, "rust"),
+    typescript: parse_floor(raw.floors.typescript, "typescript"),
+    rust: parse_floor(raw.floors.rust, "rust"),
   };
   if (!Array.isArray(raw.exclusions))
     throw new Error("Coverage policy exclusions must be an array");
-  const excludedPaths = new Set<string>();
+  const excluded_paths = new Set<string>();
   const exclusions = raw.exclusions.map((value, index): CoverageExclusion => {
     const label = `Coverage exclusion ${index}`;
-    assertRecord(value, label);
-    validateKeys(value, EXCLUSION_KEYS, label);
-    validateRepositoryPath(value.path, `${label} path`);
-    validateText(value.reason, `${label} reason`);
-    if (excludedPaths.has(value.path))
+    assert_record(value, label);
+    validate_keys(value, EXCLUSION_KEYS, label);
+    validate_repository_path(value.path, `${label} path`);
+    validate_text(value.reason, `${label} reason`);
+    if (excluded_paths.has(value.path))
       throw new Error(`Duplicate coverage exclusion: ${value.path}`);
-    excludedPaths.add(value.path);
+    excluded_paths.add(value.path);
     return { path: value.path, reason: value.reason };
   });
   return { schemaVersion: COVERAGE_SCHEMA_VERSION, floors, exclusions };
@@ -495,8 +498,8 @@ export function scoredRuntimePaths(
   const discovered = new Set(runtimePaths);
   const excluded = new Set<string>();
   for (const exclusion of policy.exclusions) {
-    const exclusionLanguage = exclusion.path.endsWith(".rs") ? "rust" : "typescript";
-    if (exclusionLanguage !== language) continue;
+    const exclusion_language = exclusion.path.endsWith(".rs") ? "rust" : "typescript";
+    if (exclusion_language !== language) continue;
     if (!discovered.has(exclusion.path)) {
       throw new Error(`Coverage exclusion has no runtime source file: ${exclusion.path}`);
     }
@@ -505,9 +508,9 @@ export function scoredRuntimePaths(
   return new Set(runtimePaths.filter((path) => !excluded.has(path)));
 }
 
-function assertCounts(counts: CoverageCounts, label: string): void {
-  finiteNonNegativeInteger(counts.covered, `${label} covered`);
-  finiteNonNegativeInteger(counts.total, `${label} total`);
+function assert_counts(counts: CoverageCounts, label: string): void {
+  finite_non_negative_integer(counts.covered, `${label} covered`);
+  finite_non_negative_integer(counts.total, `${label} total`);
   if (counts.covered > counts.total) throw new Error(`${label} covered exceeds total`);
 }
 
@@ -520,21 +523,21 @@ export function evaluateCoveragePolicy(options: {
   readonly records: readonly CoverageRecord[];
   readonly scoredPaths: ReadonlySet<string>;
 }): CoverageTotals {
-  const { policy, language, records, scoredPaths } = options;
-  const recordByPath = new Map<string, CoverageRecord>();
+  const { policy, language, records, scoredPaths: scored_paths } = options;
+  const record_by_path = new Map<string, CoverageRecord>();
   for (const record of records) {
-    if (recordByPath.has(record.path))
+    if (record_by_path.has(record.path))
       throw new Error(`Duplicate normalized coverage source: ${record.path}`);
-    if (isCoverageContamination(record.path)) {
+    if (is_coverage_contamination(record.path)) {
       throw new Error(`Generated/test output entered scored coverage: ${record.path}`);
     }
-    assertCounts(record.lines, `${record.path} lines`);
-    assertCounts(record.functions, `${record.path} functions`);
-    if (record.regions) assertCounts(record.regions, `${record.path} regions`);
-    recordByPath.set(record.path, record);
+    assert_counts(record.lines, `${record.path} lines`);
+    assert_counts(record.functions, `${record.path} functions`);
+    if (record.regions) assert_counts(record.regions, `${record.path} regions`);
+    record_by_path.set(record.path, record);
   }
-  for (const path of scoredPaths) {
-    if (!recordByPath.has(path))
+  for (const path of scored_paths) {
+    if (!record_by_path.has(path))
       throw new Error(`Coverage report is missing scored source: ${path}`);
   }
 
@@ -545,7 +548,7 @@ export function evaluateCoveragePolicy(options: {
     if (minimum === undefined) continue;
     let covered = 0;
     let total = 0;
-    for (const record of recordByPath.values()) {
+    for (const record of record_by_path.values()) {
       const counts = record[metric];
       if (!counts) throw new Error(`Coverage report is missing ${metric} data for ${record.path}`);
       covered += counts.covered;
@@ -571,11 +574,11 @@ export function serialiseNormalizedLcov(records: readonly CoverageRecord[]): str
         `FNF:${record.functions.total}`,
         `FNH:${record.functions.covered}`,
       ];
-      const lineCounts = record.lineCounts;
-      if (!lineCounts) {
+      const line_counts = record.lineCounts;
+      if (!line_counts) {
         throw new Error(`Normalized coverage is missing line counters for ${record.path}`);
       }
-      for (const [line, count] of [...lineCounts].sort(([left], [right]) => left - right)) {
+      for (const [line, count] of [...line_counts].sort(([left], [right]) => left - right)) {
         lines.push(`DA:${line},${count}`);
       }
       lines.push(`LF:${record.lines.total}`, `LH:${record.lines.covered}`, "end_of_record");

@@ -32,9 +32,9 @@ import {
   useState,
 } from "react";
 
-const useCommitLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+const use_commit_layout_effect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-function publishGrid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
+function publish_grid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   if (typeof ref === "function") ref(grid);
   else if (ref) ref.current = grid;
 }
@@ -105,119 +105,119 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
 const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
   function SheetwriteGrid(props, ref): ReactElement {
     const {
-      className,
+      className: class_name,
       style,
       fallback,
-      wasmSource,
-      onInitializationError,
-      onGridChange,
-      onRowDelta,
-      onSelectionChange,
-      onViewportChange,
-      onEditBegin,
-      onEditCommit,
-      onSearch,
-      onCommandStateChange,
-      onActiveSheetChange,
-      onMutationRejected,
-      onRendererFallback,
-      onDatasourceError,
-      onExportError,
-      onKeyBindingsChange,
-      onReady,
-      rowBridge,
+      wasmSource: wasm_source,
+      onInitializationError: on_initialization_error,
+      onGridChange: on_grid_change,
+      onRowDelta: on_row_delta,
+      onSelectionChange: on_selection_change,
+      onViewportChange: on_viewport_change,
+      onEditBegin: on_edit_begin,
+      onEditCommit: on_edit_commit,
+      onSearch: on_search,
+      onCommandStateChange: on_command_state_change,
+      onActiveSheetChange: on_active_sheet_change,
+      onMutationRejected: on_mutation_rejected,
+      onRendererFallback: on_renderer_fallback,
+      onDatasourceError: on_datasource_error,
+      onExportError: on_export_error,
+      onKeyBindingsChange: on_key_bindings_change,
+      onReady: on_ready,
+      rowBridge: row_bridge,
       workbook,
       data,
       datasource,
-      datasourceStorage,
+      datasourceStorage: datasource_storage,
       renderer,
-      workerUrl,
+      workerUrl: worker_url,
       presentation,
       theme,
-      readOnly,
-      protectionResolver,
-      mutationPolicy,
-      transactionResourceLimits,
-      hyperlinkActivation,
+      readOnly: read_only,
+      protectionResolver: protection_resolver,
+      mutationPolicy: mutation_policy,
+      transactionResourceLimits: transaction_resource_limits,
+      hyperlinkActivation: hyperlink_activation,
       addons,
       renderers,
       editors,
       overscan,
-      minColumns,
+      minColumns: min_columns,
       config,
       height,
       fill,
-      ...hostAttributes
+      ...host_attributes
     } = props;
 
-    const hostRef = useRef<HTMLDivElement | null>(null);
-    const controllerRef = useRef<AdapterGridController | null>(null);
-    const currentGrid = useRef<Grid | null>(null);
-    const publishedRef = useRef<ForwardedRef<Grid> | null>(null);
-    const [initializationState, setInitializationState] = useState<"loading" | "ready" | "error">(
-      "loading",
-    );
+    const host_ref = useRef<HTMLDivElement | null>(null);
+    const controller_ref = useRef<AdapterGridController | null>(null);
+    const current_grid = useRef<Grid | null>(null);
+    const published_ref = useRef<ForwardedRef<Grid> | null>(null);
+    const [initialization_state, set_initialization_state] = useState<
+      "loading" | "ready" | "error"
+    >("loading");
 
     const handlers = useRef<GridAdapterEventHandlers | null>(null);
-    useCommitLayoutEffect(() => {
-      const committedHandlers: GridAdapterEventHandlers = {
-        onGridChange,
-        onRowDelta,
-        onSelectionChange,
-        onViewportChange,
-        onEditBegin,
-        onEditCommit,
-        onSearch,
-        onCommandStateChange,
-        onActiveSheetChange,
-        onMutationRejected,
-        onRendererFallback,
-        onDatasourceError,
-        onExportError,
-        onKeyBindingsChange,
-        onReady,
-        onInitializationError,
+    use_commit_layout_effect(() => {
+      const committed_handlers: GridAdapterEventHandlers = {
+        onGridChange: on_grid_change,
+        onRowDelta: on_row_delta,
+        onSelectionChange: on_selection_change,
+        onViewportChange: on_viewport_change,
+        onEditBegin: on_edit_begin,
+        onEditCommit: on_edit_commit,
+        onSearch: on_search,
+        onCommandStateChange: on_command_state_change,
+        onActiveSheetChange: on_active_sheet_change,
+        onMutationRejected: on_mutation_rejected,
+        onRendererFallback: on_renderer_fallback,
+        onDatasourceError: on_datasource_error,
+        onExportError: on_export_error,
+        onKeyBindingsChange: on_key_bindings_change,
+        onReady: on_ready,
+        onInitializationError: on_initialization_error,
       };
-      handlers.current = committedHandlers;
+      handlers.current = committed_handlers;
       return () => {
-        if (handlers.current === committedHandlers) handlers.current = null;
+        if (handlers.current === committed_handlers) handlers.current = null;
       };
     }, [
-      onGridChange,
-      onRowDelta,
-      onSelectionChange,
-      onViewportChange,
-      onEditBegin,
-      onEditCommit,
-      onSearch,
-      onCommandStateChange,
-      onActiveSheetChange,
-      onMutationRejected,
-      onRendererFallback,
-      onDatasourceError,
-      onExportError,
-      onKeyBindingsChange,
-      onReady,
-      onInitializationError,
+      on_grid_change,
+      on_row_delta,
+      on_selection_change,
+      on_viewport_change,
+      on_edit_begin,
+      on_edit_commit,
+      on_search,
+      on_command_state_change,
+      on_active_sheet_change,
+      on_mutation_rejected,
+      on_renderer_fallback,
+      on_datasource_error,
+      on_export_error,
+      on_key_bindings_change,
+      on_ready,
+      on_initialization_error,
     ]);
 
-    useCommitLayoutEffect(() => {
-      const previous = publishedRef.current;
-      if (previous && previous !== ref) publishGrid(previous, null);
-      publishedRef.current = ref;
-      publishGrid(ref, currentGrid.current);
+    use_commit_layout_effect(() => {
+      const previous = published_ref.current;
+      if (previous && previous !== ref) publish_grid(previous, null);
+      published_ref.current = ref;
+      publish_grid(ref, current_grid.current);
       return () => {
-        if (publishedRef.current !== ref) return;
-        publishGrid(ref, null);
-        publishedRef.current = null;
+        if (published_ref.current !== ref) return;
+        publish_grid(ref, null);
+        published_ref.current = null;
       };
     }, [ref]);
 
-    if (!controllerRef.current) {
-      const forwardCommandStateChange: NonNullable<
+    if (!controller_ref.current) {
+      const forward_command_state_change: NonNullable<
         GridControllerHandlers["onCommandStateChange"]
       > = (event) => handlers.current?.onCommandStateChange?.(event);
-      controllerRef.current = createAdapterGridController(
+      controller_ref.current = createAdapterGridController(
         {
           onGridChange: (event) => handlers.current?.onGridChange?.(event),
           onRowDelta: (event) => handlers.current?.onRowDelta?.(event),
@@ -227,7 +227,9 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
           onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
           onSearch: (event) => handlers.current?.onSearch?.(event),
           get onCommandStateChange() {
-            return handlers.current?.onCommandStateChange ? forwardCommandStateChange : undefined;
+            return handlers.current?.onCommandStateChange
+              ? forward_command_state_change
+              : undefined;
           },
           onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
           onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
@@ -240,41 +242,45 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
         },
         {
           publish(grid) {
-            currentGrid.current = grid;
-            publishGrid(publishedRef.current, grid);
+            current_grid.current = grid;
+            publish_grid(published_ref.current, grid);
           },
-          setInitializationState,
+          setInitializationState: set_initialization_state,
           reportConsumerFailure(thrown) {
             reportError(thrown);
           },
         } satisfies GridPublicationAdapter,
       );
     }
-    const committedInput = useRef<AdapterGridInput>({
+    const committed_input = useRef<AdapterGridInput>({
       options: extractGridOptions({ ...props }),
-      rowBridge,
-      wasmSource,
+      rowBridge: row_bridge,
+      wasmSource: wasm_source,
     });
-    useCommitLayoutEffect(() => {
-      committedInput.current = { options: extractGridOptions({ ...props }), rowBridge, wasmSource };
+    use_commit_layout_effect(() => {
+      committed_input.current = {
+        options: extractGridOptions({ ...props }),
+        rowBridge: row_bridge,
+        wasmSource: wasm_source,
+      };
     });
     useEffect(() => {
-      const controller = controllerRef.current;
-      const host = hostRef.current;
+      const controller = controller_ref.current;
+      const host = host_ref.current;
       if (!controller || !host) return;
-      controller.mount(host, committedInput.current);
+      controller.mount(host, committed_input.current);
       return () => controller.unmount();
     }, []);
     useEffect(() => {
-      controllerRef.current?.update(committedInput.current);
+      controller_ref.current?.update(committed_input.current);
     });
 
-    const hostClassName = className ? `sheetwrite ${className}` : "sheetwrite";
+    const host_class_name = class_name ? `sheetwrite ${class_name}` : "sheetwrite";
     const sizing = gridSizeStyle({ height, fill });
-    const hostStyle = { ...style, ...sizing };
+    const host_style = { ...style, ...sizing };
     return (
-      <div {...hostAttributes} ref={hostRef} className={hostClassName} style={hostStyle}>
-        {initializationState === "ready" ? null : fallback}
+      <div {...host_attributes} ref={host_ref} className={host_class_name} style={host_style}>
+        {initialization_state === "ready" ? null : fallback}
       </div>
     );
   },
@@ -324,25 +330,32 @@ const SheetwriteComponent = forwardRef<
   Grid,
   SheetwriteProps<Record<string, CellScalar>, RowBridgeId>
 >(function Sheetwrite(
-  { columns, defaultRows, sheetName, getRowId, createRowId, ...props },
+  {
+    columns,
+    defaultRows: default_rows,
+    sheetName: sheet_name,
+    getRowId: get_row_id,
+    createRowId: create_row_id,
+    ...props
+  },
   ref,
 ): ReactElement {
   assertGridSize({ height: props.height, fill: props.fill });
   const input = useMemo(
-    () => createSimpleGridInput({ columns, defaultRows, sheetName }),
-    [columns, defaultRows, sheetName],
+    () => createSimpleGridInput({ columns, defaultRows: default_rows, sheetName: sheet_name }),
+    [columns, default_rows, sheet_name],
   );
-  const rowBridge = useMemo(
+  const row_bridge = useMemo(
     () =>
       createSimpleRowBridge({
         columns,
-        defaultRows,
-        ...(getRowId === undefined ? {} : { getRowId }),
-        ...(createRowId === undefined ? {} : { createRowId }),
+        defaultRows: default_rows,
+        ...(get_row_id === undefined ? {} : { getRowId: get_row_id }),
+        ...(create_row_id === undefined ? {} : { createRowId: create_row_id }),
       }),
-    [columns, defaultRows, getRowId, createRowId],
+    [columns, default_rows, get_row_id, create_row_id],
   );
-  return <SheetwriteGrid {...props} {...input} rowBridge={rowBridge} ref={ref} />;
+  return <SheetwriteGrid {...props} {...input} rowBridge={row_bridge} ref={ref} />;
 });
 
 /**

@@ -47,10 +47,10 @@ const OUTLINE: CellStyle = {
   },
 };
 
-function cell(rowOffset: number, colOffset: number, value: string | number, style?: CellStyle) {
+function cell(row_offset: number, col_offset: number, value: string | number, style?: CellStyle) {
   return {
-    rowOffset,
-    colOffset,
+    rowOffset: row_offset,
+    colOffset: col_offset,
     value: { kind: "literal", value } as const,
     ...(style ? { style } : {}),
   };
@@ -241,17 +241,17 @@ export function applyStyleCommand(grid: Grid, command: StyleCommand): void {
   }
 }
 
-function subsetMatches(expected: unknown, actual: unknown): boolean {
+function subset_matches(expected: unknown, actual: unknown): boolean {
   if (typeof expected !== "object" || expected === null) return expected === actual;
   if (typeof actual !== "object" || actual === null) return false;
 
   return Object.entries(expected).every(([key, value]) =>
-    subsetMatches(value, Reflect.get(actual, key)),
+    subset_matches(value, Reflect.get(actual, key)),
   );
 }
 
 /** XLSX may move column defaults onto cells and omit false font flags. Compare effective styles. */
-function stylesByCell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
+function styles_by_cell(snapshot: WorkbookSnapshot): Map<string, CellStyle> {
   const result = new Map<string, CellStyle>();
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {
@@ -289,15 +289,15 @@ export async function roundTripFormatting(grid: Pick<Grid, "exportSnapshot">) {
   const snapshot = await fromXlsxWorkbook(bytes, {
     onWarning: (warning) => warnings.push(warning),
   });
-  const imported = stylesByCell(snapshot);
-  const expected = stylesByCell(source);
+  const imported = styles_by_cell(snapshot);
+  const expected = styles_by_cell(source);
   const differences: string[] = [];
   for (const [address, style] of expected) {
-    if (!subsetMatches(style, imported.get(address))) differences.push(address);
+    if (!subset_matches(style, imported.get(address))) differences.push(address);
   }
   for (const sheet of source.sheets) {
     const after = snapshot.sheets.find((candidate) => candidate.name === sheet.name);
-    if (!subsetMatches(sheet.conditionalFormats ?? [], after?.conditionalFormats ?? []))
+    if (!subset_matches(sheet.conditionalFormats ?? [], after?.conditionalFormats ?? []))
       differences.push(`${sheet.name}!conditional formats`);
   }
 

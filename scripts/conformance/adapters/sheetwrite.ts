@@ -36,21 +36,21 @@ const ENGINE_ERRORS: ReadonlySet<string> = new Set([
 
 function classify(
   value: CellScalar,
-  numberFormat: string | undefined,
+  number_format: string | undefined,
   formatter: typeof formatNumberType,
 ): CellResult {
-  const displayedText =
-    numberFormat !== undefined && (typeof value === "number" || typeof value === "string")
-      ? formatter(value, numberFormat, "en-US")
+  const displayed_text =
+    number_format !== undefined && (typeof value === "number" || typeof value === "string")
+      ? formatter(value, number_format, "en-US")
       : undefined;
   if (value === null) return { type: "blank" };
-  if (typeof value === "number") return { type: "number", value, displayedText };
+  if (typeof value === "number") return { type: "number", value, displayedText: displayed_text };
   if (typeof value === "boolean") return { type: "boolean", value };
   if (ENGINE_ERRORS.has(value)) return { type: "error", error: value };
   return { type: "string", value };
 }
 
-function fixtureWorkbook(): Workbook {
+function fixture_workbook(): Workbook {
   const columns: Column[] = Array.from({ length: 32 }, (_, index) => ({
     key: `c${index}`,
     header: `Column ${index + 1}`,
@@ -80,27 +80,27 @@ const FEATURE_CHECKS: Readonly<Record<string, (context: FeatureContext) => boole
     apply([literal("A10", 4)]);
     return store.getCell({ sheet: "oracle", ...a1("B10") }).resolved === 5;
   },
-  "fill-formula": ({ apply, literal, formula, store, shiftA1Refs }) => {
+  "fill-formula": ({ apply, literal, formula, store, shiftA1Refs: shift_a1_refs }) => {
     const source = "=A20+10";
     apply([
       literal("A20", 1),
       literal("A21", 2),
       literal("A22", 3),
       formula("B20", source),
-      formula("B21", shiftA1Refs(source, 1, 0)),
-      formula("B22", shiftA1Refs(source, 2, 0)),
+      formula("B21", shift_a1_refs(source, 1, 0)),
+      formula("B22", shift_a1_refs(source, 2, 0)),
     ]);
     return ["B20", "B21", "B22"].every(
       (cell, index) => store.getCell({ sheet: "oracle", ...a1(cell) }).resolved === index + 11,
     );
   },
-  "copy-formula": ({ apply, literal, formula, store, shiftA1Refs }) => {
+  "copy-formula": ({ apply, literal, formula, store, shiftA1Refs: shift_a1_refs }) => {
     const source = "=A30*2";
     apply([
       literal("A30", 7),
       literal("A31", 8),
       formula("B30", source),
-      formula("B31", shiftA1Refs(source, 1, 0)),
+      formula("B31", shift_a1_refs(source, 1, 0)),
     ]);
     return store.getCell({ sheet: "oracle", ...a1("B31") }).resolved === 16;
   },
@@ -213,7 +213,7 @@ const FEATURE_CHECKS: Readonly<Record<string, (context: FeatureContext) => boole
           name: "Feature Sheet",
           order: 1,
           rowCount: 16,
-          columns: fixtureWorkbook().sheets[0]!.columns,
+          columns: fixture_workbook().sheets[0]!.columns,
           cells: [],
         },
       },
@@ -251,7 +251,7 @@ const FEATURE_CHECKS: Readonly<Record<string, (context: FeatureContext) => boole
             name: "Visibility",
             order: store.getWorkbook().sheets.length,
             rowCount: 16,
-            columns: fixtureWorkbook().sheets[0]!.columns,
+            columns: fixture_workbook().sheets[0]!.columns,
             cells: [],
           },
         },
@@ -426,11 +426,11 @@ export async function runSheetwriteCase(entry: ConformanceCase): Promise<Conform
   if (entry.unsupported) return { type: "unsupported" };
 
   const [
-    { initSheetwrite },
-    { formatNumber },
+    { initSheetwrite: init_sheetwrite },
+    { formatNumber: format_number },
     { SheetwriteStore },
     { DocumentController },
-    { shiftA1Refs },
+    { shiftA1Refs: shift_a1_refs },
   ] = await Promise.all([
     import("../../../packages/core/src/grid.js"),
     import("../../../packages/core/src/number-format.js"),
@@ -438,12 +438,12 @@ export async function runSheetwriteCase(entry: ConformanceCase): Promise<Conform
     import("../../../packages/core/src/document-controller.js"),
     import("../../../packages/core/src/a1.js"),
   ]);
-  await initSheetwrite();
+  await init_sheetwrite();
 
-  const store = new SheetwriteStore(fixtureWorkbook());
+  const store = new SheetwriteStore(fixture_workbook());
   try {
     if (entry.kind !== "workbook" && entry.kind !== "mutation") {
-      return runFormulaCase(entry, store, formatNumber);
+      return run_formula_case(entry, store, format_number);
     }
 
     if (entry.feature === "mutation-matrix" || entry.feature === "workbook-matrix") {
@@ -457,24 +457,24 @@ export async function runSheetwriteCase(entry: ConformanceCase): Promise<Conform
         onHistoryApplied: () => undefined,
       });
       try {
-        return runFeatureChecks(entry, store, controller, shiftA1Refs);
+        return run_feature_checks(entry, store, controller, shift_a1_refs);
       } finally {
         controller.destroy();
       }
     }
 
-    return runWorkbookOperations(entry, store);
+    return run_workbook_operations(entry, store);
   } finally {
     store.dispose();
   }
 }
 
 /** Run each listed feature check against one store and count the features that behaved. */
-function runFeatureChecks(
+function run_feature_checks(
   entry: ConformanceCase,
   store: SheetwriteStore,
   controller: DocumentController,
-  shiftA1Refs: typeof shiftA1RefsType,
+  shift_a1_refs: typeof shiftA1RefsType,
 ): ConformanceResult {
   const context: FeatureContext = {
     store,
@@ -495,7 +495,7 @@ function runFeatureChecks(
       addr: { sheet: "oracle", ...a1(cell) },
       value: { kind: "formula", src },
     }),
-    shiftA1Refs,
+    shiftA1Refs: shift_a1_refs,
   };
 
   const checks: Record<string, boolean> = {};
@@ -511,40 +511,43 @@ function runFeatureChecks(
 }
 
 /** Apply the case's sheet and cell operations as one transaction and report the workbook. */
-function runWorkbookOperations(entry: ConformanceCase, store: SheetwriteStore): ConformanceResult {
+function run_workbook_operations(
+  entry: ConformanceCase,
+  store: SheetwriteStore,
+): ConformanceResult {
   const patches: DocumentOp[] = [];
-  const observedCells: Array<{ sheet: string; cell: string }> = [];
-  let activeSheet = "oracle";
-  let createdSheets = 0;
+  const observed_cells: Array<{ sheet: string; cell: string }> = [];
+  let active_sheet = "oracle";
+  let created_sheets = 0;
   for (const operation of entry.operations ?? []) {
     if (operation.op === "create-sheet" && isNonemptyString(operation.name)) {
-      if (createdSheets === 0) {
-        patches.push({ op: "renameSheet", sheet: activeSheet, name: operation.name });
+      if (created_sheets === 0) {
+        patches.push({ op: "renameSheet", sheet: active_sheet, name: operation.name });
       } else {
-        const id = `oracle-${createdSheets + 1}`;
+        const id = `oracle-${created_sheets + 1}`;
         patches.push({
           op: "addSheet",
           sheet: {
             id,
             name: operation.name,
-            order: createdSheets,
+            order: created_sheets,
             rowCount: 256,
-            columns: fixtureWorkbook().sheets[0]!.columns,
+            columns: fixture_workbook().sheets[0]!.columns,
             cells: [],
           },
         });
-        activeSheet = id;
+        active_sheet = id;
       }
-      createdSheets += 1;
+      created_sheets += 1;
     } else if (operation.op === "set" && isNonemptyString(operation.cell)) {
       patches.push({
         op: "set",
-        addr: { sheet: activeSheet, ...a1(operation.cell) },
+        addr: { sheet: active_sheet, ...a1(operation.cell) },
         value: { kind: "literal", value: operation.value as CellScalar } satisfies CellValue,
       });
-      observedCells.push({ sheet: activeSheet, cell: operation.cell });
+      observed_cells.push({ sheet: active_sheet, cell: operation.cell });
     } else if (operation.op === "rename-sheet" && isNonemptyString(operation.name)) {
-      patches.push({ op: "renameSheet", sheet: activeSheet, name: operation.name });
+      patches.push({ op: "renameSheet", sheet: active_sheet, name: operation.name });
     } else if (
       operation.op === "set-visibility" &&
       (operation.visibility === "visible" ||
@@ -553,7 +556,7 @@ function runWorkbookOperations(entry: ConformanceCase, store: SheetwriteStore): 
     ) {
       patches.push({
         op: "setSheetVisibility",
-        sheet: activeSheet,
+        sheet: active_sheet,
         visibility: operation.visibility,
       });
     } else {
@@ -565,7 +568,7 @@ function runWorkbookOperations(entry: ConformanceCase, store: SheetwriteStore): 
     throw new Error(`${entry.id}: workbook operations rejected: ${canonicalJson(outcome)}`);
   }
   const workbook = store.getWorkbook();
-  const active = workbook.sheets.find((sheet) => sheet.id === activeSheet);
+  const active = workbook.sheets.find((sheet) => sheet.id === active_sheet);
   return {
     type: "workbook",
     value: {
@@ -575,7 +578,7 @@ function runWorkbookOperations(entry: ConformanceCase, store: SheetwriteStore): 
         name: sheet.name,
         visibility: sheet.visibility ?? "visible",
         cells: Object.fromEntries(
-          observedCells
+          observed_cells
             .filter((cell) => cell.sheet === sheet.id)
             .map((cell) => [
               cell.cell,
@@ -588,10 +591,10 @@ function runWorkbookOperations(entry: ConformanceCase, store: SheetwriteStore): 
 }
 
 /** Evaluate the case's formula over its inputs and classify the anchor or spilled values. */
-function runFormulaCase(
+function run_formula_case(
   entry: ConformanceCase,
   store: SheetwriteStore,
-  formatNumber: typeof formatNumberType,
+  format_number: typeof formatNumberType,
 ): ConformanceResult {
   const patches: DocumentOp[] = entry.calculation
     ? [{ op: "setCalculation", calculation: { ...entry.calculation } }]
@@ -616,7 +619,7 @@ function runFormulaCase(
   const anchor = classify(
     store.getCell({ sheet: "oracle", ...target }).resolved,
     entry.numberFormat,
-    formatNumber,
+    format_number,
   );
   if (entry.expected.type !== "array") return { ...anchor, formula: entry.formula };
   const rows = entry.expected.rows!;

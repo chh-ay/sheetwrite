@@ -29,7 +29,7 @@ afterEach(() => {
  * Sheet 1 holds the fixture rows (amounts 0.5, 10.5, … 50.5; cities Phnom
  * Penh, Tokyo, Berlin repeating); sheet s2 holds the subtotals over them.
  */
-function storeWithSubtotals(workbook: Workbook = makeWorkbook(ROWS)): SheetwriteStore {
+function store_with_subtotals(workbook: Workbook = makeWorkbook(ROWS)): SheetwriteStore {
   workbook.sheets.push(sheet("s2", 2));
   const store = new SheetwriteStore(workbook, makeColumnarData(workbook.sheets[0]?.rowCount));
   stores.push(store);
@@ -51,7 +51,7 @@ function storeWithSubtotals(workbook: Workbook = makeWorkbook(ROWS)): Sheetwrite
 }
 
 /** Tokyo rows 1 and 4 pass the filter; row 0 is hidden and rows 4-5 are a collapsed group. */
-function workbookWithSavedView(): Workbook {
+function workbook_with_saved_view(): Workbook {
   const workbook = makeWorkbook(ROWS);
   const [data] = workbook.sheets;
   if (!data) throw new Error("fixture has a first sheet");
@@ -62,10 +62,10 @@ function workbookWithSavedView(): Workbook {
   return workbook;
 }
 
-function visibleDataRows(store: SheetwriteStore, sheetId: string): number[] {
+function visible_data_rows(store: SheetwriteStore, sheet_id: string): number[] {
   const rows: number[] = [];
   for (let row = 0; row < ROWS; row++) {
-    if (store.viewRowOf(sheetId, row) !== null) rows.push(row);
+    if (store.viewRowOf(sheet_id, row) !== null) rows.push(row);
   }
 
   return rows;
@@ -77,7 +77,7 @@ function subtotals(store: SheetwriteStore): unknown[] {
 
 describe("SUBTOTAL over hidden rows", () => {
   it("skips filtered rows for every code and rows hidden by hand or by a group for 101-111", () => {
-    const store = storeWithSubtotals();
+    const store = store_with_subtotals();
     expect(subtotals(store)).toEqual([153, 153]);
 
     store.hideRows("s1", [1]);
@@ -98,13 +98,13 @@ describe("SUBTOTAL over hidden rows", () => {
   });
 
   it("reads the hidden rows and filters that the workbook was loaded with", () => {
-    expect(subtotals(storeWithSubtotals(workbookWithSavedView()))).toEqual([51, 10.5]);
+    expect(subtotals(store_with_subtotals(workbook_with_saved_view()))).toEqual([51, 10.5]);
   });
 
   it("closes the mutation when the engine rejects the hidden rows", () => {
-    const store = storeWithSubtotals();
-    const setHiddenRows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");
-    setHiddenRows.mockReturnValue(false);
+    const store = store_with_subtotals();
+    const set_hidden_rows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");
+    set_hidden_rows.mockReturnValue(false);
     try {
       expect(() =>
         store.applyTransaction({
@@ -121,30 +121,30 @@ describe("SUBTOTAL over hidden rows", () => {
       // The barrier still ran, so the edit of B1 (0.5 to 100) is recalculated.
       expect(subtotals(store)).toEqual([252.5, 252.5]);
     } finally {
-      setHiddenRows.mockRestore();
+      set_hidden_rows.mockRestore();
     }
   });
 });
 
 describe("saved view state at load", () => {
   it("applies saved hidden rows, collapsed groups and filters when the store is built", () => {
-    const store = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+    const store = keep(new SheetwriteStore(workbook_with_saved_view(), makeColumnarData(ROWS)));
 
     expect(store.hasView("s1")).toBe(true);
     expect(store.viewRowCount("s1")).toBe(1);
-    expect(visibleDataRows(store, "s1")).toEqual([VISIBLE_ROW]);
+    expect(visible_data_rows(store, "s1")).toEqual([VISIBLE_ROW]);
   });
 
   it("applies the saved view of a snapshot after its cells load", () => {
-    const source = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+    const source = keep(new SheetwriteStore(workbook_with_saved_view(), makeColumnarData(ROWS)));
     const loaded = keep(SheetwriteStore.fromSnapshot(source.exportSnapshot()));
 
     expect(loaded.hasView("s1")).toBe(true);
-    expect(visibleDataRows(loaded, "s1")).toEqual([VISIBLE_ROW]);
+    expect(visible_data_rows(loaded, "s1")).toEqual([VISIBLE_ROW]);
   });
 
   it("applies the saved view of a sheet added from a snapshot", () => {
-    const source = keep(new SheetwriteStore(workbookWithSavedView(), makeColumnarData(ROWS)));
+    const source = keep(new SheetwriteStore(workbook_with_saved_view(), makeColumnarData(ROWS)));
     const [saved] = source.exportSnapshot().sheets;
     if (!saved) throw new Error("snapshot has a first sheet");
 
@@ -155,6 +155,6 @@ describe("saved view state at load", () => {
 
     expect(outcome.status).toBe("applied");
     expect(store.hasView("s2")).toBe(true);
-    expect(visibleDataRows(store, "s2")).toEqual([VISIBLE_ROW]);
+    expect(visible_data_rows(store, "s2")).toEqual([VISIBLE_ROW]);
   });
 });

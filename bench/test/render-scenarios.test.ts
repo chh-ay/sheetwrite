@@ -38,13 +38,13 @@ type FakeAdapter = RenderBenchAdapter & { readonly values: unknown[][] };
  * An in-memory grid for the scenarios below. The diagnostic-only scenarios
  * (formula-dense, text-heavy, geometry) never run here, so their hooks are inert.
  */
-function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
+function fake_adapter(faults: FakeFaults = {}): FakeAdapter {
   const values: unknown[][] = toAoA(makeColumnar(ROWS));
   let selected: CellSelection | null = null;
   let editing = false;
   let top = 0;
   let left = 0;
-  let isBaselineRead = true;
+  let is_baseline_read = true;
   const transfer = {
     logicalFrames: 0,
     windowReadRequests: 0,
@@ -53,7 +53,7 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
     outputAllocationEvents: 0,
   };
   const inert = () => {};
-  const setCellValue = (row: number, col: number, value: string | number | null) => {
+  const set_cell_value = (row: number, col: number, value: string | number | null) => {
     const target = values[row];
     if (!target) throw new RangeError(`missing row ${row}`);
     target[col] = value;
@@ -71,19 +71,19 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
     isMountedAndAccessible: () => true,
     rowCount: () => values.length,
     cellValue: (row, col) => values[row]?.[col],
-    setCellValue,
+    setCellValue: set_cell_value,
     selection: () => selected,
     editorOpen: () => editing,
-    prepareScroll: (axis, startMiddle) => {
-      top = axis === "top" && startMiddle ? MAXIMUM_TOP / 2 : 0;
-      left = axis === "left" && startMiddle ? MAXIMUM_LEFT / 2 : 0;
+    prepareScroll: (axis, start_middle) => {
+      top = axis === "top" && start_middle ? MAXIMUM_TOP / 2 : 0;
+      left = axis === "left" && start_middle ? MAXIMUM_LEFT / 2 : 0;
     },
     scrollBy: (axis, pixels) => {
       if (axis === "top") top = Math.min(MAXIMUM_TOP, top + pixels);
       else left = Math.min(MAXIMUM_LEFT, left + pixels);
       transfer.logicalFrames++;
       transfer.windowReadRequests++;
-      if (!isBaselineRead) return;
+      if (!is_baseline_read) return;
       transfer.logicalWindowReads++;
       transfer.copiedBytes += BYTES_PER_WINDOW_READ;
       transfer.outputAllocationEvents += ALLOCATIONS_PER_WINDOW_READ;
@@ -100,7 +100,7 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
     openEditor: () => (editing = true),
     closeEditor: () => (editing = false),
     editCommit: (value) => {
-      setCellValue(selection().row, selection().col, value);
+      set_cell_value(selection().row, selection().col, value);
       editing = false;
     },
     moveSelection: (direction) => {
@@ -141,7 +141,7 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
       indexConstructions: faults.indexConstructions ?? 1,
       candidatesExamined: faults.candidatesExamined ?? 4,
     }),
-    setWindowReadDiagnosticMode: (mode) => (isBaselineRead = mode === "baseline"),
+    setWindowReadDiagnosticMode: (mode) => (is_baseline_read = mode === "baseline"),
     resetWindowTransferCounters: () => {
       for (const key of Object.keys(transfer) as (keyof typeof transfer)[]) transfer[key] = 0;
     },
@@ -159,19 +159,19 @@ const options = {
   minimumSampleDurationMs: 0.01,
 } as const;
 
-function run(scenarioId: ScenarioId, adapter = fakeAdapter()) {
-  return runRenderScenario(adapter, dataset, scenarioId, options);
+function run(scenario_id: ScenarioId, adapter = fake_adapter()) {
+  return runRenderScenario(adapter, dataset, scenario_id, options);
 }
 
 /** Sheetwrite ingests the date column's ISO text as a date serial (2020-10-20). */
 const INGESTED_DATE_SERIAL = 44_124;
 
 /** The fake's first row, with its date cell holding what Sheetwrite's ingest stores. */
-function ingestedFirstRow(adapter: FakeAdapter): unknown[] {
-  const firstRow = adapter.values[0];
-  if (!firstRow) throw new Error("the fake grid has no first row");
-  firstRow[1] = INGESTED_DATE_SERIAL;
-  return firstRow;
+function ingested_first_row(adapter: FakeAdapter): unknown[] {
+  const first_row = adapter.values[0];
+  if (!first_row) throw new Error("the fake grid has no first row");
+  first_row[1] = INGESTED_DATE_SERIAL;
+  return first_row;
 }
 
 test.each([
@@ -204,19 +204,22 @@ test.each([
     null,
   ],
   ["no merge candidates", { candidatesExamined: 0 }, "merge-heavy.paint", "candidate", null],
-] as const)("fails validation for %s", (_label, faults, scenarioId, checkpoint, partialSamples) => {
-  const adapter = fakeAdapter(faults ?? {});
-  if (faults === null) adapter.values.pop();
-  const result = run(scenarioId, adapter);
-  if (result.status !== "failed") throw new Error("expected a failed result");
-  expect(result.stage).toBe("validate");
-  expect(result.message).toContain(checkpoint);
-  if (partialSamples !== null) expect(result.partialSamples).toHaveLength(partialSamples);
-});
+] as const)(
+  "fails validation for %s",
+  (_label, faults, scenario_id, checkpoint, partial_samples) => {
+    const adapter = fake_adapter(faults ?? {});
+    if (faults === null) adapter.values.pop();
+    const result = run(scenario_id, adapter);
+    if (result.status !== "failed") throw new Error("expected a failed result");
+    expect(result.stage).toBe("validate");
+    expect(result.message).toContain(checkpoint);
+    if (partial_samples !== null) expect(result.partialSamples).toHaveLength(partial_samples);
+  },
+);
 
 test("names the cleanup step when a successful action cannot be undone", () => {
   // The insert succeeded; only the untimed cleanup overflowed the stack.
-  const result = run("altering.insert-5-rows-top", fakeAdapter({ failRowRemoval: true }));
+  const result = run("altering.insert-5-rows-top", fake_adapter({ failRowRemoval: true }));
   expect(result).toMatchObject({
     status: "failed",
     stage: "measure",
@@ -227,8 +230,8 @@ test("names the cleanup step when a successful action cannot be undone", () => {
 
 test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {
   const baseline = run(WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
-  const upperBound = run(WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID);
-  if (baseline.status !== "success" || upperBound.status !== "success") {
+  const upper_bound = run(WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID);
+  if (baseline.status !== "success" || upper_bound.status !== "success") {
     throw new Error("expected a successful transfer diagnostic pair");
   }
   expect(baseline.dataValidity).toBe("product-valid");
@@ -238,10 +241,10 @@ test("separates exact transfer counters from the pixel-data-invalid upper bound"
     copiedBytesPerLogicalRead: BYTES_PER_WINDOW_READ,
     outputAllocationEventsPerLogicalRead: ALLOCATIONS_PER_WINDOW_READ,
   });
-  expect(upperBound.dataValidity).toBe("pixel-data-invalid");
-  expect(upperBound.windowTransfer).toMatchObject({
-    logicalFrames: upperBound.operationCount,
-    windowReadRequests: upperBound.operationCount,
+  expect(upper_bound.dataValidity).toBe("pixel-data-invalid");
+  expect(upper_bound.windowTransfer).toMatchObject({
+    logicalFrames: upper_bound.operationCount,
+    windowReadRequests: upper_bound.operationCount,
     logicalWindowReads: 0,
     copiedBytes: 0,
     outputAllocationEvents: 0,
@@ -251,8 +254,8 @@ test("separates exact transfer counters from the pixel-data-invalid upper bound"
 });
 
 test("checks merged cells against the loaded values when merge-heavy runs alone", () => {
-  const adapter = fakeAdapter();
-  ingestedFirstRow(adapter);
+  const adapter = fake_adapter();
+  ingested_first_row(adapter);
   const result = run("merge-heavy.paint", adapter);
   if (result.status !== "success") throw new Error(result.message);
   expect(result.validation).toContainEqual(
@@ -264,25 +267,25 @@ test("checks merged cells against the loaded values when merge-heavy runs alone"
 });
 
 test("formatted-paint restores the values the cells held, not dataset text", () => {
-  const adapter = fakeAdapter();
-  const firstRow = ingestedFirstRow(adapter);
-  const loaded = [...firstRow];
+  const adapter = fake_adapter();
+  const first_row = ingested_first_row(adapter);
+  const loaded = [...first_row];
   const result = run("formatted-paint.top-left", adapter);
   if (result.status !== "success") throw new Error(result.message);
-  expect(firstRow).toEqual(loaded);
+  expect(first_row).toEqual(loaded);
 });
 
 test("times sub-microsecond geometry builds in batches the clock can resolve", () => {
   // A 50 ns build: 1,000,000 builds timed one by one add up to only 50 ms.
-  const buildMs = 0.000_05;
-  const minimumSampleDurationMs = 100;
-  let clockMs = 0;
-  const clock = spyOn(performance, "now").mockImplementation(() => clockMs);
+  const build_ms = 0.000_05;
+  const minimum_sample_duration_ms = 100;
+  let clock_ms = 0;
+  const clock = spyOn(performance, "now").mockImplementation(() => clock_ms);
   try {
     const adapter: FakeAdapter = {
-      ...fakeAdapter(),
+      ...fake_adapter(),
       measureUnresizedMillionRowGeometry: () => {
-        clockMs += buildMs;
+        clock_ms += build_ms;
         return {
           count: 1_000_000,
           backingStoreBytes: 0,
@@ -296,11 +299,11 @@ test("times sub-microsecond geometry builds in batches the clock can resolve", (
     };
     const result = runRenderScenario(adapter, dataset, "geometry-unresized.1m", {
       ...options,
-      minimumSampleDurationMs,
+      minimumSampleDurationMs: minimum_sample_duration_ms,
     });
     if (result.status !== "success") throw new Error(result.message);
-    expect(result.rawSamples[0]?.durationMs).toBeGreaterThanOrEqual(minimumSampleDurationMs);
-    expect(result.medianMs).toBeCloseTo(buildMs, 9);
+    expect(result.rawSamples[0]?.durationMs).toBeGreaterThanOrEqual(minimum_sample_duration_ms);
+    expect(result.medianMs).toBeCloseTo(build_ms, 9);
   } finally {
     clock.mockRestore();
   }

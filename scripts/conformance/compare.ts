@@ -14,7 +14,7 @@ const SIGN_BIT = 1n << 63n;
  * `SIGN_BIT + magnitude bits` and negative floats to `SIGN_BIT - magnitude
  * bits`, so `-0` and `+0` share one point and every value fits in 64 bits.
  */
-function orderedFloat(value: number): bigint {
+function ordered_float(value: number): bigint {
   const bytes = new ArrayBuffer(8);
   const view = new DataView(bytes);
   view.setFloat64(0, value, false);
@@ -31,7 +31,7 @@ interface ComparedFields {
   formula?: string;
 }
 
-function comparedFields(result: ConformanceResult): ComparedFields {
+function compared_fields(result: ConformanceResult): ComparedFields {
   switch (result.type) {
     case "array":
       return { rows: result.rows, columns: result.columns, formula: result.formula };
@@ -43,7 +43,7 @@ function comparedFields(result: ConformanceResult): ComparedFields {
   }
 }
 
-function numbersMatch(
+function numbers_match(
   left: number,
   right: number,
   tolerance: ResultTolerance | undefined,
@@ -54,10 +54,11 @@ function numbersMatch(
   }
 
   if (tolerance?.kind === "ulp") {
-    const leftBits = orderedFloat(left);
-    const rightBits = orderedFloat(right);
+    const left_bits = ordered_float(left);
+    const right_bits = ordered_float(right);
     return (
-      Number(leftBits < rightBits ? rightBits - leftBits : leftBits - rightBits) <= tolerance.value
+      Number(left_bits < right_bits ? right_bits - left_bits : left_bits - right_bits) <=
+      tolerance.value
     );
   }
 
@@ -71,7 +72,7 @@ export function compareResults(expected: ConformanceResult, actual: ConformanceR
 
   const differences: string[] = [];
   if (expected.type === "number" && actual.type === "number") {
-    if (!numbersMatch(expected.value, actual.value, expected.tolerance)) {
+    if (!numbers_match(expected.value, actual.value, expected.tolerance)) {
       differences.push(`value: expected ${expected.value}, received ${actual.value}`);
     }
   } else if (expected.type === "error" && actual.type === "error") {
@@ -86,12 +87,12 @@ export function compareResults(expected: ConformanceResult, actual: ConformanceR
     }
   }
 
-  const expectedFields = comparedFields(expected);
-  const actualFields = comparedFields(actual);
+  const expected_fields = compared_fields(expected);
+  const actual_fields = compared_fields(actual);
   for (const field of ["rows", "columns", "displayedText", "formula"] as const) {
-    if (expectedFields[field] !== undefined && actualFields[field] !== expectedFields[field]) {
+    if (expected_fields[field] !== undefined && actual_fields[field] !== expected_fields[field]) {
       differences.push(
-        `${field}: expected ${String(expectedFields[field])}, received ${String(actualFields[field])}`,
+        `${field}: expected ${String(expected_fields[field])}, received ${String(actual_fields[field])}`,
       );
     }
   }
@@ -104,13 +105,13 @@ export function compareReviewedObservation(
   observation: ReviewedObservation,
   divergence?: KnownDivergence,
 ): string[] {
-  const expectedDifferences = compareResults(expected, observation.result);
-  if (expectedDifferences.length === 0) return [];
-  if (!divergence?.producers.includes(observation.producer)) return expectedDifferences;
-  const alternateDifferences = compareResults(divergence.alternate, observation.result);
-  if (alternateDifferences.length === 0) return [];
+  const expected_differences = compareResults(expected, observation.result);
+  if (expected_differences.length === 0) return [];
+  if (!divergence?.producers.includes(observation.producer)) return expected_differences;
+  const alternate_differences = compareResults(divergence.alternate, observation.result);
+  if (alternate_differences.length === 0) return [];
   return [
-    ...expectedDifferences,
-    `declared alternate did not match (${alternateDifferences.join("; ")})`,
+    ...expected_differences,
+    `declared alternate did not match (${alternate_differences.join("; ")})`,
   ];
 }

@@ -50,8 +50,8 @@ export function dateToSerial(date: Date): number {
  * @returns The date, in UTC.
  */
 export function serialToDate(serial: number): Date {
-  const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
-  return new Date(EPOCH_MS + realSerial * MS_PER_DAY);
+  const real_serial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
+  return new Date(EPOCH_MS + real_serial * MS_PER_DAY);
 }
 
 /**
@@ -126,15 +126,15 @@ const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 export function parseDateInput(raw: string): number | null {
   const s = raw.trim();
 
-  const dateTime = ISO_DATETIME.exec(s);
-  if (dateTime) {
+  const date_time = ISO_DATETIME.exec(s);
+  if (date_time) {
     return componentsToSerial(
-      Number(dateTime[1]),
-      Number(dateTime[2]),
-      Number(dateTime[3]),
-      Number(dateTime[4]),
-      Number(dateTime[5]),
-      dateTime[6] ? Number(dateTime[6]) : 0,
+      Number(date_time[1]),
+      Number(date_time[2]),
+      Number(date_time[3]),
+      Number(date_time[4]),
+      Number(date_time[5]),
+      date_time[6] ? Number(date_time[6]) : 0,
     );
   }
 

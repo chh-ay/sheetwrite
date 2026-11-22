@@ -43,13 +43,13 @@ export function installCoreStyles(): () => void {
  */
 export function keepXlsxSlots(): () => void {
   const workbook = xlsxWorkbookBackend();
-  const tableImport = xlsxTableImportBackend();
-  const tableExport = xlsxTableExportBackend();
+  const table_import = xlsxTableImportBackend();
+  const table_export = xlsxTableExportBackend();
 
   return () => {
     setXlsxWorkbookBackend(workbook);
-    setXlsxTableImportBackend(tableImport);
-    setXlsxTableExportBackend(tableExport);
+    setXlsxTableImportBackend(table_import);
+    setXlsxTableExportBackend(table_export);
   };
 }
 
@@ -176,7 +176,7 @@ export async function answerDialog(host: HTMLElement, label: string): Promise<vo
 }
 
 /** Fill each requested column of `values`, with `null` for keys it lacks. */
-function coveredRow(request: DataSourceRequest, values: RowData): RowData {
+function covered_row(request: DataSourceRequest, values: RowData): RowData {
   const row: RowData = {};
   for (const band of request.columns) {
     for (const key of band.keys) row[key] = values[key] ?? null;
@@ -190,7 +190,7 @@ export function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSo
     protocol: 2,
     start: request.start,
     columns: request.columns,
-    rows: rows.map((row) => coveredRow(request, row)),
+    rows: rows.map((row) => covered_row(request, row)),
   };
 }
 
@@ -202,10 +202,10 @@ export function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSo
  */
 export function pressLikeWebKit(target: HTMLElement): void {
   target.dispatchEvent(new Event("pointerdown", { bubbles: true }));
-  const focusMoves = target.dispatchEvent(
+  const focus_moves = target.dispatchEvent(
     new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
   );
-  if (focusMoves) {
+  if (focus_moves) {
     const focusable = target.parentElement?.closest<HTMLElement>("[tabindex]");
     if (focusable) focusable.focus();
     else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();

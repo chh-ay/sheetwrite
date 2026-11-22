@@ -12,26 +12,26 @@ import type { HastNode } from "./build-hast.js";
 /** Class names of the focusable symbols inside rendered code. */
 export const CODE_SYMBOL_CLASSES = ["sw-code-popover__trigger", "sw-code-ref"] as const;
 
-function classNames(node: HastNode): readonly string[] {
+function class_names(node: HastNode): readonly string[] {
   const value = node.properties?.className;
   return Array.isArray(value) ? value.map(String) : String(value ?? "").split(" ");
 }
 
-function isCodeSymbol(node: HastNode): boolean {
-  const names = classNames(node);
+function is_code_symbol(node: HastNode): boolean {
+  const names = class_names(node);
   return CODE_SYMBOL_CLASSES.some((name) => names.includes(name));
 }
 
-function collectSymbols(node: HastNode, symbols: HastNode[]): void {
+function collect_symbols(node: HastNode, symbols: HastNode[]): void {
   for (const child of node.children ?? []) {
     if (child.type !== "element") continue;
-    if (isCodeSymbol(child)) symbols.push(child);
-    collectSymbols(child, symbols);
+    if (is_code_symbol(child)) symbols.push(child);
+    collect_symbols(child, symbols);
   }
 }
 
-function setTabIndex(node: HastNode, tabIndex: number): void {
-  node.properties = { ...node.properties, tabIndex };
+function set_tab_index(node: HastNode, tab_index: number): void {
+  node.properties = { ...node.properties, tabIndex: tab_index };
 }
 
 /** Rehype plugin: within every `<pre>`, only the first code symbol is a Tab stop. */
@@ -40,8 +40,8 @@ export function rovingCodeFocus() {
     const visit = (node: HastNode): void => {
       if (node.type === "element" && node.tagName === "pre") {
         const symbols: HastNode[] = [];
-        collectSymbols(node, symbols);
-        symbols.forEach((symbol, index) => setTabIndex(symbol, index === 0 ? 0 : -1));
+        collect_symbols(node, symbols);
+        symbols.forEach((symbol, index) => set_tab_index(symbol, index === 0 ? 0 : -1));
         return;
       }
       for (const child of node.children ?? []) visit(child);

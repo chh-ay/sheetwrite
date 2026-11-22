@@ -105,7 +105,7 @@ function collect(root: HTMLElement): Parts {
 }
 
 /** The middle of a target, in the window's coordinates. */
-function centerOf(parts: Parts, target: Target): { x: number; y: number } {
+function center_of(parts: Parts, target: Target): { x: number; y: number } {
   const element = parts.targets.get(target);
   if (element === undefined) return { x: 0, y: 0 };
 
@@ -114,11 +114,11 @@ function centerOf(parts: Parts, target: Target): { x: number; y: number } {
   return { x: box.left + box.width / 2 - frame.left, y: box.top + box.height / 2 - frame.top };
 }
 
-function setText(element: HTMLElement, value: string): void {
+function set_text(element: HTMLElement, value: string): void {
   if (element.textContent !== value) element.textContent = value;
 }
 
-function setRange(element: HTMLElement, range: Range): void {
+function set_range(element: HTMLElement, range: Range): void {
   element.style.setProperty("--c", String(range.c));
   element.style.setProperty("--r", String(range.r));
   element.style.setProperty("--w", String(range.w));
@@ -132,8 +132,8 @@ function setRange(element: HTMLElement, range: Range): void {
  */
 function apply(parts: Parts, frame: Frame): void {
   // Read layout first, then write, so a frame forces at most one layout.
-  const from = centerOf(parts, frame.pointer.from);
-  const to = centerOf(parts, frame.pointer.to);
+  const from = center_of(parts, frame.pointer.from);
+  const to = center_of(parts, frame.pointer.to);
 
   const { root } = parts;
   root.dataset.tab = frame.tab;
@@ -145,14 +145,14 @@ function apply(parts: Parts, frame: Frame): void {
   // The Pivot tab takes no room until the pivot sheet exists.
   root.dataset.pivotTab = String(frame.pivotTab > 0);
 
-  setText(parts.text.name, frame.name);
-  setText(parts.text.formula, frame.formula);
-  setText(parts.text.b3, frame.b3);
-  setText(parts.text.d3, frame.d3);
-  setText(parts.text.b6, frame.b6);
-  setText(parts.text.d6, frame.d6);
-  setText(parts.text.badge, frame.badge.text);
-  setRange(parts.selection, frame.selection);
+  set_text(parts.text.name, frame.name);
+  set_text(parts.text.formula, frame.formula);
+  set_text(parts.text.b3, frame.b3);
+  set_text(parts.text.d3, frame.d3);
+  set_text(parts.text.b6, frame.b6);
+  set_text(parts.text.d6, frame.d6);
+  set_text(parts.text.badge, frame.badge.text);
+  set_range(parts.selection, frame.selection);
   parts.pulses.forEach((pulse, index) => {
     pulse.style.opacity = String(frame.pulses[index] ?? 0);
   });
@@ -349,7 +349,7 @@ function Ribbon() {
 }
 
 /** A cell overlay placed on the sheet in column and row units. */
-function cellBox(range: Range): JSX.CSSProperties {
+function cell_box(range: Range): JSX.CSSProperties {
   return {
     "--c": String(range.c),
     "--r": String(range.r),
@@ -359,7 +359,7 @@ function cellBox(range: Range): JSX.CSSProperties {
 }
 
 function SalesCells(props: Readonly<{ still: Frame }>) {
-  const cellContent = (row: number, column: number): JSX.Element => {
+  const cell_content = (row: number, column: number): JSX.Element => {
     if (row === 0) return ["Region", "Units", "Rate", "Revenue"][column] ?? "";
 
     const sales = SALES[row - 1];
@@ -385,11 +385,11 @@ function SalesCells(props: Readonly<{ still: Frame }>) {
     return "";
   };
 
-  return <Cells cellContent={cellContent} />;
+  return <Cells cellContent={cell_content} />;
 }
 
 function PivotCells() {
-  const cellContent = (row: number, column: number): JSX.Element => {
+  const cell_content = (row: number, column: number): JSX.Element => {
     if (row === 0) return ["Region", "Sum of Revenue", "Sum of Units"][column] ?? "";
     const pivot = PIVOT_ROWS[row - 1];
     if (pivot !== undefined) {
@@ -404,7 +404,7 @@ function PivotCells() {
     }
     return "";
   };
-  return <Cells pivot cellContent={cellContent} />;
+  return <Cells pivot cellContent={cell_content} />;
 }
 
 const ROW_INDEXES: readonly number[] = Array.from({ length: ROWS }, (_, row) => row);
@@ -414,7 +414,7 @@ function Cells(
 ) {
   const pivot = props.pivot === true;
   // The total rule spans the table's own columns, not the empty ones.
-  const isTotal = (row: number, column: number): boolean =>
+  const is_total = (row: number, column: number): boolean =>
     column < (pivot ? PIVOT_COLUMNS : SALES_COLUMNS) &&
     row === (pivot ? PIVOT_ROWS.length : SALES.length) + 1;
 
@@ -425,13 +425,13 @@ function Cells(
           <>
             <span class="ha-rowhead">{row + 1}</span>
             <For each={COLUMNS}>
-              {(_, columnIndex) => {
-                const column = columnIndex();
+              {(_, column_index) => {
+                const column = column_index();
                 return (
                   <span
                     class="ha-cell"
                     data-head={row === 0 ? "true" : undefined}
-                    data-total={isTotal(row, column) ? "true" : undefined}
+                    data-total={is_total(row, column) ? "true" : undefined}
                     data-text={column === 0 ? "true" : undefined}
                     data-units={pivot && column === 2 ? "true" : undefined}
                   >
@@ -456,7 +456,7 @@ const THOUSAND = 1000;
 
 function Chart(props: Readonly<{ still: Frame }>) {
   const slot = PLOT.w / SALES.length;
-  const barW = slot * BAR_SHARE;
+  const bar_w = slot * BAR_SHARE;
   return (
     <div class="ha-chart" data-part="chart" style={{ opacity: props.still.chart }}>
       <svg aria-hidden="true" viewBox="0 0 320 196">
@@ -477,9 +477,9 @@ function Chart(props: Readonly<{ still: Frame }>) {
           }}
         </For>
         <For each={SALES}>
-          {(row, barIndex) => {
-            const index = barIndex();
-            const x = PLOT.x + slot * index + (slot - barW) / 2;
+          {(row, bar_index) => {
+            const index = bar_index();
+            const x = PLOT.x + slot * index + (slot - bar_w) / 2;
             return (
               <g>
                 <rect
@@ -489,11 +489,11 @@ function Chart(props: Readonly<{ still: Frame }>) {
                   height={PLOT.h}
                   rx={2}
                   style={{ transform: `scaleY(${props.still.bars[index] ?? 0})` }}
-                  width={barW}
+                  width={bar_w}
                   x={x}
                   y={PLOT.y}
                 />
-                <text class="ha-chart__label" x={x + barW / 2} y={PLOT.y + PLOT.h + 16}>
+                <text class="ha-chart__label" x={x + bar_w / 2} y={PLOT.y + PLOT.h + 16}>
                   {row.region}
                 </text>
               </g>
@@ -537,7 +537,7 @@ const STILL = frameAt(STILL_SECONDS);
 
 export function HeroApp() {
   // Screen readers hear which chapter the picture shows.
-  const [currentAct, setCurrentAct] = createSignal(STILL.act);
+  const [current_act, set_current_act] = createSignal(STILL.act);
   const timeline = createTimeline<HTMLElement>({
     loopSeconds: HERO_LOOP_SECONDS,
     stillSeconds: STILL_SECONDS,
@@ -546,7 +546,7 @@ export function HeroApp() {
       return (seconds) => {
         const frame = frameAt(seconds);
         apply(parts, frame);
-        setCurrentAct(frame.act);
+        set_current_act(frame.act);
       };
     },
   });
@@ -593,37 +593,37 @@ export function HeroApp() {
             <span
               class="ha-box ha-anchor"
               data-target="a1"
-              style={cellBox({ c: 0, r: 0, w: 1, h: 1 })}
+              style={cell_box({ c: 0, r: 0, w: 1, h: 1 })}
             />
             <span
               class="ha-box ha-anchor"
               data-target="d5"
-              style={cellBox({ c: 3, r: 4, w: 1, h: 1 })}
+              style={cell_box({ c: 3, r: 4, w: 1, h: 1 })}
             />
             <span
               class="ha-box ha-anchor"
               data-target="b3"
-              style={cellBox({ c: 1, r: 2, w: 1, h: 1 })}
+              style={cell_box({ c: 1, r: 2, w: 1, h: 1 })}
             />
             <span
               class="ha-box ha-pulse"
               data-part="pulse-d3"
-              style={{ ...cellBox({ c: 3, r: 2, w: 1, h: 1 }), opacity: 0 }}
+              style={{ ...cell_box({ c: 3, r: 2, w: 1, h: 1 }), opacity: 0 }}
             />
             <span
               class="ha-box ha-pulse"
               data-part="pulse-b6"
-              style={{ ...cellBox({ c: 1, r: 5, w: 1, h: 1 }), opacity: 0 }}
+              style={{ ...cell_box({ c: 1, r: 5, w: 1, h: 1 }), opacity: 0 }}
             />
             <span
               class="ha-box ha-pulse"
               data-part="pulse-d6"
-              style={{ ...cellBox({ c: 3, r: 5, w: 1, h: 1 }), opacity: 0 }}
+              style={{ ...cell_box({ c: 3, r: 5, w: 1, h: 1 }), opacity: 0 }}
             />
             <span
               class="ha-box ha-selection"
               data-part="selection"
-              style={cellBox(STILL.selection)}
+              style={cell_box(STILL.selection)}
             />
             <Chart still={STILL} />
           </div>
@@ -656,9 +656,9 @@ export function HeroApp() {
       <ol aria-label="What the illustration shows" class="ha-acts">
         <For each={ACTS}>
           {(act, index) => (
-            <li data-current={String(index() === currentAct())}>
+            <li data-current={String(index() === current_act())}>
               <button
-                aria-current={index() === currentAct() ? "step" : undefined}
+                aria-current={index() === current_act() ? "step" : undefined}
                 onClick={() => timeline.seek(act.start)}
                 type="button"
               >

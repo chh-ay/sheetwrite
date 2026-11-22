@@ -8,11 +8,11 @@ const EMPTY_WORDS = new Uint32Array();
 const NO_TEXT = Uint32Array.of(0);
 const ENCODER = new TextEncoder();
 
-function writeColumn(
+function write_column(
   store: PackedFixtureStore,
   sheet: number,
   col: number,
-  startRow: number,
+  start_row: number,
   kinds: Uint8Array,
   numbers: Float64Array,
   text: Uint8Array,
@@ -22,7 +22,7 @@ function writeColumn(
   if (kinds.length === 0) return;
   const status = store.setBlockPacked(
     sheet,
-    startRow,
+    start_row,
     col,
     kinds.length,
     1,
@@ -47,7 +47,7 @@ export function writeNumberColumn(
   values: Float64Array,
   style: number,
 ): void {
-  writeColumn(
+  write_column(
     store,
     sheet,
     col,
@@ -75,7 +75,7 @@ export function writeStringColumn(
   }
   const text = new Uint8Array(offsets[chunks.length]!);
   for (let index = 0; index < chunks.length; index++) text.set(chunks[index]!, offsets[index]!);
-  writeColumn(
+  write_column(
     store,
     sheet,
     col,

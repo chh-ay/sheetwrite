@@ -15,10 +15,10 @@ const box = (left: number, top: number, width: number, height: number) => ({
   bottom: top + height,
 });
 
-/** A 17 px tall symbol at x 400 and y `triggerTop`, in a 1440 × 900 viewport under a 64 px header. */
-function input(triggerTop: number, panel = { width: 560, height: 280 }): PlacementInput {
+/** A 17 px tall symbol at x 400 and y `trigger_top`, in a 1440 × 900 viewport under a 64 px header. */
+function input(trigger_top: number, panel = { width: 560, height: 280 }): PlacementInput {
   return {
-    trigger: box(400, triggerTop, 80, 17),
+    trigger: box(400, trigger_top, 80, 17),
     panel,
     viewport: box(12, 76, 1440 - 24, 900 - 76 - 12),
     gap: 8,

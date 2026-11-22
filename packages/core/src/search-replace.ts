@@ -12,7 +12,7 @@ const WILDCARD = /[*?]/u;
 const REGEX_SYNTAX = /[\\^$.*+?()[\]{}|/]/gu;
 
 /** Whether `query` uses Excel's wildcards, as the engine's Find reads them. */
-function hasWildcards(query: string): boolean {
+function has_wildcards(query: string): boolean {
   return WILDCARD.test(query) || query.includes("~~");
 }
 
@@ -60,8 +60,8 @@ interface Segment {
 class WildcardPattern {
   private readonly segments: readonly Segment[];
   /** Whether the pattern starts or ends with a star. */
-  private readonly leadingRun: boolean;
-  private readonly trailingRun: boolean;
+  private readonly leading_run: boolean;
+  private readonly trailing_run: boolean;
   /**
    * The whole-cell match of a pattern with at most one run, as one regular
    * expression: a star at either end backtracks at most once per character.
@@ -74,9 +74,9 @@ class WildcardPattern {
     const characters = Array.from(query);
     const segments: Segment[] = [];
     let source = "";
-    let endsWithRun = false;
-    let lastSource = "";
-    const endSegment = () => {
+    let ends_with_run = false;
+    let last_source = "";
+    const end_segment = () => {
       if (source === "") return;
       segments.push({
         search: new RegExp(source, `g${flags}`),
@@ -84,32 +84,32 @@ class WildcardPattern {
         last: new RegExp(`[\\s\\S]*(?:${source})`, `y${flags}`),
         ending: new RegExp(`(?:${source})$`, `g${flags}`),
       });
-      lastSource = source;
+      last_source = source;
       source = "";
     };
     for (let index = 0; index < characters.length; index++) {
       const character = characters[index]!;
       const next = characters[index + 1];
-      endsWithRun = character === "*";
+      ends_with_run = character === "*";
       if (character === "~" && (next === "*" || next === "?" || next === "~")) {
         source += next.replace(REGEX_SYNTAX, "\\$&");
         index++;
       } else if (character === "*") {
-        endSegment();
+        end_segment();
       } else if (character === "?") {
         source += "[\\s\\S]";
       } else {
         source += character.replace(REGEX_SYNTAX, "\\$&");
       }
     }
-    endSegment();
+    end_segment();
     this.segments = segments;
-    this.leadingRun = characters[0] === "*";
-    this.trailingRun = endsWithRun;
+    this.leading_run = characters[0] === "*";
+    this.trailing_run = ends_with_run;
     this.whole =
       segments.length === 1
         ? new RegExp(
-            `^(?:${this.leadingRun ? "[\\s\\S]*" : ""}${lastSource}${endsWithRun ? "[\\s\\S]*" : ""})$`,
+            `^(?:${this.leading_run ? "[\\s\\S]*" : ""}${last_source}${ends_with_run ? "[\\s\\S]*" : ""})$`,
             flags,
           )
         : null;
@@ -132,22 +132,22 @@ class WildcardPattern {
     const segments = this.segments;
     const count = segments.length;
     if (count === 0) return true;
-    const startFree = within || this.leadingRun;
-    const endFree = within || this.trailingRun;
+    const start_free = within || this.leading_run;
+    const end_free = within || this.trailing_run;
     let position = 0;
     let index = 0;
-    if (!startFree) {
+    if (!start_free) {
       position = run(segments[0]!.at, text, 0, budget);
       if (position < 0) return false;
-      if (count === 1 && !endFree) return position === text.length;
+      if (count === 1 && !end_free) return position === text.length;
       index = 1;
     }
-    const middle = endFree ? count : count - 1;
+    const middle = end_free ? count : count - 1;
     for (; index < middle; index++) {
       position = run(segments[index]!.search, text, position, budget);
       if (position < 0) return false;
     }
-    return endFree || run(segments[count - 1]!.ending, text, position, budget) >= 0;
+    return end_free || run(segments[count - 1]!.ending, text, position, budget) >= 0;
   }
 
   /**
@@ -163,7 +163,7 @@ class WildcardPattern {
     let start = from;
     let position = from;
     let index = 0;
-    if (!this.leadingRun) {
+    if (!this.leading_run) {
       const search = segments[0]!.search;
       search.lastIndex = from;
       const found = search.exec(text);
@@ -171,15 +171,15 @@ class WildcardPattern {
       if (!found || budget.steps < 0) return null;
       start = found.index;
       position = search.lastIndex;
-      if (count === 1 && !this.trailingRun) return [start, position];
+      if (count === 1 && !this.trailing_run) return [start, position];
       index = 1;
     }
-    const middle = this.trailingRun ? count : count - 1;
+    const middle = this.trailing_run ? count : count - 1;
     for (; index < middle; index++) {
       position = run(segments[index]!.search, text, position, budget);
       if (position < 0) return null;
     }
-    const end = this.trailingRun
+    const end = this.trailing_run
       ? text.length
       : run(segments[count - 1]!.last, text, position, budget);
     return end > start ? [start, end] : null;
@@ -195,13 +195,17 @@ function run(pattern: RegExp, text: string, from: number, budget: StepBudget): n
 }
 
 /** The pattern of the last query, which Replace all matches against every cell. */
-let lastPattern: { query: string; matchCase: boolean; pattern: WildcardPattern } | undefined;
+let last_pattern: { query: string; matchCase: boolean; pattern: WildcardPattern } | undefined;
 
-function wildcardPattern(query: string, matchCase: boolean): WildcardPattern {
-  if (lastPattern?.query !== query || lastPattern.matchCase !== matchCase) {
-    lastPattern = { query, matchCase, pattern: new WildcardPattern(query, matchCase) };
+function wildcard_pattern(query: string, match_case: boolean): WildcardPattern {
+  if (last_pattern?.query !== query || last_pattern.matchCase !== match_case) {
+    last_pattern = {
+      query,
+      matchCase: match_case,
+      pattern: new WildcardPattern(query, match_case),
+    };
   }
-  return lastPattern.pattern;
+  return last_pattern.pattern;
 }
 
 /**
@@ -209,7 +213,7 @@ function wildcardPattern(query: string, matchCase: boolean): WildcardPattern {
  * `wholeCell`. Text without wildcards matches as a plain substring.
  */
 export function findMatcher(query: string, opts: ReplaceOptions = {}): (text: string) => boolean {
-  if (hasWildcards(query)) {
+  if (has_wildcards(query)) {
     return new WildcardPattern(query, opts.matchCase === true).matcher(opts.wholeCell !== true);
   }
   if (opts.matchCase) {
@@ -226,13 +230,13 @@ export function findMatcher(query: string, opts: ReplaceOptions = {}): (text: st
  * Replace each leftmost longest non-empty run a wildcard pattern matches, or
  * return null when none does.
  */
-function replaceWildcards(
+function replace_wildcards(
   text: string,
   query: string,
   replacement: string,
   opts: ReplaceOptions,
 ): string | null {
-  const pattern = wildcardPattern(query, opts.matchCase === true);
+  const pattern = wildcard_pattern(query, opts.matchCase === true);
   const budget = { steps: MAX_WILDCARD_STEPS };
   if (opts.wholeCell) return pattern.test(text, false, budget) ? replacement : null;
 
@@ -271,7 +275,7 @@ export function replaceInText(
   opts: ReplaceOptions = {},
 ): string | null {
   if (query === "") return null;
-  if (hasWildcards(query)) return replaceWildcards(text, query, replacement, opts);
+  if (has_wildcards(query)) return replace_wildcards(text, query, replacement, opts);
 
   if (opts.wholeCell) {
     const equal = opts.matchCase ? text === query : text.toLowerCase() === query.toLowerCase();
@@ -289,16 +293,16 @@ export function replaceInText(
   const needle = query.toLowerCase();
   if (haystack.length !== text.length || needle.length !== query.length) {
     let result = "";
-    let previousEnd = 0;
+    let previous_end = 0;
     for (let offset = 0; offset <= text.length - query.length; offset++) {
       if (text.slice(offset, offset + query.length).toLowerCase() !== needle) continue;
 
-      result += text.slice(previousEnd, offset) + replacement;
-      previousEnd = offset + query.length;
-      offset = previousEnd - 1;
+      result += text.slice(previous_end, offset) + replacement;
+      previous_end = offset + query.length;
+      offset = previous_end - 1;
     }
 
-    return previousEnd === 0 ? null : result + text.slice(previousEnd);
+    return previous_end === 0 ? null : result + text.slice(previous_end);
   }
   let idx = haystack.indexOf(needle);
   if (idx < 0) return null;

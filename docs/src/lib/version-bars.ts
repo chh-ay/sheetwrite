@@ -80,7 +80,7 @@ interface Measure {
 
 const MIB = 1024 ** 2;
 
-function summaryOf(report: VersionReport, version: string, engine: Engine): EngineSummary {
+function summary_of(report: VersionReport, version: string, engine: Engine): EngineSummary {
   const summary = report.summary[version]?.[engine];
   if (summary === undefined) {
     throw new Error(`${report.machine}: no ${engine} summary for ${version}`);
@@ -94,21 +94,21 @@ const MEASURES: readonly Measure[] = [
     detail: (report) => `Geometric mean of ${report.method.rows.length} edit workloads`,
     quantity: "time",
     noise: "recalcGeomean",
-    value: (report, version, engine) => summaryOf(report, version, engine).recalcGeomeanMs,
+    value: (report, version, engine) => summary_of(report, version, engine).recalcGeomeanMs,
   },
   {
     label: "Retained memory",
     detail: () => "After loading 100,000 formulas",
     quantity: "memory",
     noise: "retained",
-    value: (report, version, engine) => summaryOf(report, version, engine).retainedMiB * MIB,
+    value: (report, version, engine) => summary_of(report, version, engine).retainedMiB * MIB,
   },
   {
     label: "Peak memory",
     detail: () => "While loading 100,000 formulas",
     quantity: "memory",
     noise: "peak",
-    value: (report, version, engine) => summaryOf(report, version, engine).peakMiB * MIB,
+    value: (report, version, engine) => summary_of(report, version, engine).peakMiB * MIB,
   },
   {
     label: "Engine download",
@@ -127,14 +127,14 @@ const MEASURES: readonly Measure[] = [
     detail: () => "50,000 rows × 6 columns, 100,000 formulas",
     quantity: "time",
     noise: "import",
-    value: (report, version, engine) => summaryOf(report, version, engine).importMs,
+    value: (report, version, engine) => summary_of(report, version, engine).importMs,
   },
   {
     label: "XLSX export",
     detail: () => "50,000 rows × 6 columns, 100,000 formulas",
     quantity: "time",
     noise: "export",
-    value: (report, version, engine) => summaryOf(report, version, engine).exportMs,
+    value: (report, version, engine) => summary_of(report, version, engine).exportMs,
   },
 ];
 
@@ -143,11 +143,11 @@ const RATIO_WORDING = 1.5;
 /** Below this share of its row's scale a bar would vanish; it stays visible at this width. */
 const MIN_FILL_PERCENT = 1;
 
-function formatValue(value: number, quantity: Quantity): string {
+function format_value(value: number, quantity: Quantity): string {
   return quantity === "time" ? formatTime(value) : formatSize(value);
 }
 
-function wholePercent(fraction: number): string {
+function whole_percent(fraction: number): string {
   return `${fraction < 0 ? "−" : "+"}${Math.round(Math.abs(fraction) * 100)}%`;
 }
 
@@ -173,16 +173,16 @@ export function versionChange(
   if (noisePercent !== undefined && Math.abs(fraction) * 100 <= noisePercent) {
     return { kind: "noise", text: "Within noise" };
   }
-  const isLower = fraction < 0;
-  const kind = isLower ? "better" : "worse";
+  const is_lower = fraction < 0;
+  const kind = is_lower ? "better" : "worse";
   if (quantity === "time") {
-    const ratio = isLower ? previous / value : value / previous;
+    const ratio = is_lower ? previous / value : value / previous;
     return ratio >= RATIO_WORDING
-      ? { kind, text: `${ratio.toFixed(1)}× ${isLower ? "faster" : "slower"}` }
-      : { kind, text: `${wholePercent(fraction)} time` };
+      ? { kind, text: `${ratio.toFixed(1)}× ${is_lower ? "faster" : "slower"}` }
+      : { kind, text: `${whole_percent(fraction)} time` };
   }
-  if (quantity === "memory") return { kind, text: `${wholePercent(fraction)} memory` };
-  return { kind, text: `${wholePercent(fraction)} ${isLower ? "smaller" : "larger"}` };
+  if (quantity === "memory") return { kind, text: `${whole_percent(fraction)} memory` };
+  return { kind, text: `${whole_percent(fraction)} ${is_lower ? "smaller" : "larger"}` };
 }
 
 const CHANGE_ICONS = { better: "arrow-down", worse: "arrow-up", noise: "minus" } as const;
@@ -194,11 +194,11 @@ export interface MachineReport {
 }
 
 /** A measure's values: per engine, per version, oldest first. */
-function seriesOf(measure: Measure, report: VersionReport, versions: readonly string[]) {
+function series_of(measure: Measure, report: VersionReport, versions: readonly string[]) {
   return ENGINES.map((engine) => versions.map((version) => measure.value(report, version, engine)));
 }
 
-function changeOf(measure: Measure, report: VersionReport, series: readonly number[]) {
+function change_of(measure: Measure, report: VersionReport, series: readonly number[]) {
   return versionChange(
     series.at(-1) ?? 0,
     series.at(-2) ?? 1,
@@ -207,18 +207,18 @@ function changeOf(measure: Measure, report: VersionReport, series: readonly numb
   );
 }
 
-function rowMarkup(
+function row_markup(
   measure: Measure,
   report: VersionReport,
   versions: readonly string[],
   icon: PerfIconMarkup,
 ): string {
-  const values = seriesOf(measure, report, versions);
+  const values = series_of(measure, report, versions);
   // One scale per row, from zero to its largest value, shared by both engines.
   const top = Math.max(...values.flat());
   const engines = ENGINES.map((engine, index) => {
     const series = values[index] ?? [];
-    const change = changeOf(measure, report, series);
+    const change = change_of(measure, report, series);
     const bars = versions
       .map((version, at) => {
         const value = series[at] ?? 0;
@@ -228,7 +228,7 @@ function rowMarkup(
           `<div class="version-bars__bar"${newest}>` +
           `<span class="version-bars__version">${escapeHtml(version)}</span>` +
           `<span class="version-bars__track"><i style="width:${fill.toFixed(2)}%"></i></span>` +
-          `<span class="version-bars__value">${formatValue(value, measure.quantity)}</span>` +
+          `<span class="version-bars__value">${format_value(value, measure.quantity)}</span>` +
           "</div>"
         );
       })
@@ -249,12 +249,12 @@ function rowMarkup(
   );
 }
 
-function tableMarkup(machines: readonly MachineReport[], versions: readonly string[]): string {
+function table_markup(machines: readonly MachineReport[], versions: readonly string[]): string {
   const columns = ["Measure", "Engine", ...versions, `Change vs ${versions.at(-2) ?? ""}`];
   const head = `<thead><tr>${columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr></thead>`;
   const bodies = machines.map(({ machine, report }) => {
     const rows = MEASURES.flatMap((measure) =>
-      seriesOf(measure, report, versions).map((series, index) => {
+      series_of(measure, report, versions).map((series, index) => {
         const engine = ENGINES[index] ?? "default";
         return (
           "<tr>" +
@@ -262,8 +262,8 @@ function tableMarkup(machines: readonly MachineReport[], versions: readonly stri
             ? `<th scope="row" rowspan="${ENGINES.length}">${escapeHtml(measure.label)}</th>`
             : "") +
           `<td>${ENGINE_NAMES[engine]}</td>` +
-          series.map((value) => `<td>${formatValue(value, measure.quantity)}</td>`).join("") +
-          `<td>${escapeHtml(changeOf(measure, report, series).text)}</td>` +
+          series.map((value) => `<td>${format_value(value, measure.quantity)}</td>`).join("") +
+          `<td>${escapeHtml(change_of(measure, report, series).text)}</td>` +
           "</tr>"
         );
       }),
@@ -278,7 +278,7 @@ function tableMarkup(machines: readonly MachineReport[], versions: readonly stri
   );
 }
 
-function shortCommit(commit: string): string {
+function short_commit(commit: string): string {
   return /^[0-9a-f]{40}$/u.test(commit) ? commit.slice(0, 9) : commit;
 }
 
@@ -310,12 +310,12 @@ export function renderVersionBars(
     )
     .join("");
   const commits = machines
-    .map(({ report }) => `${report.machine} at ${shortCommit(report.commits[newest] ?? "")}`)
+    .map(({ report }) => `${report.machine} at ${short_commit(report.commits[newest] ?? "")}`)
     .join(", ");
   const sections = machines
     .map(
       ({ machine, report }) =>
-        `<section class="version-bars__machine" data-machine="${machine}"><ul class="version-bars__rows">${MEASURES.map((measure) => rowMarkup(measure, report, versions, icon)).join("")}</ul></section>`,
+        `<section class="version-bars__machine" data-machine="${machine}"><ul class="version-bars__rows">${MEASURES.map((measure) => row_markup(measure, report, versions, icon)).join("")}</ul></section>`,
     )
     .join("");
   return [
@@ -334,7 +334,7 @@ export function renderVersionBars(
       : "",
     // The rows repeat the table below; screen readers read the table.
     `<div class="version-bars__charts" aria-hidden="true">${sections}</div>`,
-    tableMarkup(machines, versions),
+    table_markup(machines, versions),
     `<figcaption class="version-bars__caption">Medians of ${first.report.rounds} runs on each machine: the published ${older} packages against ${escapeHtml(newest)} (${escapeHtml(commits)}). Bars start at zero; each row has its own scale. A change smaller than the measure's run-to-run variation reads "Within noise". Compare within a machine, not across machines.</figcaption>`,
     "</figure>",
   ].join("\n");

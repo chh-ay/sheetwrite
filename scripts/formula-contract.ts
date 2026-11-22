@@ -30,22 +30,22 @@ export interface FormulaContractValidation {
 
 type JsonObject = Record<string, unknown>;
 
-function isObject(value: unknown): value is JsonObject {
+function is_object(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function sameJson(left: unknown, right: unknown): boolean {
+function same_json(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function schemaTypeMatches(value: unknown, type: string): boolean {
+function schema_type_matches(value: unknown, type: string): boolean {
   switch (type) {
     case "null":
       return value === null;
     case "array":
       return Array.isArray(value);
     case "object":
-      return isObject(value);
+      return is_object(value);
     case "integer":
       return Number.isSafeInteger(value);
     case "number":
@@ -55,12 +55,12 @@ function schemaTypeMatches(value: unknown, type: string): boolean {
   }
 }
 
-function resolveJsonPointer(root: JsonObject, reference: string): unknown {
+function resolve_json_pointer(root: JsonObject, reference: string): unknown {
   if (!reference.startsWith("#/")) throw new Error(`unsupported schema reference ${reference}`);
   let current: unknown = root;
-  for (const rawPart of reference.slice(2).split("/")) {
-    const part = rawPart.replaceAll("~1", "/").replaceAll("~0", "~");
-    if (!isObject(current) || !(part in current)) {
+  for (const raw_part of reference.slice(2).split("/")) {
+    const part = raw_part.replaceAll("~1", "/").replaceAll("~0", "~");
+    if (!is_object(current) || !(part in current)) {
       throw new Error(`unresolved schema reference ${reference}`);
     }
     current = current[part];
@@ -68,34 +68,37 @@ function resolveJsonPointer(root: JsonObject, reference: string): unknown {
   return current;
 }
 
-function validateSchemaNode(
+function validate_schema_node(
   value: unknown,
   node: unknown,
   root: JsonObject,
   path: string,
   issues: string[],
 ): void {
-  if (!isObject(node)) {
+  if (!is_object(node)) {
     issues.push(`${path}: invalid schema node`);
     return;
   }
   if (typeof node.$ref === "string") {
-    validateSchemaNode(value, resolveJsonPointer(root, node.$ref), root, path, issues);
+    validate_schema_node(value, resolve_json_pointer(root, node.$ref), root, path, issues);
     return;
   }
-  if ("const" in node && !sameJson(value, node.const)) {
+  if ("const" in node && !same_json(value, node.const)) {
     issues.push(`${path}: expected constant ${JSON.stringify(node.const)}`);
   }
-  if (Array.isArray(node.enum) && !node.enum.some((candidate) => sameJson(candidate, value))) {
+  if (Array.isArray(node.enum) && !node.enum.some((candidate) => same_json(candidate, value))) {
     issues.push(`${path}: value is outside the closed enum`);
   }
-  const declaredTypes = Array.isArray(node.type)
+  const declared_types = Array.isArray(node.type)
     ? node.type.filter((entry): entry is string => typeof entry === "string")
     : typeof node.type === "string"
       ? [node.type]
       : [];
-  if (declaredTypes.length > 0 && !declaredTypes.some((type) => schemaTypeMatches(value, type))) {
-    issues.push(`${path}: expected ${declaredTypes.join(" or ")}`);
+  if (
+    declared_types.length > 0 &&
+    !declared_types.some((type) => schema_type_matches(value, type))
+  ) {
+    issues.push(`${path}: expected ${declared_types.join(" or ")}`);
     return;
   }
   if (typeof value === "string") {
@@ -126,12 +129,12 @@ function validateSchemaNode(
     }
     if (node.items !== undefined) {
       value.forEach((entry, index) => {
-        validateSchemaNode(entry, node.items, root, `${path}[${index}]`, issues);
+        validate_schema_node(entry, node.items, root, `${path}[${index}]`, issues);
       });
     }
   }
-  if (!isObject(value)) return;
-  const properties = isObject(node.properties) ? node.properties : {};
+  if (!is_object(value)) return;
+  const properties = is_object(node.properties) ? node.properties : {};
   if (Array.isArray(node.required)) {
     for (const key of node.required) {
       if (typeof key === "string" && !(key in value)) issues.push(`${path}.${key}: required field`);
@@ -142,24 +145,24 @@ function validateSchemaNode(
   }
   for (const [key, child] of Object.entries(value)) {
     if (key in properties) {
-      validateSchemaNode(child, properties[key], root, `${path}.${key}`, issues);
+      validate_schema_node(child, properties[key], root, `${path}.${key}`, issues);
     } else if (node.additionalProperties === false) {
       issues.push(`${path}.${key}: unknown field`);
-    } else if (isObject(node.additionalProperties)) {
-      validateSchemaNode(child, node.additionalProperties, root, `${path}.${key}`, issues);
+    } else if (is_object(node.additionalProperties)) {
+      validate_schema_node(child, node.additionalProperties, root, `${path}.${key}`, issues);
     }
   }
 }
 
 export function validateAgainstFormulaSchema(value: unknown, schema: unknown): string[] {
-  if (!isObject(schema)) return ["schema: expected object"];
+  if (!is_object(schema)) return ["schema: expected object"];
   const issues: string[] = [];
-  validateSchemaNode(value, schema, schema, "contract", issues);
+  validate_schema_node(value, schema, schema, "contract", issues);
   return issues;
 }
 
 export function validateClosedSchema(schema: unknown): string[] {
-  if (!isObject(schema)) return ["schema: expected object"];
+  if (!is_object(schema)) return ["schema: expected object"];
   const issues: string[] = [];
   if (schema.$schema !== "https://json-schema.org/draft/2020-12/schema") {
     issues.push("schema.$schema: expected JSON Schema 2020-12");
@@ -174,7 +177,7 @@ export function validateClosedSchema(schema: unknown): string[] {
       });
       return;
     }
-    if (!isObject(value)) return;
+    if (!is_object(value)) return;
     if (value.type === "object" && !("additionalProperties" in value)) {
       issues.push(`${path}: object schema is not closed`);
     }
@@ -184,13 +187,13 @@ export function validateClosedSchema(schema: unknown): string[] {
   return issues;
 }
 
-function namesHash(names: readonly string[]): string {
+function names_hash(names: readonly string[]): string {
   return createHash("sha256")
     .update([...names].sort().join("\n"))
     .digest("hex");
 }
 
-function namesFromFunction(entry: JsonObject): string[] {
+function names_from_function(entry: JsonObject): string[] {
   const canonical = typeof entry.canonical === "string" ? [entry.canonical] : [];
   const aliases = Array.isArray(entry.aliases)
     ? entry.aliases.filter((value): value is string => typeof value === "string")
@@ -198,28 +201,28 @@ function namesFromFunction(entry: JsonObject): string[] {
   return [...canonical, ...aliases];
 }
 
-function stringMap(value: unknown): JsonObject {
-  return isObject(value) ? value : {};
+function string_map(value: unknown): JsonObject {
+  return is_object(value) ? value : {};
 }
 
-function objectProperty(object: JsonObject, key: unknown): JsonObject | undefined {
+function object_property(object: JsonObject, key: unknown): JsonObject | undefined {
   if (typeof key !== "string") return undefined;
   const value = object[key];
-  return isObject(value) ? value : undefined;
+  return is_object(value) ? value : undefined;
 }
 
-function sortedDifference(left: ReadonlySet<string>, right: ReadonlySet<string>): string[] {
+function sorted_difference(left: ReadonlySet<string>, right: ReadonlySet<string>): string[] {
   return [...left].filter((entry) => !right.has(entry)).sort();
 }
 
-function compareNameSets(
+function compare_name_sets(
   actual: ReadonlySet<string>,
   expected: ReadonlySet<string>,
   label: string,
   issues: string[],
 ): void {
-  const missing = sortedDifference(expected, actual);
-  const extra = sortedDifference(actual, expected);
+  const missing = sorted_difference(expected, actual);
+  const extra = sorted_difference(actual, expected);
   if (missing.length > 0) issues.push(`${label}: missing ${missing.join(", ")}`);
   if (extra.length > 0) issues.push(`${label}: unexpected ${extra.join(", ")}`);
 }
@@ -233,26 +236,30 @@ export function extractParserSpellings(source: string): string[] {
   }
 
   const spellings: string[] = [];
-  const parseBlock = (block: string, arm: RegExp, label: string): void => {
-    let armCount = 0;
+  const parse_block = (block: string, arm: RegExp, label: string): void => {
+    let arm_count = 0;
     for (const line of block.split("\n")) {
       if (line.trim().length === 0) continue;
       const match = line.match(arm);
       if (!match?.[1]) throw new Error(`unrecognized formula parser ${label}: ${line.trim()}`);
       spellings.push(match[1]);
-      armCount += 1;
+      arm_count += 1;
     }
-    if (label === "canonical arm" && armCount === 0) {
+    if (label === "canonical arm" && arm_count === 0) {
       throw new Error("formula parser registry has no canonical arms");
     }
   };
 
-  parseBlock(
+  parse_block(
     registry[1],
     /^\s*[A-Za-z][A-Za-z0-9_]*\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/,
     "canonical arm",
   );
-  parseBlock(registry[2], /^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/, "alias arm");
+  parse_block(
+    registry[2],
+    /^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/,
+    "alias arm",
+  );
   return spellings;
 }
 
@@ -284,39 +291,39 @@ export function extractVolatileFunctions(typesSource: string, calcSource: string
   });
 }
 
-function validateReferencesAndNames(inventory: JsonObject, issues: string[]): void {
-  const sources = stringMap(inventory.sources);
-  const families = stringMap(inventory.families);
-  const signatures = stringMap(inventory.signatureProfiles);
-  const semantics = stringMap(inventory.semanticsProfiles);
-  const dialects = stringMap(inventory.dialectProfiles);
-  const implementations = stringMap(inventory.implementationProfiles);
+function validate_references_and_names(inventory: JsonObject, issues: string[]): void {
+  const sources = string_map(inventory.sources);
+  const families = string_map(inventory.families);
+  const signatures = string_map(inventory.signatureProfiles);
+  const semantics = string_map(inventory.semanticsProfiles);
+  const dialects = string_map(inventory.dialectProfiles);
+  const implementations = string_map(inventory.implementationProfiles);
 
-  for (const [familyId, rawFamily] of Object.entries(families)) {
-    if (!isObject(rawFamily)) continue;
-    if (typeof rawFamily.source !== "string" || !(rawFamily.source in sources)) {
+  for (const [family_id, raw_family] of Object.entries(families)) {
+    if (!is_object(raw_family)) continue;
+    if (typeof raw_family.source !== "string" || !(raw_family.source in sources)) {
       issues.push(
-        `contract.families.${familyId}.source: unknown source ${String(rawFamily.source)}`,
+        `contract.families.${family_id}.source: unknown source ${String(raw_family.source)}`,
       );
     }
   }
 
-  const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(isObject) : [];
-  const canonicalNames = new Set<string>();
-  const parserNames = new Set<string>();
-  const requiredNames: string[] = [];
+  const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(is_object) : [];
+  const canonical_names = new Set<string>();
+  const parser_names = new Set<string>();
+  const required_names: string[] = [];
   for (const [index, entry] of functions.entries()) {
     const path = `contract.functions[${index}]`;
     const canonical = entry.canonical;
     if (typeof canonical === "string") {
-      if (canonicalNames.has(canonical)) issues.push(`${path}.canonical: duplicate ${canonical}`);
-      canonicalNames.add(canonical);
-      if (entry.contractStatus === "required-supported") requiredNames.push(canonical);
+      if (canonical_names.has(canonical)) issues.push(`${path}.canonical: duplicate ${canonical}`);
+      canonical_names.add(canonical);
+      if (entry.contractStatus === "required-supported") required_names.push(canonical);
     }
-    for (const spelling of namesFromFunction(entry)) {
+    for (const spelling of names_from_function(entry)) {
       if (!FORMULA_NAME.test(spelling)) continue;
-      if (parserNames.has(spelling)) issues.push(`${path}: duplicate parser spelling ${spelling}`);
-      parserNames.add(spelling);
+      if (parser_names.has(spelling)) issues.push(`${path}: duplicate parser spelling ${spelling}`);
+      parser_names.add(spelling);
     }
     if (Array.isArray(entry.aliases) && entry.aliases.includes(canonical)) {
       issues.push(`${path}.aliases: canonical spelling cannot repeat as an alias`);
@@ -341,33 +348,33 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
         issues.push(`${path}.${field}: unknown profile ${String(reference)}`);
       }
     }
-    const implementation = objectProperty(implementations, entry.implementation);
-    const parser = implementation ? objectProperty(implementation, "parser") : undefined;
+    const implementation = object_property(implementations, entry.implementation);
+    const parser = implementation ? object_property(implementation, "parser") : undefined;
     if (parser?.status !== "implemented") {
       issues.push(`${path}.implementation: parser spelling is not marked implemented`);
     }
   }
 
-  if (namesHash(requiredNames) !== REQUIRED_TARGET_HASH) {
+  if (names_hash(required_names) !== REQUIRED_TARGET_HASH) {
     issues.push(
       "contract.functions: required-supported target set differs from the expansion specification",
     );
   }
-  const letEntry = functions.find((entry) => entry.canonical === "LET");
-  if (letEntry?.contractStatus !== "required-supported") {
+  const let_entry = functions.find((entry) => entry.canonical === "LET");
+  if (let_entry?.contractStatus !== "required-supported") {
     issues.push("contract.functions: LET must remain required-supported");
   }
 
   const unsupported = Array.isArray(inventory.unsupportedCategories)
-    ? inventory.unsupportedCategories.filter(isObject)
+    ? inventory.unsupportedCategories.filter(is_object)
     : [];
-  const unsupportedIds = unsupported
+  const unsupported_ids = unsupported
     .map((entry) => entry.id)
     .filter((value): value is string => typeof value === "string");
-  if (new Set(unsupportedIds).size !== unsupportedIds.length) {
+  if (new Set(unsupported_ids).size !== unsupported_ids.length) {
     issues.push("contract.unsupportedCategories: duplicate category id");
   }
-  if (namesHash(unsupportedIds) !== UNSUPPORTED_CATEGORY_HASH) {
+  if (names_hash(unsupported_ids) !== UNSUPPORTED_CATEGORY_HASH) {
     issues.push("contract.unsupportedCategories: required unsupported category set differs");
   }
   for (const [index, category] of unsupported.entries()) {
@@ -378,7 +385,7 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
     }
     // An unsupported example must not also be a function that some build evaluates.
     for (const example of Array.isArray(category.examples) ? category.examples : []) {
-      if (typeof example === "string" && parserNames.has(example)) {
+      if (typeof example === "string" && parser_names.has(example)) {
         issues.push(
           `contract.unsupportedCategories[${index}].examples: ${example} is a supported function`,
         );
@@ -392,15 +399,15 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
  * Formula help completes every built-in name of the active engine from the
  * generated function table, so this set must equal the names of every build.
  */
-function assistNames(inventory: JsonObject, issues: string[]): Set<string> {
+function assist_names(inventory: JsonObject, issues: string[]): Set<string> {
   const names = new Set<string>();
-  const implementations = stringMap(inventory.implementationProfiles);
-  const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(isObject) : [];
+  const implementations = string_map(inventory.implementationProfiles);
+  const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(is_object) : [];
   for (const [index, entry] of functions.entries()) {
-    const profile = objectProperty(implementations, entry.implementation);
-    const assist = profile ? objectProperty(profile, "assist") : undefined;
+    const profile = object_property(implementations, entry.implementation);
+    const assist = profile ? object_property(profile, "assist") : undefined;
     if (assist?.status === "implemented") {
-      for (const spelling of namesFromFunction(entry)) names.add(spelling);
+      for (const spelling of names_from_function(entry)) names.add(spelling);
     } else if (assist?.status !== "missing" && assist?.status !== "declared") {
       issues.push(`contract.functions[${index}].implementation: invalid assist status`);
     }
@@ -408,18 +415,18 @@ function assistNames(inventory: JsonObject, issues: string[]): Set<string> {
   return names;
 }
 
-function inventoryParserNames(inventory: JsonObject, build = "@sheetwrite/wasm"): Set<string> {
+function inventory_parser_names(inventory: JsonObject, build = "@sheetwrite/wasm"): Set<string> {
   const names = new Set<string>();
   if (!Array.isArray(inventory.functions)) return names;
   for (const entry of inventory.functions) {
-    if (!isObject(entry)) continue;
+    if (!is_object(entry)) continue;
     if (!Array.isArray(entry.builds) || !entry.builds.includes(build)) continue;
-    for (const spelling of namesFromFunction(entry)) names.add(spelling);
+    for (const spelling of names_from_function(entry)) names.add(spelling);
   }
   return names;
 }
 
-async function validateEvidencePaths(
+async function validate_evidence_paths(
   root: string,
   inventory: JsonObject,
   issues: string[],
@@ -430,7 +437,7 @@ async function validateEvidencePaths(
       value.forEach(collect);
       return;
     }
-    if (!isObject(value)) return;
+    if (!is_object(value)) return;
     for (const [key, child] of Object.entries(value)) {
       if (key === "paths" && Array.isArray(child)) {
         for (const path of child) if (typeof path === "string") paths.add(path);
@@ -457,15 +464,17 @@ async function validateEvidencePaths(
   );
 }
 
-function validatePortableFormulaSemantics(inventory: JsonObject, issues: string[]): void {
-  const signatures = stringMap(inventory.signatureProfiles);
-  const numberValue = isObject(signatures["number-value"]) ? signatures["number-value"] : undefined;
-  const numberArguments =
-    numberValue && Array.isArray(numberValue.arguments)
-      ? numberValue.arguments.filter(isObject)
+function validate_portable_formula_semantics(inventory: JsonObject, issues: string[]): void {
+  const signatures = string_map(inventory.signatureProfiles);
+  const number_value = is_object(signatures["number-value"])
+    ? signatures["number-value"]
+    : undefined;
+  const number_arguments =
+    number_value && Array.isArray(number_value.arguments)
+      ? number_value.arguments.filter(is_object)
       : [];
-  const decimal = numberArguments.find((argument) => argument.name === "decimalSeparator");
-  const grouping = numberArguments.find((argument) => argument.name === "groupSeparator");
+  const decimal = number_arguments.find((argument) => argument.name === "decimalSeparator");
+  const grouping = number_arguments.find((argument) => argument.name === "groupSeparator");
   if (decimal?.default !== ".") {
     issues.push(
       "contract.signatureProfiles.number-value.decimalSeparator: expected invariant default",
@@ -476,9 +485,10 @@ function validatePortableFormulaSemantics(inventory: JsonObject, issues: string[
       "contract.signatureProfiles.number-value.groupSeparator: expected invariant default",
     );
   }
-  const semantics = stringMap(inventory.semanticsProfiles);
-  const dateTime = isObject(semantics["date-time"]) ? semantics["date-time"] : undefined;
-  const environment = dateTime && isObject(dateTime.environment) ? dateTime.environment : undefined;
+  const semantics = string_map(inventory.semanticsProfiles);
+  const date_time = is_object(semantics["date-time"]) ? semantics["date-time"] : undefined;
+  const environment =
+    date_time && is_object(date_time.environment) ? date_time.environment : undefined;
   if (environment?.locale !== "invariant") {
     issues.push("contract.semanticsProfiles.date-time.environment.locale: expected invariant");
   }
@@ -489,7 +499,7 @@ interface AnalysisSources {
   readonly families: ReadonlyMap<string, string>;
 }
 
-async function readAnalysisSources(root: string): Promise<AnalysisSources> {
+async function read_analysis_sources(root: string): Promise<AnalysisSources> {
   const directory = resolve(root, ANALYSIS_PATH);
   const files = (await readdir(directory)).filter((file) => file.endsWith(".rs")).sort();
   const sources = await Promise.all(
@@ -505,7 +515,7 @@ async function readAnalysisSources(root: string): Promise<AnalysisSources> {
 }
 
 /** Each `analysis/<family>.rs` must declare its functions once and be registered in `mod.rs`. */
-function extractAnalysisSpellings(sources: AnalysisSources, issues: string[]): string[] {
+function extract_analysis_spellings(sources: AnalysisSources, issues: string[]): string[] {
   const spellings: string[] = [];
   if (sources.families.size === 0) issues.push("analysis family registry not found");
   for (const [family, source] of sources.families) {
@@ -535,8 +545,8 @@ export function validateFormulaContractData(inventory: unknown, schema: unknown)
     ...validateClosedSchema(schema),
     ...validateAgainstFormulaSchema(inventory, schema),
   ];
-  if (isObject(inventory)) validateReferencesAndNames(inventory, issues);
-  if (isObject(inventory)) validatePortableFormulaSemantics(inventory, issues);
+  if (is_object(inventory)) validate_references_and_names(inventory, issues);
+  if (is_object(inventory)) validate_portable_formula_semantics(inventory, issues);
   return issues;
 }
 
@@ -544,17 +554,17 @@ export async function validateFormulaContractRepository(
   root = REPOSITORY_ROOT,
   inventoryOverride?: unknown,
 ): Promise<FormulaContractValidation> {
-  const [schemaSource, inventorySource, parserSource, analysisSources] = await Promise.all([
+  const [schema_source, inventory_source, parser_source, analysis_sources] = await Promise.all([
     readFile(resolve(root, SCHEMA_PATH), "utf8"),
     inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
     readFile(resolve(root, "packages/wasm/src/calc/functions.rs"), "utf8"),
-    readAnalysisSources(root),
+    read_analysis_sources(root),
   ]);
   let schema: unknown;
   let inventory: unknown = inventoryOverride;
   const issues: string[] = [];
   try {
-    schema = JSON.parse(schemaSource);
+    schema = JSON.parse(schema_source);
   } catch (error) {
     return {
       issues: [`${SCHEMA_PATH}: invalid JSON: ${String(error)}`],
@@ -570,7 +580,7 @@ export async function validateFormulaContractRepository(
   }
   if (inventoryOverride === undefined) {
     try {
-      inventory = JSON.parse(inventorySource ?? "");
+      inventory = JSON.parse(inventory_source ?? "");
     } catch (error) {
       return {
         issues: [`${INVENTORY_PATH}: invalid JSON: ${String(error)}`],
@@ -587,50 +597,50 @@ export async function validateFormulaContractRepository(
   }
   issues.push(...validateFormulaContractData(inventory, schema));
 
-  let parserSpellings: string[] = [];
-  let assistSpellings = new Set<string>();
+  let parser_spellings: string[] = [];
+  let assist_spellings = new Set<string>();
   try {
-    parserSpellings = extractParserSpellings(parserSource);
+    parser_spellings = extractParserSpellings(parser_source);
   } catch (error) {
     issues.push(`parser drift extraction failed: ${String(error)}`);
   }
-  if (new Set(parserSpellings).size !== parserSpellings.length) {
+  if (new Set(parser_spellings).size !== parser_spellings.length) {
     issues.push("parser drift extraction found duplicate spellings");
   }
-  const extensionSpellings = extractAnalysisSpellings(analysisSources, issues);
-  if (isObject(inventory)) {
-    compareNameSets(
-      new Set(parserSpellings),
-      inventoryParserNames(inventory),
+  const extension_spellings = extract_analysis_spellings(analysis_sources, issues);
+  if (is_object(inventory)) {
+    compare_name_sets(
+      new Set(parser_spellings),
+      inventory_parser_names(inventory),
       "parser/inventory drift",
       issues,
     );
-    assistSpellings = assistNames(inventory, issues);
-    compareNameSets(
-      assistSpellings,
+    assist_spellings = assist_names(inventory, issues);
+    compare_name_sets(
+      assist_spellings,
       new Set([
-        ...inventoryParserNames(inventory),
-        ...inventoryParserNames(inventory, "@sheetwrite/formulas"),
+        ...inventory_parser_names(inventory),
+        ...inventory_parser_names(inventory, "@sheetwrite/formulas"),
       ]),
       "assist/inventory drift",
       issues,
     );
-    compareNameSets(
-      new Set([...parserSpellings, ...extensionSpellings]),
-      inventoryParserNames(inventory, "@sheetwrite/formulas"),
+    compare_name_sets(
+      new Set([...parser_spellings, ...extension_spellings]),
+      inventory_parser_names(inventory, "@sheetwrite/formulas"),
       "formulas/inventory drift",
       issues,
     );
-    await validateEvidencePaths(root, inventory, issues);
+    await validate_evidence_paths(root, inventory, issues);
   }
 
   const functions =
-    isObject(inventory) && Array.isArray(inventory.functions)
-      ? inventory.functions.filter(isObject)
+    is_object(inventory) && Array.isArray(inventory.functions)
+      ? inventory.functions.filter(is_object)
       : [];
   const unsupported =
-    isObject(inventory) && Array.isArray(inventory.unsupportedCategories)
-      ? inventory.unsupportedCategories.filter(isObject)
+    is_object(inventory) && Array.isArray(inventory.unsupportedCategories)
+      ? inventory.unsupportedCategories.filter(is_object)
       : [];
   return {
     issues: [...new Set(issues)].sort(),
@@ -639,9 +649,9 @@ export async function validateFormulaContractRepository(
       requiredSupported: functions.filter((entry) => entry.contractStatus === "required-supported")
         .length,
       unsupportedCategories: unsupported.length,
-      parserSpellings: new Set(parserSpellings).size,
-      assistSpellings: assistSpellings.size,
-      formulasSpellings: new Set([...parserSpellings, ...extensionSpellings]).size,
+      parserSpellings: new Set(parser_spellings).size,
+      assistSpellings: assist_spellings.size,
+      formulasSpellings: new Set([...parser_spellings, ...extension_spellings]).size,
     },
   };
 }

@@ -70,7 +70,7 @@ interface LoaderState {
 
 const STATES = new WeakMap<Grid, LoaderState>();
 
-function stateOf(grid: Grid): LoaderState {
+function state_of(grid: Grid): LoaderState {
   let state = STATES.get(grid);
   if (state === undefined) {
     state = {
@@ -102,7 +102,7 @@ export function pivotsAvailable(grid: Grid): boolean {
  * the `AbortError` as cancellation.
  */
 export function loadPanels(grid: Grid): Promise<PanelController> {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   state.loading ??= import("./panel-controller.js").then(
     (controller) => {
       if (state.controller === null && !state.lifetime.closed) {
@@ -129,7 +129,7 @@ export function loadPanels(grid: Grid): Promise<PanelController> {
  * that finishes opens nothing.
  */
 export function requestPanel(grid: Grid, open: (controller: PanelController) => void): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   if (state.controller !== null) {
     open(state.controller);
     return;
@@ -179,7 +179,7 @@ interface OutputRect {
   readonly right: number;
 }
 
-function pivotOutputs(grid: Grid, sheet: SheetId): OutputRect[] {
+function pivot_outputs(grid: Grid, sheet: SheetId): OutputRect[] {
   return grid.getPivots(sheet).map((pivot) => {
     const result = grid.getPivotResult(sheet, pivot.id);
     const top = result?.anchor.row ?? pivot.anchor.row;
@@ -191,7 +191,7 @@ function pivotOutputs(grid: Grid, sheet: SheetId): OutputRect[] {
 }
 
 /** The pivot whose output rectangle holds `row, col`, among `rects` of one sheet. */
-function hitIn(rects: readonly OutputRect[], row: number, col: number): OutputRect | undefined {
+function hit_in(rects: readonly OutputRect[], row: number, col: number): OutputRect | undefined {
   return rects.find(
     (rect) => row >= rect.top && row <= rect.bottom && col >= rect.left && col <= rect.right,
   );
@@ -202,7 +202,7 @@ export function pivotAt(
   grid: Grid,
   cell: { sheet: SheetId; row: number; col: number },
 ): PivotHit | null {
-  const hit = hitIn(pivotOutputs(grid, cell.sheet), cell.row, cell.col);
+  const hit = hit_in(pivot_outputs(grid, cell.sheet), cell.row, cell.col);
   return hit === undefined ? null : { sheet: cell.sheet, id: hit.id };
 }
 
@@ -223,20 +223,20 @@ export function showPivotFields(grid: Grid): void {
  * disposer, which also detaches the controller when it has loaded.
  */
 export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   state.icons = icons;
 
   // Output rectangles, cached until the next change: selection moves on every arrow key.
   const outputs = new Map<SheetId, OutputRect[]>();
-  const pivotHit = (): PivotHit | null => {
+  const pivot_hit = (): PivotHit | null => {
     const cell = selectionCell(grid.getSelection());
     if (cell === null) return null;
     let rects = outputs.get(cell.sheet);
     if (rects === undefined) {
-      rects = pivotOutputs(grid, cell.sheet);
+      rects = pivot_outputs(grid, cell.sheet);
       outputs.set(cell.sheet, rects);
     }
-    const hit = hitIn(rects, cell.row, cell.col);
+    const hit = hit_in(rects, cell.row, cell.col);
     return hit === undefined ? null : { sheet: cell.sheet, id: hit.id };
   };
 
@@ -249,11 +249,11 @@ export function attachPanelTriggers(grid: Grid, icons?: IconOverrides): () => vo
   state.lifetime.add(grid.on("change", () => outputs.clear()));
   state.lifetime.add(
     grid.on("selection", () => {
-      const hit = pivotHit();
+      const hit = pivot_hit();
       // Without the controller no panel is open, so only a hit needs it.
       if (state.controller !== null) state.controller.syncPivotPanel(grid, hit);
       else if (hit !== null) {
-        requestPanel(grid, (controller) => controller.syncPivotPanel(grid, pivotHit()));
+        requestPanel(grid, (controller) => controller.syncPivotPanel(grid, pivot_hit()));
       }
     }),
   );

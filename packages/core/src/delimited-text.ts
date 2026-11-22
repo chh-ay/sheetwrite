@@ -153,7 +153,7 @@ const BOM_CODE_UNIT = 0xfeff;
 /** Records scanned or encoded between two abort checks; never one check per field. */
 const ABORT_CHECK_RECORDS = 1024;
 
-function failResource(
+function fail_resource(
   resource: keyof DelimitedTextResourceLimits,
   limit: number,
   actual: number,
@@ -169,13 +169,13 @@ export function assertDelimitedTextDimensions(
   limits: Readonly<DelimitedTextResourceLimits>,
   operation: DelimitedTextOperation,
 ): void {
-  if (rows > limits.maxRows) failResource("maxRows", limits.maxRows, rows, operation);
+  if (rows > limits.maxRows) fail_resource("maxRows", limits.maxRows, rows, operation);
   if (columns > limits.maxColumns) {
-    failResource("maxColumns", limits.maxColumns, columns, operation);
+    fail_resource("maxColumns", limits.maxColumns, columns, operation);
   }
   if (rows !== 0 && columns > Math.floor(limits.maxCells / rows)) {
     const actual = rows * columns;
-    failResource(
+    fail_resource(
       "maxCells",
       limits.maxCells,
       Number.isSafeInteger(actual) ? actual : limits.maxCells + 1,
@@ -219,79 +219,83 @@ export function scanDelimitedText(
   signal: AbortSignal | undefined,
 ): void {
   signal?.throwIfAborted();
-  const inputBytes = utf8ByteLength(text, limits.maxInputBytes);
-  if (inputBytes > limits.maxInputBytes) {
-    failResource("maxInputBytes", limits.maxInputBytes, inputBytes, "parse");
+  const input_bytes = utf8ByteLength(text, limits.maxInputBytes);
+  if (input_bytes > limits.maxInputBytes) {
+    fail_resource("maxInputBytes", limits.maxInputBytes, input_bytes, "parse");
   }
 
-  const delimiterCode = delimiter.charCodeAt(0);
-  const fieldLimit = sink.fieldLimit;
-  let rowCount = 0;
-  let rowFields = 0;
+  const delimiter_code = delimiter.charCodeAt(0);
+  const field_limit = sink.fieldLimit;
+  let row_count = 0;
+  let row_fields = 0;
   // Pieces of the current field; only quoted fields with doubled quotes need
   // more than one. Reused across fields to avoid an array per field.
-  const fieldParts: string[] = [];
-  let fieldBytes = 0;
+  const field_parts: string[] = [];
+  let field_bytes = 0;
   let cells = 0;
-  let fieldPresent = false;
+  let field_present = false;
   let quoted = false;
   let index = text.charCodeAt(0) === BOM_CODE_UNIT ? 1 : 0;
-  let segmentStart = index;
+  let segment_start = index;
 
-  const appendSegment = (end: number): void => {
-    if (end > segmentStart) fieldParts.push(text.slice(segmentStart, end));
+  const append_segment = (end: number): void => {
+    if (end > segment_start) field_parts.push(text.slice(segment_start, end));
   };
 
-  const materializeField = (end: number): void => {
-    const nextColumn = rowFields + 1;
-    if (nextColumn > limits.maxColumns) {
-      failResource("maxColumns", limits.maxColumns, nextColumn, "parse");
+  const materialize_field = (end: number): void => {
+    const next_column = row_fields + 1;
+    if (next_column > limits.maxColumns) {
+      fail_resource("maxColumns", limits.maxColumns, next_column, "parse");
     }
-    const nextCells = cells + 1;
-    if (nextCells > limits.maxCells) {
-      failResource("maxCells", limits.maxCells, nextCells, "parse");
+    const next_cells = cells + 1;
+    if (next_cells > limits.maxCells) {
+      fail_resource("maxCells", limits.maxCells, next_cells, "parse");
     }
-    if (rowFields < fieldLimit) {
-      if (fieldParts.length === 0) {
+    if (row_fields < field_limit) {
+      if (field_parts.length === 0) {
         // Plain field: one span of the input, no intermediate pieces.
-        if (sink.span?.(rowCount, rowFields, text, segmentStart, end) !== true) {
-          sink.field(rowCount, rowFields, end > segmentStart ? text.slice(segmentStart, end) : "");
+        if (sink.span?.(row_count, row_fields, text, segment_start, end) !== true) {
+          sink.field(
+            row_count,
+            row_fields,
+            end > segment_start ? text.slice(segment_start, end) : "",
+          );
         }
       } else {
-        appendSegment(end);
+        append_segment(end);
         sink.field(
-          rowCount,
-          rowFields,
-          fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join(""),
+          row_count,
+          row_fields,
+          field_parts.length === 1 ? (field_parts[0] ?? "") : field_parts.join(""),
         );
       }
     }
-    fieldParts.length = 0;
-    fieldBytes = 0;
-    fieldPresent = false;
-    cells = nextCells;
-    rowFields = nextColumn;
+    field_parts.length = 0;
+    field_bytes = 0;
+    field_present = false;
+    cells = next_cells;
+    row_fields = next_column;
   };
 
-  const materializeRow = (end: number): void => {
-    materializeField(end);
-    const nextRows = rowCount + 1;
-    if (nextRows > limits.maxRows) {
-      failResource("maxRows", limits.maxRows, nextRows, "parse");
+  const materialize_row = (end: number): void => {
+    materialize_field(end);
+    const next_rows = row_count + 1;
+    if (next_rows > limits.maxRows) {
+      fail_resource("maxRows", limits.maxRows, next_rows, "parse");
     }
-    sink.row(rowCount, rowFields);
-    rowCount = nextRows;
-    rowFields = 0;
-    if (rowCount % ABORT_CHECK_RECORDS === 0) signal?.throwIfAborted();
+    sink.row(row_count, row_fields);
+    row_count = next_rows;
+    row_fields = 0;
+    if (row_count % ABORT_CHECK_RECORDS === 0) signal?.throwIfAborted();
   };
 
-  const countFieldCodePoint = (): void => {
+  const count_field_code_point = (): void => {
     const width = utf8CodePointBytes(text, index);
-    fieldBytes += width;
-    if (fieldBytes > limits.maxFieldBytes) {
-      failResource("maxFieldBytes", limits.maxFieldBytes, fieldBytes, "parse");
+    field_bytes += width;
+    if (field_bytes > limits.maxFieldBytes) {
+      fail_resource("maxFieldBytes", limits.maxFieldBytes, field_bytes, "parse");
     }
-    fieldPresent = true;
+    field_present = true;
     index += utf8CodePointUnits(width);
   };
 
@@ -299,48 +303,48 @@ export function scanDelimitedText(
     const code = text.charCodeAt(index);
     if (quoted) {
       if (code !== QUOTE_CODE_UNIT) {
-        countFieldCodePoint();
+        count_field_code_point();
         continue;
       }
       if (text.charCodeAt(index + 1) === QUOTE_CODE_UNIT) {
-        appendSegment(index);
-        fieldBytes++;
-        if (fieldBytes > limits.maxFieldBytes) {
-          failResource("maxFieldBytes", limits.maxFieldBytes, fieldBytes, "parse");
+        append_segment(index);
+        field_bytes++;
+        if (field_bytes > limits.maxFieldBytes) {
+          fail_resource("maxFieldBytes", limits.maxFieldBytes, field_bytes, "parse");
         }
-        fieldParts.push('"');
+        field_parts.push('"');
         index += 2;
-        segmentStart = index;
+        segment_start = index;
         continue;
       }
-      appendSegment(index);
+      append_segment(index);
       quoted = false;
       index++;
-      segmentStart = index;
+      segment_start = index;
       continue;
     }
 
-    if (code === QUOTE_CODE_UNIT && !fieldPresent && fieldParts.length === 0) {
+    if (code === QUOTE_CODE_UNIT && !field_present && field_parts.length === 0) {
       quoted = true;
-      fieldPresent = true;
+      field_present = true;
       index++;
-      segmentStart = index;
+      segment_start = index;
       continue;
     }
-    if (code === delimiterCode) {
-      materializeField(index);
-      if (rowFields >= limits.maxColumns) {
-        failResource("maxColumns", limits.maxColumns, limits.maxColumns + 1, "parse");
+    if (code === delimiter_code) {
+      materialize_field(index);
+      if (row_fields >= limits.maxColumns) {
+        fail_resource("maxColumns", limits.maxColumns, limits.maxColumns + 1, "parse");
       }
       if (cells >= limits.maxCells) {
-        failResource("maxCells", limits.maxCells, limits.maxCells + 1, "parse");
+        fail_resource("maxCells", limits.maxCells, limits.maxCells + 1, "parse");
       }
       index++;
-      segmentStart = index;
+      segment_start = index;
       continue;
     }
     if (code === CARRIAGE_RETURN_CODE_UNIT || code === LINE_FEED_CODE_UNIT) {
-      materializeRow(index);
+      materialize_row(index);
       if (
         code === CARRIAGE_RETURN_CODE_UNIT &&
         text.charCodeAt(index + 1) === LINE_FEED_CODE_UNIT
@@ -348,43 +352,43 @@ export function scanDelimitedText(
         index++;
       }
       index++;
-      segmentStart = index;
-      if (index < text.length && rowCount >= limits.maxRows) {
-        failResource("maxRows", limits.maxRows, limits.maxRows + 1, "parse");
+      segment_start = index;
+      if (index < text.length && row_count >= limits.maxRows) {
+        fail_resource("maxRows", limits.maxRows, limits.maxRows + 1, "parse");
       }
       continue;
     }
     if (code > ASCII_MAX_CODE_UNIT) {
-      countFieldCodePoint();
+      count_field_code_point();
       continue;
     }
     // Unquoted ASCII text: take a whole run, stopping at anything the branches
     // above must inspect (quote, delimiter, record break, or non-ASCII).
-    let runEnd = index + 1;
-    while (runEnd < text.length) {
-      const next = text.charCodeAt(runEnd);
+    let run_end = index + 1;
+    while (run_end < text.length) {
+      const next = text.charCodeAt(run_end);
       if (
         next > ASCII_MAX_CODE_UNIT ||
         next === QUOTE_CODE_UNIT ||
-        next === delimiterCode ||
+        next === delimiter_code ||
         next === CARRIAGE_RETURN_CODE_UNIT ||
         next === LINE_FEED_CODE_UNIT
       ) {
         break;
       }
-      runEnd += 1;
+      run_end += 1;
     }
-    fieldBytes += runEnd - index;
-    if (fieldBytes > limits.maxFieldBytes) {
+    field_bytes += run_end - index;
+    if (field_bytes > limits.maxFieldBytes) {
       // The field was within the ceiling before this run of one-byte units, so a
       // unit-by-unit count first exceeds it at exactly one byte over.
-      failResource("maxFieldBytes", limits.maxFieldBytes, limits.maxFieldBytes + 1, "parse");
+      fail_resource("maxFieldBytes", limits.maxFieldBytes, limits.maxFieldBytes + 1, "parse");
     }
-    fieldPresent = true;
-    index = runEnd;
+    field_present = true;
+    index = run_end;
   }
 
-  if (fieldPresent || rowFields > 0 || fieldParts.length > 0) materializeRow(index);
+  if (field_present || row_fields > 0 || field_parts.length > 0) materialize_row(index);
 }
 
 /** Parse a fixed comma or tab dialect into raw string rows. */
@@ -422,36 +426,36 @@ interface EncodedFieldPlan {
   readonly bytes: number;
 }
 
-function planEncodedField(
+function plan_encoded_field(
   text: string,
   delimiter: "," | "\t",
-  forceQuote: boolean,
+  force_quote: boolean,
   limits: Readonly<DelimitedTextResourceLimits>,
   operation: DelimitedTextOperation,
 ): EncodedFieldPlan {
   let bytes = 0;
-  let quoteCount = 0;
-  let quote = forceQuote;
+  let quote_count = 0;
+  let quote = force_quote;
   for (let index = 0; index < text.length;) {
     const ch = text[index]!;
     const width = utf8CodePointBytes(text, index);
     bytes += width;
     if (bytes > limits.maxFieldBytes) {
-      failResource("maxFieldBytes", limits.maxFieldBytes, bytes, operation);
+      fail_resource("maxFieldBytes", limits.maxFieldBytes, bytes, operation);
     }
     if (ch === '"') {
       quote = true;
-      quoteCount++;
+      quote_count++;
     } else if (ch === delimiter || ch === "\r" || ch === "\n") {
       quote = true;
     }
     index += utf8CodePointUnits(width);
   }
-  return { text, quote, quoteCount, bytes };
+  return { text, quote, quoteCount: quote_count, bytes };
 }
 
 /** Enforce every row ceiling before any encoded byte of that row is emitted. */
-function* plannedRows(
+function* planned_rows(
   rows: Iterable<readonly string[]>,
   delimiter: "," | "\t",
   options: DelimitedTextOptions = {},
@@ -459,31 +463,31 @@ function* plannedRows(
 ): Generator<readonly EncodedFieldPlan[]> {
   const limits = resolveDelimitedTextResourceLimits(options);
   const operation = config.operation ?? "encode";
-  let outputBytes = config.bom ? 3 : 0;
-  let rowCount = 0;
+  let output_bytes = config.bom ? 3 : 0;
+  let row_count = 0;
   let cells = 0;
-  if (outputBytes > limits.maxOutputBytes) {
-    failResource("maxOutputBytes", limits.maxOutputBytes, outputBytes, operation);
+  if (output_bytes > limits.maxOutputBytes) {
+    fail_resource("maxOutputBytes", limits.maxOutputBytes, output_bytes, operation);
   }
 
   for (const row of rows) {
-    if (rowCount % ABORT_CHECK_RECORDS === 0) options.signal?.throwIfAborted();
-    const nextRows = rowCount + 1;
-    if (nextRows > limits.maxRows) {
-      failResource("maxRows", limits.maxRows, nextRows, operation);
+    if (row_count % ABORT_CHECK_RECORDS === 0) options.signal?.throwIfAborted();
+    const next_rows = row_count + 1;
+    if (next_rows > limits.maxRows) {
+      fail_resource("maxRows", limits.maxRows, next_rows, operation);
     }
     if (row.length > limits.maxColumns) {
-      failResource("maxColumns", limits.maxColumns, row.length, operation);
+      fail_resource("maxColumns", limits.maxColumns, row.length, operation);
     }
-    const nextCells = cells + row.length;
-    if (nextCells > limits.maxCells) {
-      failResource("maxCells", limits.maxCells, nextCells, operation);
+    const next_cells = cells + row.length;
+    if (next_cells > limits.maxCells) {
+      fail_resource("maxCells", limits.maxCells, next_cells, operation);
     }
 
     const plans: EncodedFieldPlan[] = new Array(row.length);
-    let rowBytes = row.length > 0 ? row.length - 1 : 0;
+    let row_bytes = row.length > 0 ? row.length - 1 : 0;
     for (let column = 0; column < row.length; column++) {
-      const plan = planEncodedField(
+      const plan = plan_encoded_field(
         row[column]!,
         delimiter,
         row.length === 1 && row[column] === "",
@@ -491,12 +495,12 @@ function* plannedRows(
         operation,
       );
       plans[column] = plan;
-      rowBytes += plan.bytes + plan.quoteCount + (plan.quote ? 2 : 0);
+      row_bytes += plan.bytes + plan.quoteCount + (plan.quote ? 2 : 0);
     }
-    const required = rowBytes + (rowCount > 0 ? 2 : 0);
-    if (required > limits.maxOutputBytes - outputBytes) {
-      const actual = outputBytes + required;
-      failResource(
+    const required = row_bytes + (row_count > 0 ? 2 : 0);
+    if (required > limits.maxOutputBytes - output_bytes) {
+      const actual = output_bytes + required;
+      fail_resource(
         "maxOutputBytes",
         limits.maxOutputBytes,
         Number.isSafeInteger(actual) ? actual : limits.maxOutputBytes + 1,
@@ -505,9 +509,9 @@ function* plannedRows(
     }
 
     yield plans;
-    outputBytes += required;
-    rowCount = nextRows;
-    cells = nextCells;
+    output_bytes += required;
+    row_count = next_rows;
+    cells = next_cells;
   }
 }
 
@@ -521,7 +525,7 @@ export function* encodeDelimitedTextChunks(
   config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
 ): Generator<string> {
   let first = true;
-  for (const plans of plannedRows(rows, delimiter, options, config)) {
+  for (const plans of planned_rows(rows, delimiter, options, config)) {
     const separator = first ? (config.bom ? "\ufeff" : "") : "\r\n";
     first = false;
     if (plans.every((plan) => plan.text.length <= FIELD_CHUNK_CHARACTERS)) {
@@ -565,7 +569,7 @@ export function encodeDelimitedText(
   config: { bom?: boolean; operation?: DelimitedTextOperation } = {},
 ): string {
   const lines: string[] = [];
-  for (const plans of plannedRows(rows, delimiter, options, config)) {
+  for (const plans of planned_rows(rows, delimiter, options, config)) {
     lines.push(
       plans
         .map((plan) => (plan.quote ? `"${plan.text.replaceAll('"', '""')}"` : plan.text))

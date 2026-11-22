@@ -29,63 +29,63 @@ export interface AxisMove {
 export class ScrollAxisMotion {
   private readonly times: number[] = [];
   private readonly positions: number[] = [];
-  private measuredVelocity = 0;
+  private measured_velocity = 0;
   private travelling = true;
   /** Units per millisecond squared that the speed is falling at; zero while it is not falling. */
   private deceleration = 0;
   /** When the speed started falling without a break; `undefined` while it is not falling. */
-  private slowingSince: number | undefined;
-  private lastAt = 0;
+  private slowing_since: number | undefined;
+  private last_at = 0;
   direction: -1 | 0 | 1 = 0;
 
   /** Units per millisecond; the sign is the direction of travel. */
   get velocity(): number {
-    return this.travelling ? this.measuredVelocity : 0;
+    return this.travelling ? this.measured_velocity : 0;
   }
 
   record(at: number, position: number, extent: number): AxisMove {
-    const lastIndex = this.times.length - 1;
-    const previousAt = this.times[lastIndex];
-    const previousPosition = this.positions[lastIndex];
-    this.lastAt = at;
-    if (previousAt === undefined || previousPosition === undefined) {
+    const last_index = this.times.length - 1;
+    const previous_at = this.times[last_index];
+    const previous_position = this.positions[last_index];
+    this.last_at = at;
+    if (previous_at === undefined || previous_position === undefined) {
       this.times.push(at);
       this.positions.push(position);
       return { reversal: false, jump: false };
     }
 
-    const delta = position - previousPosition;
-    const elapsed = Math.max(0, at - previousAt);
-    const moveDirection: -1 | 0 | 1 = delta === 0 ? 0 : delta > 0 ? 1 : -1;
+    const delta = position - previous_position;
+    const elapsed = Math.max(0, at - previous_at);
+    const move_direction: -1 | 0 | 1 = delta === 0 ? 0 : delta > 0 ? 1 : -1;
     const reversal =
-      moveDirection !== 0 && this.direction !== 0 && moveDirection !== this.direction;
-    const jumpDistance = JUMP_EXTENTS * Math.max(1, extent);
+      move_direction !== 0 && this.direction !== 0 && move_direction !== this.direction;
+    const jump_distance = JUMP_EXTENTS * Math.max(1, extent);
     // The speed lags a slowing scroll by up to a window, so a move within half of what
     // the speed predicts still follows it.
-    const expected = this.measuredVelocity * elapsed;
+    const expected = this.measured_velocity * elapsed;
     const jump =
-      Math.abs(delta) > jumpDistance &&
-      Math.abs(delta - expected) > Math.max(jumpDistance, Math.abs(expected) / 2);
+      Math.abs(delta) > jump_distance &&
+      Math.abs(delta - expected) > Math.max(jump_distance, Math.abs(expected) / 2);
 
     if (reversal || jump) {
       // The previous sample anchors the new history: the move itself is the newest motion.
       this.times.length = 0;
       this.positions.length = 0;
-      this.times.push(previousAt);
-      this.positions.push(previousPosition);
+      this.times.push(previous_at);
+      this.positions.push(previous_position);
       this.deceleration = 0;
-      this.slowingSince = undefined;
+      this.slowing_since = undefined;
     }
     if (jump) this.travelling = false;
-    else if (moveDirection !== 0) this.travelling = true;
-    if (moveDirection !== 0) this.direction = moveDirection;
+    else if (move_direction !== 0) this.travelling = true;
+    if (move_direction !== 0) this.direction = move_direction;
     this.times.push(at);
     this.positions.push(position);
 
     // Keep the newest sample at or before the window start as the anchor.
-    const windowStart = at - SCROLL_VELOCITY_WINDOW_MS;
+    const window_start = at - SCROLL_VELOCITY_WINDOW_MS;
     let anchor = 0;
-    while (anchor + 1 < this.times.length && (this.times[anchor + 1] ?? at) <= windowStart) {
+    while (anchor + 1 < this.times.length && (this.times[anchor + 1] ?? at) <= window_start) {
       anchor += 1;
     }
     if (anchor > 0) {
@@ -93,21 +93,21 @@ export class ScrollAxisMotion {
       this.positions.splice(0, anchor);
     }
 
-    const from = this.times.length > 2 && (this.times[0] ?? at) <= windowStart ? 1 : 0;
-    const fromAt = this.times[from] ?? at;
-    const fromPosition = this.positions[from] ?? position;
-    const previousVelocity = this.measuredVelocity;
-    this.measuredVelocity = at > fromAt ? (position - fromPosition) / (at - fromAt) : 0;
+    const from = this.times.length > 2 && (this.times[0] ?? at) <= window_start ? 1 : 0;
+    const from_at = this.times[from] ?? at;
+    const from_position = this.positions[from] ?? position;
+    const previous_velocity = this.measured_velocity;
+    this.measured_velocity = at > from_at ? (position - from_position) / (at - from_at) : 0;
 
     if (!reversal && !jump && elapsed > 0) {
       const slowing =
-        Math.sign(this.measuredVelocity) === Math.sign(previousVelocity)
-          ? (Math.abs(previousVelocity) - Math.abs(this.measuredVelocity)) / elapsed
+        Math.sign(this.measured_velocity) === Math.sign(previous_velocity)
+          ? (Math.abs(previous_velocity) - Math.abs(this.measured_velocity)) / elapsed
           : 0;
       const weight = 1 - Math.exp(-elapsed / SCROLL_VELOCITY_WINDOW_MS);
       this.deceleration += (Math.max(0, slowing) - this.deceleration) * weight;
-      if (slowing > 0) this.slowingSince ??= at;
-      else this.slowingSince = undefined;
+      if (slowing > 0) this.slowing_since ??= at;
+      else this.slowing_since = undefined;
     }
     return { reversal, jump };
   }
@@ -126,8 +126,8 @@ export class ScrollAxisMotion {
    * exponentially, so the distance is speed² / deceleration.
    */
   restDistance(): number {
-    const slowingFor = this.slowingSince === undefined ? 0 : this.lastAt - this.slowingSince;
-    if (this.deceleration <= 0 || slowingFor < SCROLL_VELOCITY_WINDOW_MS) {
+    const slowing_for = this.slowing_since === undefined ? 0 : this.last_at - this.slowing_since;
+    if (this.deceleration <= 0 || slowing_for < SCROLL_VELOCITY_WINDOW_MS) {
       return Number.POSITIVE_INFINITY;
     }
     return (this.velocity * this.velocity) / this.deceleration;
@@ -136,10 +136,10 @@ export class ScrollAxisMotion {
   reset(): void {
     this.times.length = 0;
     this.positions.length = 0;
-    this.measuredVelocity = 0;
+    this.measured_velocity = 0;
     this.travelling = true;
     this.deceleration = 0;
-    this.slowingSince = undefined;
+    this.slowing_since = undefined;
     this.direction = 0;
   }
 }

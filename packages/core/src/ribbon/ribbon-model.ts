@@ -65,7 +65,7 @@ const PERCENT_SCALE = 100;
 const MAX_FONT_SIZE_PT = 409;
 
 /** Inclusive data-row spans of the selection, for row grouping. */
-function selectedRowSpans(grid: Grid): Array<[number, number]> {
+function selected_row_spans(grid: Grid): Array<[number, number]> {
   const selection = grid.getSelection();
   switch (selection?.kind) {
     case "cell":
@@ -73,15 +73,15 @@ function selectedRowSpans(grid: Grid): Array<[number, number]> {
     case "row":
       return [[selection.row, selection.row]];
     case "range":
-      return [rowSpan(selection.range.start.row, selection.range.end.row)];
+      return [row_span(selection.range.start.row, selection.range.end.row)];
     case "multi":
-      return selection.ranges.map((range) => rowSpan(range.start.row, range.end.row));
+      return selection.ranges.map((range) => row_span(range.start.row, range.end.row));
     default:
       return [];
   }
 }
 
-function rowSpan(a: number, b: number): [number, number] {
+function row_span(a: number, b: number): [number, number] {
   return [Math.min(a, b), Math.max(a, b)];
 }
 
@@ -90,20 +90,20 @@ function rowSpan(a: number, b: number): [number, number] {
  * ribbon chunk rather than the panel loader, so grids without queries carry
  * none of it.
  */
-function showQueryPanel(grid: Grid, create: boolean): void {
+function show_query_panel(grid: Grid, create: boolean): void {
   requestPanel(grid, (controller) => controller.openQueryPanel(grid, create));
 }
 
 /** The query commands show only while a query session is connected to the grid. */
 // They stay enabled in a read-only grid: the grid rejects the write and the
 // rejection message is shown, because no command state reports read-only alone.
-const queriesConnected = (grid: Grid): boolean => queryCommandsOf(grid) !== undefined;
+const queries_connected = (grid: Grid): boolean => queryCommandsOf(grid) !== undefined;
 
 const QUERIES_REFRESHED = "Queries refreshed.";
 const QUERIES_REFRESHING = "Refreshing queries. Select Refresh All again to cancel.";
 
 /** Data › Refresh All: one refresh of every output table; a second press cancels it. */
-function refreshAllQueries(grid: Grid): void {
+function refresh_all_queries(grid: Grid): void {
   const feedback = actionFeedbackFor(grid);
   if (queryRefreshRunning(grid)) {
     // The running refresh reports its own cancellation.
@@ -196,14 +196,14 @@ const SORT_ITEMS: readonly RibbonMenuItem[] = [
 ];
 
 /** Sort the view only; the two orders share the glyph, so each names its own ID. */
-const viewSortButton = (label: string, id: string, ascending: boolean): RibbonButtonSpec => ({
+const view_sort_button = (label: string, id: string, ascending: boolean): RibbonButtonSpec => ({
   ...button(label, "sortView", (grid) => grid.actions.sortView(ascending), "edit", {
     flags: SORT,
   }),
   id,
 });
 
-const fontFamily: RibbonComboSpec = {
+const font_family: RibbonComboSpec = {
   kind: "combo",
   id: "fontFamily",
   label: "Font",
@@ -220,7 +220,7 @@ const fontFamily: RibbonComboSpec = {
   },
 };
 
-const fontSize: RibbonComboSpec = {
+const font_size: RibbonComboSpec = {
   kind: "combo",
   id: "fontSize",
   label: "Font Size",
@@ -239,7 +239,7 @@ const fontSize: RibbonComboSpec = {
   },
 };
 
-const numberFormat: RibbonComboSpec = {
+const number_format: RibbonComboSpec = {
   kind: "combo",
   id: "numberFormat",
   label: "Number Format",
@@ -255,7 +255,7 @@ const numberFormat: RibbonComboSpec = {
   },
 };
 
-const fontColor: RibbonColorSpec = {
+const font_color: RibbonColorSpec = {
   kind: "color",
   id: "textColor",
   flags: ["textColor"],
@@ -266,7 +266,7 @@ const fontColor: RibbonColorSpec = {
   apply: (grid, color) => grid.actions.setTextColor(color),
 };
 
-const fillColor: RibbonColorSpec = {
+const fill_color: RibbonColorSpec = {
   kind: "color",
   id: "fillColor",
   flags: ["fillColor"],
@@ -324,7 +324,7 @@ const note: RibbonFormSpec = {
 
 const PIVOT_NEEDS_FULL_ENGINE = "Pivot tables need the full engine (@sheetwrite/formulas).";
 
-const pivotTable: RibbonPlacementSpec = {
+const pivot_table: RibbonPlacementSpec = {
   kind: "placement",
   id: "pivotTable",
   label: "PivotTable",
@@ -334,38 +334,38 @@ const pivotTable: RibbonPlacementSpec = {
 };
 
 /** Inserts a chart of `kind` from the selection; the panel code loads on first use. */
-const insertChartOf =
+const insert_chart_of =
   (kind: ChartKind) =>
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertChart(grid, kind);
 
 /** Insert › Charts › PivotChart inserts a chart of `kind` over a dashboard or worksheet pivot. */
-const insertPivotChartOf =
+const insert_pivot_chart_of =
   (kind: ChartKind) =>
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertPivotChart(grid, kind);
 
 /** Insert › Dashboard › KPI Card opens the measure picker; the panel code loads on first use. */
-const insertKpi = async (grid: Grid): Promise<void> => (await loadPanels(grid)).openKpiPanel(grid);
+const insert_kpi = async (grid: Grid): Promise<void> => (await loadPanels(grid)).openKpiPanel(grid);
 
 /** Insert › Filters › Slicer opens the Insert Slicers list; the panel code loads on first use. */
-const insertSlicer = async (grid: Grid): Promise<void> =>
+const insert_slicer = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openSlicerPanel(grid);
 
-function activeSheetIsDashboard(grid: Grid): boolean {
+function active_sheet_is_dashboard(grid: Grid): boolean {
   const sheet = grid.getActiveSheet();
   return isDashboard(grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet));
 }
 
 /** Data › Data Tools opens the data model panel; the panel code loads on first use. */
-const openDataModel = async (grid: Grid): Promise<void> =>
+const open_data_model = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openDataModelPanel(grid);
 
-const openMeasures = async (grid: Grid): Promise<void> =>
+const open_measures = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openMeasurePanel(grid);
 
 /** The data model needs workbook tables: one to manage, two to relate. */
-function workbookTableCount(grid: Grid): number {
+function workbook_table_count(grid: Grid): number {
   let count = 0;
   for (const sheet of grid.store.getWorkbook().sheets) count += sheet.tables?.length ?? 0;
   return count;
@@ -382,33 +382,33 @@ const chart: RibbonMenuSpec = {
   icon: "chart",
   availability: "edit",
   large: true,
-  run: insertChartOf("column"),
-  items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insertChartOf(kind) })),
+  run: insert_chart_of("column"),
+  items: CHART_KINDS.map(({ kind, label, icon }) => ({ label, icon, run: insert_chart_of(kind) })),
 };
 
 /**
  * Excel's PivotChart: on a dashboard with a pivot, or with the active cell in
  * a worksheet pivot, a chart over that pivot.
  */
-const pivotChart: RibbonMenuSpec = {
+const pivot_chart: RibbonMenuSpec = {
   kind: "menu",
   id: "pivotChart",
   label: "PivotChart",
   icon: "pivotChart",
   availability: "newDashboard",
   large: true,
-  run: insertPivotChartOf("column"),
+  run: insert_pivot_chart_of("column"),
   items: CHART_KINDS.map(({ kind, label, icon }) => ({
     label,
     icon,
-    run: insertPivotChartOf(kind),
+    run: insert_pivot_chart_of(kind),
   })),
-  available: (grid) => activeSheetIsDashboard(grid) || selectedPivot(grid) !== null,
+  available: (grid) => active_sheet_is_dashboard(grid) || selectedPivot(grid) !== null,
 };
 
 function outline(group: boolean): (grid: Grid) => void {
   return (grid) => {
-    for (const [start, end] of selectedRowSpans(grid)) {
+    for (const [start, end] of selected_row_spans(grid)) {
       if (group) grid.groupRows(start, end);
       else grid.ungroupRows(start, end);
     }
@@ -416,7 +416,7 @@ function outline(group: boolean): (grid: Grid) => void {
 }
 
 /** Functions the host registered on the grid's store; none without the full engine. */
-function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
+function host_functions(grid: Grid): readonly FormulaFunctionMetadata[] {
   return storeEngine(grid.store)?.hostFunctions?.metadata() ?? [];
 }
 
@@ -425,7 +425,7 @@ function hostFunctions(grid: Grid): readonly FormulaFunctionMetadata[] {
  * Insert Function does; the user types the arguments. The selection holds the
  * same coordinates the formula bar edits with.
  */
-function startFormula(grid: Grid, name: string): void {
+function start_formula(grid: Grid, name: string): void {
   const cell = selectionCell(grid.getSelection());
   if (cell !== null) grid.beginEdit(cell.row, cell.col, `=${name}(`);
 }
@@ -435,19 +435,19 @@ function startFormula(grid: Grid, name: string): void {
  * and description. It shows only while the store has host functions, which
  * needs the full engine; built-in functions stay with formula autocomplete.
  */
-const insertFunction: RibbonMenuSpec = {
+const insert_function: RibbonMenuSpec = {
   kind: "menu",
   id: "insertFunction",
   label: "Insert Function",
   icon: "insertFunction",
   availability: "edit",
   large: true,
-  available: (grid) => hostFunctions(grid).length > 0,
+  available: (grid) => host_functions(grid).length > 0,
   items: (grid) =>
-    hostFunctions(grid).map((fn) => ({
+    host_functions(grid).map((fn) => ({
       label: fn.name,
       description: `${signature(fn)}: ${fn.description}`,
-      run: (target: Grid) => startFormula(target, fn.name),
+      run: (target: Grid) => start_formula(target, fn.name),
     })),
 };
 
@@ -564,8 +564,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "rows",
         rows: [
           [
-            fontFamily,
-            fontSize,
+            font_family,
+            font_size,
             button("Increase Font Size", "fontGrow", (grid) => grid.actions.stepFontSize(1)),
             button("Decrease Font Size", "fontShrink", (grid) => grid.actions.stepFontSize(-1)),
           ],
@@ -592,8 +592,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
                 item(label, (grid) => grid.actions.setBorders(preset), icon),
               ),
             },
-            fillColor,
-            fontColor,
+            fill_color,
+            font_color,
           ],
         ],
       },
@@ -650,7 +650,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "currency",
         layout: "rows",
         rows: [
-          [numberFormat],
+          [number_format],
           [
             button("Accounting Number Format", "currency", (grid) =>
               grid.actions.setNumberFormat(ACCOUNTING_FORMAT),
@@ -773,14 +773,14 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Tables",
         icon: "pivotTable",
         layout: "flow",
-        controls: [pivotTable],
+        controls: [pivot_table],
       },
       {
         id: "charts",
         label: "Charts",
         icon: "chart",
         layout: "flow",
-        controls: [chart, pivotChart],
+        controls: [chart, pivot_chart],
       },
       {
         id: "dashboard",
@@ -801,10 +801,10 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             id: "newDashboard",
           },
           {
-            ...button("KPI Card", "kpiCard", insertKpi, "newDashboard", { large: true }),
+            ...button("KPI Card", "kpiCard", insert_kpi, "newDashboard", { large: true }),
             // A KPI card is a dashboard item over a data model measure.
             available: (grid) =>
-              activeSheetIsDashboard(grid) &&
+              active_sheet_is_dashboard(grid) &&
               (grid.store.getWorkbook().dataModel?.measures?.length ?? 0) > 0,
           },
         ],
@@ -816,9 +816,9 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("Slicer", "slicer", insertSlicer, "newDashboard", { large: true }),
+            ...button("Slicer", "slicer", insert_slicer, "newDashboard", { large: true }),
             // A slicer is a dashboard item, so the command shows on a dashboard.
-            available: (grid) => activeSheetIsDashboard(grid),
+            available: (grid) => active_sheet_is_dashboard(grid),
           },
         ],
       },
@@ -835,7 +835,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         label: "Function Library",
         icon: "insertFunction",
         layout: "flow",
-        controls: [insertFunction],
+        controls: [insert_function],
       },
       {
         id: "definedNames",
@@ -879,10 +879,10 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("Get Data", "getData", (grid) => showQueryPanel(grid, true), "view", {
+            ...button("Get Data", "getData", (grid) => show_query_panel(grid, true), "view", {
               large: true,
             }),
-            available: queriesConnected,
+            available: queries_connected,
           },
         ],
       },
@@ -893,17 +893,17 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("Refresh All", "refreshAll", refreshAllQueries, "view", { large: true }),
-            available: queriesConnected,
+            ...button("Refresh All", "refreshAll", refresh_all_queries, "view", { large: true }),
+            available: queries_connected,
           },
           {
             ...button(
               "Queries & Connections",
               "queries",
-              (grid) => showQueryPanel(grid, false),
+              (grid) => show_query_panel(grid, false),
               "view",
             ),
-            available: queriesConnected,
+            available: queries_connected,
           },
           {
             ...button(
@@ -935,8 +935,8 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             large: true,
             flags: SORT,
           }),
-          viewSortButton("Sort View A to Z", "sortViewAsc", true),
-          viewSortButton("Sort View Z to A", "sortViewDesc", false),
+          view_sort_button("Sort View A to Z", "sortViewAsc", true),
+          view_sort_button("Sort View Z to A", "sortViewDesc", false),
           {
             ...button("Filter", "filter", (grid) => grid.actions.toggleAutoFilter(), "filter", {
               toggle: true,
@@ -969,18 +969,18 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           {
             // Excel's "Manage Data Model" wraps to three lines under a large
             // glyph, so the label is short and the tooltip keeps Excel's name.
-            ...button("Data Model", "dataModel", openDataModel, "view", { large: true }),
+            ...button("Data Model", "dataModel", open_data_model, "view", { large: true }),
             description: "Manage Data Model",
-            available: (grid) => workbookTableCount(grid) > 0,
+            available: (grid) => workbook_table_count(grid) > 0,
           },
           {
-            ...button("Relationships", "relationships", openDataModel, "view", { large: true }),
-            available: (grid) => workbookTableCount(grid) > 1,
+            ...button("Relationships", "relationships", open_data_model, "view", { large: true }),
+            available: (grid) => workbook_table_count(grid) > 1,
           },
           {
-            ...button("Measures", "measure", openMeasures, "view", { large: true }),
+            ...button("Measures", "measure", open_measures, "view", { large: true }),
             description: "Manage Measures",
-            available: (grid) => workbookTableCount(grid) > 0,
+            available: (grid) => workbook_table_count(grid) > 0,
           },
         ],
       },

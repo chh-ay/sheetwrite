@@ -213,7 +213,7 @@ export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
   formattedText(row: number, col: number): string;
 }
 
-function diagnosticAdapter(adapter: RenderBenchAdapter): RenderBenchDiagnosticAdapter {
+function diagnostic_adapter(adapter: RenderBenchAdapter): RenderBenchDiagnosticAdapter {
   if (adapter.id !== "sheetwrite") {
     throw new ScenarioValidationError(
       `${adapter.id} does not implement the diagnostic scenario surface`,
@@ -247,7 +247,7 @@ interface ScenarioActions {
 }
 
 /** A value read back for an untimed restore; scenario writes take only scalars. */
-function restorableValue(value: unknown, cell: string): string | number | null {
+function restorable_value(value: unknown, cell: string): string | number | null {
   if (value === null || typeof value === "string" || typeof value === "number") return value;
   throw new ScenarioValidationError(`${cell} holds a ${typeof value} that cannot be restored`);
 }
@@ -259,7 +259,7 @@ function restorableValue(value: unknown, cell: string): string | number | null {
  * puts them back with their values. Rows near the top, the middle sentinel
  * and the last row stay where they are.
  */
-function rowHeadroom(
+function row_headroom(
   adapter: RenderBenchAdapter,
   dataset: ColumnarDataset,
 ): { make: () => void; restore: () => void } {
@@ -270,7 +270,7 @@ function rowHeadroom(
       saved.length = 0;
       for (let row = start; row < start + ALTER_COUNT; row++) {
         for (let col = 0; col < adapter.colCount; col++) {
-          saved.push(restorableValue(adapter.cellValue(row, col), `row ${row} column ${col}`));
+          saved.push(restorable_value(adapter.cellValue(row, col), `row ${row} column ${col}`));
         }
       }
       adapter.removeRows(start, ALTER_COUNT);
@@ -287,7 +287,7 @@ function rowHeadroom(
   };
 }
 
-function usedJsHeapBytes(): number | null {
+function used_js_heap_bytes(): number | null {
   const candidate: unknown = performance;
   if (candidate !== null && typeof candidate === "object" && "memory" in candidate) {
     const memory = candidate.memory;
@@ -304,11 +304,15 @@ function usedJsHeapBytes(): number | null {
   return null;
 }
 
-function memoryDelta(beforeBytes: number | null, afterBytes: number | null): MemoryDelta {
-  if (beforeBytes === null || afterBytes === null) {
+function memory_delta(before_bytes: number | null, after_bytes: number | null): MemoryDelta {
+  if (before_bytes === null || after_bytes === null) {
     return { beforeBytes: null, afterBytes: null, deltaBytes: null };
   }
-  return { beforeBytes, afterBytes, deltaBytes: afterBytes - beforeBytes };
+  return {
+    beforeBytes: before_bytes,
+    afterBytes: after_bytes,
+    deltaBytes: after_bytes - before_bytes,
+  };
 }
 
 function display(value: unknown): string {
@@ -337,13 +341,13 @@ function checkpoint(
   }
 }
 
-function expectedSentinels(dataset: ColumnarDataset): readonly unknown[] {
+function expected_sentinels(dataset: ColumnarDataset): readonly unknown[] {
   const middle = Math.floor(dataset.rowCount / 2);
   const last = dataset.rowCount - 1;
   return [dataset.id[0], dataset.customer[0], dataset.city[middle], dataset.amount[last]];
 }
 
-function observedSentinels(
+function observed_sentinels(
   adapter: RenderBenchAdapter,
   dataset: ColumnarDataset,
 ): readonly unknown[] {
@@ -357,7 +361,7 @@ function observedSentinels(
   ];
 }
 
-function validateCanonicalState(
+function validate_canonical_state(
   adapter: RenderBenchAdapter,
   dataset: ColumnarDataset,
   observations: ValidationObservation[],
@@ -372,28 +376,28 @@ function validateCanonicalState(
   checkpoint(
     observations,
     "canonical sentinel checksum",
-    logicalValueChecksum(expectedSentinels(dataset)),
-    logicalValueChecksum(observedSentinels(adapter, dataset)),
+    logicalValueChecksum(expected_sentinels(dataset)),
+    logicalValueChecksum(observed_sentinels(adapter, dataset)),
   );
 }
 
-function validateSelection(
+function validate_selection(
   adapter: RenderBenchAdapter,
   observations: ValidationObservation[],
   row: number,
   col: number,
-  checkpointName: string,
+  checkpoint_name: string,
 ): void {
   const selection = adapter.selection();
   checkpoint(
     observations,
-    checkpointName,
+    checkpoint_name,
     `${row},${col}`,
     selection ? `${selection.row},${selection.col}` : "none",
   );
 }
 
-function withEffectCleanup(action: () => void, cleanup: () => void, validate: () => void): void {
+function with_effect_cleanup(action: () => void, cleanup: () => void, validate: () => void): void {
   action();
   try {
     validate();
@@ -414,28 +418,28 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 /** Reach of the long-scroll action, matching `text-heavy.long-scroll`. */
-function longScrollSteps(dataset: ColumnarDataset): number {
+function long_scroll_steps(dataset: ColumnarDataset): number {
   return Math.min(
     LONG_SCROLL_MAX_STEPS,
     Math.max(1, Math.floor(dataset.rowCount / LONG_SCROLL_ROW_STRIDE) - 1),
   );
 }
 
-function scenarioActions(
-  scenarioId: ScenarioId,
+function scenario_actions(
+  scenario_id: ScenarioId,
   adapter: RenderBenchAdapter,
   dataset: ColumnarDataset,
 ): ScenarioActions {
-  const middleRow = Math.floor(dataset.rowCount / 2);
-  const middleCol = Math.floor(adapter.colCount / 2);
-  const lastRow = dataset.rowCount - 1;
-  const lastCol = adapter.colCount - 1;
+  const middle_row = Math.floor(dataset.rowCount / 2);
+  const middle_col = Math.floor(adapter.colCount / 2);
+  const last_row = dataset.rowCount - 1;
+  const last_col = adapter.colCount - 1;
 
   if (
-    scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID ||
-    scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID
+    scenario_id === WINDOW_TRANSFER_BASELINE_SCENARIO_ID ||
+    scenario_id === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID
   ) {
-    const upperBound = scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID;
+    const upper_bound = scenario_id === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID;
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => adapter.scrollBy("top", SCROLL_STEP);
     return {
@@ -443,7 +447,7 @@ function scenarioActions(
         adapter.setWindowReadDiagnosticMode("baseline");
         prepare();
         adapter.setWindowReadDiagnosticMode(
-          upperBound ? "reuse-decoded-view-upper-bound" : "baseline",
+          upper_bound ? "reuse-decoded-view-upper-bound" : "baseline",
         );
       },
       measureWindowTransfer: true,
@@ -458,20 +462,20 @@ function scenarioActions(
           const counters = adapter.windowTransferCounters();
           checkpoint(
             observations,
-            `${scenarioId} completes one coordinator paint`,
+            `${scenario_id} completes one coordinator paint`,
             1,
             counters.logicalFrames,
           );
           checkpoint(
             observations,
-            `${scenarioId} requests one visible window`,
+            `${scenario_id} requests one visible window`,
             1,
             counters.windowReadRequests,
           );
-          if (upperBound) {
+          if (upper_bound) {
             checkpoint(
               observations,
-              `${scenarioId} deliberately reuses pixel-data-invalid decoded data`,
+              `${scenario_id} deliberately reuses pixel-data-invalid decoded data`,
               JSON.stringify({
                 logicalWindowReads: 0,
                 copiedBytes: 0,
@@ -486,7 +490,7 @@ function scenarioActions(
           } else {
             checkpoint(
               observations,
-              `${scenarioId} accounts for a fresh decoded window`,
+              `${scenario_id} accounts for a fresh decoded window`,
               true,
               counters.logicalWindowReads === 1 &&
                 counters.copiedBytes > 0 &&
@@ -500,7 +504,7 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "formula-dense.paint") {
+  if (scenario_id === "formula-dense.paint") {
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => adapter.repaint();
     return {
@@ -531,12 +535,12 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "text-heavy.long-scroll") {
+  if (scenario_id === "text-heavy.long-scroll") {
     const steps = Math.min(
       LONG_SCROLL_MAX_STEPS,
       Math.max(1, Math.floor(dataset.rowCount / LONG_SCROLL_ROW_STRIDE) - 1),
     );
-    const installedRows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
+    const installed_rows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => {
       for (let step = 0; step < steps; step++) {
@@ -544,7 +548,7 @@ function scenarioActions(
       }
     };
     return {
-      setup: () => adapter.installTextHeavy(installedRows),
+      setup: () => adapter.installTextHeavy(installed_rows),
       prepare,
       action,
       cleanup: () => {},
@@ -560,12 +564,12 @@ function scenarioActions(
             true,
             after.firstVisibleRow > before.firstVisibleRow,
           );
-          const observedRow = Math.min(installedRows, Math.max(1, after.firstVisibleRow));
+          const observed_row = Math.min(installed_rows, Math.max(1, after.firstVisibleRow));
           checkpoint(
             observations,
             "text-heavy.long-scroll retains unique long text",
             true,
-            String(adapter.cellValue(observedRow, 2)).startsWith("diagnostic-long-"),
+            String(adapter.cellValue(observed_row, 2)).startsWith("diagnostic-long-"),
           );
         } finally {
           adapter.clearTextHeavy();
@@ -574,10 +578,10 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "wrap-heavy.scroll") {
-    const steps = longScrollSteps(dataset);
-    const installedRows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
-    const diagnostics = diagnosticAdapter(adapter);
+  if (scenario_id === "wrap-heavy.scroll") {
+    const steps = long_scroll_steps(dataset);
+    const installed_rows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
+    const diagnostics = diagnostic_adapter(adapter);
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => {
       for (let step = 0; step < steps; step++) {
@@ -585,12 +589,12 @@ function scenarioActions(
       }
     };
     return {
-      setup: () => diagnostics.installWrapHeavy(installedRows),
+      setup: () => diagnostics.installWrapHeavy(installed_rows),
       prepare,
       action,
       cleanup: () => {},
       validateEffect: (observations) => {
-        let observedRow = 0;
+        let observed_row = 0;
         try {
           prepare();
           const before = adapter.scrollObservation();
@@ -602,8 +606,8 @@ function scenarioActions(
             true,
             after.firstVisibleRow > before.firstVisibleRow,
           );
-          observedRow = Math.min(installedRows, Math.max(1, after.firstVisibleRow));
-          const text = adapter.cellValue(observedRow, 2);
+          observed_row = Math.min(installed_rows, Math.max(1, after.firstVisibleRow));
+          const text = adapter.cellValue(observed_row, 2);
           checkpoint(
             observations,
             "wrap-heavy.scroll keeps full-length body text",
@@ -616,7 +620,7 @@ function scenarioActions(
             observations,
             "wrap-heavy.scroll keeps the wrap flag on painted cells",
             true,
-            diagnostics.resolvedStyle(observedRow, 2).wrap,
+            diagnostics.resolvedStyle(observed_row, 2).wrap,
           );
         } finally {
           diagnostics.clearWrapHeavy();
@@ -625,16 +629,16 @@ function scenarioActions(
           observations,
           "wrap-heavy.scroll restores unwrapped body cells",
           false,
-          diagnostics.resolvedStyle(observedRow, 2).wrap,
+          diagnostics.resolvedStyle(observed_row, 2).wrap,
         );
       },
     };
   }
 
-  const wrapUnicodeGraphemes = WRAP_UNICODE_GRAPHEMES[scenarioId];
-  if (wrapUnicodeGraphemes !== undefined) {
-    const diagnostics = diagnosticAdapter(adapter);
-    const text = WRAP_UNICODE_GRAPHEME.repeat(wrapUnicodeGraphemes);
+  const wrap_unicode_graphemes = WRAP_UNICODE_GRAPHEMES[scenario_id];
+  if (wrap_unicode_graphemes !== undefined) {
+    const diagnostics = diagnostic_adapter(adapter);
+    const text = WRAP_UNICODE_GRAPHEME.repeat(wrap_unicode_graphemes);
     const { row, col } = WRAP_UNICODE_CELL;
     const action = (): void => adapter.repaint();
     return {
@@ -650,13 +654,13 @@ function scenarioActions(
           action();
           checkpoint(
             observations,
-            `${scenarioId} paints the whole wrapped text`,
+            `${scenario_id} paints the whole wrapped text`,
             true,
             adapter.cellValue(row, col) === text,
           );
           checkpoint(
             observations,
-            `${scenarioId} keeps the wrap flag on the painted cell`,
+            `${scenario_id} keeps the wrap flag on the painted cell`,
             true,
             diagnostics.resolvedStyle(row, col).wrap,
           );
@@ -665,7 +669,7 @@ function scenarioActions(
         }
         checkpoint(
           observations,
-          `${scenarioId} restores the unwrapped body cell`,
+          `${scenario_id} restores the unwrapped body cell`,
           false,
           diagnostics.resolvedStyle(row, col).wrap,
         );
@@ -673,10 +677,10 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "search-many.scroll") {
-    const steps = longScrollSteps(dataset);
-    const matchedRows = dataset.rowCount - 1;
-    const diagnostics = diagnosticAdapter(adapter);
+  if (scenario_id === "search-many.scroll") {
+    const steps = long_scroll_steps(dataset);
+    const matched_rows = dataset.rowCount - 1;
+    const diagnostics = diagnostic_adapter(adapter);
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => {
       for (let step = 0; step < steps; step++) {
@@ -685,7 +689,7 @@ function scenarioActions(
     };
     return {
       setup: () => {
-        diagnostics.installSearchMatches(matchedRows);
+        diagnostics.installSearchMatches(matched_rows);
         diagnostics.beginSearch(SEARCH_MATCH_PREFIX);
       },
       prepare,
@@ -713,13 +717,13 @@ function scenarioActions(
           checkpoint(
             observations,
             "search-many.scroll keeps every body match",
-            matchedRows,
+            matched_rows,
             search.matches,
           );
           checkpoint(
             observations,
             "search-many.scroll keeps the contiguous match run",
-            `1,${COL.customer}..${matchedRows},${COL.customer}`,
+            `1,${COL.customer}..${matched_rows},${COL.customer}`,
             `${search.first ?? "none"}..${search.last ?? "none"}`,
           );
           checkpoint(
@@ -736,8 +740,8 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "frozen.scroll") {
-    const diagnostics = diagnosticAdapter(adapter);
+  if (scenario_id === "frozen.scroll") {
+    const diagnostics = diagnostic_adapter(adapter);
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => {
       for (let step = 0; step < FROZEN_SCROLL_ROWS; step++) {
@@ -804,7 +808,7 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "hscroll-small") {
+  if (scenario_id === "hscroll-small") {
     const prepare = (): void => adapter.prepareScroll("left", false);
     const action = (): void => {
       for (let step = 0; step < HSCROLL_SMALL_STEPS; step++) {
@@ -848,9 +852,9 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "cond-format.scroll") {
-    const steps = longScrollSteps(dataset);
-    const diagnostics = diagnosticAdapter(adapter);
+  if (scenario_id === "cond-format.scroll") {
+    const steps = long_scroll_steps(dataset);
+    const diagnostics = diagnostic_adapter(adapter);
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => {
       for (let step = 0; step < steps; step++) {
@@ -874,15 +878,15 @@ function scenarioActions(
             true,
             after.firstVisibleRow > before.firstVisibleRow,
           );
-          const observedRow = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
-          const observedAmount = dataset.amount[observedRow];
-          const style = diagnostics.resolvedStyle(observedRow, COL.amount);
+          const observed_row = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
+          const observed_amount = dataset.amount[observed_row];
+          const style = diagnostics.resolvedStyle(observed_row, COL.amount);
           checkpoint(
             observations,
             "cond-format.scroll applies the amount threshold rule",
-            observedAmount === undefined
+            observed_amount === undefined
               ? "missing-amount"
-              : observedAmount > CONDITIONAL_AMOUNT_THRESHOLD
+              : observed_amount > CONDITIONAL_AMOUNT_THRESHOLD
                 ? CONDITIONAL_HIGH_BACKGROUND
                 : null,
             style.background,
@@ -890,9 +894,9 @@ function scenarioActions(
           checkpoint(
             observations,
             "cond-format.scroll applies the complementary amount rule",
-            observedAmount === undefined
+            observed_amount === undefined
               ? "missing-amount"
-              : observedAmount <= CONDITIONAL_AMOUNT_THRESHOLD
+              : observed_amount <= CONDITIONAL_AMOUNT_THRESHOLD
                 ? CONDITIONAL_LOW_COLOR
                 : null,
             style.color,
@@ -903,15 +907,15 @@ function scenarioActions(
             true,
             style.underline,
           );
-          const outsideRules = diagnostics.resolvedStyle(0, 0);
+          const outside_rules = diagnostics.resolvedStyle(0, 0);
           checkpoint(
             observations,
             "cond-format.scroll leaves rows outside the rule range unstyled",
             JSON.stringify({ background: null, color: null, underline: false }),
             JSON.stringify({
-              background: outsideRules.background,
-              color: outsideRules.color,
-              underline: outsideRules.underline,
+              background: outside_rules.background,
+              color: outside_rules.color,
+              underline: outside_rules.underline,
             }),
           );
         } finally {
@@ -921,13 +925,13 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "number-format.hscroll") {
-    const diagnostics = diagnosticAdapter(adapter);
-    const columnSteps = COLUMNS.slice(0, COLUMNS.length - 1).map((column) => column.width);
-    const totalStepPx = columnSteps.reduce((total, width) => total + width, 0);
+  if (scenario_id === "number-format.hscroll") {
+    const diagnostics = diagnostic_adapter(adapter);
+    const column_steps = COLUMNS.slice(0, COLUMNS.length - 1).map((column) => column.width);
+    const total_step_px = column_steps.reduce((total, width) => total + width, 0);
     const prepare = (): void => adapter.prepareScroll("left", false);
     const action = (): void => {
-      for (const width of columnSteps) adapter.scrollBy("left", width);
+      for (const width of column_steps) adapter.scrollBy("left", width);
     };
     return {
       setup: () => diagnostics.installCurrencyFormat(),
@@ -949,27 +953,27 @@ function scenarioActions(
           checkpoint(
             observations,
             "number-format.hscroll advances one column per step",
-            Math.min(before.maximumLeft, before.left + totalStepPx),
+            Math.min(before.maximumLeft, before.left + total_step_px),
             after.left,
           );
-          const observedRow = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
-          const observedAmount = dataset.amount[observedRow];
+          const observed_row = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
+          const observed_amount = dataset.amount[observed_row];
           checkpoint(
             observations,
             "number-format.hscroll keeps the currency column formatted",
-            observedAmount === undefined
+            observed_amount === undefined
               ? "missing-amount"
-              : CURRENCY_FORMATTER.format(observedAmount),
-            diagnostics.formattedText(observedRow, COL.amount),
+              : CURRENCY_FORMATTER.format(observed_amount),
+            diagnostics.formattedText(observed_row, COL.amount),
           );
-          const observedDate = dataset.date[observedRow];
+          const observed_date = dataset.date[observed_row];
           checkpoint(
             observations,
             "number-format.hscroll keeps the date column formatted",
-            typeof observedDate === "string"
-              ? DATE_FORMATTER.format(new Date(`${observedDate}T00:00:00Z`))
+            typeof observed_date === "string"
+              ? DATE_FORMATTER.format(new Date(`${observed_date}T00:00:00Z`))
               : "missing-date",
-            diagnostics.formattedText(observedRow, COL.date),
+            diagnostics.formattedText(observed_row, COL.date),
           );
         } finally {
           diagnostics.clearCurrencyFormat();
@@ -978,7 +982,7 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "scroll-fractional.same-window") {
+  if (scenario_id === "scroll-fractional.same-window") {
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => adapter.scrollBy("top", FRACTIONAL_SCROLL_STEP);
     return {
@@ -990,13 +994,13 @@ function scenarioActions(
         const before = adapter.scrollObservation();
         action();
         const after = adapter.scrollObservation();
-        const deviceDelta = (after.top - before.top) * after.devicePixelRatio;
+        const device_delta = (after.top - before.top) * after.devicePixelRatio;
         checkpoint(
           observations,
           "scroll-fractional.same-window uses a fractional device-pixel delta",
           true,
           after.top === Math.min(before.maximumTop, before.top + FRACTIONAL_SCROLL_STEP) &&
-            !Number.isInteger(deviceDelta),
+            !Number.isInteger(device_delta),
         );
         checkpoint(
           observations,
@@ -1008,7 +1012,7 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "geometry-unresized.1m") {
+  if (scenario_id === "geometry-unresized.1m") {
     let observed: GeometryObservation | undefined;
     const action = (): void => {
       for (let build = 0; build < GEOMETRY_BUILDS_PER_ACTION; build++) {
@@ -1040,12 +1044,12 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "formatted-paint.top-left") {
+  if (scenario_id === "formatted-paint.top-left") {
     // Restore what the cells held, not dataset text: Sheetwrite ingests the
     // date column's ISO text as serials, and writing the text back would leave
     // later scenarios a document that differs from a freshly loaded one.
-    let originalDate: string | number | null = null;
-    let originalAmount: string | number | null = null;
+    let original_date: string | number | null = null;
+    let original_amount: string | number | null = null;
     adapter.resetFormatResources();
     const prepare = (): void => {
       adapter.setCellValue(0, 1, 45_351);
@@ -1053,13 +1057,13 @@ function scenarioActions(
     };
     const action = (): void => adapter.repaint();
     const cleanup = (): void => {
-      adapter.setCellValue(0, 1, originalDate);
-      adapter.setCellValue(0, 4, originalAmount);
+      adapter.setCellValue(0, 1, original_date);
+      adapter.setCellValue(0, 4, original_amount);
     };
     return {
       setup: () => {
-        originalDate = restorableValue(adapter.cellValue(0, 1), "A1 date cell");
-        originalAmount = restorableValue(adapter.cellValue(0, 4), "A1 amount cell");
+        original_date = restorable_value(adapter.cellValue(0, 1), "A1 date cell");
+        original_amount = restorable_value(adapter.cellValue(0, 4), "A1 amount cell");
       },
       prepare,
       action,
@@ -1114,11 +1118,11 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "merge-heavy.paint") {
+  if (scenario_id === "merge-heavy.paint") {
     // Compare against the value before merging, not dataset text: the loaded
     // date cell holds the ingested serial, so a fixed text expectation passes
     // only after another scenario has rewritten the cell.
-    const coveredBeforeMerge = adapter.cellValue(0, 1);
+    const covered_before_merge = adapter.cellValue(0, 1);
     adapter.installMergeHeavy();
     adapter.resetMergeResources();
     const action = (): void => adapter.repaint();
@@ -1134,7 +1138,7 @@ function scenarioActions(
             "merge-heavy.paint preserves anchor and covered-cell values",
             JSON.stringify([
               dataset.id[0],
-              adapter.id === "sheetwrite" ? coveredBeforeMerge : null,
+              adapter.id === "sheetwrite" ? covered_before_merge : null,
             ]),
             JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 1)]),
           );
@@ -1160,7 +1164,7 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "scroll-smooth.same-window") {
+  if (scenario_id === "scroll-smooth.same-window") {
     const prepare = (): void => adapter.prepareScroll("top", false);
     const action = (): void => adapter.scrollBy("top", 1);
     return {
@@ -1195,13 +1199,13 @@ function scenarioActions(
   }
 
   if (
-    scenarioId === "scroll-down.top-left" ||
-    scenarioId === "scroll-down.middle" ||
-    scenarioId === "scroll-right.top-left"
+    scenario_id === "scroll-down.top-left" ||
+    scenario_id === "scroll-down.middle" ||
+    scenario_id === "scroll-right.top-left"
   ) {
-    const axis = scenarioId === "scroll-right.top-left" ? "left" : "top";
-    const startMiddle = scenarioId === "scroll-down.middle";
-    const prepare = (): void => adapter.prepareScroll(axis, startMiddle);
+    const axis = scenario_id === "scroll-right.top-left" ? "left" : "top";
+    const start_middle = scenario_id === "scroll-down.middle";
+    const prepare = (): void => adapter.prepareScroll(axis, start_middle);
     const action = (): void => adapter.scrollBy(axis, SCROLL_STEP);
     return {
       prepare,
@@ -1215,17 +1219,17 @@ function scenarioActions(
         const maximum = axis === "top" ? before.maximumTop : before.maximumLeft;
         const start = axis === "top" ? before.top : before.left;
         const end = axis === "top" ? after.top : after.left;
-        checkpoint(observations, `${scenarioId} has scrollable range`, true, maximum > 0);
+        checkpoint(observations, `${scenario_id} has scrollable range`, true, maximum > 0);
         checkpoint(
           observations,
-          `${scenarioId} reaches expected scroll offset`,
+          `${scenario_id} reaches expected scroll offset`,
           Math.min(maximum, start + SCROLL_STEP),
           end,
         );
         if (axis === "top") {
           checkpoint(
             observations,
-            `${scenarioId} advances the logical top row`,
+            `${scenario_id} advances the logical top row`,
             true,
             after.firstVisibleRow > before.firstVisibleRow,
           );
@@ -1234,13 +1238,13 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId.startsWith("edit-open.")) {
+  if (scenario_id.startsWith("edit-open.")) {
     const [row, col] =
-      scenarioId === "edit-open.top-left"
+      scenario_id === "edit-open.top-left"
         ? [2, 2]
-        : scenarioId === "edit-open.middle"
-          ? [middleRow, middleCol]
-          : [lastRow, lastCol];
+        : scenario_id === "edit-open.middle"
+          ? [middle_row, middle_col]
+          : [last_row, last_col];
     const prepare = (): void => {
       adapter.closeEditor();
       adapter.selectAndReveal(row, col);
@@ -1253,17 +1257,17 @@ function scenarioActions(
       cleanup,
       validateEffect: (observations) => {
         prepare();
-        withEffectCleanup(action, cleanup, () => {
-          validateSelection(adapter, observations, row, col, `${scenarioId} intended selection`);
-          checkpoint(observations, `${scenarioId} editor opened`, true, adapter.editorOpen());
+        with_effect_cleanup(action, cleanup, () => {
+          validate_selection(adapter, observations, row, col, `${scenario_id} intended selection`);
+          checkpoint(observations, `${scenario_id} editor opened`, true, adapter.editorOpen());
         });
       },
     };
   }
 
-  if (scenarioId === "edit-commit.middle") {
-    const row = middleRow;
-    const col = middleCol;
+  if (scenario_id === "edit-commit.middle") {
+    const row = middle_row;
+    const col = middle_col;
     const original = dataset.customer[row]!;
     const prepare = (): void => {
       adapter.setCellValue(row, col, original);
@@ -1277,7 +1281,7 @@ function scenarioActions(
       cleanup,
       validateEffect: (observations) => {
         prepare();
-        withEffectCleanup(action, cleanup, () => {
+        with_effect_cleanup(action, cleanup, () => {
           checkpoint(
             observations,
             "edit-commit.middle changes the intended cell",
@@ -1289,8 +1293,8 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "altering.insert-5-rows-top") {
-    const headroom = rowHeadroom(adapter, dataset);
+  if (scenario_id === "altering.insert-5-rows-top") {
+    const headroom = row_headroom(adapter, dataset);
     const action = (): void => adapter.insertRows(1, ALTER_COUNT);
     const cleanup = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
@@ -1300,7 +1304,7 @@ function scenarioActions(
       cleanup,
       validateEffect: (observations) => {
         try {
-          withEffectCleanup(action, cleanup, () => {
+          with_effect_cleanup(action, cleanup, () => {
             checkpoint(
               observations,
               "insert increases row count",
@@ -1327,8 +1331,8 @@ function scenarioActions(
     };
   }
 
-  if (scenarioId === "altering.remove-5-rows-top") {
-    const headroom = rowHeadroom(adapter, dataset);
+  if (scenario_id === "altering.remove-5-rows-top") {
+    const headroom = row_headroom(adapter, dataset);
     const prepare = (): void => adapter.insertRows(1, ALTER_COUNT);
     const action = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
@@ -1365,13 +1369,13 @@ function scenarioActions(
     };
   }
 
-  const isDown = scenarioId === "arrow-down.top-left";
-  const row = isDown ? 25 : middleRow;
-  const col = isDown ? 0 : middleCol;
-  const expectedRow = isDown ? row + 1 : row;
-  const expectedCol = isDown ? col : col + 1;
+  const is_down = scenario_id === "arrow-down.top-left";
+  const row = is_down ? 25 : middle_row;
+  const col = is_down ? 0 : middle_col;
+  const expected_row = is_down ? row + 1 : row;
+  const expected_col = is_down ? col : col + 1;
   const prepare = (): void => adapter.selectAndReveal(row, col);
-  const action = (): void => adapter.moveSelection(isDown ? "down" : "right");
+  const action = (): void => adapter.moveSelection(is_down ? "down" : "right");
   return {
     prepare,
     action,
@@ -1379,12 +1383,12 @@ function scenarioActions(
     validateEffect: (observations) => {
       prepare();
       action();
-      validateSelection(
+      validate_selection(
         adapter,
         observations,
-        expectedRow,
-        expectedCol,
-        `${scenarioId} moves one logical cell`,
+        expected_row,
+        expected_col,
+        `${scenario_id} moves one logical cell`,
       );
     },
   };
@@ -1399,7 +1403,7 @@ type ScenarioStep = "prepare" | "action" | "counters" | "cleanup";
  * measured action or its untimed cleanup produced it; the same error in a
  * prepare step means the sample never started.
  */
-function stepFailure(step: ScenarioStep, error: unknown): Error {
+function step_failure(step: ScenarioStep, error: unknown): Error {
   const cause = error instanceof Error ? error : new Error(String(error));
   const message = `${step} step failed: ${cause.message}`;
   const wrapped = cause instanceof RangeError ? new RangeError(message) : new Error(message);
@@ -1410,16 +1414,16 @@ function stepFailure(step: ScenarioStep, error: unknown): Error {
 /** Guards against an action that never accumulates measurable time. */
 const MAXIMUM_ACTIONS_PER_SAMPLE = 1_000_000;
 
-function aggregateSample(
+function aggregate_sample(
   adapter: RenderBenchAdapter,
   actions: ScenarioActions,
-  minimumDurationMs: number,
+  minimum_duration_ms: number,
 ): MeasuredSample {
-  let durationMs = 0;
-  let operationCount = 0;
-  let actionCount = 0;
-  const operationsPerAction = actions.operationsPerAction ?? 1;
-  const transferCounters = {
+  let duration_ms = 0;
+  let operation_count = 0;
+  let action_count = 0;
+  const operations_per_action = actions.operationsPerAction ?? 1;
+  const transfer_counters = {
     logicalFrames: 0,
     windowReadRequests: 0,
     logicalWindowReads: 0,
@@ -1430,7 +1434,7 @@ function aggregateSample(
     try {
       actions.prepare();
     } catch (error) {
-      throw stepFailure("prepare", error);
+      throw step_failure("prepare", error);
     }
     if (actions.measureWindowTransfer) adapter.resetWindowTransferCounters();
     const started = performance.now();
@@ -1444,11 +1448,11 @@ function aggregateSample(
     if (actions.measureWindowTransfer && failure === undefined) {
       try {
         const observed = adapter.windowTransferCounters();
-        transferCounters.logicalFrames += observed.logicalFrames;
-        transferCounters.windowReadRequests += observed.windowReadRequests;
-        transferCounters.logicalWindowReads += observed.logicalWindowReads;
-        transferCounters.copiedBytes += observed.copiedBytes;
-        transferCounters.outputAllocationEvents += observed.outputAllocationEvents;
+        transfer_counters.logicalFrames += observed.logicalFrames;
+        transfer_counters.windowReadRequests += observed.windowReadRequests;
+        transfer_counters.logicalWindowReads += observed.logicalWindowReads;
+        transfer_counters.copiedBytes += observed.copiedBytes;
+        transfer_counters.outputAllocationEvents += observed.outputAllocationEvents;
       } catch (error) {
         failure = { step: "counters", error };
       }
@@ -1460,36 +1464,36 @@ function aggregateSample(
       // when the measured action itself succeeded.
       failure ??= { step: "cleanup", error };
     }
-    if (failure !== undefined) throw stepFailure(failure.step, failure.error);
+    if (failure !== undefined) throw step_failure(failure.step, failure.error);
     if (!Number.isFinite(elapsed) || elapsed < 0) {
       throw new RangeError(`invalid operation duration: ${elapsed}`);
     }
-    durationMs += elapsed;
-    operationCount += operationsPerAction;
-    actionCount++;
-    if (actionCount > MAXIMUM_ACTIONS_PER_SAMPLE) {
+    duration_ms += elapsed;
+    operation_count += operations_per_action;
+    action_count++;
+    if (action_count > MAXIMUM_ACTIONS_PER_SAMPLE) {
       throw new RangeError(
-        `aggregate did not reach ${minimumDurationMs} ms within ${MAXIMUM_ACTIONS_PER_SAMPLE.toLocaleString("en-US")} actions`,
+        `aggregate did not reach ${minimum_duration_ms} ms within ${MAXIMUM_ACTIONS_PER_SAMPLE.toLocaleString("en-US")} actions`,
       );
     }
-  } while (durationMs < minimumDurationMs);
+  } while (duration_ms < minimum_duration_ms);
 
   return {
     index: 0,
-    durationMs,
-    operationCount,
-    perOperationMs: durationMs / operationCount,
+    durationMs: duration_ms,
+    operationCount: operation_count,
+    perOperationMs: duration_ms / operation_count,
     ...(actions.measureWindowTransfer
-      ? { windowTransfer: createWindowTransferMetrics(transferCounters) }
+      ? { windowTransfer: createWindowTransferMetrics(transfer_counters) }
       : {}),
   };
 }
 
-function failedScenario(
+function failed_scenario(
   identity: ScenarioIdentity,
   stage: FailedScenario["stage"],
   error: unknown,
-  partialSamples: readonly MeasuredSample[],
+  partial_samples: readonly MeasuredSample[],
   validation: readonly ValidationObservation[],
   memory: MemoryDelta,
 ): FailedScenario {
@@ -1504,7 +1508,7 @@ function failedScenario(
     crash: false,
     consoleErrors: [],
     pageErrors: [],
-    partialSamples,
+    partialSamples: partial_samples,
     validation,
     memory,
   };
@@ -1519,7 +1523,7 @@ export function runRenderScenario(
   if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
     throw new RangeError(`unknown render scenario: ${scenarioId}`);
   }
-  const dataValidity = scenarioDataValidity(scenarioId);
+  const data_validity = scenarioDataValidity(scenarioId);
   const identity: ScenarioIdentity = {
     runId: options.runId,
     round: options.round,
@@ -1527,46 +1531,46 @@ export function runRenderScenario(
     rows: dataset.rowCount,
     scenarioId,
     group: scenarioGroup(scenarioId),
-    ...(dataValidity === undefined ? {} : { dataValidity }),
+    ...(data_validity === undefined ? {} : { dataValidity: data_validity }),
   };
-  const actions = scenarioActions(scenarioId, adapter, dataset);
+  const actions = scenario_actions(scenarioId, adapter, dataset);
   const validation: ValidationObservation[] = [];
-  const rawSamples: MeasuredSample[] = [];
-  const beforeBytes = usedJsHeapBytes();
+  const raw_samples: MeasuredSample[] = [];
+  const before_bytes = used_js_heap_bytes();
   let stage: FailedScenario["stage"] = "validate";
 
   try {
     options.onStage?.("validate");
-    validateCanonicalState(adapter, dataset, validation);
+    validate_canonical_state(adapter, dataset, validation);
     actions.setup?.();
     stage = "warmup";
     options.onStage?.("warmup");
     for (let index = 0; index < options.warmupSamples; index++) {
-      aggregateSample(adapter, actions, options.minimumSampleDurationMs);
+      aggregate_sample(adapter, actions, options.minimumSampleDurationMs);
     }
     stage = "measure";
     options.onStage?.("measure");
     for (let index = 0; index < options.measuredSamples; index++) {
-      rawSamples.push({
-        ...aggregateSample(adapter, actions, options.minimumSampleDurationMs),
+      raw_samples.push({
+        ...aggregate_sample(adapter, actions, options.minimumSampleDurationMs),
         index,
       });
     }
     stage = "validate";
     options.onStage?.("validate");
     actions.validateEffect(validation);
-    validateCanonicalState(adapter, dataset, validation);
-    const afterBytes = usedJsHeapBytes();
-    const summary = summarizeFinite(rawSamples.map((sample) => sample.perOperationMs));
-    let windowTransfer: WindowTransferMetrics | undefined;
+    validate_canonical_state(adapter, dataset, validation);
+    const after_bytes = used_js_heap_bytes();
+    const summary = summarizeFinite(raw_samples.map((sample) => sample.perOperationMs));
+    let window_transfer: WindowTransferMetrics | undefined;
     if (actions.measureWindowTransfer) {
-      const metrics = rawSamples.map((sample) => {
+      const metrics = raw_samples.map((sample) => {
         if (!sample.windowTransfer) {
           throw new ScenarioValidationError("window-transfer sample counters are missing");
         }
         return sample.windowTransfer;
       });
-      windowTransfer = createWindowTransferMetrics({
+      window_transfer = createWindowTransferMetrics({
         logicalFrames: metrics.reduce((sum, entry) => sum + entry.logicalFrames, 0),
         windowReadRequests: metrics.reduce((sum, entry) => sum + entry.windowReadRequests, 0),
         logicalWindowReads: metrics.reduce((sum, entry) => sum + entry.logicalWindowReads, 0),
@@ -1580,25 +1584,25 @@ export function runRenderScenario(
     return {
       ...identity,
       status: "success",
-      operationCount: rawSamples.reduce((total, sample) => total + sample.operationCount, 0),
-      rawSamples,
+      operationCount: raw_samples.reduce((total, sample) => total + sample.operationCount, 0),
+      rawSamples: raw_samples,
       medianMs: summary.median,
       p95Ms: summary.p95,
       madMs: summary.mad,
       validation,
-      memory: memoryDelta(beforeBytes, afterBytes),
+      memory: memory_delta(before_bytes, after_bytes),
       resources: adapter.formatResources(),
       mergeResources: adapter.mergeResources(),
-      ...(windowTransfer === undefined ? {} : { windowTransfer }),
+      ...(window_transfer === undefined ? {} : { windowTransfer: window_transfer }),
     };
   } catch (error) {
-    return failedScenario(
+    return failed_scenario(
       identity,
       stage,
       error,
-      rawSamples,
+      raw_samples,
       validation,
-      memoryDelta(beforeBytes, usedJsHeapBytes()),
+      memory_delta(before_bytes, used_js_heap_bytes()),
     );
   }
 }

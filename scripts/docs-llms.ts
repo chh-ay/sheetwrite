@@ -35,7 +35,7 @@ export const LLMS_SITE_BASE = SITE_URL;
 export const LLMS_INDEX_PATH = "docs/public/llms.txt";
 export const LLMS_FULL_PATH = "docs/public/llms-full.txt";
 
-const contentRoot = "docs/src/content/docs";
+const content_root = "docs/src/content/docs";
 
 /** One generated endpoint: the absolute path to write and the exact bytes it must hold. */
 export interface LlmsFile {
@@ -89,27 +89,27 @@ export async function expectedLlmsFiles(
   repositoryRoot: string,
   generatedFiles: readonly LlmsGeneratedFile[],
 ): Promise<LlmsFile[]> {
-  const inventory = await generatedInventory(repositoryRoot, generatedFiles);
-  const documents = inNavigationOrder(await authoredDocuments(repositoryRoot, generatedFiles));
-  const version = await releaseVersions(manifest, repositoryRoot);
+  const inventory = await generated_inventory(repositoryRoot, generatedFiles);
+  const documents = inNavigationOrder(await authored_documents(repositoryRoot, generatedFiles));
+  const version = await release_versions(manifest, repositoryRoot);
   return [
     {
       path: join(repositoryRoot, LLMS_INDEX_PATH),
-      content: renderIndex(manifest, documents, inventory, version),
+      content: render_index(manifest, documents, inventory, version),
     },
     {
       path: join(repositoryRoot, LLMS_FULL_PATH),
-      content: renderFullText(manifest, documents, version),
+      content: render_full_text(manifest, documents, version),
     },
   ];
 }
 
-function siteUrl(route: string): string {
+function site_url(route: string): string {
   return `${LLMS_SITE_BASE}${route}`;
 }
 
-function absoluteUrl(url: string): string {
-  return url.startsWith("/") ? siteUrl(url) : url;
+function absolute_url(url: string): string {
+  return url.startsWith("/") ? site_url(url) : url;
 }
 
 function unquote(value: string): string {
@@ -117,7 +117,7 @@ function unquote(value: string): string {
   return match?.[2] ?? value;
 }
 
-function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; body: string } {
+function parse_frontmatter(source: string): { data: ReadonlyMap<string, string>; body: string } {
   if (!source.startsWith("---\n")) return { data: new Map(), body: source };
   const end = source.indexOf("\n---", 3);
   if (end === -1) return { data: new Map(), body: source };
@@ -125,8 +125,8 @@ function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; 
   for (const line of source.slice(4, end).split("\n")) {
     const match = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/.exec(line);
     if (match === null) continue;
-    const [, key, rawValue] = match;
-    if (key !== undefined && rawValue !== undefined) data.set(key, unquote(rawValue.trim()));
+    const [, key, raw_value] = match;
+    if (key !== undefined && raw_value !== undefined) data.set(key, unquote(raw_value.trim()));
   }
   return { data, body: source.slice(end + 4).replace(/^\n/, "") };
 }
@@ -136,32 +136,32 @@ function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; 
  * (generated reference material) and the API index page. Entry and symbol pages
  * are skipped: their declarations are reproduced from the manifest instead.
  */
-async function generatedInventory(
-  repositoryRoot: string,
-  generatedFiles: readonly LlmsGeneratedFile[],
+async function generated_inventory(
+  repository_root: string,
+  generated_files: readonly LlmsGeneratedFile[],
 ): Promise<GeneratedInventory> {
-  const documentRoot = join(repositoryRoot, contentRoot);
-  const apiRoot = join(documentRoot, "api");
-  const apiIndexPath = join(apiRoot, "index.md");
+  const document_root = join(repository_root, content_root);
+  const api_root = join(document_root, "api");
+  const api_index_path = join(api_root, "index.md");
   const pages: GeneratedPage[] = [];
-  let indexPage: GeneratedPage | undefined;
-  for (const file of generatedFiles) {
-    if (!file.path.startsWith(`${documentRoot}${sep}`) || !/\.mdx?$/.test(file.path)) continue;
-    if (file.path !== apiIndexPath && file.path.startsWith(`${apiRoot}${sep}`)) continue;
-    const page = await generatedPage(repositoryRoot, file);
-    if (file.path === apiIndexPath) indexPage = page;
+  let index_page: GeneratedPage | undefined;
+  for (const file of generated_files) {
+    if (!file.path.startsWith(`${document_root}${sep}`) || !/\.mdx?$/.test(file.path)) continue;
+    if (file.path !== api_index_path && file.path.startsWith(`${api_root}${sep}`)) continue;
+    const page = await generated_page(repository_root, file);
+    if (file.path === api_index_path) index_page = page;
     else pages.push(page);
   }
   pages.sort((left, right) => left.route.localeCompare(right.route));
-  return { indexPage, pages };
+  return { indexPage: index_page, pages };
 }
 
-async function generatedPage(
-  repositoryRoot: string,
+async function generated_page(
+  repository_root: string,
   file: LlmsGeneratedFile,
 ): Promise<GeneratedPage> {
-  const { data } = parseFrontmatter(file.content ?? (await readFile(file.path, "utf8")));
-  const route = routeForContentPath(join(repositoryRoot, contentRoot), file.path);
+  const { data } = parse_frontmatter(file.content ?? (await readFile(file.path, "utf8")));
+  const route = routeForContentPath(join(repository_root, content_root), file.path);
   return { route, title: data.get("title") ?? route, description: data.get("description") ?? "" };
 }
 
@@ -185,13 +185,13 @@ export function inNavigationOrder<T extends { readonly route: string }>(
 }
 
 /** Every content page the generator does not own, in route order. */
-async function authoredDocuments(
-  repositoryRoot: string,
-  generatedFiles: readonly LlmsGeneratedFile[],
+async function authored_documents(
+  repository_root: string,
+  generated_files: readonly LlmsGeneratedFile[],
 ): Promise<AuthoredDocument[]> {
-  const documentRoot = join(repositoryRoot, contentRoot);
-  const apiRoot = join(documentRoot, "api");
-  const generated = new Set(generatedFiles.map((file) => file.path));
+  const document_root = join(repository_root, content_root);
+  const api_root = join(document_root, "api");
+  const generated = new Set(generated_files.map((file) => file.path));
   const documents: AuthoredDocument[] = [];
   const visit = async (directory: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -199,31 +199,31 @@ async function authoredDocuments(
       if (entry.isDirectory()) {
         // The API subtree is generated whole; a page left behind by a removed
         // symbol is still generated content, not an authored guide.
-        if (path === apiRoot) continue;
+        if (path === api_root) continue;
         await visit(path);
         continue;
       }
       if (!entry.isFile() || !/\.mdx?$/.test(entry.name) || generated.has(path)) continue;
-      const route = routeForContentPath(documentRoot, path);
-      const { data, body } = parseFrontmatter(await readFile(path, "utf8"));
+      const route = routeForContentPath(document_root, path);
+      const { data, body } = parse_frontmatter(await readFile(path, "utf8"));
       documents.push({
         route,
         title: data.get("title") ?? route,
-        description: data.get("description") ?? firstParagraph(body),
+        description: data.get("description") ?? first_paragraph(body),
         body,
       });
     }
   };
-  await visit(documentRoot);
+  await visit(document_root);
   return documents.sort((left, right) => left.route.localeCompare(right.route));
 }
 
 /** Guides without a frontmatter description fall back to their opening sentence. */
-function firstParagraph(body: string): string {
+function first_paragraph(body: string): string {
   for (const line of body.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.length === 0 || /^[#|<`\-*_>]|\]/u.test(trimmed)) continue;
-    return truncate(plainText(trimmed), 200);
+    return truncate(plain_text(trimmed), 200);
   }
   return "";
 }
@@ -232,16 +232,16 @@ function truncate(value: string, limit: number): string {
   return value.length <= limit ? value : `${value.slice(0, limit - 1).trimEnd()}…`;
 }
 
-async function releaseVersions(
+async function release_versions(
   manifest: PublicApiManifest,
-  repositoryRoot: string,
+  repository_root: string,
 ): Promise<string> {
   const versions = new Set<string>();
   for (const pkg of manifest.packages) {
     const directory = pkg.name.replace(/^@[^/]+\//, "");
     try {
       const parsed: unknown = JSON.parse(
-        await readFile(join(repositoryRoot, "packages", directory, "package.json"), "utf8"),
+        await readFile(join(repository_root, "packages", directory, "package.json"), "utf8"),
       );
       const version = Reflect.get(parsed as object, "version");
       if (typeof version === "string") versions.add(version);
@@ -253,13 +253,13 @@ async function releaseVersions(
   return [...versions].sort().join(", ");
 }
 
-function renderIndex(
+function render_index(
   manifest: PublicApiManifest,
   documents: readonly AuthoredDocument[],
   inventory: GeneratedInventory,
   version: string,
 ): string {
-  const byRoute = new Map(documents.map((document) => [document.route, document]));
+  const by_route = new Map(documents.map((document) => [document.route, document]));
   const lines: string[] = ["# Sheetwrite", "", `> ${SITE_SUMMARY}`, ""];
   const release = version.length === 0 ? "" : ` at version ${version}`;
   lines.push(
@@ -267,7 +267,7 @@ function renderIndex(
     "",
     "## Full text",
     "",
-    `- [llms-full.txt](${siteUrl("/llms-full.txt")}): every authored guide plus every public API declaration in one plain-text file. Fetch this when you need to answer a question or write code.`,
+    `- [llms-full.txt](${site_url("/llms-full.txt")}): every authored guide plus every public API declaration in one plain-text file. Fetch this when you need to answer a question or write code.`,
     "",
     "## Agent workflow",
     "",
@@ -277,45 +277,45 @@ function renderIndex(
   const listed = new Set<string>();
   const entries = (items: readonly NavigationItem[]): string[] =>
     navigationPages(items).flatMap((page) => {
-      const document = byRoute.get(page.href);
+      const document = by_route.get(page.href);
       if (document === undefined || listed.has(page.href)) return [];
       listed.add(page.href);
-      return [indexEntry(document)];
+      return [index_entry(document)];
     });
   for (const section of AUTHORED_NAVIGATION) {
     // Each group starts a block; later standalone pages continue the current block.
     const blocks: string[][] = [];
     for (const item of section.items) {
       if (item.items === undefined) {
-        const pageLines = entries([item]);
-        if (pageLines.length === 0) continue;
+        const page_lines = entries([item]);
+        if (page_lines.length === 0) continue;
 
-        const currentBlock = blocks.at(-1);
-        if (currentBlock === undefined) blocks.push(pageLines);
-        else currentBlock.push(...pageLines);
+        const current_block = blocks.at(-1);
+        if (current_block === undefined) blocks.push(page_lines);
+        else current_block.push(...page_lines);
         continue;
       }
 
       // A group keeps its name so a reader sees where its pages belong.
-      const groupLines = entries([item]);
-      if (groupLines.length > 0) blocks.push([`### ${item.label}`, "", ...groupLines]);
+      const group_lines = entries([item]);
+      if (group_lines.length > 0) blocks.push([`### ${item.label}`, "", ...group_lines]);
     }
     if (blocks.length > 0) {
-      const sectionText = blocks.map((block) => block.join("\n")).join("\n\n");
-      lines.push("", `## ${section.label}`, "", sectionText);
+      const section_text = blocks.map((block) => block.join("\n")).join("\n\n");
+      lines.push("", `## ${section.label}`, "", section_text);
     }
   }
 
   const remaining = documents.filter((document) => !listed.has(document.route));
   if (remaining.length > 0) {
     lines.push("", "## More guides", "");
-    for (const document of remaining) lines.push(indexEntry(document));
+    for (const document of remaining) lines.push(index_entry(document));
   }
 
   if (inventory.indexPage !== undefined) {
     lines.push("", "## Public API", "");
     lines.push(
-      `- [${inventory.indexPage.title}](${siteUrl(inventory.indexPage.route)})${
+      `- [${inventory.indexPage.title}](${site_url(inventory.indexPage.route)})${
         inventory.indexPage.description.length === 0 ? "" : `: ${inventory.indexPage.description}`
       }`,
     );
@@ -324,11 +324,11 @@ function renderIndex(
       if (entry === undefined) continue;
       const route = `/docs/api/${entrySlug(pkg.name, entry.subpath)}/`;
       lines.push(
-        `- [\`${pkg.name}\`](${siteUrl(route)}): ${entry.exports.length} exports across ${pkg.entryPoints.length} entry points (primary entry point: ${entry.classification}).`,
+        `- [\`${pkg.name}\`](${site_url(route)}): ${entry.exports.length} exports across ${pkg.entryPoints.length} entry points (primary entry point: ${entry.classification}).`,
       );
     }
     lines.push(
-      `- [Public API declarations](${siteUrl("/llms-full.txt")}): every export signature grouped by package and entry point. Do not invent symbols absent from it.`,
+      `- [Public API declarations](${site_url("/llms-full.txt")}): every export signature grouped by package and entry point. Do not invent symbols absent from it.`,
     );
   }
 
@@ -342,32 +342,32 @@ function renderIndex(
     );
     for (const page of inventory.pages) {
       const suffix = page.description.length === 0 ? "" : `: ${page.description}`;
-      lines.push(`- [${page.title}](${siteUrl(page.route)})${suffix}`);
+      lines.push(`- [${page.title}](${site_url(page.route)})${suffix}`);
     }
   }
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
-function indexEntry(document: AuthoredDocument): string {
+function index_entry(document: AuthoredDocument): string {
   const suffix = document.description.length === 0 ? "" : `: ${document.description}`;
-  return `- [${document.title}](${siteUrl(document.route)})${suffix}`;
+  return `- [${document.title}](${site_url(document.route)})${suffix}`;
 }
 
-function renderFullText(
+function render_full_text(
   manifest: PublicApiManifest,
   documents: readonly AuthoredDocument[],
   version: string,
 ): string {
-  const anchors = uniqueAnchors(documents);
+  const anchors = unique_anchors(documents);
   const descriptions = new Map(documents.map((document) => [document.route, document.description]));
   const lines: string[] = [
     "# Sheetwrite — full documentation text",
     "",
     `> ${SITE_SUMMARY}`,
     "",
-    `Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from ${siteUrl("/llms.txt")} instead of being repeated here.`,
+    `Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from ${site_url("/llms.txt")} instead of being repeated here.`,
     "",
-    `Packages: ${version.length === 0 ? "versioned together" : version}. Canonical HTML: ${siteUrl("/docs/")}`,
+    `Packages: ${version.length === 0 ? "versioned together" : version}. Canonical HTML: ${site_url("/docs/")}`,
     "",
     "## Contents",
     "",
@@ -386,13 +386,13 @@ function renderFullText(
       "",
       `### ${document.title}`,
       "",
-      `Source: ${siteUrl(document.route)}`,
+      `Source: ${site_url(document.route)}`,
       "",
     );
     const body = document.body.replace(/<div class="sw-section-cards"><\/div>/g, () =>
-      sectionCardsMarkdown(document.route, (href) => descriptions.get(href), siteUrl),
+      sectionCardsMarkdown(document.route, (href) => descriptions.get(href), site_url),
     );
-    lines.push(convertDocumentBody(body));
+    lines.push(convert_document_body(body));
   }
 
   lines.push(
@@ -403,12 +403,12 @@ function renderFullText(
   );
   for (const pkg of manifest.packages) {
     lines.push("", `### \`${pkg.name}\``);
-    for (const entry of pkg.entryPoints) lines.push(...renderEntry(pkg, entry));
+    for (const entry of pkg.entryPoints) lines.push(...render_entry(pkg, entry));
   }
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
-function renderEntry(pkg: ApiPackage, entry: ApiEntryPoint): string[] {
+function render_entry(pkg: ApiPackage, entry: ApiEntryPoint): string[] {
   const label = entryLabel(pkg, entry);
   const lines = [
     "",
@@ -417,12 +417,12 @@ function renderEntry(pkg: ApiPackage, entry: ApiEntryPoint): string[] {
     `Declaration target: \`${entry.target}\``,
   ];
   if (entry.source !== undefined) lines.push(`Source entry: \`${entry.source}\``);
-  lines.push(`Page: ${siteUrl(`/docs/api/${entrySlug(pkg.name, entry.subpath)}/`)}`);
-  for (const item of entry.exports) lines.push(...renderExport(item));
+  lines.push(`Page: ${site_url(`/docs/api/${entrySlug(pkg.name, entry.subpath)}/`)}`);
+  for (const item of entry.exports) lines.push(...render_export(item));
   return lines;
 }
 
-function renderExport(item: ApiExport): string[] {
+function render_export(item: ApiExport): string[] {
   const lines = [
     "",
     `##### \`${item.name}\` — ${item.kind}`,
@@ -431,12 +431,12 @@ function renderExport(item: ApiExport): string[] {
     ...item.signature.split("\n"),
     "```",
   ];
-  const documentation = plainText(absolutizeMarkdownLinks(item.documentation));
+  const documentation = plain_text(absolutize_markdown_links(item.documentation));
   if (documentation.length > 0) lines.push("", documentation);
   if (item.memberDocs.length > 0) {
     lines.push("", "Members:");
     for (const member of item.memberDocs) {
-      const text = plainText(absolutizeMarkdownLinks(member.documentation));
+      const text = plain_text(absolutize_markdown_links(member.documentation));
       lines.push(`- \`${member.name}\`${text.length === 0 ? "" : ` — ${text}`}`);
     }
   }
@@ -444,7 +444,7 @@ function renderExport(item: ApiExport): string[] {
 }
 
 /** One Contents anchor per guide route; a repeated title gets a numbered suffix. */
-function uniqueAnchors(documents: readonly AuthoredDocument[]): ReadonlyMap<string, string> {
+function unique_anchors(documents: readonly AuthoredDocument[]): ReadonlyMap<string, string> {
   const anchors = new Map<string, string>();
   const used = new Set<string>(["contents", "authored-guides", "public-api-declarations"]);
   for (const { route, title } of documents) {
@@ -471,22 +471,22 @@ const LANGUAGE_PATTERN = /^[A-Za-z][A-Za-z0-9+#.-]*$/;
  * blank lines, so a run of blank prose lines becomes one; blank lines inside
  * code stay as written.
  */
-function convertDocumentBody(body: string): string {
+function convert_document_body(body: string): string {
   const lines = body.split("\n");
   const blocks = fenceBlocks(lines);
   const output: string[] = [];
-  let blockIndex = 0;
-  let previousProseBlank = true;
+  let block_index = 0;
+  let previous_prose_blank = true;
   for (let index = 0; index < lines.length; index += 1) {
-    const block = blocks[blockIndex];
+    const block = blocks[block_index];
     if (block?.start === index) {
       const language = block.info.trim().split(/\s+/)[0] ?? "";
       output.push(`${block.marker}${LANGUAGE_PATTERN.test(language) ? language : ""}`);
       output.push(...lines.slice(index + 1, block.closed ? block.end : block.end + 1));
       if (block.closed) output.push(lines[block.end]?.trim() ?? block.marker);
       index = block.end;
-      blockIndex += 1;
-      previousProseBlank = false;
+      block_index += 1;
+      previous_prose_blank = false;
       continue;
     }
 
@@ -498,10 +498,10 @@ function convertDocumentBody(body: string): string {
         line += ` ${(lines[index] ?? "").trim()}`;
       }
     }
-    const prose = convertProseLine(formatTokens(line));
+    const prose = convert_prose_line(formatTokens(line));
     const blank = prose.trim() === "";
-    if (!(blank && previousProseBlank)) output.push(blank ? "" : prose);
-    previousProseBlank = blank;
+    if (!(blank && previous_prose_blank)) output.push(blank ? "" : prose);
+    previous_prose_blank = blank;
   }
   if (output.at(-1) === "") output.pop();
   return output.join("\n");
@@ -518,7 +518,7 @@ const CALLOUT_LABELS: Readonly<Record<string, string>> = {
 };
 
 /** An attribute of a component tag, as written. */
-function tagAttribute(tag: string, name: string): string | undefined {
+function tag_attribute(tag: string, name: string): string | undefined {
   return new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
 }
 
@@ -527,15 +527,15 @@ function tagAttribute(tag: string, name: string): string | undefined {
  * bold, a figure keeps its alt text, a callout its label, and the rest of the
  * chrome is dropped.
  */
-function componentText(tag: string): string {
+function component_text(tag: string): string {
   const name = /^<\/?([A-Z][A-Za-z0-9]*)/.exec(tag.trim())?.[1] ?? "";
   if (tag.trim().startsWith("</")) return "";
-  const title = tagAttribute(tag, "title");
-  if (name === "Update") return `### ${tagAttribute(tag, "version") ?? ""}`;
+  const title = tag_attribute(tag, "title");
+  if (name === "Update") return `### ${tag_attribute(tag, "version") ?? ""}`;
   if (name in CALLOUT_LABELS)
     return title === undefined ? `${CALLOUT_LABELS[name]}:` : `**${title}**`;
   if (name === "Card") {
-    const href = tagAttribute(tag, "href");
+    const href = tag_attribute(tag, "href");
     return title === undefined
       ? ""
       : href === undefined
@@ -543,38 +543,38 @@ function componentText(tag: string): string {
         : `**[${title}](${href})**`;
   }
   if (title !== undefined) return `**${title}**`;
-  const alt = tagAttribute(tag, "alt") ?? tagAttribute(tag, "label");
+  const alt = tag_attribute(tag, "alt") ?? tag_attribute(tag, "label");
   return alt === undefined ? "" : `(Figure: ${alt})`;
 }
 
-function convertProseLine(line: string): string {
-  if (isMdxImport(line)) return "";
+function convert_prose_line(line: string): string {
+  if (is_mdx_import(line)) return "";
   if (/^\s*<\/?[A-Z][A-Za-z0-9]*(\s[^>]*)?\/?>\s*$/.test(line)) {
-    return plainText(absolutizeMarkdownLinks(componentText(line)));
+    return plain_text(absolutize_markdown_links(component_text(line)));
   }
   // A one-line callout: `<Note>text</Note>`.
   const callout = /^\s*<(Note|Info|Tip|Check|Warning|Danger)>(.*)<\/\1>\s*$/.exec(line);
   if (callout !== null) {
-    return `${CALLOUT_LABELS[callout[1] ?? ""]}: ${plainText(absolutizeMarkdownLinks(convertInlineHtml(callout[2] ?? "")))}`;
+    return `${CALLOUT_LABELS[callout[1] ?? ""]}: ${plain_text(absolutize_markdown_links(convert_inline_html(callout[2] ?? "")))}`;
   }
-  return plainText(absolutizeMarkdownLinks(convertInlineHtml(line)));
+  return plain_text(absolutize_markdown_links(convert_inline_html(line)));
 }
 
 /** MDX pulls its components in with JavaScript import statements that carry no prose. */
-function isMdxImport(line: string): boolean {
+function is_mdx_import(line: string): boolean {
   return (
     /^\s*(?:import|export)\s+(?:type\s+)?[^;]*\bfrom\s+["'][^"']+["']\s*;?\s*$/.test(line) ||
     /^\s*import\s+["'][^"']+["']\s*;?\s*$/.test(line)
   );
 }
 
-function convertInlineHtml(line: string): string {
-  const { masked, restore } = maskInlineCode(line);
+function convert_inline_html(line: string): string {
+  const { masked, restore } = mask_inline_code(line);
   const stripped = masked
     .replace(/<!--.*?-->/g, "")
     .replace(
       /<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g,
-      (_match, href: string, inner: string) => `${stripTags(inner)} (${absoluteUrl(href)})`,
+      (_match, href: string, inner: string) => `${strip_tags(inner)} (${absolute_url(href)})`,
     )
     .replace(/<code>([\s\S]*?)<\/code>/g, "`$1`")
     // A result legend writes one term and its definition per line.
@@ -589,7 +589,7 @@ function convertInlineHtml(line: string): string {
  * Generic type arguments such as `Partial<Theme>` look like HTML tags, so code
  * spans are held aside while inline HTML is stripped.
  */
-function maskInlineCode(line: string): { masked: string; restore: (value: string) => string } {
+function mask_inline_code(line: string): { masked: string; restore: (value: string) => string } {
   const spans: string[] = [];
   const masked = line.replace(/`[^`]*`/g, (span) => {
     spans.push(span);
@@ -604,13 +604,13 @@ function maskInlineCode(line: string): { masked: string; restore: (value: string
   };
 }
 
-function stripTags(value: string): string {
-  const text = plainText(decodeEntities(value.replace(/<[^>]*>/g, " ")));
+function strip_tags(value: string): string {
+  const text = plain_text(decode_entities(value.replace(/<[^>]*>/g, " ")));
   return text.replace(/\s+([.,;:!?)\]])/g, "$1");
 }
 
-function absolutizeMarkdownLinks(text: string): string {
-  return text.replace(/\]\((\/[^)\s]+)\)/g, (_match, url: string) => `](${absoluteUrl(url)})`);
+function absolutize_markdown_links(text: string): string {
+  return text.replace(/\]\((\/[^)\s]+)\)/g, (_match, url: string) => `](${absolute_url(url)})`);
 }
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
@@ -622,7 +622,7 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   quot: '"',
 };
 
-function decodeEntities(text: string): string {
+function decode_entities(text: string): string {
   return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
     if (!entity.startsWith("#")) return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
     const code = /^#x/i.test(entity)
@@ -632,8 +632,8 @@ function decodeEntities(text: string): string {
   });
 }
 
-function plainText(value: string): string {
-  return decodeEntities(value)
+function plain_text(value: string): string {
+  return decode_entities(value)
     .replace(/[ \t]+/g, " ")
     .trim();
 }

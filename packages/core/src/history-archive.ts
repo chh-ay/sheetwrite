@@ -162,52 +162,52 @@ interface PruneOptions {
   signal?: AbortSignal;
 }
 
-function isOperation(value: unknown): value is DocumentOp {
+function is_operation(value: unknown): value is DocumentOp {
   return validateDocumentOperationShape(value).length === 0;
 }
 
-function validId(value: unknown): value is string {
+function valid_id(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= MAX_ID_LENGTH;
 }
 
-function restoreValue(value: unknown): RestoreProvenance | undefined {
+function restore_value(value: unknown): RestoreProvenance | undefined {
   if (!object(value)) {
     return undefined;
   }
 
-  const { versionId, scope } = value;
-  const validScope = scope === "workbook" || scope === "sheet" || scope === "range";
+  const { versionId: version_id, scope } = value;
+  const valid_scope = scope === "workbook" || scope === "sheet" || scope === "range";
 
-  return validId(versionId) && validScope ? { versionId, scope } : undefined;
+  return valid_id(version_id) && valid_scope ? { versionId: version_id, scope } : undefined;
 }
 
 /**
- * Validate one committed transaction that follows `baseRevision`, and return
+ * Validate one committed transaction that follows `base_revision`, and return
  * its encoded operation bytes. A transaction spans at most one atomic batch.
  */
-function checkCommit(
+function check_commit(
   commit: CommittedTransaction,
-  baseRevision: number,
-  notBefore: number,
+  base_revision: number,
+  not_before: number,
   limits: Readonly<HistoryLimits>,
 ): number {
-  const validRevision =
-    commit.baseRevision === baseRevision &&
+  const valid_revision =
+    commit.baseRevision === base_revision &&
     integer(commit.revision) &&
     commit.revision > commit.baseRevision &&
     commit.revision - commit.baseRevision <= MAX_ATOMIC_BATCH_VERSIONS;
 
   const valid =
-    validRevision &&
+    valid_revision &&
     integer(commit.time) &&
-    commit.time >= notBefore &&
-    validId(commit.mutationId) &&
-    validId(commit.authorId) &&
+    commit.time >= not_before &&
+    valid_id(commit.mutationId) &&
+    valid_id(commit.authorId) &&
     Array.isArray(commit.operations) &&
     commit.operations.length > 0 &&
     commit.operations.length <= MAX_OPERATIONS &&
-    commit.operations.every(isOperation) &&
-    (commit.restore === undefined || restoreValue(commit.restore) !== undefined);
+    commit.operations.every(is_operation) &&
+    (commit.restore === undefined || restore_value(commit.restore) !== undefined);
 
   if (!valid) {
     throw new HistoryError(
@@ -228,7 +228,7 @@ function checkCommit(
  * Encode one transaction as segments of at most `maxSegmentBytes` plus one
  * envelope with its author and revision. The envelope is the last record.
  */
-async function writeCommit(
+async function write_commit(
   commit: CommittedTransaction,
   limits: Readonly<HistoryLimits>,
 ): Promise<HistoryStoredRecord[]> {
@@ -263,7 +263,7 @@ async function writeCommit(
 }
 
 /** Join and parse the segments of one transaction; replay sees only a complete transaction. */
-async function readCommit(
+async function read_commit(
   id: string,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
@@ -274,38 +274,46 @@ async function readCommit(
     throw new HistoryError("integrity", "Invalid archived transaction envelope");
   }
 
-  const { baseRevision, revision, mutationId, authorId, time, operationBytes, segments } = envelope;
-  const restore = restoreValue(envelope.restore);
-  const maxSegments = Math.ceil(limits.maxTransactionBytes / limits.maxSegmentBytes);
+  const {
+    baseRevision: base_revision,
+    revision,
+    mutationId: mutation_id,
+    authorId: author_id,
+    time,
+    operationBytes: operation_bytes,
+    segments,
+  } = envelope;
+  const restore = restore_value(envelope.restore);
+  const max_segments = Math.ceil(limits.maxTransactionBytes / limits.maxSegmentBytes);
   const valid =
-    integer(baseRevision) &&
+    integer(base_revision) &&
     integer(revision) &&
-    typeof mutationId === "string" &&
-    typeof authorId === "string" &&
+    typeof mutation_id === "string" &&
+    typeof author_id === "string" &&
     integer(time) &&
-    integer(operationBytes) &&
-    operationBytes <= limits.maxTransactionBytes &&
+    integer(operation_bytes) &&
+    operation_bytes <= limits.maxTransactionBytes &&
     strings(segments) &&
-    segments.length <= maxSegments &&
+    segments.length <= max_segments &&
     (envelope.restore === undefined || restore !== undefined);
 
   if (!valid) {
     throw new HistoryError("integrity", "Invalid archived transaction envelope");
   }
 
-  const reservation = operationBytes * TRANSACTION_RESERVATION_MULTIPLIER + REPLAY_WINDOW_BYTES;
+  const reservation = operation_bytes * TRANSACTION_RESERVATION_MULTIPLIER + REPLAY_WINDOW_BYTES;
   if (reservation > limits.maxWorkingBytes) {
     throw new HistoryError("capacity", "Archived transaction exceeds its replay reservation");
   }
 
-  const payload = new Uint8Array(operationBytes);
+  const payload = new Uint8Array(operation_bytes);
   let offset = 0;
-  for (const segmentId of segments) {
-    if (!record.references.includes(segmentId)) {
+  for (const segment_id of segments) {
+    if (!record.references.includes(segment_id)) {
       throw new HistoryError("integrity", "Transaction references an unowned log segment");
     }
 
-    const segment = await read(segmentId);
+    const segment = await read(segment_id);
     if (segment.kind !== "segment") {
       throw new HistoryError("integrity", "Expected an archived operation segment");
     }
@@ -330,22 +338,22 @@ async function readCommit(
     throw new HistoryError("integrity", "Invalid archived operation JSON", { cause });
   }
 
-  if (!Array.isArray(operations) || !operations.every(isOperation)) {
+  if (!Array.isArray(operations) || !operations.every(is_operation)) {
     throw new HistoryError("integrity", "Invalid archived document operations");
   }
 
   return {
-    baseRevision,
+    baseRevision: base_revision,
     revision,
-    mutationId,
-    authorId,
+    mutationId: mutation_id,
+    authorId: author_id,
     time,
     operations,
     ...(restore !== undefined ? { restore } : {}),
   };
 }
 
-function manifestResponse(
+function manifest_response(
   value: HistoryManifest | HistoryVersion | HistoryStoredRecord,
 ): HistoryManifest {
   if (!("generation" in value)) {
@@ -355,7 +363,7 @@ function manifestResponse(
   return value;
 }
 
-function versionResponse(
+function version_response(
   value: HistoryManifest | HistoryVersion | HistoryStoredRecord,
 ): HistoryVersion {
   if (
@@ -375,16 +383,16 @@ function versionResponse(
  * more than ten times faster than a paged one. Larger sparse sheets use paged
  * storage.
  */
-function replayStorage(snapshot: WorkbookSnapshot): "dense" | "paged" {
-  let logicalCells = 0;
+function replay_storage(snapshot: WorkbookSnapshot): "dense" | "paged" {
+  let logical_cells = 0;
   for (const sheet of snapshot.sheets) {
-    logicalCells += sheet.rowCount * sheet.columns.length;
+    logical_cells += sheet.rowCount * sheet.columns.length;
   }
 
-  return logicalCells <= DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ? "dense" : "paged";
+  return logical_cells <= DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ? "dense" : "paged";
 }
 
-function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
+function apply_batch(store: SheetwriteStore, operations: DocumentOp[]): void {
   if (operations.length === 0) {
     return;
   }
@@ -411,7 +419,7 @@ function applyBatch(store: SheetwriteStore, operations: DocumentOp[]): void {
  * result is the same, and the store recalculates once per batch instead of
  * once per archived transaction.
  */
-async function rebuildVersion(
+async function rebuild_version(
   checkpoint: CheckedSnapshot,
   tail: readonly string[],
   read: HistoryRecordReader,
@@ -424,7 +432,7 @@ async function rebuildVersion(
   try {
     store = buildOnEngineInstance(instance, () =>
       SheetwriteStore.fromSnapshot(checkpoint, {
-        storage: replayStorage(checkpoint.snapshot),
+        storage: replay_storage(checkpoint.snapshot),
         cacheBytes: REPLAY_WINDOW_BYTES,
         transactionResourceLimits: {
           maxOperations: MAX_OPERATIONS,
@@ -449,32 +457,32 @@ async function rebuildVersion(
   try {
     let revision = checkpoint.snapshot.version ?? 0;
     let batch: DocumentOp[] = [];
-    let batchBytes = 0;
+    let batch_bytes = 0;
 
-    for (const transactionId of tail) {
-      const commit = await readCommit(transactionId, read, limits);
-      const bytes = checkCommit(commit, revision, 0, limits);
+    for (const transaction_id of tail) {
+      const commit = await read_commit(transaction_id, read, limits);
+      const bytes = check_commit(commit, revision, 0, limits);
 
       const full =
         batch.length + commit.operations.length > MAX_OPERATIONS ||
-        batchBytes + bytes > REPLAY_BATCH_BYTES;
+        batch_bytes + bytes > REPLAY_BATCH_BYTES;
 
       if (full) {
-        applyBatch(store, batch);
+        apply_batch(store, batch);
         batch = [];
-        batchBytes = 0;
+        batch_bytes = 0;
       }
 
       for (const operation of commit.operations) {
         batch.push(operation);
       }
 
-      batchBytes += bytes;
+      batch_bytes += bytes;
       revision = commit.revision;
       checkAbort(signal);
     }
 
-    applyBatch(store, batch);
+    apply_batch(store, batch);
     replayed = true;
 
     return { store, revision, free };
@@ -490,7 +498,7 @@ async function rebuildVersion(
  * following `later`'s checkpoint back through each checkpoint's `previous`
  * link. `complete` is `false` when a checkpoint on the way was pruned.
  */
-async function intervalLog(
+async function interval_log(
   later: HistoryVersion,
   revision: number,
   read: HistoryRecordReader,
@@ -523,14 +531,14 @@ async function intervalLog(
 }
 
 /** Read `transactions` one at a time and yield those after `revision`. */
-async function* commitsAfter(
+async function* commits_after(
   transactions: readonly string[],
   revision: number,
   read: HistoryRecordReader,
   limits: Readonly<HistoryLimits>,
 ): AsyncGenerator<CommittedTransaction> {
   for (const id of transactions) {
-    const commit = await readCommit(id, read, limits);
+    const commit = await read_commit(id, read, limits);
     if (commit.revision > revision) {
       yield commit;
     }
@@ -562,7 +570,7 @@ interface PageInputs {
  */
 export class HistoryArchive {
   private readonly storage: HistoryStorageAdapter;
-  private readonly documentId: string;
+  private readonly document_id: string;
   private readonly limits: Readonly<HistoryLimits>;
   private manifest: HistoryManifest;
   private lock = Promise.resolve();
@@ -575,14 +583,14 @@ export class HistoryArchive {
     manifest: HistoryManifest,
   ) {
     this.storage = options.storage;
-    this.documentId = options.documentId;
+    this.document_id = options.documentId;
     this.limits = limits;
     this.manifest = manifest;
   }
 
   /** Open an archive by reading its manifest only; no workbook is loaded. */
   static async open(options: HistoryArchiveOptions, signal?: AbortSignal): Promise<HistoryArchive> {
-    if (!validId(options.documentId)) {
+    if (!valid_id(options.documentId)) {
       throw new HistoryError("invalid-history", "History requires a bounded document ID");
     }
 
@@ -594,11 +602,11 @@ export class HistoryArchive {
       signal,
     });
 
-    return new HistoryArchive(options, limits, manifestResponse(response));
+    return new HistoryArchive(options, limits, manifest_response(response));
   }
 
   private request(signal?: AbortSignal) {
-    return { documentId: this.documentId, limits: this.limits, signal };
+    return { documentId: this.document_id, limits: this.limits, signal };
   }
 
   private async serialized<T>(action: () => Promise<T>): Promise<T> {
@@ -647,7 +655,7 @@ export class HistoryArchive {
       }
 
       const revision = snapshot.version ?? 0;
-      const checkpoint = await writeCheckpoint(snapshot, this.documentId, revision, this.limits);
+      const checkpoint = await writeCheckpoint(snapshot, this.document_id, revision, this.limits);
       const head: HistoryHead = {
         revision,
         checkpoint: checkpoint.checkpoint,
@@ -683,8 +691,8 @@ export class HistoryArchive {
         throw new HistoryError("invalid-history", "History baseline is required before recording");
       }
 
-      const encodedBytes = checkCommit(commit, current.revision, current.time, this.limits);
-      const records = await writeCommit(commit, this.limits);
+      const encoded_bytes = check_commit(commit, current.revision, current.time, this.limits);
+      const records = await write_commit(commit, this.limits);
       const envelope = records[records.length - 1];
       if (!envelope) {
         throw new HistoryError("integrity", "Archived transaction envelope is missing");
@@ -692,25 +700,25 @@ export class HistoryArchive {
 
       // Idle time counts as at most one automatic interval, so a pause makes one version.
       const idle = Math.min(commit.time - current.time, this.limits.automaticIntervalMs);
-      const activeMs = current.activeMs + idle;
+      const active_ms = current.activeMs + idle;
 
       let head: HistoryHead = {
         ...current,
         revision: commit.revision,
         time: commit.time,
         tail: [...current.tail, envelope.id],
-        activeMs,
+        activeMs: active_ms,
         checkpointTransactions: current.checkpointTransactions + 1,
-        checkpointLogBytes: current.checkpointLogBytes + encodedBytes,
+        checkpointLogBytes: current.checkpointLogBytes + encoded_bytes,
       };
 
-      const checkpointDue =
-        activeMs - current.checkpointAt >= this.limits.checkpointIntervalMs ||
+      const checkpoint_due =
+        active_ms - current.checkpointAt >= this.limits.checkpointIntervalMs ||
         head.checkpointTransactions >= this.limits.checkpointTransactions ||
         head.checkpointLogBytes >= this.limits.checkpointLogBytes;
 
       let publication = records;
-      if (checkpointDue) {
+      if (checkpoint_due) {
         if (!capture) {
           throw new HistoryError(
             "invalid-history",
@@ -723,7 +731,7 @@ export class HistoryArchive {
 
         const checkpoint = await writeCheckpoint(
           snapshot,
-          this.documentId,
+          this.document_id,
           commit.revision,
           this.limits,
           head.tail,
@@ -736,16 +744,16 @@ export class HistoryArchive {
           checkpoint: checkpoint.checkpoint,
           tail: [],
           checkpoints: [...head.checkpoints, checkpoint.checkpoint],
-          checkpointAt: activeMs,
+          checkpointAt: active_ms,
           checkpointTransactions: 0,
           checkpointLogBytes: 0,
         };
       }
 
       let version: HistoryVersion | undefined;
-      if (activeMs - current.automaticAt >= this.limits.automaticIntervalMs) {
+      if (active_ms - current.automaticAt >= this.limits.automaticIntervalMs) {
         version = await this.version(head, "automatic", commit.authorId, commit.time);
-        head = { ...head, automaticAt: activeMs, checkpoints: [] };
+        head = { ...head, automaticAt: active_ms, checkpoints: [] };
       }
 
       await this.publish(publication, head, version, signal);
@@ -756,14 +764,14 @@ export class HistoryArchive {
   private async version(
     head: HistoryHead,
     kind: HistoryVersion["kind"],
-    authorId: string,
+    author_id: string,
     time: number,
     name?: string,
   ): Promise<HistoryVersion> {
     const content = {
       revision: head.revision,
       kind,
-      authorId,
+      authorId: author_id,
       time,
       checkpoint: head.checkpoint,
       tail: [...head.tail],
@@ -821,11 +829,11 @@ export class HistoryArchive {
    * `releaseMemory`.
    */
   async readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
-    return this.withPinnedVersion(id, signal, async (version, read) => {
+    return this.with_pinned_version(id, signal, async (version, read) => {
       const rebuilt =
         version.tail.length === 0
-          ? (await this.checkpointOf(version, read)).snapshot
-          : await this.withRebuiltVersion(version, read, signal, true, ({ store, revision }) => ({
+          ? (await this.checkpoint_of(version, read)).snapshot
+          : await this.with_rebuilt_version(version, read, signal, true, ({ store, revision }) => ({
               ...store.exportSnapshot(),
               version: revision,
             }));
@@ -896,14 +904,14 @@ export class HistoryArchive {
     };
 
     try {
-      const compareRows = await loadRowComparer(options.kernel);
-      return await this.withPinnedVersion(id, options.signal, async (version, read) => {
+      const compare_rows = await loadRowComparer(options.kernel);
+      return await this.with_pinned_version(id, options.signal, async (version, read) => {
         const kept = this.rebuilt.holds(
           rebuiltKey(version.id, version.revision, version.checkpoint),
         );
         const sync = options.sync;
         if (sync && !kept) {
-          const atHead = await this.restoreAtHead(
+          const at_head = await this.restore_at_head(
             grid,
             { version, read },
             scope,
@@ -911,13 +919,18 @@ export class HistoryArchive {
             options.signal,
             (plan, revision) => commit(plan, version, revision),
           );
-          if (atHead) {
-            return atHead;
+          if (at_head) {
+            return at_head;
           }
         }
 
-        return this.withRebuiltVersion(version, read, options.signal, true, ({ store, revision }) =>
-          commit(planRestore(grid.store, store, scope, compareRows), version, revision),
+        return this.with_rebuilt_version(
+          version,
+          read,
+          options.signal,
+          true,
+          ({ store, revision }) =>
+            commit(planRestore(grid.store, store, scope, compare_rows), version, revision),
         );
       });
     } finally {
@@ -932,7 +945,7 @@ export class HistoryArchive {
    * the grid is not at the head, a log tail or the scope needs more cells, or
    * too many pages differ.
    */
-  private async restoreAtHead(
+  private async restore_at_head(
     grid: Grid,
     leased: LeasedVersion,
     scope: HistoryRestoreScope,
@@ -940,12 +953,12 @@ export class HistoryArchive {
     signal: AbortSignal | undefined,
     commit: (plan: RestoreCommit, revision: number) => ApplyTransactionResult,
   ): Promise<ApplyTransactionResult | undefined> {
-    return this.withPinnedVersion("head", signal, async (head, readHead) => {
+    return this.with_pinned_version("head", signal, async (head, read_head) => {
       if (head.revision !== sync.state.serverVersion) {
         return undefined;
       }
 
-      const inputs = await this.pageInputs(leased.version, leased.read, head, readHead);
+      const inputs = await this.page_inputs(leased.version, leased.read, head, read_head);
       const pages =
         inputs &&
         selectRestorePages(inputs.earlier, inputs.later, inputs.earlierWrites, inputs.laterWrites);
@@ -953,7 +966,7 @@ export class HistoryArchive {
         return undefined;
       }
 
-      const sparse = await this.sparseVersion(inputs.earlier, pages.read, leased, signal);
+      const sparse = await this.sparse_version(inputs.earlier, pages.read, leased, signal);
       try {
         // A server version that moved while the pages were read leaves the grid off the head.
         if (head.revision !== sync.state.serverVersion) {
@@ -987,36 +1000,36 @@ export class HistoryArchive {
     diffPageSize(request);
     const { signal } = request;
 
-    return this.withPinnedVersion(request.from, signal, (earlier, readEarlier) =>
-      this.withPinnedVersion(request.to, signal, async (later, read) => {
+    return this.with_pinned_version(request.from, signal, (earlier, read_earlier) =>
+      this.with_pinned_version(request.to, signal, async (later, read) => {
         if (later.revision < earlier.revision) {
           throw new HistoryError("invalid-scope", "The later version precedes the earlier one");
         }
 
-        const log = await intervalLog(later, earlier.revision, read, this.limits);
-        const commits = commitsAfter(log.transactions, earlier.revision, read, this.limits);
+        const log = await interval_log(later, earlier.revision, read, this.limits);
+        const commits = commits_after(log.transactions, earlier.revision, read, this.limits);
         const tracked = { logComplete: log.complete, request };
 
-        const byPage = await this.pageInputs(earlier, readEarlier, later, read);
-        if (!byPage) {
-          return this.withRebuiltVersion(earlier, readEarlier, signal, false, (before) =>
-            this.withRebuiltVersion(later, read, signal, false, (after) =>
+        const by_page = await this.page_inputs(earlier, read_earlier, later, read);
+        if (!by_page) {
+          return this.with_rebuilt_version(earlier, read_earlier, signal, false, (before) =>
+            this.with_rebuilt_version(later, read, signal, false, (after) =>
               diffStores({ ...tracked, before: before.store, after: after.store, commits }),
             ),
           );
         }
 
         const state = await trackLog(
-          manifestShapes(byPage.earlier),
-          manifestShapes(byPage.later),
+          manifestShapes(by_page.earlier),
+          manifestShapes(by_page.later),
           commits,
           request,
         );
         try {
-          return await this.diffByPage(
+          return await this.diff_by_page(
             state,
-            byPage,
-            { version: earlier, read: readEarlier },
+            by_page,
+            { version: earlier, read: read_earlier },
             { version: later, read },
             tracked,
           );
@@ -1032,7 +1045,7 @@ export class HistoryArchive {
    * that can differ; see `selectPages`. When too many pages differ, the whole
    * versions are compared under the same log.
    */
-  private async diffByPage(
+  private async diff_by_page(
     state: Tracking,
     inputs: PageInputs,
     earlier: LeasedVersion,
@@ -1049,16 +1062,16 @@ export class HistoryArchive {
     );
 
     if (!selection) {
-      return this.withRebuiltVersion(earlier.version, earlier.read, signal, false, (before) =>
-        this.withRebuiltVersion(later.version, later.read, signal, false, (after) =>
+      return this.with_rebuilt_version(earlier.version, earlier.read, signal, false, (before) =>
+        this.with_rebuilt_version(later.version, later.read, signal, false, (after) =>
           diffTracked(state, { ...tracked, before: before.store, after: after.store }),
         ),
       );
     }
 
-    const before = await this.sparseVersion(inputs.earlier, selection.earlier, earlier, signal);
+    const before = await this.sparse_version(inputs.earlier, selection.earlier, earlier, signal);
     try {
-      const after = await this.sparseVersion(inputs.later, selection.later, later, signal);
+      const after = await this.sparse_version(inputs.later, selection.later, later, signal);
       try {
         const page = diffTracked(state, { ...tracked, before: before.store, after: after.store });
         await this.calculate(page, "before", before.store, earlier, signal);
@@ -1078,34 +1091,34 @@ export class HistoryArchive {
    * holds an operation that a compare by page cannot follow; the versions are
    * then compared whole.
    */
-  private async pageInputs(
+  private async page_inputs(
     earlier: HistoryVersion,
-    readEarlier: HistoryRecordReader,
+    read_earlier: HistoryRecordReader,
     later: HistoryVersion,
     read: HistoryRecordReader,
   ): Promise<PageInputs | undefined> {
-    const earlierWrites = await this.tailWrites(earlier.tail, readEarlier);
-    const laterWrites = earlierWrites && (await this.tailWrites(later.tail, read));
-    if (!earlierWrites || !laterWrites) {
+    const earlier_writes = await this.tail_writes(earlier.tail, read_earlier);
+    const later_writes = earlier_writes && (await this.tail_writes(later.tail, read));
+    if (!earlier_writes || !later_writes) {
       return undefined;
     }
 
     return {
-      earlier: await this.manifestOf(earlier, readEarlier),
-      later: await this.manifestOf(later, read),
-      earlierWrites,
-      laterWrites,
+      earlier: await this.manifest_of(earlier, read_earlier),
+      later: await this.manifest_of(later, read),
+      earlierWrites: earlier_writes,
+      laterWrites: later_writes,
     };
   }
 
   /** The cells a log tail writes, or `undefined` when it holds an operation a compare by page cannot follow. */
-  private async tailWrites(
+  private async tail_writes(
     tail: readonly string[],
     read: HistoryRecordReader,
   ): Promise<TailWrites | undefined> {
     const writes: TailWrites = new Map();
     for (const id of tail) {
-      const commit = await readCommit(id, read, this.limits);
+      const commit = await read_commit(id, read, this.limits);
       if (!addTailWrites(writes, commit.operations)) {
         return undefined;
       }
@@ -1115,12 +1128,12 @@ export class HistoryArchive {
   }
 
   /** Read a leased version's checkpoint manifest and check that it belongs to this document. */
-  private async manifestOf(
+  private async manifest_of(
     version: HistoryVersion,
     read: HistoryRecordReader,
   ): Promise<CheckpointManifest> {
     const manifest = await readCheckpointManifest(version.checkpoint, read, this.limits);
-    if (manifest.documentId !== this.documentId) {
+    if (manifest.documentId !== this.document_id) {
       throw new HistoryError("integrity", "History checkpoint belongs to another document");
     }
 
@@ -1128,7 +1141,7 @@ export class HistoryArchive {
   }
 
   /** Rebuild a version from only the cell pages in `pages`; other cells are empty. */
-  private async sparseVersion(
+  private async sparse_version(
     manifest: CheckpointManifest,
     pages: ReadonlyArray<ReadonlySet<string>>,
     { version, read }: LeasedVersion,
@@ -1136,7 +1149,7 @@ export class HistoryArchive {
   ): Promise<RebuiltVersion> {
     const checkpoint = await readCheckpointCells(manifest, read, this.limits, selectedPages(pages));
 
-    return rebuildVersion(checkpoint, version.tail, read, this.limits, signal);
+    return rebuild_version(checkpoint, version.tail, read, this.limits, signal);
   }
 
   /**
@@ -1156,7 +1169,7 @@ export class HistoryArchive {
       return;
     }
 
-    await this.withRebuiltVersion(version, read, signal, false, ({ store }) => {
+    await this.with_rebuilt_version(version, read, signal, false, ({ store }) => {
       for (const { detail, sheet, row, col } of cells) {
         detail[side] = cellIn(store, sheet, row, col);
       }
@@ -1177,7 +1190,7 @@ export class HistoryArchive {
    * when it matches, else a new rebuild. With `keep`, a new rebuild replaces
    * the kept version.
    */
-  private withRebuiltVersion<T>(
+  private with_rebuilt_version<T>(
     version: HistoryVersion,
     read: HistoryRecordReader,
     signal: AbortSignal | undefined,
@@ -1188,8 +1201,8 @@ export class HistoryArchive {
       rebuiltKey(version.id, version.revision, version.checkpoint),
       keep,
       async () =>
-        rebuildVersion(
-          await this.checkpointOf(version, read),
+        rebuild_version(
+          await this.checkpoint_of(version, read),
           version.tail,
           read,
           this.limits,
@@ -1200,12 +1213,12 @@ export class HistoryArchive {
   }
 
   /** Read a leased version's checkpoint and check that it belongs to this document. */
-  private async checkpointOf(
+  private async checkpoint_of(
     version: HistoryVersion,
     read: HistoryRecordReader,
   ): Promise<CheckedSnapshot> {
     const checkpoint = await readCheckpoint(version.checkpoint, read, this.limits);
-    if (checkpoint.snapshot.documentId !== this.documentId) {
+    if (checkpoint.snapshot.documentId !== this.document_id) {
       throw new HistoryError("integrity", "History checkpoint belongs to another document");
     }
 
@@ -1213,7 +1226,7 @@ export class HistoryArchive {
   }
 
   /** Lease one version and pass it and a leased record reader to `use`. */
-  private async withPinnedVersion<T>(
+  private async with_pinned_version<T>(
     id: string,
     signal: AbortSignal | undefined,
     use: (version: HistoryVersion, read: HistoryRecordReader) => Promise<T>,
@@ -1230,21 +1243,23 @@ export class HistoryArchive {
 
     try {
       // The current document is leased by the same storage transaction that reads its head.
-      const head = id === "head" ? manifestResponse(leased).head : undefined;
+      const head = id === "head" ? manifest_response(leased).head : undefined;
       const version: HistoryVersion = head
         ? { ...head, id, kind: "automatic", authorId: "" }
-        : versionResponse(await this.storage.get({ ...this.request(signal), kind: "version", id }));
+        : version_response(
+            await this.storage.get({ ...this.request(signal), kind: "version", id }),
+          );
 
-      const maxReadBytes = this.limits.maxSnapshotBytes + this.limits.maxTransactionBytes;
-      let readBytes = 0;
+      const max_read_bytes = this.limits.maxSnapshotBytes + this.limits.maxTransactionBytes;
+      let read_bytes = 0;
 
-      const read = async (recordId: string): Promise<HistoryStoredRecord> => {
+      const read = async (record_id: string): Promise<HistoryStoredRecord> => {
         checkAbort(signal);
 
         const stored = await this.storage.get({
           ...this.request(signal),
           kind: "record",
-          id: recordId,
+          id: record_id,
           maxBytes: this.limits.maxSnapshotBytes,
           pin: token,
         });
@@ -1253,8 +1268,8 @@ export class HistoryArchive {
           throw new HistoryError("integrity", "History adapter returned an invalid record");
         }
 
-        readBytes += stored.decodedBytes;
-        if (readBytes > maxReadBytes) {
+        read_bytes += stored.decodedBytes;
+        if (read_bytes > max_read_bytes) {
           throw new HistoryError("capacity", "History replay exceeds its input reservation");
         }
 
@@ -1270,7 +1285,7 @@ export class HistoryArchive {
   /** Retained bytes and counts, read from the manifest without fetching any payload. */
   async storageUsage(signal?: AbortSignal): Promise<HistoryStorageUsage> {
     const response = await this.storage.get({ ...this.request(signal), kind: "manifest" });
-    const manifest = manifestResponse(response);
+    const manifest = manifest_response(response);
 
     return {
       encodedBytes: manifest.encodedBytes,
@@ -1287,12 +1302,12 @@ export class HistoryArchive {
    */
   async prune(options: PruneOptions = {}): Promise<void> {
     return this.serialized(async () => {
-      const ageCeiling = (this.manifest.head?.time ?? 0) - this.limits.maxAgeMs;
+      const age_ceiling = (this.manifest.head?.time ?? 0) - this.limits.maxAgeMs;
 
       this.manifest = await this.storage.prune({
         ...this.request(options.signal),
         expectedGeneration: this.manifest.generation,
-        beforeTime: options.beforeTime ?? ageCeiling,
+        beforeTime: options.beforeTime ?? age_ceiling,
         targetBytes: options.targetBytes,
       });
       // A removed version can no longer be leased, so its rebuild would never be used.

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-const distRoot = resolve(import.meta.dir, "../docs/dist/client");
-const defaultPages = [
+const dist_root = resolve(import.meta.dir, "../docs/dist/client");
+const default_pages = [
   "index.html",
   "react/index.html",
   "svelte/index.html",
@@ -13,8 +13,8 @@ const defaultPages = [
   "test/framework-lifecycle/svelte/index.html",
   "test/framework-lifecycle/vue/index.html",
 ];
-const xlsxMarker = "sheetwrite-workbook-metadata-v1";
-const moduleScanner = new Bun.Transpiler({ loader: "js" });
+const xlsx_marker = "sheetwrite-workbook-metadata-v1";
+const module_scanner = new Bun.Transpiler({ loader: "js" });
 
 /**
  * The relative specifiers a built module imports, statically or lazily. The
@@ -25,7 +25,7 @@ export function relativeImports(
   content: string,
   kind: "import-statement" | "dynamic-import",
 ): string[] {
-  return moduleScanner
+  return module_scanner
     .scanImports(content)
     .filter((entry) => entry.kind === kind && entry.path.startsWith("."))
     .map((entry) => entry.path);
@@ -83,54 +83,54 @@ interface Page {
   readonly routers: ReadonlySet<string>;
 }
 
-async function readPage(relativePath: string): Promise<Page> {
-  const html = await readFile(join(distRoot, relativePath), "utf8");
+async function read_page(relative_path: string): Promise<Page> {
+  const html = await readFile(join(dist_root, relative_path), "utf8");
   const modules: string[] = [];
   for (const match of html.matchAll(
     /(?:src|component-url|renderer-url|href)=["'][^"']*?(assets\/[^"']+\.js)["']/g,
   )) {
-    if (match[1] !== undefined) modules.push(join(distRoot, match[1]));
+    if (match[1] !== undefined) modules.push(join(dist_root, match[1]));
   }
   const routers = new Set<string>();
   for (const match of html.matchAll(
     /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'][^"']*?(assets\/[^"']+\.js)["']/g,
   )) {
-    if (match[1] !== undefined) routers.add(join(distRoot, match[1]));
+    if (match[1] !== undefined) routers.add(join(dist_root, match[1]));
   }
-  if (routers.size === 0) throw new Error(`${relativePath} has no entry script`);
+  if (routers.size === 0) throw new Error(`${relative_path} has no entry script`);
   return { modules, routers };
 }
 
-function includesBackend(graph: ReadonlyMap<string, string>): boolean {
-  return [...graph.values()].some((content) => content.includes(xlsxMarker));
+function includes_backend(graph: ReadonlyMap<string, string>): boolean {
+  return [...graph.values()].some((content) => content.includes(xlsx_marker));
 }
 
 async function main(): Promise<void> {
-  const defaultEntrypoints = (
-    await Promise.all(defaultPages.map(async (page) => (await readPage(page)).modules))
+  const default_entrypoints = (
+    await Promise.all(default_pages.map(async (page) => (await read_page(page)).modules))
   ).flat();
-  const defaultGraph = await collectStaticGraph(defaultEntrypoints);
-  for (const [path, content] of defaultGraph) {
-    if (content.includes(xlsxMarker)) {
+  const default_graph = await collectStaticGraph(default_entrypoints);
+  for (const [path, content] of default_graph) {
+    if (content.includes(xlsx_marker)) {
       throw new Error(`Default example graph eagerly includes the XLSX backend through ${path}`);
     }
   }
 
-  const reactPage = await readPage("react/index.html");
-  const reactGraph = await collectStaticGraph(reactPage.modules);
-  if (!includesBackend(await collectLazyGraph(reactGraph, reactPage.routers))) {
+  const react_page = await read_page("react/index.html");
+  const react_graph = await collectStaticGraph(react_page.modules);
+  if (!includes_backend(await collectLazyGraph(react_graph, react_page.routers))) {
     throw new Error("React workbook XLSX action cannot reach the backend through a lazy import");
   }
 
-  const xlsxPage = await readPage("test/xlsx/index.html");
-  const xlsxGraph = await collectStaticGraph(xlsxPage.modules);
-  const xlsxLazyGraph = await collectLazyGraph(xlsxGraph, xlsxPage.routers);
-  if (!includesBackend(xlsxGraph) && !includesBackend(xlsxLazyGraph)) {
+  const xlsx_page = await read_page("test/xlsx/index.html");
+  const xlsx_graph = await collectStaticGraph(xlsx_page.modules);
+  const xlsx_lazy_graph = await collectLazyGraph(xlsx_graph, xlsx_page.routers);
+  if (!includes_backend(xlsx_graph) && !includes_backend(xlsx_lazy_graph)) {
     throw new Error("Dedicated XLSX route cannot load the concrete workbook backend");
   }
 
   console.log(
-    `Example XLSX isolation passed (${defaultGraph.size} default chunks, ${xlsxGraph.size + xlsxLazyGraph.size} XLSX chunks)`,
+    `Example XLSX isolation passed (${default_graph.size} default chunks, ${xlsx_graph.size + xlsx_lazy_graph.size} XLSX chunks)`,
   );
 }
 

@@ -56,7 +56,7 @@ function workbook(id: string, sheet: SheetSnapshot): WorkbookSnapshot {
   };
 }
 
-function scalarSheet(rows: number): SheetSnapshot {
+function scalar_sheet(rows: number): SheetSnapshot {
   const cells = new Array<SnapshotCell>(rows * 8);
   let index = 0;
   for (let row = 0; row < rows; row++) {
@@ -108,7 +108,7 @@ function scalarSheet(rows: number): SheetSnapshot {
   };
 }
 
-function richSheet(rows: number): SheetSnapshot {
+function rich_sheet(rows: number): SheetSnapshot {
   const cells = new Array<SnapshotCell>(rows * 8);
   const notes: NonNullable<SheetSnapshot["notes"]> = [];
   let index = 0;
@@ -155,7 +155,7 @@ function richSheet(rows: number): SheetSnapshot {
   };
 }
 
-function sharedStyleSheet(rows: number): SheetSnapshot {
+function shared_style_sheet(rows: number): SheetSnapshot {
   const cells = new Array<SnapshotCell>(rows * 8);
   let index = 0;
   for (let row = 0; row < rows; row++) {
@@ -178,10 +178,10 @@ function sharedStyleSheet(rows: number): SheetSnapshot {
   };
 }
 
-function sparseSheet(cellCount: number): SheetSnapshot {
-  const cells = new Array<SnapshotCell>(cellCount);
-  for (let index = 0; index < cellCount; index++) {
-    const row = Math.floor((index * 999_983) / Math.max(1, cellCount - 1));
+function sparse_sheet(cell_count: number): SheetSnapshot {
+  const cells = new Array<SnapshotCell>(cell_count);
+  for (let index = 0; index < cell_count; index++) {
+    const row = Math.floor((index * 999_983) / Math.max(1, cell_count - 1));
     const col = (index * 29) % 4;
     cells[index] = {
       rowOffset: row,
@@ -200,28 +200,28 @@ function sparseSheet(cellCount: number): SheetSnapshot {
   };
 }
 
-function orderedSheet(sheet: SheetSnapshot, order: number): SheetSnapshot {
+function ordered_sheet(sheet: SheetSnapshot, order: number): SheetSnapshot {
   return { ...sheet, order };
 }
 
 export function createXlsxCorpus(mode: XlsxCorpusMode): XlsxCorpus {
-  const scalarRows = mode === "smoke" ? 250 : 10_000;
-  const richRows = mode === "smoke" ? 125 : 5_000;
-  const sharedRows = mode === "smoke" ? 250 : 10_000;
-  const sparseCells = mode === "smoke" ? 100 : 2_000;
-  const scalar = workbook("scalar", scalarSheet(scalarRows));
-  const rich = workbook("rich", richSheet(richRows));
-  const sharedStyle = workbook("shared-style", sharedStyleSheet(sharedRows));
-  const sparse = workbook("sparse", sparseSheet(sparseCells));
+  const scalar_rows = mode === "smoke" ? 250 : 10_000;
+  const rich_rows = mode === "smoke" ? 125 : 5_000;
+  const shared_rows = mode === "smoke" ? 250 : 10_000;
+  const sparse_cells = mode === "smoke" ? 100 : 2_000;
+  const scalar = workbook("scalar", scalar_sheet(scalar_rows));
+  const rich = workbook("rich", rich_sheet(rich_rows));
+  const shared_style = workbook("shared-style", shared_style_sheet(shared_rows));
+  const sparse = workbook("sparse", sparse_sheet(sparse_cells));
   const sheets = [
-    orderedSheet(scalar.sheets[0]!, 0),
-    orderedSheet(rich.sheets[0]!, 1),
-    orderedSheet(sharedStyle.sheets[0]!, 2),
-    orderedSheet(sparse.sheets[0]!, 3),
+    ordered_sheet(scalar.sheets[0]!, 0),
+    ordered_sheet(rich.sheets[0]!, 1),
+    ordered_sheet(shared_style.sheets[0]!, 2),
+    ordered_sheet(sparse.sheets[0]!, 3),
   ];
   return {
     mode,
-    scenarios: { scalar, rich, "shared-style": sharedStyle, sparse },
+    scenarios: { scalar, rich, "shared-style": shared_style, sparse },
     combined: {
       schemaVersion: 1,
       documentId: `xlsx-benchmark-combined-${mode}`,

@@ -7,8 +7,8 @@ import { createSignal } from "solid-js";
  * where they render (never destructure them).
  */
 function useAction(): ActionGuard & ActionState {
-  const [state, setState] = createSignal<ActionState>({ pending: false, error: null });
-  const { run, clearError } = createActionGuard(setState);
+  const [state, set_state] = createSignal<ActionState>({ pending: false, error: null });
+  const { run, clearError: clear_error } = createActionGuard(set_state);
   return {
     get pending() {
       return state().pending;
@@ -20,7 +20,7 @@ function useAction(): ActionGuard & ActionState {
       return state();
     },
     run,
-    clearError,
+    clearError: clear_error,
   };
 }
 

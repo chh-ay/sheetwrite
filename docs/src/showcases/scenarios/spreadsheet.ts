@@ -131,7 +131,7 @@ const style = (
 });
 
 /** One order per row; deterministic so tests and screenshots are stable. */
-function salesOrder(index: number) {
+function sales_order(index: number) {
   const product = PRODUCTS[(index * 3) % PRODUCTS.length] ?? PRODUCTS[0];
   return {
     serial: FIRST_ORDER_SERIAL + index * DAYS_BETWEEN_ORDERS,
@@ -146,14 +146,14 @@ function salesOrder(index: number) {
 /** Every value, formula and style both sheets start with, as one transaction. */
 export function salesOperations(): DocumentOp[] {
   const ops: DocumentOp[] = [];
-  const lastSalesRow = SALES_ROWS + 1;
+  const last_sales_row = SALES_ROWS + 1;
 
   ["Date", "Region", "Rep", "Product", "Units", "Unit price", "Revenue"].forEach((title, col) =>
     ops.push(literal(SALES_SHEET, 0, col, title)),
   );
   for (let index = 0; index < SALES_ROWS; index += 1) {
     const row = index + 1;
-    const order = salesOrder(index);
+    const order = sales_order(index);
     ops.push(
       literal(SALES_SHEET, row, 0, order.serial),
       literal(SALES_SHEET, row, 1, order.region),
@@ -171,8 +171,8 @@ export function salesOperations(): DocumentOp[] {
     style(SALES_SHEET, [1, SALES_ROWS], [5, 6], { numberFormat: CURRENCY }),
   );
 
-  const regions = `Sales!$B$2:$B$${lastSalesRow}`;
-  const totalRow = REGIONS.length + 1;
+  const regions = `Sales!$B$2:$B$${last_sales_row}`;
+  const total_row = REGIONS.length + 1;
   ["Region", "Units", "Revenue", "Share"].forEach((title, col) =>
     ops.push(literal(SUMMARY_SHEET, 0, col, title)),
   );
@@ -181,20 +181,20 @@ export function salesOperations(): DocumentOp[] {
     const cell = row + 1;
     ops.push(
       literal(SUMMARY_SHEET, row, 0, region),
-      formula(SUMMARY_SHEET, row, 1, `=SUMIF(${regions},A${cell},Sales!$E$2:$E$${lastSalesRow})`),
-      formula(SUMMARY_SHEET, row, 2, `=SUMIF(${regions},A${cell},Sales!$G$2:$G$${lastSalesRow})`),
-      formula(SUMMARY_SHEET, row, 3, `=C${cell}/$C$${totalRow + 1}`),
+      formula(SUMMARY_SHEET, row, 1, `=SUMIF(${regions},A${cell},Sales!$E$2:$E$${last_sales_row})`),
+      formula(SUMMARY_SHEET, row, 2, `=SUMIF(${regions},A${cell},Sales!$G$2:$G$${last_sales_row})`),
+      formula(SUMMARY_SHEET, row, 3, `=C${cell}/$C$${total_row + 1}`),
     );
   });
   ops.push(
-    literal(SUMMARY_SHEET, totalRow, 0, "Total"),
-    formula(SUMMARY_SHEET, totalRow, 1, `=SUM(B2:B${totalRow})`),
-    formula(SUMMARY_SHEET, totalRow, 2, `=SUM(C2:C${totalRow})`),
-    formula(SUMMARY_SHEET, totalRow, 3, `=SUM(D2:D${totalRow})`),
+    literal(SUMMARY_SHEET, total_row, 0, "Total"),
+    formula(SUMMARY_SHEET, total_row, 1, `=SUM(B2:B${total_row})`),
+    formula(SUMMARY_SHEET, total_row, 2, `=SUM(C2:C${total_row})`),
+    formula(SUMMARY_SHEET, total_row, 3, `=SUM(D2:D${total_row})`),
     style(SUMMARY_SHEET, [0, 0], [0, 3], HEADER_STYLE),
-    style(SUMMARY_SHEET, [1, totalRow], [2, 2], { numberFormat: CURRENCY }),
-    style(SUMMARY_SHEET, [1, totalRow], [3, 3], { numberFormat: SHARE }),
-    style(SUMMARY_SHEET, [totalRow, totalRow], [0, 3], TOTAL_STYLE),
+    style(SUMMARY_SHEET, [1, total_row], [2, 2], { numberFormat: CURRENCY }),
+    style(SUMMARY_SHEET, [1, total_row], [3, 3], { numberFormat: SHARE }),
+    style(SUMMARY_SHEET, [total_row, total_row], [0, 3], TOTAL_STYLE),
   );
   return ops;
 }
@@ -227,7 +227,7 @@ const TARGETS_QUERY: SavedQuery = {
 };
 
 /** Saves and runs the targets query through the grid's query session. */
-async function loadTargets(session: QuerySession): Promise<void> {
+async function load_targets(session: QuerySession): Promise<void> {
   const defined = session.define(TARGETS_QUERY);
   if (defined.status !== "applied")
     throw new Error(`The targets query was not saved: ${defined.status}`);
@@ -255,8 +255,9 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     // The query package is a separate chunk; its engine and WASM load once
     // this page's grid exists. Only this grid gets a source, so other pages'
     // grids have no query session.
-    const { queriesAddon, querySessionOf } = await import("@sheetwrite/queries");
-    await initSheetwrite({ addons: [queriesAddon()] });
+    const { queriesAddon: queries_addon, querySessionOf: query_session_of } =
+      await import("@sheetwrite/queries");
+    await initSheetwrite({ addons: [queries_addon()] });
     if (disposed) return;
     shell = createSpreadsheetShell(host, {
       ribbon: { mode: "auto" },
@@ -283,17 +284,17 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     if (result.status !== "applied")
       throw new Error(`The sales workbook did not load: ${result.status}`);
     shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
-    await loadTargets(await querySessionOf(shell.grid));
+    await load_targets(await query_session_of(shell.grid));
   })();
 
-  const stopTheme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
+  const stop_theme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
 
   return {
     ready,
     grid: () => shell?.grid ?? null,
     dispose() {
       disposed = true;
-      stopTheme();
+      stop_theme();
       shell?.destroy();
       shell = null;
     },

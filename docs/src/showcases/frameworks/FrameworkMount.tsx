@@ -24,14 +24,14 @@ export function FrameworkMount(props: FrameworkMountProps) {
   onMount(() => {
     let disposed = false;
     let unmount: (() => void) | undefined;
-    const stopWaiting = whenNearViewport(host, () => {
+    const stop_waiting = whenNearViewport(host, () => {
       void props.load().then((mount) => {
         if (!disposed) unmount = mount(host);
       });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       unmount?.();
     });
   });
@@ -51,7 +51,11 @@ export function VueWorkbenchIsland() {
   return (
     <FrameworkMount
       framework="vue"
-      load={() => import("./vue/mount.js").then(({ mountVueWorkbench }) => mountVueWorkbench)}
+      load={() =>
+        import("./vue/mount.js").then(
+          ({ mountVueWorkbench: mount_vue_workbench }) => mount_vue_workbench,
+        )
+      }
     />
   );
 }
@@ -62,7 +66,9 @@ export function SvelteWorkbenchIsland() {
     <FrameworkMount
       framework="svelte"
       load={() =>
-        import("./svelte/mount.js").then(({ mountSvelteWorkbench }) => mountSvelteWorkbench)
+        import("./svelte/mount.js").then(
+          ({ mountSvelteWorkbench: mount_svelte_workbench }) => mount_svelte_workbench,
+        )
       }
     />
   );
@@ -73,7 +79,11 @@ export function ReactWorkbenchIsland() {
   return (
     <FrameworkMount
       framework="react"
-      load={() => import("./react/mount.js").then(({ mountReactWorkbench }) => mountReactWorkbench)}
+      load={() =>
+        import("./react/mount.js").then(
+          ({ mountReactWorkbench: mount_react_workbench }) => mount_react_workbench,
+        )
+      }
     />
   );
 }

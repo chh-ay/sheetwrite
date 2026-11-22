@@ -9,7 +9,7 @@ const rect = { x: 20, y: 30, w: 120, h: 28 };
 const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 0 } };
 const regions = ["North", "South", "East", "West", "North-East", "South-West"];
 
-function listRule(): DataValidationRule {
+function list_rule(): DataValidationRule {
   return {
     id: "region",
     range,
@@ -24,8 +24,8 @@ function host(): HTMLDivElement {
   return element;
 }
 
-function press(target: Element | null, key: string, shiftKey = false): void {
-  target?.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true }));
+function press(target: Element | null, key: string, shift_key = false): void {
+  target?.dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey: shift_key, bubbles: true }));
 }
 
 function type(input: HTMLInputElement, text: string): void {
@@ -33,7 +33,7 @@ function type(input: HTMLInputElement, text: string): void {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function shownItems(): string[] {
+function shown_items(): string[] {
   return [...document.querySelectorAll('[role="option"]')].map(
     (option) => option.textContent ?? "",
   );
@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe("ValidationEditor", () => {
-  function openList(fields: Partial<BeginValidationEditOptions> = {}) {
+  function open_list(fields: Partial<BeginValidationEditOptions> = {}) {
     const editor = new ValidationEditor(host());
     const commits: Array<{ value: CellScalar; navigate: string }> = [];
     const texts: Array<{ text: string; navigate: string }> = [];
@@ -52,7 +52,7 @@ describe("ValidationEditor", () => {
     editor.begin({
       row: 0,
       col: 0,
-      rule: listRule(),
+      rule: list_rule(),
       values: regions,
       current: "East",
       filter: "",
@@ -71,23 +71,23 @@ describe("ValidationEditor", () => {
   }
 
   it("starts on the cell's value and stores the text when no item is highlighted", () => {
-    let list = openList();
-    expect(shownItems()).toEqual(regions);
+    let list = open_list();
+    expect(shown_items()).toEqual(regions);
     const active = list.input.getAttribute("aria-activedescendant") ?? "";
     expect(document.getElementById(active)?.textContent).toBe("East");
     press(list.input, "Tab");
     expect(list.commits).toEqual([{ value: "East", navigate: "right" }]);
 
-    list = openList({ filter: "west" });
+    list = open_list({ filter: "west" });
     press(list.input, "Enter");
     expect(list.commits).toEqual([{ value: "West", navigate: "down" }]);
 
-    list = openList({ filter: "Nowhere" });
-    expect(shownItems()).toEqual([]);
+    list = open_list({ filter: "Nowhere" });
+    expect(shown_items()).toEqual([]);
     press(list.input, "Enter", true);
     expect(list.texts).toEqual([{ text: "Nowhere", navigate: "up" }]);
 
-    list = openList();
+    list = open_list();
     press(list.input, "Escape");
     expect(list.cancels()).toBe(1);
     expect(list.commits).toEqual([]);
@@ -96,7 +96,7 @@ describe("ValidationEditor", () => {
 
   // #1095: Excel keeps the cell's value in sight while its list is open.
   it("leaves the cell in sight when opened without typing, until the first typed text", () => {
-    const { editor, input } = openList();
+    const { editor, input } = open_list();
     const box = input.parentElement;
     const current = document.querySelector('[role="option"][aria-selected="true"]');
     // Nothing covers the cell: the list opens below it, its own value highlighted.
@@ -110,7 +110,7 @@ describe("ValidationEditor", () => {
     expectSame(input.parentElement, box);
     expect(box?.style.top).toBe(`${rect.y}px`);
     expect(input.style.height).toBe(`${rect.h}px`);
-    expect(shownItems()).toEqual(["South", "East", "West", "North-East", "South-West"]);
+    expect(shown_items()).toEqual(["South", "East", "West", "North-East", "South-West"]);
     editor.destroy();
   });
 

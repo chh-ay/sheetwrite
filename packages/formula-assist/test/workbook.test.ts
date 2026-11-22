@@ -54,9 +54,9 @@ function workbook(...sheets: SheetSnapshot[]): SheetwriteStore {
   });
 }
 
-function set(store: SheetwriteStore, sheetId: string, row: number, value: CellValue): void {
+function set(store: SheetwriteStore, sheet_id: string, row: number, value: CellValue): void {
   store.applyTransaction({
-    patches: [{ op: "set", addr: { sheet: sheetId, row, col: 0 }, value }],
+    patches: [{ op: "set", addr: { sheet: sheet_id, row, col: 0 }, value }],
   });
 }
 

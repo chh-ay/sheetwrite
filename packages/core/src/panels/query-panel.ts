@@ -43,17 +43,17 @@ const SAVED = "Query saved.";
 const KEPT_IN_FILE =
   "It stays in the file unchanged while the saved queries are not edited; a change to the saved queries drops it on the next XLSX save.";
 
-function button(label: string, run: () => void, focusKey?: string): HTMLButtonElement {
+function button(label: string, run: () => void, focus_key?: string): HTMLButtonElement {
   const control = document.createElement("button");
   control.type = "button";
   control.className = "sheetwrite-panel-control";
   control.textContent = label;
-  if (focusKey !== undefined) control.dataset.focusKey = focusKey;
+  if (focus_key !== undefined) control.dataset.focusKey = focus_key;
   control.addEventListener("click", run);
   return control;
 }
 
-function textInput(value = ""): HTMLInputElement {
+function text_input(value = ""): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "text";
   input.autocomplete = "off";
@@ -76,11 +76,11 @@ interface StepRow {
   readonly error: HTMLParagraphElement;
 }
 
-function savedQueries(grid: Grid): readonly SavedQuery[] {
+function saved_queries(grid: Grid): readonly SavedQuery[] {
   return grid.store.getWorkbook().queries ?? [];
 }
 
-function outputText(grid: Grid, query: SavedQuery): string {
+function output_text(grid: Grid, query: SavedQuery): string {
   const output = query.output;
   if (output === undefined) return "Connection only";
   const sheets = grid.store.getWorkbook().sheets;
@@ -100,86 +100,86 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
       const status = note();
       status.setAttribute("role", "status");
       const cancel = button("Cancel refresh", () => void toggleQueryRefresh(grid, null));
-      const refreshAll = button("Refresh All", () => refresh(null), "refresh-all");
-      const statusSection = panelSection("Refresh");
-      statusSection.append(refreshAll, cancel, status);
+      const refresh_all = button("Refresh All", () => refresh(null), "refresh-all");
+      const status_section = panelSection("Refresh");
+      status_section.append(refresh_all, cancel, status);
 
       const list = panelSection("Queries");
       const entries = document.createElement("div");
       list.append(entries);
 
       const kept = panelSection("Kept from the file");
-      const keptEntries = document.createElement("div");
-      kept.append(keptEntries);
+      const kept_entries = document.createElement("div");
+      kept.append(kept_entries);
       kept.hidden = true;
 
       const editor = panelSection("Query");
       const form = document.createElement("form");
-      const name = panelField("Name", textInput(), "query-name");
+      const name = panelField("Name", text_input(), "query-name");
       const kind = panelField("Source", selectOf(SOURCE_KINDS, "csv"), "query-source-kind");
-      const sourceId = panelField("Source ID", textInput(), "query-source-id");
-      const locator = panelField("Address (public, no credentials)", textInput(), "query-locator");
-      const columnsArea = document.createElement("textarea");
-      columnsArea.rows = 4;
-      columnsArea.className = "sheetwrite-panel-control";
-      columnsArea.dataset.focusKey = "query-columns";
-      columnsArea.placeholder = "Region: text\nTotal: number";
-      const columnsLabel = document.createElement("label");
-      columnsLabel.className = "sheetwrite-panel-field";
-      const columnsTitle = document.createElement("span");
-      columnsTitle.className = "sheetwrite-panel-label";
-      columnsTitle.textContent = "Columns (Name: type, one per line)";
-      const columnsError = note();
-      columnsLabel.append(columnsTitle, columnsArea, columnsError);
+      const source_id = panelField("Source ID", text_input(), "query-source-id");
+      const locator = panelField("Address (public, no credentials)", text_input(), "query-locator");
+      const columns_area = document.createElement("textarea");
+      columns_area.rows = 4;
+      columns_area.className = "sheetwrite-panel-control";
+      columns_area.dataset.focusKey = "query-columns";
+      columns_area.placeholder = "Region: text\nTotal: number";
+      const columns_label = document.createElement("label");
+      columns_label.className = "sheetwrite-panel-field";
+      const columns_title = document.createElement("span");
+      columns_title.className = "sheetwrite-panel-label";
+      columns_title.textContent = "Columns (Name: type, one per line)";
+      const columns_error = note();
+      columns_label.append(columns_title, columns_area, columns_error);
 
-      const stepsList = document.createElement("ol");
-      stepsList.className = "sheetwrite-query-steps";
-      const stepsLabel = note("Steps run in order. Name columns as they are before each step.");
-      const addStep = button("Add step", () => appendStep("filter", ""), "query-add-step");
+      const steps_list = document.createElement("ol");
+      steps_list.className = "sheetwrite-query-steps";
+      const steps_label = note("Steps run in order. Name columns as they are before each step.");
+      const add_step = button("Add step", () => append_step("filter", ""), "query-add-step");
 
       const load = document.createElement("input");
       load.type = "checkbox";
       load.checked = true;
       load.dataset.focusKey = "query-load";
-      const loadLabel = document.createElement("label");
-      loadLabel.className = "sheetwrite-panel-check";
-      loadLabel.append(load, "Load to a table");
-      const tableName = panelField("Table name", textInput(), "query-table-name");
-      const anchor = panelField("Top-left cell", textInput("A1"), "query-anchor");
+      const load_label = document.createElement("label");
+      load_label.className = "sheetwrite-panel-check";
+      load_label.append(load, "Load to a table");
+      const table_name = panelField("Table name", text_input(), "query-table-name");
+      const anchor = panelField("Top-left cell", text_input("A1"), "query-anchor");
 
       const save = document.createElement("button");
       save.type = "submit";
       save.className = "sheetwrite-panel-control";
       save.textContent = "Save";
       save.dataset.focusKey = "query-save";
-      const formError = note();
-      formError.setAttribute("role", "alert");
+      const form_error = note();
+      form_error.setAttribute("role", "alert");
       form.append(
         name.element,
         kind.element,
-        sourceId.element,
+        source_id.element,
         locator.element,
-        columnsLabel,
-        stepsLabel,
-        stepsList,
-        addStep,
-        loadLabel,
-        tableName.element,
+        columns_label,
+        steps_label,
+        steps_list,
+        add_step,
+        load_label,
+        table_name.element,
         anchor.element,
         save,
         button("New query", () => edit(undefined), "query-new"),
-        formError,
+        form_error,
       );
       editor.append(form);
-      body.append(statusSection, list, kept, editor);
+      body.append(status_section, list, kept, editor);
 
       let editing: SavedQuery | undefined;
       let rows: StepRow[] = [];
 
-      const showStatus = (): void => {
+      const show_status = (): void => {
         const running = queryRefreshRunning(grid);
         cancel.hidden = !running;
-        refreshAll.hidden = running;
+        refresh_all.hidden = running;
         if (running) status.textContent = REFRESHING;
       };
 
@@ -190,36 +190,36 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         });
       };
 
-      const appendStep = (stepKind: StepKind, text: string): void => {
+      const append_step = (step_kind: StepKind, text: string): void => {
         const item = document.createElement("li");
-        const kindSelect = selectOf(
+        const kind_select = selectOf(
           STEP_KINDS.map(([value, label]) => [value, label] as const),
-          stepKind,
+          step_kind,
         );
-        kindSelect.className = "sheetwrite-panel-control";
-        kindSelect.setAttribute("aria-label", "Step kind");
-        const input = textInput(text);
+        kind_select.className = "sheetwrite-panel-control";
+        kind_select.setAttribute("aria-label", "Step kind");
+        const input = text_input(text);
         input.className = "sheetwrite-panel-control";
         input.setAttribute("aria-label", "Step");
         const hint = (): void => {
-          input.placeholder = STEP_KINDS.find(([value]) => value === kindSelect.value)?.[2] ?? "";
+          input.placeholder = STEP_KINDS.find(([value]) => value === kind_select.value)?.[2] ?? "";
         };
-        kindSelect.addEventListener("change", hint);
+        kind_select.addEventListener("change", hint);
         hint();
         const error = note();
-        const row: StepRow = { kind: kindSelect, text: input, error };
+        const row: StepRow = { kind: kind_select, text: input, error };
         const move = (offset: number): void => {
           const index = rows.indexOf(row);
           const target = index + offset;
           if (target < 0 || target >= rows.length) return;
           rows.splice(index, 1);
           rows.splice(target, 0, row);
-          const sibling = stepsList.children[offset < 0 ? target : target + 1] ?? null;
-          stepsList.insertBefore(item, sibling);
+          const sibling = steps_list.children[offset < 0 ? target : target + 1] ?? null;
+          steps_list.insertBefore(item, sibling);
           input.focus();
         };
         item.append(
-          kindSelect,
+          kind_select,
           input,
           button("Move up", () => move(-1)),
           button("Move down", () => move(1)),
@@ -230,33 +230,33 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
           error,
         );
         rows.push(row);
-        stepsList.append(item);
+        steps_list.append(item);
       };
 
       const edit = (query: SavedQuery | undefined): void => {
         editing = query;
-        formError.textContent = "";
-        columnsError.textContent = "";
+        form_error.textContent = "";
+        columns_error.textContent = "";
         name.setError(null);
-        sourceId.setError(null);
-        tableName.setError(null);
+        source_id.setError(null);
+        table_name.setError(null);
         anchor.setError(null);
         name.control.value = query?.name ?? "";
         kind.control.value = query?.source.kind ?? "csv";
-        sourceId.control.value = query?.source.sourceId ?? "";
+        source_id.control.value = query?.source.sourceId ?? "";
         locator.control.value =
           query !== undefined && query.source.kind !== "host" ? (query.source.locator ?? "") : "";
-        columnsArea.value = query === undefined ? "" : sourceColumnsText(query.source.columns);
-        stepsList.replaceChildren();
+        columns_area.value = query === undefined ? "" : sourceColumnsText(query.source.columns);
+        steps_list.replaceChildren();
         rows = [];
         if (query !== undefined) {
-          const queries = savedQueries(grid);
+          const queries = saved_queries(grid);
           query.steps.forEach((step, index) => {
-            appendStep(step.kind, stepText(step, columnsAfter(query, queries, index), queries));
+            append_step(step.kind, stepText(step, columnsAfter(query, queries, index), queries));
           });
         }
         load.checked = query === undefined || query.output !== undefined;
-        tableName.control.value = query?.output?.tableName ?? "";
+        table_name.control.value = query?.output?.tableName ?? "";
         const sheets = grid.store.getWorkbook().sheets;
         const output = query?.output;
         anchor.control.value =
@@ -270,42 +270,42 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         name.control.focus();
       };
 
-      const syncKind = (): void => {
+      const sync_kind = (): void => {
         locator.element.hidden = kind.control.value === "host";
       };
-      kind.control.addEventListener("change", syncKind);
-      const syncLoad = (): void => {
-        tableName.element.hidden = !load.checked;
+      kind.control.addEventListener("change", sync_kind);
+      const sync_load = (): void => {
+        table_name.element.hidden = !load.checked;
         anchor.element.hidden = !load.checked;
       };
-      load.addEventListener("change", syncLoad);
+      load.addEventListener("change", sync_load);
 
       /** Builds the definition from the form, or shows why it cannot. */
       const definition = (): SavedQuery | undefined => {
-        const queries = savedQueries(grid);
-        const queryName = name.control.value.trim();
-        name.setError(queryName === "" ? NO_NAME : null);
-        const id = sourceId.control.value.trim();
-        sourceId.setError(id === "" ? NO_SOURCE_ID : null);
-        const columns = parseSourceColumns(columnsArea.value, editing?.source.columns);
-        columnsError.textContent = "error" in columns ? columns.error : "";
-        if (queryName === "" || id === "" || "error" in columns) return undefined;
+        const queries = saved_queries(grid);
+        const query_name = name.control.value.trim();
+        name.setError(query_name === "" ? NO_NAME : null);
+        const id = source_id.control.value.trim();
+        source_id.setError(id === "" ? NO_SOURCE_ID : null);
+        const columns = parseSourceColumns(columns_area.value, editing?.source.columns);
+        columns_error.textContent = "error" in columns ? columns.error : "";
+        if (query_name === "" || id === "" || "error" in columns) return undefined;
 
-        const queryId =
-          editing?.id ?? freshId(queryName, new Set(queries.map((query) => query.id)));
+        const query_id =
+          editing?.id ?? freshId(query_name, new Set(queries.map((query) => query.id)));
         const address = locator.control.value.trim();
-        const sourceKind = SOURCE_KINDS.find(([value]) => value === kind.control.value)?.[0];
+        const source_kind = SOURCE_KINDS.find(([value]) => value === kind.control.value)?.[0];
         let source: SavedQuerySource;
-        if (sourceKind === "host" || sourceKind === undefined) {
+        if (source_kind === "host" || source_kind === undefined) {
           source = { kind: "host", sourceId: id, columns: columns.value };
         } else {
           // Options the form does not show stay as they were saved.
-          const previous = editing?.source.kind === sourceKind ? editing.source : undefined;
+          const previous = editing?.source.kind === source_kind ? editing.source : undefined;
           const options =
             previous === undefined ? {} : (({ locator: _locator, ...rest }) => rest)(previous);
           source = {
             ...options,
-            kind: sourceKind,
+            kind: source_kind,
             sourceId: id,
             columns: columns.value,
             ...(address === "" ? {} : { locator: address }),
@@ -313,14 +313,14 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         }
 
         const steps: QueryStep[] = [];
-        let schema: ModelColumn[] = columns.value.map(({ id: columnId, name: columnName }) => ({
-          id: columnId,
-          name: columnName,
+        let schema: ModelColumn[] = columns.value.map(({ id: column_id, name: column_name }) => ({
+          id: column_id,
+          name: column_name,
         }));
         let valid = true;
         for (const row of rows) {
-          const stepKind = STEP_KINDS.find(([value]) => value === row.kind.value)?.[0] ?? "filter";
-          const parsed = parseStep(stepKind, row.text.value, schema, queries, queryId);
+          const step_kind = STEP_KINDS.find(([value]) => value === row.kind.value)?.[0] ?? "filter";
+          const parsed = parseStep(step_kind, row.text.value, schema, queries, query_id);
           row.error.textContent = "error" in parsed ? parsed.error : "";
           if ("error" in parsed) {
             valid = false;
@@ -331,11 +331,11 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         }
         if (!valid) return undefined;
 
-        const base: SavedQuery = { id: queryId, name: queryName, source, steps };
+        const base: SavedQuery = { id: query_id, name: query_name, source, steps };
         if (!load.checked) return base;
 
-        const table = tableName.control.value.trim();
-        tableName.setError(table === "" ? NO_TABLE_NAME : null);
+        const table = table_name.control.value.trim();
+        table_name.setError(table === "" ? NO_TABLE_NAME : null);
         const workbook = grid.store.getWorkbook();
         const sheet = grid.getActiveSheet();
         const cell = parseRangeText(anchor.control.value, workbook.sheets, sheet);
@@ -343,13 +343,13 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         if (table === "" || "error" in cell) return undefined;
 
         const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
-        const tableId =
+        const table_id =
           editing?.output?.table ??
-          freshId(`query-${queryId}`, new Set(tables.map((candidate) => candidate.id)));
+          freshId(`query-${query_id}`, new Set(tables.map((candidate) => candidate.id)));
         return {
           ...base,
           output: {
-            table: tableId,
+            table: table_id,
             tableName: table,
             anchor: { sheet: cell.range.sheet, ...cell.range.start },
           },
@@ -360,13 +360,13 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         event.preventDefault();
         const commands = queryCommandsOf(grid);
         if (commands === undefined) {
-          formError.textContent = NO_SESSION;
+          form_error.textContent = NO_SESSION;
           return;
         }
         const query = definition();
         if (query === undefined) return;
         const message = commands.define(query);
-        formError.textContent = message ?? SAVED;
+        form_error.textContent = message ?? SAVED;
         if (message === null) editing = query;
       });
 
@@ -377,7 +377,7 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         if (message === null && editing?.id === query.id) edit(undefined);
       };
 
-      const selectOutput = (query: SavedQuery): void => {
+      const select_output = (query: SavedQuery): void => {
         const output = query.output;
         if (output === undefined) return;
         const table = grid.store
@@ -391,7 +391,7 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
 
       const draw = (): void => {
         entries.replaceChildren();
-        const queries = savedQueries(grid);
+        const queries = saved_queries(grid);
         if (queries.length === 0) entries.append(note("No saved queries yet."));
         for (const query of queries) {
           const row = document.createElement("div");
@@ -399,7 +399,7 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
           const title = document.createElement("strong");
           title.textContent = query.name;
           const detail = note(
-            `${query.source.kind.toUpperCase()} source · ${outputText(grid, query)}`,
+            `${query.source.kind.toUpperCase()} source · ${output_text(grid, query)}`,
           );
           row.append(
             title,
@@ -408,21 +408,21 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
             button("Edit", () => edit(query)),
             ...(query.output === undefined
               ? []
-              : [button("Select output", () => selectOutput(query))]),
+              : [button("Select output", () => select_output(query))]),
             button("Remove", () => remove(query)),
           );
           entries.append(row);
         }
-        showStatus();
+        show_status();
       };
 
-      const drawKept = (): void => {
+      const draw_kept = (): void => {
         // XLSX import records them on the kept DataMashup graph; they leave with it.
         const members =
           grid.store
             .getWorkbook()
             .xlsxSource?.graphs.flatMap((graph) => graph.unsupportedQueries ?? []) ?? [];
-        keptEntries.replaceChildren(
+        kept_entries.replaceChildren(
           ...members.map((member) => {
             const row = document.createElement("div");
             row.className = "sheetwrite-query-row";
@@ -436,23 +436,23 @@ export function queryPanel(grid: Grid, create: boolean): GridPanel {
         kept.hidden = members.length === 0;
       };
 
-      syncKind();
-      syncLoad();
+      sync_kind();
+      sync_load();
       draw();
-      drawKept();
+      draw_kept();
       if (create) {
         edit(undefined);
         // The side panel focuses its first control after render; Get Data starts at the name.
         queueMicrotask(() => name.control.focus());
       }
-      const stopChange = grid.on("change", () => {
+      const stop_change = grid.on("change", () => {
         draw();
-        drawKept();
+        draw_kept();
       });
-      const stopCommands = onQueryCommandsChange(grid, showStatus);
+      const stop_commands = onQueryCommandsChange(grid, show_status);
       return () => {
-        stopChange();
-        stopCommands();
+        stop_change();
+        stop_commands();
       };
     },
   };

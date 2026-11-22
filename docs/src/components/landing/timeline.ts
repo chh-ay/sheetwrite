@@ -39,32 +39,32 @@ export function createTimeline<T extends HTMLElement>(options: TimelineOptions<T
     stop();
     const element = root;
     if (element === undefined) return;
-    const { loopSeconds, stillSeconds, create } = options;
+    const { loopSeconds: loop_seconds, stillSeconds: still_seconds, create } = options;
     const draw = create(element);
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const startAt = start;
+    const reduced_motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const start_at = start;
     let visible = false;
     let raf = 0;
-    let elapsed = startAt ?? 0;
+    let elapsed = start_at ?? 0;
     let last = 0;
 
     const tick = (now: number): void => {
       // A long pause (a background tab) does not skip the picture ahead.
       elapsed += Math.min(100, now - last) / 1000;
       last = now;
-      draw(elapsed % loopSeconds);
+      draw(elapsed % loop_seconds);
       raf = requestAnimationFrame(tick);
     };
     const update = (): void => {
-      const play = visible && !reducedMotion.matches;
+      const play = visible && !reduced_motion.matches;
       element.dataset.landingRunning = String(play);
       cancelAnimationFrame(raf);
       raf = 0;
       if (play) {
         last = performance.now();
         raf = requestAnimationFrame(tick);
-      } else if (reducedMotion.matches) {
-        draw(startAt ?? stillSeconds);
+      } else if (reduced_motion.matches) {
+        draw(start_at ?? still_seconds);
       }
     };
     const observer = new IntersectionObserver(
@@ -74,14 +74,14 @@ export function createTimeline<T extends HTMLElement>(options: TimelineOptions<T
       },
       { threshold: 0.15 },
     );
-    draw(reducedMotion.matches ? (startAt ?? stillSeconds) : elapsed);
+    draw(reduced_motion.matches ? (start_at ?? still_seconds) : elapsed);
     observer.observe(element);
-    reducedMotion.addEventListener("change", update);
+    reduced_motion.addEventListener("change", update);
     update();
     stop = () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
-      reducedMotion.removeEventListener("change", update);
+      reduced_motion.removeEventListener("change", update);
     };
   };
 

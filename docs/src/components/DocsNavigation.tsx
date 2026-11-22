@@ -65,7 +65,7 @@ function NavigationEntries(props: NavigationEntriesProps) {
         const open =
           (props.current?.ancestors.includes(item) ?? false) ||
           (item.href !== undefined && props.current?.href === item.href);
-        const ownPage: NavigationItem[] =
+        const own_page: NavigationItem[] =
           item.href === undefined
             ? []
             : [
@@ -85,7 +85,7 @@ function NavigationEntries(props: NavigationEntriesProps) {
               <Icon class="sw-disclosure-icon" name="chevron-right" />
             </summary>
             <div>
-              <NavigationEntries current={props.current} items={[...ownPage, ...children]} />
+              <NavigationEntries current={props.current} items={[...own_page, ...children]} />
             </div>
           </details>
         );
@@ -95,7 +95,7 @@ function NavigationEntries(props: NavigationEntriesProps) {
 }
 
 /** A section of one page and no overview leads with that page, unlabelled. */
-function sectionLabelHidden(section: NavigationSection): boolean {
+function section_label_hidden(section: NavigationSection): boolean {
   return section.href === undefined && section.items.length === 1;
 }
 
@@ -107,17 +107,17 @@ function NavigationSectionBlock(props: {
   readonly section: NavigationSection;
   readonly current: NavigationLocation | undefined;
 }) {
-  const labelId = createUniqueId();
-  const labelled = !sectionLabelHidden(props.section);
+  const label_id = createUniqueId();
+  const labelled = !section_label_hidden(props.section);
   const section = props.section;
   return (
     <div
-      aria-labelledby={labelled ? labelId : undefined}
+      aria-labelledby={labelled ? label_id : undefined}
       class="sw-nav-section"
       role={labelled ? "group" : undefined}
     >
       <Show when={labelled}>
-        <p class="sw-nav-section__label" id={labelId}>
+        <p class="sw-nav-section__label" id={label_id}>
           {section.label}
         </p>
       </Show>

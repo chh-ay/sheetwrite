@@ -19,14 +19,14 @@ export function collectCapabilityIssues(
   owners: readonly CapabilityOwner[],
 ): string[] {
   const issues: string[] = [];
-  const ownerIds = new Set(owners.map((owner) => owner.id));
+  const owner_ids = new Set(owners.map((owner) => owner.id));
 
   if (inventory.length === 0) issues.push("capability inventory is empty");
 
-  const ownerDuplicates = new Set<string>();
+  const owner_duplicates = new Set<string>();
   for (const owner of owners) {
-    if (ownerDuplicates.has(owner.id)) issues.push(`owner ${owner.id}: registered twice`);
-    ownerDuplicates.add(owner.id);
+    if (owner_duplicates.has(owner.id)) issues.push(`owner ${owner.id}: registered twice`);
+    owner_duplicates.add(owner.id);
     if (!/^\/(?:[a-z-]+\/)+$/.test(owner.href)) {
       issues.push(
         `owner ${owner.id}: href "${owner.href}" must be an absolute trailing-slash path`,
@@ -38,17 +38,17 @@ export function collectCapabilityIssues(
     }
   }
 
-  const seenIds = new Set<string>();
+  const seen_ids = new Set<string>();
   for (const capability of inventory) {
     const label = capability.id.length > 0 ? capability.id : `<untitled: ${capability.title}>`;
 
     if (!/^[a-z]+(?:-[a-z]+)*\.[a-z]+(?:-[a-z]+)*$/.test(capability.id)) {
       issues.push(`${label}: id must be a stable "area.name" identifier`);
     }
-    if (seenIds.has(capability.id)) issues.push(`${label}: duplicate capability id`);
-    seenIds.add(capability.id);
+    if (seen_ids.has(capability.id)) issues.push(`${label}: duplicate capability id`);
+    seen_ids.add(capability.id);
 
-    if (!ownerIds.has(capability.primary)) {
+    if (!owner_ids.has(capability.primary)) {
       issues.push(`${label}: primary owner "${capability.primary}" is not a registered showcase`);
     }
     if (capability.interaction.length === 0) {
@@ -81,16 +81,16 @@ export function collectCapabilityIssues(
     }
 
     const secondaries = capability.secondary ?? [];
-    const seenSecondary = new Set<string>();
+    const seen_secondary = new Set<string>();
     for (const secondary of secondaries) {
       if (secondary.owner === capability.primary) {
         issues.push(`${label}: secondary coverage duplicates the primary owner`);
       }
-      if (seenSecondary.has(secondary.owner)) {
+      if (seen_secondary.has(secondary.owner)) {
         issues.push(`${label}: secondary owner "${secondary.owner}" declared twice`);
       }
-      seenSecondary.add(secondary.owner);
-      if (!ownerIds.has(secondary.owner)) {
+      seen_secondary.add(secondary.owner);
+      if (!owner_ids.has(secondary.owner)) {
         issues.push(`${label}: secondary owner "${secondary.owner}" is not a registered showcase`);
       }
       if (secondary.reason.length === 0) {

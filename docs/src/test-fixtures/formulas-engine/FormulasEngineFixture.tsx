@@ -21,23 +21,23 @@ const workbook: Workbook = {
 
 export function FormulasEngineFixture() {
   let host: HTMLElement | undefined;
-  const [status, setStatus] = createSignal("loading");
-  const [value, setValue] = createSignal("");
+  const [status, set_status] = createSignal("loading");
+  const [value, set_value] = createSignal("");
 
   onMount(() => {
     const element = host;
     if (!element) return;
-    let isDisposed = false;
+    let is_disposed = false;
     let grid: Grid | undefined;
     onCleanup(() => {
-      isDisposed = true;
+      is_disposed = true;
       grid?.destroy();
     });
 
-    const isFullEngine = new URLSearchParams(location.search).get("engine") === "full";
-    void initSheetwrite({ engine: isFullEngine ? formulas : undefined }).then(
+    const is_full_engine = new URLSearchParams(location.search).get("engine") === "full";
+    void initSheetwrite({ engine: is_full_engine ? formulas : undefined }).then(
       () => {
-        if (isDisposed) return;
+        if (is_disposed) return;
         grid = createGrid(element, { workbook });
         const address = { sheet: "distribution", row: 0, col: 0 };
         const result = grid.applyTransaction({
@@ -50,11 +50,11 @@ export function FormulasEngineFixture() {
           ],
         });
         if (result.status !== "applied") throw new Error("Formula fixture edit was not applied.");
-        setValue(String(grid.store.getCell(address).resolved));
-        setStatus("ready");
+        set_value(String(grid.store.getCell(address).resolved));
+        set_status("ready");
       },
       (error: unknown) => {
-        if (!isDisposed) setStatus(errorText(error));
+        if (!is_disposed) set_status(errorText(error));
       },
     );
   });

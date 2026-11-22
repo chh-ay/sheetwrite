@@ -29,7 +29,7 @@ import {
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const ROUNDS = 10;
 
-function baselineFixture(): ControlledRenderBaseline {
+function baseline_fixture(): ControlledRenderBaseline {
   return buildControlledBaseline(
     makeRenderArtifact({ rounds: ROUNDS }),
     TEST_HARNESS,
@@ -41,7 +41,7 @@ function baselineFixture(): ControlledRenderBaseline {
 
 function compare(samples: (round: number) => number, overrides: { rounds?: number } = {}) {
   return compareControlledRender({
-    baseline: baselineFixture(),
+    baseline: baseline_fixture(),
     fresh: makeRenderArtifact({
       rounds: overrides.rounds ?? ROUNDS,
       samples: (round) => [samples(round), samples(round), samples(round)],
@@ -63,11 +63,11 @@ describe("controlled zero-regression comparison", () => {
       [9, false, -1],
       [10.01, true],
     ];
-    for (const [sampleMs, isRegression, lowerBound] of cases) {
-      for (const row of compare(() => sampleMs)) {
-        expect(row.regression).toBe(isRegression);
-        if (lowerBound === undefined) expect(row.lowerConfidenceBoundMs).toBeGreaterThan(0);
-        else expect(row.lowerConfidenceBoundMs).toBe(lowerBound);
+    for (const [sample_ms, is_regression, lower_bound] of cases) {
+      for (const row of compare(() => sample_ms)) {
+        expect(row.regression).toBe(is_regression);
+        if (lower_bound === undefined) expect(row.lowerConfidenceBoundMs).toBeGreaterThan(0);
+        else expect(row.lowerConfidenceBoundMs).toBe(lower_bound);
       }
     }
   });
@@ -75,7 +75,7 @@ describe("controlled zero-regression comparison", () => {
   test("fails closed on an unmatched runner or a different number of rounds", () => {
     expect(() =>
       compareControlledRender({
-        baseline: baselineFixture(),
+        baseline: baseline_fixture(),
         fresh: makeRenderArtifact({ rounds: ROUNDS }),
         harness: TEST_HARNESS,
         runner: { ...TEST_RUNNER, cpu: "different cpu" },
@@ -88,7 +88,7 @@ describe("controlled zero-regression comparison", () => {
 
   test("rejects a baseline without runner or raw samples, or with a raised threshold", () => {
     expectRejections<DeepMutable<ControlledRenderBaseline>>(
-      () => mutableCopy(baselineFixture()),
+      () => mutableCopy(baseline_fixture()),
       parseControlledBaseline,
       [
         [(baseline) => Reflect.deleteProperty(baseline.runner, "cpu"), "missing cpu"],
@@ -111,46 +111,46 @@ describe("controlled zero-regression comparison", () => {
 
 describe("strict benchmark check command", () => {
   let directory = "";
-  let baselinePath = "";
-  let rawPath = "";
+  let baseline_path = "";
+  let raw_path = "";
   let head = "";
 
   beforeAll(() => {
-    const candidateRoot = resolve(REPOSITORY_ROOT, "bench/results/candidates");
-    mkdirSync(candidateRoot, { recursive: true });
-    directory = mkdtempSync(resolve(candidateRoot, "check-"));
+    const candidate_root = resolve(REPOSITORY_ROOT, "bench/results/candidates");
+    mkdirSync(candidate_root, { recursive: true });
+    directory = mkdtempSync(resolve(candidate_root, "check-"));
     head = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: REPOSITORY_ROOT })
       .stdout.toString()
       .trim();
-    const rawBytes = `${JSON.stringify(makeRenderArtifact({ rounds: ROUNDS, commit: head }), null, 2)}\n`;
-    rawPath = resolve(directory, "raw.json");
-    writeFileSync(rawPath, rawBytes);
+    const raw_bytes = `${JSON.stringify(makeRenderArtifact({ rounds: ROUNDS, commit: head }), null, 2)}\n`;
+    raw_path = resolve(directory, "raw.json");
+    writeFileSync(raw_path, raw_bytes);
     const baseline = buildControlledBaseline(
       makeRenderArtifact({ rounds: ROUNDS, commit: head }),
       computeHarnessFingerprint(MATRIX_IDS.render.full, CONTROLLED_SAMPLING_FINGERPRINT),
       TEST_RUNNER,
-      relative(REPOSITORY_ROOT, rawPath),
-      createHash("sha256").update(rawBytes).digest("hex"),
+      relative(REPOSITORY_ROOT, raw_path),
+      createHash("sha256").update(raw_bytes).digest("hex"),
     );
-    baselinePath = resolve(directory, "baseline.json");
-    writeFileSync(baselinePath, stableBaselineJson(baseline));
+    baseline_path = resolve(directory, "baseline.json");
+    writeFileSync(baseline_path, stableBaselineJson(baseline));
   });
 
   afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
-  function freshJson(sampleMs = 10, timestamp = new Date().toISOString()): string {
+  function fresh_json(sample_ms = 10, timestamp = new Date().toISOString()): string {
     const fresh = makeRenderArtifact({
       rounds: ROUNDS,
       commit: head,
       timestamp,
-      samples: () => [sampleMs, sampleMs, sampleMs],
+      samples: () => [sample_ms, sample_ms, sample_ms],
     });
     return JSON.stringify(fresh);
   }
 
-  async function check(fresh: string, extraArgs: readonly string[] = []) {
-    const freshPath = resolve(directory, `fresh-${crypto.randomUUID()}.json`);
-    writeFileSync(freshPath, fresh);
+  async function check(fresh: string, extra_args: readonly string[] = []) {
+    const fresh_path = resolve(directory, `fresh-${crypto.randomUUID()}.json`);
+    writeFileSync(fresh_path, fresh);
     const stderr: string[] = [];
     const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
       stderr.push(String(chunk));
@@ -159,18 +159,18 @@ describe("strict benchmark check command", () => {
     // The comparison table goes to standard output; the verdict goes to standard error.
     const table = spyOn(console, "log").mockImplementation(() => undefined);
     try {
-      const exitCode = await runCheck([
+      const exit_code = await runCheck([
         "--baseline",
-        baselinePath,
+        baseline_path,
         "--fresh",
-        freshPath,
+        fresh_path,
         "--power-mode",
         TEST_RUNNER.powerMode,
         "--concurrency",
         String(TEST_RUNNER.concurrency),
-        ...extraArgs,
+        ...extra_args,
       ]);
-      return { exitCode, stderr: stderr.join("") };
+      return { exitCode: exit_code, stderr: stderr.join("") };
     } finally {
       write.mockRestore();
       table.mockRestore();
@@ -178,13 +178,13 @@ describe("strict benchmark check command", () => {
   }
 
   test("gates matched, malformed, stale and slower results; report-only never gates", async () => {
-    const passing = await check(freshJson());
+    const passing = await check(fresh_json());
     expect(passing.exitCode, passing.stderr).toBe(0);
     expect(passing.stderr).toContain("no statistically detected regression");
     for (const [fresh, verdict] of [
       ["{broken", "performance gate invalid"],
-      [freshJson(10, "2020-01-01T00:00:00.000Z"), "stale render result timestamp"],
-      [freshJson(10.01), "statistically significant slowdown"],
+      [fresh_json(10, "2020-01-01T00:00:00.000Z"), "stale render result timestamp"],
+      [fresh_json(10.01), "statistically significant slowdown"],
     ] as const) {
       const failing = await check(fresh);
       expect(failing.exitCode).toBe(1);
@@ -196,16 +196,16 @@ describe("strict benchmark check command", () => {
   });
 
   test("fails when checked-in raw provenance is missing or checksum-mismatched", async () => {
-    const original = readFileSync(rawPath, "utf8");
+    const original = readFileSync(raw_path, "utf8");
     try {
-      rmSync(rawPath);
-      expect((await check(freshJson())).exitCode).toBe(1);
-      writeFileSync(rawPath, `${original} `);
-      const mismatch = await check(freshJson());
+      rmSync(raw_path);
+      expect((await check(fresh_json())).exitCode).toBe(1);
+      writeFileSync(raw_path, `${original} `);
+      const mismatch = await check(fresh_json());
       expect(mismatch.exitCode).toBe(1);
       expect(mismatch.stderr).toContain("checksum mismatch");
     } finally {
-      writeFileSync(rawPath, original);
+      writeFileSync(raw_path, original);
     }
   });
 });

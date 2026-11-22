@@ -33,7 +33,7 @@ function sheet(
 }
 
 /** The sheet names the syntax signal completes from `typed` in the Budget sheet. */
-async function sheetNames(typed: string): Promise<string[]> {
+async function sheet_names(typed: string): Promise<string[]> {
   const store = SheetwriteStore.fromSnapshot({
     schemaVersion: 1,
     workbook: { activeSheet: "budget" },
@@ -52,8 +52,8 @@ async function sheetNames(typed: string): Promise<string[]> {
 }
 
 it("completes the names of visible sheets only, as the sheet tabs show them", async () => {
-  expect(await sheetNames("=Led")).toEqual(["=Ledger!"]);
+  expect(await sheet_names("=Led")).toEqual(["=Ledger!"]);
   // Hidden and very hidden sheets stay out of every list the UI shows; the formula bar too.
-  expect(await sheetNames("=Pay")).toEqual([]);
-  expect(await sheetNames("=Vau")).toEqual([]);
+  expect(await sheet_names("=Pay")).toEqual([]);
+  expect(await sheet_names("=Vau")).toEqual([]);
 });

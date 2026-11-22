@@ -4,8 +4,8 @@ import { join, resolve } from "node:path";
 import { optionValue } from "../bench/src/cli-options.js";
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const evidenceRoot = join(repositoryRoot, "test-results/dependency-audit");
+const repository_root = resolve(import.meta.dir, "..");
+const evidence_root = join(repository_root, "test-results/dependency-audit");
 
 interface NpmAuditMetadata {
   readonly vulnerabilities?: Readonly<Record<string, number>>;
@@ -25,14 +25,14 @@ async function audit(
     ["npm", "audit", "--package-lock-only", "--json", "--audit-level=high", ...options],
     { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
   );
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
   await Promise.all([
-    writeFile(join(evidenceRoot, `${name}.json`), stdout),
-    writeFile(join(evidenceRoot, `${name}.stderr.txt`), stderr),
+    writeFile(join(evidence_root, `${name}.json`), stdout),
+    writeFile(join(evidence_root, `${name}.stderr.txt`), stderr),
   ]);
   let report: NpmAuditReport;
   try {
@@ -42,43 +42,43 @@ async function audit(
       `${name} npm audit returned malformed JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  if (exitCode !== 0 && (blocking || exitCode !== 1)) {
-    throw new Error(`${name} npm audit failed with exit code ${exitCode}: ${stderr.trim()}`);
+  if (exit_code !== 0 && (blocking || exit_code !== 1)) {
+    throw new Error(`${name} npm audit failed with exit code ${exit_code}: ${stderr.trim()}`);
   }
   return report;
 }
 
-function findingCount(report: NpmAuditReport): number {
+function finding_count(report: NpmAuditReport): number {
   return Object.entries(report.metadata?.vulnerabilities ?? {})
     .filter(([severity]) => severity !== "total")
     .reduce((total, [, count]) => total + count, 0);
 }
 
 async function cli(): Promise<void> {
-  const artifactDirectory = optionValue(process.argv, "--artifacts");
-  if (artifactDirectory === undefined) throw new Error("Release audit requires --artifacts");
-  await verifyReleaseArtifacts(resolve(artifactDirectory));
-  await mkdir(evidenceRoot, { recursive: true });
+  const artifact_directory = optionValue(process.argv, "--artifacts");
+  if (artifact_directory === undefined) throw new Error("Release audit requires --artifacts");
+  await verifyReleaseArtifacts(resolve(artifact_directory));
+  await mkdir(evidence_root, { recursive: true });
 
   const production = await audit(
     "npm-runtime",
-    join(repositoryRoot, "test/release-locks/core-xlsx"),
+    join(repository_root, "test/release-locks/core-xlsx"),
     ["--omit=dev"],
     true,
   );
-  const fixtureDirectories = [
+  const fixture_directories = [
     ["npm-fixture-consumer", "test/consumer"],
     ["npm-fixture-vite", "test/bundler-fixtures/vite"],
     ["npm-fixture-webpack", "test/bundler-fixtures/webpack"],
     ["npm-fixture-next", "test/bundler-fixtures/next"],
   ] as const;
   const fixtures = await Promise.all(
-    fixtureDirectories.map(([name, path]) =>
-      audit(name, join(repositoryRoot, path), ["--include=dev"], false),
+    fixture_directories.map(([name, path]) =>
+      audit(name, join(repository_root, path), ["--include=dev"], false),
     ),
   );
   console.log(
-    `Locked npm runtime audit passed: ${findingCount(production)} low/moderate finding(s); fixture/dev audits recorded ${fixtures.reduce((total, report) => total + findingCount(report), 0)} finding(s)`,
+    `Locked npm runtime audit passed: ${finding_count(production)} low/moderate finding(s); fixture/dev audits recorded ${fixtures.reduce((total, report) => total + finding_count(report), 0)} finding(s)`,
   );
 }
 

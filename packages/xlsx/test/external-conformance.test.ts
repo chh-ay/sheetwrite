@@ -27,10 +27,10 @@ import {
 } from "./workbook-fixtures.js";
 
 const literal = (value: string | number | null): CellValue => ({ kind: "literal", value });
-const oneSheet = (body: string, options: Omit<RawXlsxOptions, "sheets"> = {}) =>
+const one_sheet = (body: string, options: Omit<RawXlsxOptions, "sheets"> = {}) =>
   rawXlsx({ ...options, sheets: [{ xml: worksheet(body) }] });
-const resourceLimit = (resource: string) => ({ code: "xlsx-resource-limit", resource });
-const importFailure = (message: RegExp) => ({
+const resource_limit = (resource: string) => ({ code: "xlsx-resource-limit", resource });
+const import_failure = (message: RegExp) => ({
   code: "xlsx-import-failed",
   message: expect.stringMatching(message),
 });
@@ -40,7 +40,7 @@ describe("pinned external XLSX behavioral vectors", () => {
     const styles = stylesXml(
       '<fonts count="2"><font/><font><b/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
     );
-    const sharedStrings = `<?xml version="1.0"?><sst xmlns="${TRANSITIONAL_MAIN}" count="4" uniqueCount="4"><si><r><rPr><b/></rPr><t>Bold,</t></r><r><rPr><i/></rPr><t>text</t></r></si><si><t>Hello, World!</t><rPh sb="0" eb="5"><t>phonetic</t></rPh></si><si><t>漢字</t><rPh sb="0" eb="2"><t>かんじ</t></rPh></si><si><t xml:space="preserve">Hello,\nWorld!</t></si></sst>`;
+    const shared_strings = `<?xml version="1.0"?><sst xmlns="${TRANSITIONAL_MAIN}" count="4" uniqueCount="4"><si><r><rPr><b/></rPr><t>Bold,</t></r><r><rPr><i/></rPr><t>text</t></r></si><si><t>Hello, World!</t><rPh sb="0" eb="5"><t>phonetic</t></rPh></si><si><t>漢字</t><rPh sb="0" eb="2"><t>かんじ</t></rPh></si><si><t xml:space="preserve">Hello,\nWorld!</t></si></sst>`;
     const body =
       '<dimension ref="A1:I1"/><sheetData><row r="1">' +
       '<c r="A1" t="e"><v>#N/A</v></c><c r="B1" t="str"><v>6E1000</v></c><c r="C1" s="1"/>' +
@@ -48,10 +48,13 @@ describe("pinned external XLSX behavioral vectors", () => {
       '<c r="E1" t="inlineStr"><is><r><rPr><color rgb="FFFF0000"/></rPr><t>red</t></r><r><rPr><color rgb="FF00FF00"/></rPr><t>green</t></r></is></c>' +
       '<c r="F1" t="s"><v>0</v></c><c r="G1" t="s"><v>1</v></c><c r="H1" t="s"><v>2</v></c><c r="I1" t="s"><v>3</v></c>' +
       "</row></sheetData>";
-    const { warnings, onWarning } = collectWarnings();
-    const imported = await backend.fromXlsxWorkbook(oneSheet(body, { styles, sharedStrings }), {
-      onWarning,
-    });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      one_sheet(body, { styles, sharedStrings: shared_strings }),
+      {
+        onWarning: on_warning,
+      },
+    );
 
     expect(valuesOf(imported)).toEqual(
       [
@@ -79,12 +82,12 @@ describe("pinned external XLSX behavioral vectors", () => {
   });
 
   it("ports case 15: neutralizes array and data-table formulas with exact warnings", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<sheetData><row r="1"><c r="A1"><f t="array" ref="A1:B1">A2</f></c><c r="B1"><f t="dataTable" ref="B1:B2">B2</f></c></row></sheetData>',
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     expect(valuesOf(imported)).toEqual([literal("=A2"), literal("=B2")]);
     expect(warnings).toEqual([
@@ -107,7 +110,7 @@ describe("pinned external XLSX behavioral vectors", () => {
     ] as const;
     const escaped = (format: string) =>
       format.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-    const numFmts = vectors.map(
+    const num_fmts = vectors.map(
       ([format], index) => `<numFmt numFmtId="${164 + index}" formatCode="${escaped(format)}"/>`,
     );
     const xfs = vectors.map(
@@ -115,7 +118,7 @@ describe("pinned external XLSX behavioral vectors", () => {
         `<xf numFmtId="${164 + index}" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>`,
     );
     const styles = stylesXml(
-      `<numFmts count="${vectors.length}">${numFmts.join("")}</numFmts>` +
+      `<numFmts count="${vectors.length}">${num_fmts.join("")}</numFmts>` +
         BASE_STYLES_BODY.replace(
           /<cellXfs[\s\S]*<\/cellXfs>/,
           `<cellXfs count="${vectors.length}">${xfs.join("")}</cellXfs>`,
@@ -125,7 +128,7 @@ describe("pinned external XLSX behavioral vectors", () => {
       (_, index) => `<c r="${String.fromCharCode(65 + index)}1" s="${index}"><v>1</v></c>`,
     );
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(`<sheetData><row r="1">${cells.join("")}</row></sheetData>`, { styles }),
+      one_sheet(`<sheetData><row r="1">${cells.join("")}</row></sheetData>`, { styles }),
     );
     expect(sheetAt(imported).columns.map((column) => [column.numberFormat, column.type])).toEqual(
       vectors.map(([format, type]) => [format, type]),
@@ -136,25 +139,29 @@ describe("pinned external XLSX behavioral vectors", () => {
     const styles = stylesXml(
       '<fonts count="3"><font/><font><b/></font><font><i/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0"/></cellXfs>',
     );
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<dimension ref="A1:B3"/><cols><col min="1" max="2" width="12" customWidth="1" bestFit="1" hidden="1" outlineLevel="1" collapsed="1" style="1"/></cols><sheetData><row r="1" ht="24" customHeight="1" hidden="1" outlineLevel="1"><c r="A1"><v>1</v></c></row><row r="2" s="2" customFormat="1" outlineLevel="1" collapsed="1"><c r="A2"><v>2</v></c></row><row r="3" s="2"><c r="A3"><v>3</v></c></row></sheetData>',
         { styles },
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     const bold = { bold: true, verticalAlign: "bottom" as const };
-    const importedSheet = sheetAt(imported);
+    const imported_sheet = sheetAt(imported);
     expect(
-      importedSheet.columns.map(({ width, visible, cellStyle }) => ({ width, visible, cellStyle })),
+      imported_sheet.columns.map(({ width, visible, cellStyle: cell_style }) => ({
+        width,
+        visible,
+        cellStyle: cell_style,
+      })),
     ).toEqual([
       { width: 84, visible: false, cellStyle: bold },
       { width: 84, visible: false, cellStyle: bold },
     ]);
-    expect(importedSheet.rowMeta).toEqual([[0, { height: 32, hidden: true }]]);
-    expect(importedSheet.rowGroups).toEqual([{ start: 0, end: 1, collapsed: true }]);
-    expect(importedSheet.cells[0]?.cells.map((cell) => cell.style)).toEqual([
+    expect(imported_sheet.rowMeta).toEqual([[0, { height: 32, hidden: true }]]);
+    expect(imported_sheet.rowGroups).toEqual([{ start: 0, end: 1, collapsed: true }]);
+    expect(imported_sheet.cells[0]?.cells.map((cell) => cell.style)).toEqual([
       bold,
       { italic: true, verticalAlign: "bottom" },
       bold,
@@ -163,12 +170,12 @@ describe("pinned external XLSX behavioral vectors", () => {
   });
 
   it("ports cases 32 and 34: maps inline and multi-range lists and warns on validation-policy loss", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<dimension ref="A1:C2"/><sheetData/><dataValidations count="3"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorStyle="stop" prompt="Pick a duck" error="Bad duck" sqref="A1"><formula1>"Ducks"</formula1></dataValidation><dataValidation type="list" allowBlank="0" sqref="B1 B2"><formula1>"A,B"</formula1></dataValidation><dataValidation type="custom" showErrorMessage="1" sqref="C1:C2"><formula1>ISNUMBER(C1)</formula1></dataValidation></dataValidations>',
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     const at = (row: number, col: number) =>
       expect.objectContaining({ start: { row, col }, end: { row, col } });
@@ -193,7 +200,7 @@ describe("pinned external XLSX behavioral vectors", () => {
   });
 
   it("ports case 39: never fetches external targets and resolves internal parent targets within OPC root", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = await backend.fromXlsxWorkbook(
       rawXlsx({
         sheets: [
@@ -211,14 +218,14 @@ describe("pinned external XLSX behavioral vectors", () => {
           "xl/comments1.xml": `<?xml version="1.0"?><comments xmlns="${TRANSITIONAL_MAIN}"><authors><author>A</author></authors><commentList><comment ref="A1" authorId="0"><text><t>resolved parent</t></text></comment></commentList></comments>`,
         },
       }),
-      { onWarning },
+      { onWarning: on_warning },
     );
-    const importedSheet = sheetAt(imported);
-    expect(importedSheet.notes?.[0]?.text).toBe("resolved parent");
-    expect(importedSheet.hyperlinks).toEqual([
+    const imported_sheet = sheetAt(imported);
+    expect(imported_sheet.notes?.[0]?.text).toBe("resolved parent");
+    expect(imported_sheet.hyperlinks).toEqual([
       {
         id: "xlsx-hyperlink-1-1",
-        range: { sheet: importedSheet.id, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        range: { sheet: imported_sheet.id, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
         target: { kind: "external", url: "https://invalid.example/never-fetch" },
       },
     ]);
@@ -226,16 +233,16 @@ describe("pinned external XLSX behavioral vectors", () => {
   });
 
   it("ports cases 40-41: rejects malformed or missing XML and ignores declared unknown extensions", async () => {
-    const valid = oneSheet("<sheetData/>");
+    const valid = one_sheet("<sheetData/>");
     const malformed = editParts(valid, { "xl/worksheets/sheet1.xml": "<worksheet><sheetData>" });
-    await expect(backend.fromXlsxWorkbook(malformed)).rejects.toMatchObject(importFailure(/XML/));
+    await expect(backend.fromXlsxWorkbook(malformed)).rejects.toMatchObject(import_failure(/XML/));
     const missing = editParts(valid, { "xl/workbook.xml": null });
     await expect(backend.fromXlsxWorkbook(missing)).rejects.toMatchObject(
-      importFailure(/xl\/workbook\.xml/),
+      import_failure(/xl\/workbook\.xml/),
     );
 
     const forward = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>kept</t></is></c></row></sheetData><extLst><ext uri="{test}"><future:payload xmlns:future="urn:example:future"><future:value>ignored</future:value></future:payload></ext></extLst>',
       ),
     );
@@ -247,18 +254,18 @@ describe("pinned external XLSX behavioral vectors", () => {
       backend.fromXlsxWorkbook(rawZip({ "huge.bin": "x".repeat(32) }, 0), {
         resourceLimits: { maxEntryUncompressedBytes: 16 },
       }),
-    ).rejects.toMatchObject(resourceLimit("maxEntryUncompressedBytes"));
+    ).rejects.toMatchObject(resource_limit("maxEntryUncompressedBytes"));
 
-    const tenByTen = oneSheet('<dimension ref="A1:J10"/><sheetData/>');
+    const ten_by_ten = one_sheet('<dimension ref="A1:J10"/><sheetData/>');
     await expect(
-      backend.fromXlsxWorkbook(tenByTen, { resourceLimits: { maxArchiveEntries: 4 } }),
-    ).rejects.toMatchObject(resourceLimit("maxArchiveEntries"));
-    const atBoundary = sheetAt(
-      await backend.fromXlsxWorkbook(tenByTen, {
+      backend.fromXlsxWorkbook(ten_by_ten, { resourceLimits: { maxArchiveEntries: 4 } }),
+    ).rejects.toMatchObject(resource_limit("maxArchiveEntries"));
+    const at_boundary = sheetAt(
+      await backend.fromXlsxWorkbook(ten_by_ten, {
         resourceLimits: { maxRowsPerSheet: 10, maxColumnsPerSheet: 10 },
       }),
     );
-    expect([atBoundary.rowCount, atBoundary.columns.length]).toEqual([10, 10]);
+    expect([at_boundary.rowCount, at_boundary.columns.length]).toEqual([10, 10]);
 
     for (const [resource, body] of [
       ["maxRowsPerSheet", '<dimension ref="A1:A11"/><sheetData><row r="11"/></sheetData>'],
@@ -269,8 +276,8 @@ describe("pinned external XLSX behavioral vectors", () => {
       ],
     ] as const) {
       await expect(
-        backend.fromXlsxWorkbook(oneSheet(body), { resourceLimits: { [resource]: 10 } }),
-      ).rejects.toMatchObject(resourceLimit(resource));
+        backend.fromXlsxWorkbook(one_sheet(body), { resourceLimits: { [resource]: 10 } }),
+      ).rejects.toMatchObject(resource_limit(resource));
     }
   });
 });
@@ -286,7 +293,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
       cell.style = reordered
         ? { backgroundColor: "#AABBCC", italic: true }
         : { italic: true, backgroundColor: "#AABBCC" };
-      const cellStyle = reordered
+      const cell_style = reordered
         ? { color: "#112233", bold: true }
         : { bold: true, color: "#112233" };
       return book([
@@ -294,7 +301,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
           rowCount: 2,
           columns: [
             { key: "a", header: "A", width: 80, type: "text" },
-            { key: "b", header: "B", width: 90, type: "number", cellStyle },
+            { key: "b", header: "B", width: 90, type: "number", cellStyle: cell_style },
           ],
           cells: reordered ? [text, styled] : [styled, text],
         }),
@@ -325,20 +332,20 @@ describe("local deterministic and adversarial XLSX gates", () => {
       reason,
     } as AbortSignal;
     const strings = Array.from({ length: 5_000 }, (_, index) => `<si><t>${index}</t></si>`);
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     await expect(
       backend.fromXlsxWorkbook(
-        oneSheet('<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>', {
+        one_sheet('<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>', {
           sharedStrings: `<?xml version="1.0"?><sst xmlns="${TRANSITIONAL_MAIN}" count="5000" uniqueCount="5000">${strings.join("")}</sst>`,
         }),
-        { signal, onWarning },
+        { signal, onWarning: on_warning },
       ),
     ).rejects.toBe(reason);
     expect(warnings).toEqual([]);
   });
 
   it("rejects ZIP local/central disagreements, duplicate logical entries, and encoded traversal", async () => {
-    const valid = oneSheet("<sheetData/>");
+    const valid = one_sheet("<sheetData/>");
     const mismatches: [RegExp, (view: DataView, local: number) => void][] = [
       [/filename/i, (view, local) => view.setUint8(local + 30, view.getUint8(local + 30) ^ 1)],
       [/CRC/, (view, local) => view.setUint32(local + 14, 0, true)],
@@ -351,10 +358,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
       const patched = patchEntries(valid, ({ view, local, index }) => {
         if (index === 0) patch(view, local);
       });
-      await expect(backend.fromXlsxWorkbook(patched)).rejects.toMatchObject(importFailure(message));
+      await expect(backend.fromXlsxWorkbook(patched)).rejects.toMatchObject(
+        import_failure(message),
+      );
     }
 
-    const exactDuplicate = patchEntries(
+    const exact_duplicate = patchEntries(
       rawZip({ "a.xml": "a", "b.xml": "b" }, 0),
       ({ view, central, local, index }) => {
         if (index !== 1) return;
@@ -364,18 +373,18 @@ describe("local deterministic and adversarial XLSX gates", () => {
     );
     const files = unzipSync(valid);
     for (const duplicate of [
-      exactDuplicate,
+      exact_duplicate,
       rawZip({ "A.xml": "a", "a.xml": "b" }),
       rawZip({ "a.xml": "a", "%61.xml": "b" }),
       rawZip({ ...files, "XL/%77orkbook.xml": files["xl/workbook.xml"] ?? "" }),
     ]) {
       await expect(backend.fromXlsxWorkbook(duplicate)).rejects.toMatchObject(
-        importFailure(/duplicate/i),
+        import_failure(/duplicate/i),
       );
     }
     await expect(
       backend.fromXlsxWorkbook(rawZip({ ...files, "xl/%2e%2e/evil.xml": strToU8("<evil/>") })),
-    ).rejects.toMatchObject(importFailure(/unsafe part name/i));
+    ).rejects.toMatchObject(import_failure(/unsafe part name/i));
   });
 
   it("rejects wrong roots or namespaces while tolerating extensions only under valid roots", async () => {
@@ -403,7 +412,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
     ] as const) {
       const wrong = editParts(base, { [part]: (xml) => xml.replace(namespace, "urn:wrong") });
       await expect(backend.fromXlsxWorkbook(wrong)).rejects.toMatchObject(
-        importFailure(/namespace/i),
+        import_failure(/namespace/i),
       );
     }
   });
@@ -444,12 +453,12 @@ describe("local deterministic and adversarial XLSX gates", () => {
         "xl/comments1.xml": (xml) => xml.replace("old note", "new note"),
       }),
     );
-    const importedSheet = sheetAt(imported);
+    const imported_sheet = sheetAt(imported);
     expect(valuesOf(imported)).toEqual([literal("native")]);
-    expect(importedSheet.cells[0]?.cells[0]?.style).toEqual({ italic: true });
+    expect(imported_sheet.cells[0]?.cells[0]?.style).toEqual({ italic: true });
     expect(imported.workbook.namedRanges?.[0]?.name).toBe("NewName");
-    expect(importedSheet.notes?.[0]?.text).toBe("new note");
-    expect([importedSheet.frozenRows, importedSheet.frozenCols]).toEqual([undefined, 1]);
+    expect(imported_sheet.notes?.[0]?.text).toBe("new note");
+    expect([imported_sheet.frozenRows, imported_sheet.frozenCols]).toEqual([undefined, 1]);
   });
 
   it("accounts UTF-8 bytes incrementally for CJK, emoji, and escaped output", async () => {
@@ -463,11 +472,11 @@ describe("local deterministic and adversarial XLSX gates", () => {
       );
     const limit = await accounted(ascii);
     expect(await accounted(unicode)).toBeGreaterThan(limit);
-    const resourceLimits = { maxOutputBytes: limit };
-    await expect(backend.toXlsxWorkbook(ascii, { resourceLimits })).resolves.toBeInstanceOf(
-      Uint8Array,
-    );
-    const failure = await backend.toXlsxWorkbook(unicode, { resourceLimits }).then(
+    const resource_limits = { maxOutputBytes: limit };
+    await expect(
+      backend.toXlsxWorkbook(ascii, { resourceLimits: resource_limits }),
+    ).resolves.toBeInstanceOf(Uint8Array);
+    const failure = await backend.toXlsxWorkbook(unicode, { resourceLimits: resource_limits }).then(
       () => undefined,
       (error: unknown) => error,
     );
@@ -480,7 +489,7 @@ describe("local deterministic and adversarial XLSX gates", () => {
 describe("column types of an imported sheet", () => {
   it("makes unformatted columns General and keeps each cell's stored type (#911)", async () => {
     const imported = await backend.fromXlsxWorkbook(
-      oneSheet(
+      one_sheet(
         '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>North</t></is></c><c r="B1"><v>5</v></c></row>' +
           '<row r="2"><c r="A2" t="inlineStr"><is><t>007</t></is></c><c r="B2" t="inlineStr"><is><t>x</t></is></c></row></sheetData>',
       ),

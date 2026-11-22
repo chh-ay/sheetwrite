@@ -35,13 +35,13 @@ export function validateExcelCapture(
   if (!isNonemptyString(value.capturedAt) || Number.isNaN(Date.parse(value.capturedAt))) {
     issues.push("capture.capturedAt: invalid timestamp");
   }
-  const expectedIds = corpus.cases
+  const expected_ids = corpus.cases
     .filter((entry) => entry.kind === "formula")
     .map((entry) => entry.id);
   if (!Array.isArray(value.observations)) {
     return [...issues, "capture.observations: expected array"];
   }
-  const receivedIds: string[] = [];
+  const received_ids: string[] = [];
   value.observations.forEach((observation, index) => {
     if (!isObject(observation)) {
       issues.push(`capture.observations[${index}]: expected object`);
@@ -55,10 +55,10 @@ export function validateExcelCapture(
     );
     if (!isNonemptyString(observation.caseId)) {
       issues.push(`capture.observations[${index}].caseId: required`);
-    } else receivedIds.push(observation.caseId);
+    } else received_ids.push(observation.caseId);
     validateResult(observation.result, `capture.observations[${index}].result`, issues);
   });
-  if (canonicalJson(receivedIds) !== canonicalJson(expectedIds)) {
+  if (canonicalJson(received_ids) !== canonicalJson(expected_ids)) {
     issues.push("capture.observations: missing, extra, or reordered case IDs");
   }
   scanSecrets(value, "capture", issues);
@@ -68,17 +68,17 @@ export function validateExcelCapture(
 export async function captureExcel(corpus: ConformanceCorpus): Promise<string> {
   const endpoint = process.env.SHEETWRITE_EXCEL_ORACLE_URL;
   const token = process.env.SHEETWRITE_EXCEL_ORACLE_TOKEN;
-  const producerVersion = process.env.SHEETWRITE_EXCEL_PRODUCER_VERSION;
-  if (!endpoint || !token || !producerVersion) {
+  const producer_version = process.env.SHEETWRITE_EXCEL_PRODUCER_VERSION;
+  if (!endpoint || !token || !producer_version) {
     throw new Error(
       "Compatibility check BLOCKED: Excel needs a protected service URL, access token, and exact app version",
     );
   }
   const script = await readFile("scripts/conformance-excel-office-script.ts", "utf8");
-  const scriptSha256 = sha256(script);
-  const payloadJson = canonicalJson({
+  const script_sha256 = sha256(script);
+  const payload_json = canonicalJson({
     protocol: corpus.protocol,
-    producerVersion,
+    producerVersion: producer_version,
     cases: corpus.cases,
   });
   const response = await fetch(endpoint, {
@@ -87,21 +87,21 @@ export async function captureExcel(corpus: ConformanceCorpus): Promise<string> {
     body: canonicalJson({
       protocol: 1,
       script,
-      scriptSha256,
-      arguments: { payloadJson, scriptSha256 },
+      scriptSha256: script_sha256,
+      arguments: { payloadJson: payload_json, scriptSha256: script_sha256 },
     }),
     signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) throw new Error(`Excel oracle failed with HTTP ${response.status}`);
-  const envelopeBytes = await readBoundedResponse(response);
+  const envelope_bytes = await readBoundedResponse(response);
   const envelope: unknown = JSON.parse(
-    new TextDecoder("utf-8", { fatal: true }).decode(envelopeBytes),
+    new TextDecoder("utf-8", { fatal: true }).decode(envelope_bytes),
   );
   if (!isObject(envelope) || typeof envelope.result !== "string") {
     throw new Error("Excel oracle response omitted the Office Script result");
   }
   const payload: unknown = JSON.parse(envelope.result);
-  const issues = validateExcelCapture(payload, corpus, producerVersion, scriptSha256);
+  const issues = validateExcelCapture(payload, corpus, producer_version, script_sha256);
   if (issues.length > 0) throw new Error(issues.join("\n"));
   const serialized = canonicalJson(payload);
   if (serialized.includes(token)) throw new Error("Excel oracle response contained a credential");

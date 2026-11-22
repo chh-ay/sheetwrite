@@ -44,7 +44,7 @@ export interface SheetCharts {
   readonly charts: readonly DrawingChart[];
 }
 
-function chartText(value: string): string {
+function chart_text(value: string): string {
   return escapeXml(encodeXstring(value));
 }
 
@@ -58,14 +58,14 @@ function formula(reference: ChartRange, snapshot: WorkbookSnapshot): string {
   return `'${sheet.name.replaceAll("'", "''")}'!${start}:${end}`;
 }
 
-function richTitle(title: string | undefined): string {
+function rich_title(title: string | undefined): string {
   if (title === undefined) return "";
-  return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${chartText(title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
+  return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${chart_text(title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
 }
 
 type ReferenceType = "numRef" | "strRef" | "multiLvlStrRef";
 
-function referenceXml(
+function reference_xml(
   tag: string,
   reference: ChartRange,
   snapshot: WorkbookSnapshot,
@@ -79,16 +79,16 @@ function referenceXml(
  * columns holds one category level per column (or row), which Excel reads
  * from `c:multiLvlStrRef`. Scatter X values are numbers.
  */
-function categoryType(reference: ChartRange, scatter: boolean): ReferenceType {
+function category_type(reference: ChartRange, scatter: boolean): ReferenceType {
   if (scatter) return "numRef";
-  const multiLevel =
+  const multi_level =
     reference !== "#REF!" &&
     reference.start.row !== reference.end.row &&
     reference.start.col !== reference.end.col;
-  return multiLevel ? "multiLvlStrRef" : "strRef";
+  return multi_level ? "multiLvlStrRef" : "strRef";
 }
 
-function pointCount(reference: ChartRange): number {
+function point_count(reference: ChartRange): number {
   if (reference === "#REF!") return 0;
   return (
     (reference.end.row - reference.start.row + 1) * (reference.end.col - reference.start.col + 1)
@@ -96,7 +96,7 @@ function pointCount(reference: ChartRange): number {
 }
 
 /** A scatter series needs X values; the renderer plots a series without categories at positions 1..n. */
-function positionLiteral(count: number): string {
+function position_literal(count: number): string {
   let points = "";
   for (let index = 0; index < count; index++)
     points += `<c:pt idx="${index}"><c:v>${index + 1}</c:v></c:pt>`;
@@ -120,20 +120,20 @@ interface PivotLink {
 type ChartValue = string | number | boolean | null;
 
 /** A `c:pt` for each point that has a value; null points are gaps. */
-function pointsXml(values: readonly ChartValue[], numeric: boolean): string {
+function points_xml(values: readonly ChartValue[], numeric: boolean): string {
   let points = "";
   for (const [index, value] of values.entries()) {
     if (value === null || (numeric && typeof value !== "number")) continue;
-    points += `<c:pt idx="${index}"><c:v>${chartText(String(value))}</c:v></c:pt>`;
+    points += `<c:pt idx="${index}"><c:v>${chart_text(String(value))}</c:v></c:pt>`;
   }
   return points;
 }
 
 /** One literal point list: `numLit` for numbers, `strLit` for labels. */
-function literalXml(tag: string, values: readonly ChartValue[], numeric: boolean): string {
+function literal_xml(tag: string, values: readonly ChartValue[], numeric: boolean): string {
   const type = numeric ? "numLit" : "strLit";
   const format = numeric ? "<c:formatCode>General</c:formatCode>" : "";
-  return `<c:${tag}><c:${type}>${format}<c:ptCount val="${values.length}"/>${pointsXml(values, numeric)}</c:${type}></c:${tag}>`;
+  return `<c:${tag}><c:${type}>${format}<c:ptCount val="${values.length}"/>${points_xml(values, numeric)}</c:${type}></c:${tag}>`;
 }
 
 /**
@@ -141,16 +141,16 @@ function literalXml(tag: string, values: readonly ChartValue[], numeric: boolean
  * `c:lvl` is the innermost level; an outer label has a point only where its
  * group starts.
  */
-function levelsCacheXml(series: ChartSeriesView): string {
-  let levels = `<c:lvl>${pointsXml(series.categories, false)}</c:lvl>`;
+function levels_cache_xml(series: ChartSeriesView): string {
+  let levels = `<c:lvl>${points_xml(series.categories, false)}</c:lvl>`;
   for (const level of series.categoryLevels.toReversed()) {
-    levels += `<c:lvl>${pointsXml(level.labels, false)}</c:lvl>`;
+    levels += `<c:lvl>${points_xml(level.labels, false)}</c:lvl>`;
   }
   return `<c:multiLvlStrCache><c:ptCount val="${series.categories.length}"/>${levels}</c:multiLvlStrCache>`;
 }
 
 /** The formula of the cells of rows `rows` and columns `cols` of sheet `sheet`. */
-function cellsFormula(
+function cells_formula(
   snapshot: WorkbookSnapshot,
   sheet: string,
   rows: readonly number[],
@@ -168,27 +168,27 @@ function cellsFormula(
  * the formula `#REF!`, as in a chart whose source was deleted: Excel draws
  * the cache.
  */
-function pivotCategoriesXml(
+function pivot_categories_xml(
   series: ChartSeriesView,
   link: PivotLink | null,
   snapshot: WorkbookSnapshot,
 ): string {
   const levels = series.categoryLevels.length > 0;
   if (link === null) {
-    if (!levels) return literalXml("cat", series.categories, false);
-    return `<c:cat><c:multiLvlStrRef><c:f>#REF!</c:f>${levelsCacheXml(series)}</c:multiLvlStrRef></c:cat>`;
+    if (!levels) return literal_xml("cat", series.categories, false);
+    return `<c:cat><c:multiLvlStrRef><c:f>#REF!</c:f>${levels_cache_xml(series)}</c:multiLvlStrRef></c:cat>`;
   }
 
-  const reference = cellsFormula(snapshot, link.sheet, link.points.rows, link.points.labelCols);
+  const reference = cells_formula(snapshot, link.sheet, link.points.rows, link.points.labelCols);
   if (levels) {
-    return `<c:cat><c:multiLvlStrRef><c:f>${reference}</c:f>${levelsCacheXml(series)}</c:multiLvlStrRef></c:cat>`;
+    return `<c:cat><c:multiLvlStrRef><c:f>${reference}</c:f>${levels_cache_xml(series)}</c:multiLvlStrRef></c:cat>`;
   }
-  const cache = `<c:strCache><c:ptCount val="${series.categories.length}"/>${pointsXml(series.categories, false)}</c:strCache>`;
+  const cache = `<c:strCache><c:ptCount val="${series.categories.length}"/>${points_xml(series.categories, false)}</c:strCache>`;
   return `<c:cat><c:strRef><c:f>${reference}</c:f>${cache}</c:strRef></c:cat>`;
 }
 
 /** The values of series `index`: a reference to its column of `link` with a cache, or literal data. */
-function pivotValuesXml(
+function pivot_values_xml(
   tag: "val" | "yVal",
   series: ChartSeriesView,
   index: number,
@@ -196,11 +196,11 @@ function pivotValuesXml(
   snapshot: WorkbookSnapshot,
 ): string {
   const col = link?.points.valueCols[index];
-  if (link === null || col === undefined) return literalXml(tag, series.values, true);
+  if (link === null || col === undefined) return literal_xml(tag, series.values, true);
 
-  const reference = cellsFormula(snapshot, link.sheet, link.points.rows, [col, col]);
+  const reference = cells_formula(snapshot, link.sheet, link.points.rows, [col, col]);
   const format = escapeXml(series.numberFormats.find((code) => code !== null) ?? "General");
-  const cache = `<c:numCache><c:formatCode>${format}</c:formatCode><c:ptCount val="${series.values.length}"/>${pointsXml(series.values, true)}</c:numCache>`;
+  const cache = `<c:numCache><c:formatCode>${format}</c:formatCode><c:ptCount val="${series.values.length}"/>${points_xml(series.values, true)}</c:numCache>`;
   return `<c:${tag}><c:numRef><c:f>${reference}</c:f>${cache}</c:numRef></c:${tag}>`;
 }
 
@@ -209,7 +209,7 @@ function pivotValuesXml(
  * the pivot's values, so Select Data in Excel names real ranges; otherwise
  * they hold literal data.
  */
-function pivotSeriesXml(
+function pivot_series_xml(
   chart: ChartDefinition,
   view: ChartView,
   link: PivotLink | null,
@@ -219,10 +219,10 @@ function pivotSeriesXml(
   const scatter = chart.kind === "scatter";
   for (const [index, series] of view.series.entries()) {
     xml.append(`<c:ser><c:idx val="${index}"/><c:order val="${index}"/>`);
-    xml.append(`<c:tx><c:v>${chartText(series.name)}</c:v></c:tx>`);
-    if (scatter) xml.append(positionLiteral(series.values.length));
-    else xml.append(pivotCategoriesXml(series, link, snapshot));
-    xml.append(pivotValuesXml(scatter ? "yVal" : "val", series, index, link, snapshot));
+    xml.append(`<c:tx><c:v>${chart_text(series.name)}</c:v></c:tx>`);
+    if (scatter) xml.append(position_literal(series.values.length));
+    else xml.append(pivot_categories_xml(series, link, snapshot));
+    xml.append(pivot_values_xml(scatter ? "yVal" : "val", series, index, link, snapshot));
     xml.append("</c:ser>");
   }
 }
@@ -234,78 +234,78 @@ function pivotSeriesXml(
  * has other rows between them, so only its PivotChart reads them, from the
  * PivotTable; its ranges span the table's rows, as Excel's PivotCharts do.
  */
-function pivotLink(data: PivotChartData | undefined, sheet: string): PivotLink | null {
+function pivot_link(data: PivotChartData | undefined, sheet: string): PivotLink | null {
   if (data?.cells === undefined) return null;
   const points = locatePoints(data.view, data.cells);
-  const pivotTable = data.cells.pivotTable;
-  if (points === null || (!points.contiguous && pivotTable === undefined)) return null;
-  return { sheet, points, ...(pivotTable === undefined ? {} : { pivotTable }) };
+  const pivot_table = data.cells.pivotTable;
+  if (points === null || (!points.contiguous && pivot_table === undefined)) return null;
+  return { sheet, points, ...(pivot_table === undefined ? {} : { pivotTable: pivot_table }) };
 }
 
-function seriesXml(chart: ChartDefinition, snapshot: WorkbookSnapshot, xml: XmlBuffer): void {
+function series_xml(chart: ChartDefinition, snapshot: WorkbookSnapshot, xml: XmlBuffer): void {
   const scatter = chart.kind === "scatter";
   for (const [index, series] of chart.series.entries()) {
     xml.append(`<c:ser><c:idx val="${index}"/><c:order val="${index}"/>`);
     if (series.nameRange !== undefined)
-      xml.append(referenceXml("tx", series.nameRange, snapshot, "strRef"));
+      xml.append(reference_xml("tx", series.nameRange, snapshot, "strRef"));
     else if (series.name !== undefined)
-      xml.append(`<c:tx><c:v>${chartText(series.name)}</c:v></c:tx>`);
+      xml.append(`<c:tx><c:v>${chart_text(series.name)}</c:v></c:tx>`);
 
     if (series.categories !== undefined) {
       const tag = scatter ? "xVal" : "cat";
-      const type = categoryType(series.categories, scatter);
-      xml.append(referenceXml(tag, series.categories, snapshot, type));
+      const type = category_type(series.categories, scatter);
+      xml.append(reference_xml(tag, series.categories, snapshot, type));
     } else if (scatter) {
-      xml.append(positionLiteral(pointCount(series.values)));
+      xml.append(position_literal(point_count(series.values)));
     }
-    xml.append(referenceXml(scatter ? "yVal" : "val", series.values, snapshot, "numRef"));
+    xml.append(reference_xml(scatter ? "yVal" : "val", series.values, snapshot, "numRef"));
     xml.append("</c:ser>");
   }
 }
 
-function axisXml(
+function axis_xml(
   tag: "catAx" | "valAx",
   id: number,
-  crossAxis: number,
+  cross_axis: number,
   position: string,
   title: string | undefined,
-  flatLabels = false,
+  flat_labels = false,
 ): string {
   // Excel's Format Axis › Multi-level Category Labels, cleared.
-  const flat = flatLabels ? '<c:noMultiLvlLbl val="1"/>' : "";
-  const categoryFields = `<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/>${flat}`;
-  const tail = tag === "catAx" ? categoryFields : '<c:crossBetween val="between"/>';
-  return `<c:${tag}><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${richTitle(title)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${crossAxis}"/><c:crosses val="autoZero"/>${tail}</c:${tag}>`;
+  const flat = flat_labels ? '<c:noMultiLvlLbl val="1"/>' : "";
+  const category_fields = `<c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/>${flat}`;
+  const tail = tag === "catAx" ? category_fields : '<c:crossBetween val="between"/>';
+  return `<c:${tag}><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${rich_title(title)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="${cross_axis}"/><c:crosses val="autoZero"/>${tail}</c:${tag}>`;
 }
 
 /**
  * Element order follows CT_ChartSpace, CT_PlotArea and each CT_*Chart
- * sequence. A chart over a pivot writes the series of `pivotChart`; when they
+ * sequence. A chart over a pivot writes the series of `pivot_chart`; when they
  * read the cells of a native PivotTable, the chart is that table's PivotChart,
  * named `[]Sheet!Table` as EPPlus names it, because the file name is unknown.
  */
-function chartXml(
+function chart_xml(
   chart: ChartDefinition,
   sheet: SheetSnapshot,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
-  pivotChart?: PivotChartData,
+  pivot_chart?: PivotChartData,
 ): Uint8Array {
   const bar = chart.kind === "column" || chart.kind === "bar";
   const circular = chart.kind === "pie" || chart.kind === "doughnut";
   const plot = bar ? "barChart" : `${chart.kind}Chart`;
-  const link = pivotLink(pivotChart, sheet.id);
+  const link = pivot_link(pivot_chart, sheet.id);
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
     `<c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="${DRAWINGML_NS}" xmlns:r="${RELATIONSHIPS_NS}">`,
   );
   if (link?.pivotTable !== undefined) {
-    const name = chartText(`[]${sheet.name}!${link.pivotTable}`);
+    const name = chart_text(`[]${sheet.name}!${link.pivotTable}`);
     xml.append(`<c:pivotSource><c:name>${name}</c:name><c:fmtId val="0"/></c:pivotSource>`);
   }
   xml.append(
-    `<c:chart>${richTitle(chart.title)}<c:autoTitleDeleted val="${chart.title === undefined ? 1 : 0}"/>`,
+    `<c:chart>${rich_title(chart.title)}<c:autoTitleDeleted val="${chart.title === undefined ? 1 : 0}"/>`,
   );
   if (link?.pivotTable !== undefined) {
     xml.append('<c:pivotFmts><c:pivotFmt><c:idx val="0"/></c:pivotFmt></c:pivotFmts>');
@@ -319,8 +319,8 @@ function chartXml(
     xml.append('<c:grouping val="standard"/>');
   else if (chart.kind === "scatter") xml.append('<c:scatterStyle val="lineMarker"/>');
   xml.append(`<c:varyColors val="${circular ? 1 : 0}"/>`);
-  if (pivotChart) pivotSeriesXml(chart, pivotChart.view, link, snapshot, xml);
-  else seriesXml(chart, snapshot, xml);
+  if (pivot_chart) pivot_series_xml(chart, pivot_chart.view, link, snapshot, xml);
+  else series_xml(chart, snapshot, xml);
   if (chart.kind === "doughnut")
     xml.append(`<c:firstSliceAng val="0"/><c:holeSize val="${DOUGHNUT_HOLE_PERCENT}"/>`);
   if (!circular) xml.append(`<c:axId val="${CATEGORY_AXIS_ID}"/><c:axId val="${VALUE_AXIS_ID}"/>`);
@@ -328,22 +328,22 @@ function chartXml(
 
   // The renderer draws `xTitle` under the plot; a bar chart has its category axis at the left.
   if (!circular) {
-    const horizontalBar = chart.kind === "bar";
-    const categoryTitle = horizontalBar ? chart.axes?.yTitle : chart.axes?.xTitle;
-    const valueTitle = horizontalBar ? chart.axes?.xTitle : chart.axes?.yTitle;
-    const categoryTag = chart.kind === "scatter" ? "valAx" : "catAx";
+    const horizontal_bar = chart.kind === "bar";
+    const category_title = horizontal_bar ? chart.axes?.yTitle : chart.axes?.xTitle;
+    const value_title = horizontal_bar ? chart.axes?.xTitle : chart.axes?.yTitle;
+    const category_tag = chart.kind === "scatter" ? "valAx" : "catAx";
     xml.append(
-      axisXml(
-        categoryTag,
+      axis_xml(
+        category_tag,
         CATEGORY_AXIS_ID,
         VALUE_AXIS_ID,
-        horizontalBar ? "l" : "b",
-        categoryTitle,
+        horizontal_bar ? "l" : "b",
+        category_title,
         chart.axes?.multiLevelLabels === false,
       ),
     );
     xml.append(
-      axisXml("valAx", VALUE_AXIS_ID, CATEGORY_AXIS_ID, horizontalBar ? "b" : "l", valueTitle),
+      axis_xml("valAx", VALUE_AXIS_ID, CATEGORY_AXIS_ID, horizontal_bar ? "b" : "l", value_title),
     );
   }
   xml.append("</c:plotArea>");
@@ -357,11 +357,11 @@ function chartXml(
   return xml.finish();
 }
 
-function anchorXml(chart: ChartDefinition, objectId: number, relationshipId: string): string {
+function anchor_xml(chart: ChartDefinition, object_id: number, relationship_id: string): string {
   const emu = (pixels: number) => Math.round(pixels * EMU_PER_PIXEL);
   const { anchor } = chart;
   const from = `<xdr:from><xdr:col>${anchor.col}</xdr:col><xdr:colOff>${emu(anchor.offsetX)}</xdr:colOff><xdr:row>${anchor.row}</xdr:row><xdr:rowOff>${emu(anchor.offsetY)}</xdr:rowOff></xdr:from>`;
-  const frame = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${objectId}" name="${chartText(chart.id)}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart r:id="${escapeXml(relationshipId)}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
+  const frame = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${object_id}" name="${chart_text(chart.id)}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart r:id="${escapeXml(relationship_id)}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
   // A one-cell anchor keeps the model's pixel size when rows or columns are resized.
   return `<xdr:oneCellAnchor xmlns:xdr="${SPREADSHEET_DRAWING_NS}" xmlns:a="${DRAWINGML_NS}" xmlns:c="${CHART_NS}" xmlns:r="${RELATIONSHIPS_NS}">${from}<xdr:ext cx="${emu(anchor.width)}" cy="${emu(anchor.height)}"/>${frame}<xdr:clientData/></xdr:oneCellAnchor>`;
 }
@@ -391,12 +391,12 @@ export function writeCharts(
     const part = freePartName(`xl/charts/sheetwrite-chart${sheetNumber}-${index + 1}`, keptParts);
     parts.push({
       name: part,
-      data: chartXml(chart, sheet, snapshot, context, pivotCharts?.get(chart.id)),
+      data: chart_xml(chart, sheet, snapshot, context, pivotCharts?.get(chart.id)),
     });
     overrides.push({ part, contentType: CHART_CONTENT });
     charts.push({
       target: `/${part}`,
-      anchorXml: (objectId, relationshipId) => anchorXml(chart, objectId, relationshipId),
+      anchorXml: (object_id, relationship_id) => anchor_xml(chart, object_id, relationship_id),
     });
   }
   return { parts, overrides, charts };

@@ -26,16 +26,16 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
-/** Data!A1:A8 hold 1..8; Summary!A1 refers to Data!A8. `dataName` names the Data sheet. */
-function snapshot(dataName = "Data"): WorkbookSnapshot {
+/** Data!A1:A8 hold 1..8; Summary!A1 refers to Data!A8. `data_name` names the Data sheet. */
+function snapshot(data_name = "Data"): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: DOCUMENT,
@@ -44,7 +44,7 @@ function snapshot(dataName = "Data"): WorkbookSnapshot {
     sheets: [
       {
         id: "data",
-        name: dataName,
+        name: data_name,
         order: 0,
         rowCount: 8,
         columns: [
@@ -115,12 +115,12 @@ interface Session {
 
 async function session(
   storage: HistoryStorageAdapter = new MemoryHistoryStorage(),
-  dataName = "Data",
+  data_name = "Data",
   limits: Partial<HistoryLimits> = {},
 ): Promise<Session> {
-  const adapter = new MemoryPersistenceAdapter(snapshot(dataName));
+  const adapter = new MemoryPersistenceAdapter(snapshot(data_name));
   const archive = await HistoryArchive.open({ documentId: DOCUMENT, storage, limits });
-  await archive.initialize(snapshot(dataName), 0);
+  await archive.initialize(snapshot(data_name), 0);
 
   const journal = new Journal(archive);
   adapter.recordHistory(DOCUMENT, journal);
@@ -134,7 +134,7 @@ interface Client {
 }
 
 /** A client that loads the authority's current document, as a host does on open. */
-async function client(adapter: MemoryPersistenceAdapter, authorId: string): Promise<Client> {
+async function client(adapter: MemoryPersistenceAdapter, author_id: string): Promise<Client> {
   const loaded = await adapter.load(DOCUMENT);
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -142,7 +142,7 @@ async function client(adapter: MemoryPersistenceAdapter, authorId: string): Prom
   const sync = new SyncCoordinator(grid, adapter, {
     documentId: DOCUMENT,
     serverVersion: loaded.version ?? 0,
-    authorId,
+    authorId: author_id,
   });
 
   return { grid, sync };
@@ -151,10 +151,10 @@ async function client(adapter: MemoryPersistenceAdapter, authorId: string): Prom
 function restore(
   archive: HistoryArchive,
   target: Client,
-  versionId: string,
+  version_id: string,
   scope: Parameters<HistoryArchive["restoreVersion"]>[2],
 ) {
-  return archive.restoreVersion(target.grid, versionId, scope, { sync: target.sync });
+  return archive.restoreVersion(target.grid, version_id, scope, { sync: target.sync });
 }
 
 async function edit(target: Client, patches: DocumentOp[]): Promise<void> {
@@ -316,7 +316,7 @@ describe("restore the workbook", () => {
   });
 
   /** A 128-row Data sheet whose row 64 holds 640 in column B, saved as a version. */
-  async function longVersion() {
+  async function long_version() {
     const opened = await session();
     await edit(opened.alice, [
       { op: "addRows", sheet: "data", at: 8, count: 120 },
@@ -328,7 +328,7 @@ describe("restore the workbook", () => {
   }
 
   /** Whether an operation of an applied restore writes `row` of sheet Data. */
-  function writesRow(outcome: Awaited<ReturnType<typeof restore>>, row: number): boolean {
+  function writes_row(outcome: Awaited<ReturnType<typeof restore>>, row: number): boolean {
     const patches = outcome.status === "applied" ? outcome.transaction.patches : [];
     return patches.some(
       (patch) =>
@@ -340,14 +340,14 @@ describe("restore the workbook", () => {
   }
 
   it("rewrites only the rows whose cells differ from the version", async () => {
-    const { archive, alice, version } = await longVersion();
+    const { archive, alice, version } = await long_version();
     await edit(alice, [set("data", 2, 0, 33), set("data", 110, 1, 1100)]);
 
     const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
     expect(outcome.status).toBe("applied");
 
     // Row 64 holds the version's cells already, so no operation of the restore writes it.
-    expect(writesRow(outcome, 64)).toBe(false);
+    expect(writes_row(outcome, 64)).toBe(false);
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 110, 1)]).toEqual([3, null]);
     expect(value(alice.grid, "data", 64, 1)).toBe(640);
   });
@@ -358,14 +358,14 @@ describe("restore the workbook", () => {
   ];
 
   it.each(reshaped)("rewrites the whole sheet when %s since the version", async (_, change) => {
-    const { archive, alice, version } = await longVersion();
+    const { archive, alice, version } = await long_version();
     await edit(alice, [change, set("data", 2, 0, 33)]);
 
     const outcome = await restore(archive, alice, version.id, { kind: "workbook" });
     expect(outcome.status).toBe("applied");
 
     // Row 64 did not change, but the whole sheet is written again.
-    expect(writesRow(outcome, 64)).toBe(true);
+    expect(writes_row(outcome, 64)).toBe(true);
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 64, 1)]).toEqual([3, 640]);
   });
 
@@ -518,7 +518,7 @@ describe("restore through sync", () => {
    * version, then two edits; and the cell pages that rebuilding that version
    * whole reads.
    */
-  async function atHeadSession() {
+  async function at_head_session() {
     const storage = new PageCountingStorage();
     const opened = await session(storage, "Data", { checkpointTransactions: 1 });
     await edit(opened.alice, [
@@ -530,7 +530,7 @@ describe("restore through sync", () => {
 
     const before = storage.cellPageReads;
     await (await HistoryArchive.open({ documentId: DOCUMENT, storage })).readVersion(version.id);
-    const wholeReads = storage.cellPageReads - before;
+    const whole_reads = storage.cellPageReads - before;
 
     const reads = async (action: () => Promise<unknown>) => {
       const start = storage.cellPageReads;
@@ -538,11 +538,11 @@ describe("restore through sync", () => {
       return storage.cellPageReads - start;
     };
 
-    return { ...opened, version, wholeReads, reads };
+    return { ...opened, version, wholeReads: whole_reads, reads };
   }
 
   it("restores a document at the archive head from the pages that differ", async () => {
-    const { archive, alice, version, wholeReads, reads } = await atHeadSession();
+    const { archive, alice, version, wholeReads: whole_reads, reads } = await at_head_session();
 
     let outcome: Awaited<ReturnType<typeof restore>> | undefined;
     const read = await reads(async () => {
@@ -550,14 +550,21 @@ describe("restore through sync", () => {
     });
 
     expect(outcome?.status).toBe("applied");
-    expect(read).toBeLessThan(wholeReads);
+    expect(read).toBeLessThan(whole_reads);
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([3, 142]);
     alice.grid.undo();
     expect([value(alice.grid, "data", 2, 0), value(alice.grid, "data", 150, 1)]).toEqual([33, -1]);
   });
 
   it("rebuilds the version whole when another client moved the archive head", async () => {
-    const { adapter, archive, alice, version, wholeReads, reads } = await atHeadSession();
+    const {
+      adapter,
+      archive,
+      alice,
+      version,
+      wholeReads: whole_reads,
+      reads,
+    } = await at_head_session();
     const bob = await client(adapter, "bob");
     // Bob has not received this edit: his server version is behind the archive head.
     await edit(alice, [set("data", 100, 1, -2)]);
@@ -568,7 +575,7 @@ describe("restore through sync", () => {
     });
 
     expect(outcome?.status).toBe("applied");
-    expect(read).toBe(wholeReads);
+    expect(read).toBe(whole_reads);
     const cells = () => [value(bob.grid, "data", 2, 0), value(bob.grid, "data", 150, 1)];
     expect(cells()).toEqual([3, 142]);
     bob.grid.undo();
@@ -579,7 +586,7 @@ describe("restore through sync", () => {
     ["local edits are not sent yet", false],
     ["a request is in flight", true],
   ])("refuses to restore before reading any page when %s", async (_, flushing) => {
-    const { archive, alice, version, reads } = await atHeadSession();
+    const { archive, alice, version, reads } = await at_head_session();
     alice.grid.applyTransaction({ patches: [set("data", 7, 0, 70)] });
     const sending = flushing ? alice.sync.flush() : undefined;
 

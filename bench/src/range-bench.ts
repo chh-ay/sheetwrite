@@ -82,14 +82,14 @@ type InstrumentedGrid = Grid & {
   resetAutoFitResourceStats(): void;
 };
 
-function workbook(rowCount: number): Workbook {
+function workbook(row_count: number): Workbook {
   return {
     activeSheet: SHEET,
     sheets: [
       {
         id: SHEET,
         name: "Range Bench",
-        rowCount,
+        rowCount: row_count,
         columns: COLUMNS.map((column) => ({ ...column })),
       },
     ],
@@ -99,26 +99,26 @@ function workbook(rowCount: number): Workbook {
 async function profile(
   rows: number,
   workload: RangeStructuralResult["workload"],
-  addressedCells: number,
-  wasmMemory: WebAssembly.Memory,
+  addressed_cells: number,
+  wasm_memory: WebAssembly.Memory,
   operation: () => StructuralObservation | Promise<StructuralObservation>,
 ): Promise<RangeStructuralResult> {
   Bun.gc(true);
-  const heapBefore = process.memoryUsage().heapUsed;
-  const wasmBefore = wasmMemory.buffer.byteLength;
+  const heap_before = process.memoryUsage().heapUsed;
+  const wasm_before = wasm_memory.buffer.byteLength;
   const start = performance.now();
   const observation = await operation();
-  const timingSamplesMs = [performance.now() - start];
+  const timing_samples_ms = [performance.now() - start];
   Bun.gc(true);
   const store = observation.store;
   return {
     rows,
     workload,
-    addressedCells,
-    timingSamplesMs,
-    timing: summarize(timingSamplesMs),
-    heapDeltaBytes: Math.max(0, process.memoryUsage().heapUsed - heapBefore),
-    wasmDeltaBytes: Math.max(0, wasmMemory.buffer.byteLength - wasmBefore),
+    addressedCells: addressed_cells,
+    timingSamplesMs: timing_samples_ms,
+    timing: summarize(timing_samples_ms),
+    heapDeltaBytes: Math.max(0, process.memoryUsage().heapUsed - heap_before),
+    wasmDeltaBytes: Math.max(0, wasm_memory.buffer.byteLength - wasm_before),
     documentOperationCount: observation.documentOperationCount ?? store?.documentOperations ?? 0,
     jsPatchObjectCount: observation.jsPatchObjectCount ?? store?.jsPatchObjects ?? 0,
     ffiCalls: observation.ffiCalls ?? store?.ffiCalls ?? 0,
@@ -137,13 +137,13 @@ async function profile(
   };
 }
 
-async function storeWorkloads(
+async function store_workloads(
   rows: number,
-  wasmMemory: WebAssembly.Memory,
+  wasm_memory: WebAssembly.Memory,
 ): Promise<RangeStructuralResult[]> {
   const store = new SheetwriteStore(workbook(rows), toSheetwriteColumnar(makeColumnar(rows)));
   const results: RangeStructuralResult[] = [];
-  const wholeColumn: Range = {
+  const whole_column: Range = {
     sheet: SHEET,
     start: { row: 0, col: 0 },
     end: { row: rows - 1, col: 0 },
@@ -152,39 +152,39 @@ async function storeWorkloads(
     patches: [
       {
         op: "setRangeStyle",
-        range: { ...wholeColumn, end: { row: Math.floor(rows / 2) - 1, col: 0 } },
+        range: { ...whole_column, end: { row: Math.floor(rows / 2) - 1, col: 0 } },
         style: { italic: true },
       },
     ],
   });
   store.resetRangeMutationAllocationStats();
   results.push(
-    await profile(rows, "style merge and clear", rows, wasmMemory, () => {
+    await profile(rows, "style merge and clear", rows, wasm_memory, () => {
       store.applyTransaction({
-        patches: [{ op: "setRangeStyle", range: wholeColumn, style: { bold: true } }],
+        patches: [{ op: "setRangeStyle", range: whole_column, style: { bold: true } }],
       });
       store.applyTransaction({
-        patches: [{ op: "setRangeStyle", range: wholeColumn, style: null }],
+        patches: [{ op: "setRangeStyle", range: whole_column, style: null }],
       });
       return { store: store.getRangeMutationAllocationStats() };
     }),
   );
 
-  const clearSnapshot = store.captureRangeHistory(wholeColumn);
-  if (!clearSnapshot) throw new Error("range benchmark could not capture clear history");
+  const clear_snapshot = store.captureRangeHistory(whole_column);
+  if (!clear_snapshot) throw new Error("range benchmark could not capture clear history");
   store.resetRangeMutationAllocationStats();
   results.push(
-    await profile(rows, "range clear", rows, wasmMemory, () => {
+    await profile(rows, "range clear", rows, wasm_memory, () => {
       store.applyTransaction({
-        patches: [{ op: "clearRange", range: wholeColumn, contents: true, style: false }],
+        patches: [{ op: "clearRange", range: whole_column, contents: true, style: false }],
       });
       return {
         store: store.getRangeMutationAllocationStats(),
-        historyBytes: clearSnapshot.byteLength,
+        historyBytes: clear_snapshot.byteLength,
       };
     }),
   );
-  clearSnapshot.dispose();
+  clear_snapshot.dispose();
 
   const sparse: DocumentOp = {
     op: "setRange",
@@ -209,40 +209,40 @@ async function storeWorkloads(
   };
   store.resetRangeMutationAllocationStats();
   results.push(
-    await profile(rows, "sparse setRange", sparse.cells.length, wasmMemory, () => {
+    await profile(rows, "sparse setRange", sparse.cells.length, wasm_memory, () => {
       store.applyTransaction({ patches: [sparse] });
       return { store: store.getRangeMutationAllocationStats() };
     }),
   );
 
-  const denseCells = Math.min(rows, 100_000);
+  const dense_cells = Math.min(rows, 100_000);
   const dense: DocumentOp = {
     op: "setBlock",
     range: {
       sheet: SHEET,
       start: { row: 0, col: 1 },
-      end: { row: denseCells - 1, col: 1 },
+      end: { row: dense_cells - 1, col: 1 },
     },
     block: {
-      rowCount: denseCells,
+      rowCount: dense_cells,
       colCount: 1,
-      values: Array.from({ length: denseCells }, (_, index) => index + 0.5),
+      values: Array.from({ length: dense_cells }, (_, index) => index + 0.5),
     },
   };
   store.resetRangeMutationAllocationStats();
   results.push(
-    await profile(rows, "dense setBlock", denseCells, wasmMemory, () => {
+    await profile(rows, "dense setBlock", dense_cells, wasm_memory, () => {
       store.applyTransaction({ patches: [dense] });
       return { store: store.getRangeMutationAllocationStats() };
     }),
   );
 
-  const selectedCells = Math.min(rows, 10_000);
+  const selected_cells = Math.min(rows, 10_000);
   results.push(
-    await profile(rows, "clipboard bulk read", selectedCells, wasmMemory, () => {
-      const packed = store.getClipboardWindow(SHEET, { start: 0, end: selectedCells }, [0]);
-      const materialized = new Array<{ resolved: unknown; style: unknown }>(selectedCells);
-      for (let index = 0; index < selectedCells; index++) {
+    await profile(rows, "clipboard bulk read", selected_cells, wasm_memory, () => {
+      const packed = store.getClipboardWindow(SHEET, { start: 0, end: selected_cells }, [0]);
+      const materialized = new Array<{ resolved: unknown; style: unknown }>(selected_cells);
+      for (let index = 0; index < selected_cells; index++) {
         materialized[index] = {
           resolved: packed.values[index] ?? null,
           style: packed.styles[packed.styleIds[index] ?? 0] ?? {},
@@ -262,26 +262,26 @@ async function storeWorkloads(
   return results;
 }
 
-async function datasourceRevisionWorkload(
+async function datasource_revision_workload(
   rows: number,
-  wasmMemory: WebAssembly.Memory,
+  wasm_memory: WebAssembly.Memory,
 ): Promise<RangeStructuralResult> {
-  return profile(rows, "datasource revision retention", rows, wasmMemory, async () => {
+  return profile(rows, "datasource revision retention", rows, wasm_memory, async () => {
     const pending = Promise.withResolvers<DataSourcePage>();
     let request: DataSourceRequest | undefined;
     const grid = createGrid(document.createElement("div"), {
       workbook: workbook(rows),
       datasource: {
         capabilities: { protocol: 2, columns: "windowed" },
-        getRows: (nextRequest) => {
-          request = nextRequest;
+        getRows: (next_request) => {
+          request = next_request;
           return pending.promise;
         },
       },
     }) as InstrumentedGrid;
     if (!request) throw new Error("range benchmark datasource request was not issued");
     const store = grid.store as SheetwriteStore;
-    const denseCells = Math.min(rows, 1_000);
+    const dense_cells = Math.min(rows, 1_000);
     const operations: DocumentOp[] = [
       {
         op: "setRange",
@@ -304,12 +304,12 @@ async function datasourceRevisionWorkload(
         range: {
           sheet: SHEET,
           start: { row: 0, col: 1 },
-          end: { row: denseCells - 1, col: 1 },
+          end: { row: dense_cells - 1, col: 1 },
         },
         block: {
-          rowCount: denseCells,
+          rowCount: dense_cells,
           colCount: 1,
-          values: new Array(denseCells).fill(1),
+          values: new Array(dense_cells).fill(1),
         },
       },
       {
@@ -326,7 +326,7 @@ async function datasourceRevisionWorkload(
     store.resetRangeMutationAllocationStats();
     store.applyTransaction({ patches: operations });
     const before = grid.getMutationRevisionStats();
-    const storeStats = store.getRangeMutationAllocationStats();
+    const store_stats = store.getRangeMutationAllocationStats();
     pending.resolve({ protocol: 2, start: request.start, columns: request.columns, rows: [] });
     await Promise.resolve();
     await Promise.resolve();
@@ -334,7 +334,7 @@ async function datasourceRevisionWorkload(
     const after = grid.getMutationRevisionStats();
     grid.destroy();
     return {
-      store: storeStats,
+      store: store_stats,
       retainedRevisionPointsBefore: before.points,
       retainedRevisionRectanglesBefore: before.rectangles,
       retainedRevisionPointsAfter: after.points,
@@ -343,12 +343,12 @@ async function datasourceRevisionWorkload(
   });
 }
 
-async function autoFitWorkload(
+async function auto_fit_workload(
   rows: number,
-  wasmMemory: WebAssembly.Memory,
+  wasm_memory: WebAssembly.Memory,
 ): Promise<RangeStructuralResult> {
-  const targetColumns = rows === 10_000 ? [0, 1] : [0];
-  return profile(rows, "large exact auto-fit", rows * targetColumns.length, wasmMemory, () => {
+  const target_columns = rows === 10_000 ? [0, 1] : [0];
+  return profile(rows, "large exact auto-fit", rows * target_columns.length, wasm_memory, () => {
     const grid = createGrid(document.createElement("div"), {
       workbook: workbook(rows),
       data: toSheetwriteColumnar(makeColumnar(rows)),
@@ -356,24 +356,24 @@ async function autoFitWorkload(
     const store = grid.store as SheetwriteStore;
     store.resetRangeMutationAllocationStats();
     grid.resetAutoFitResourceStats();
-    grid.autoFitColumns(targetColumns);
-    const autoFit = grid.getAutoFitResourceStats();
-    const storeStats = store.getRangeMutationAllocationStats();
-    if (autoFit.completedJobs !== 1 || autoFit.cancelledJobs !== 0) {
+    grid.autoFitColumns(target_columns);
+    const auto_fit = grid.getAutoFitResourceStats();
+    const store_stats = store.getRangeMutationAllocationStats();
+    if (auto_fit.completedJobs !== 1 || auto_fit.cancelledJobs !== 0) {
       throw new Error("range benchmark auto-fit did not complete exactly once");
     }
     grid.destroy();
     return {
-      store: storeStats,
-      ffiCalls: storeStats.ffiCalls + autoFit.windowRequests,
+      store: store_stats,
+      ffiCalls: store_stats.ffiCalls + auto_fit.windowRequests,
       maxTransferredArrayLength: Math.max(
-        storeStats.maxTransferredArrayLength,
-        autoFit.maxWindowCells,
+        store_stats.maxTransferredArrayLength,
+        auto_fit.maxWindowCells,
       ),
-      maxVisibleWindowCells: autoFit.maxWindowCells,
-      autoFitChunkCellLimit: autoFit.chunkCellLimit,
-      visibleWindowRequests: autoFit.windowRequests,
-      scheduledChunks: autoFit.scheduledChunks,
+      maxVisibleWindowCells: auto_fit.maxWindowCells,
+      autoFitChunkCellLimit: auto_fit.chunkCellLimit,
+      visibleWindowRequests: auto_fit.windowRequests,
+      scheduledChunks: auto_fit.scheduledChunks,
     };
   });
 }
@@ -381,9 +381,9 @@ async function autoFitWorkload(
 const bytes = readFileSync(WASM_PATH);
 await initSheetwrite({ source: bytes });
 const memory = getEngine().getMemory();
-const restoreCanvas = installCanvasTestStubs();
-const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+const restore_canvas = installCanvasTestStubs();
+const original_request_animation_frame = globalThis.requestAnimationFrame;
+const original_cancel_animation_frame = globalThis.cancelAnimationFrame;
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
   callback(performance.now());
   return 0;
@@ -393,14 +393,14 @@ globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
 const results: RangeStructuralResult[] = [];
 try {
   for (const rows of ROW_COUNTS) {
-    results.push(...(await storeWorkloads(rows, memory)));
-    results.push(await datasourceRevisionWorkload(rows, memory));
-    results.push(await autoFitWorkload(rows, memory));
+    results.push(...(await store_workloads(rows, memory)));
+    results.push(await datasource_revision_workload(rows, memory));
+    results.push(await auto_fit_workload(rows, memory));
   }
 } finally {
-  globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-  globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-  restoreCanvas();
+  globalThis.requestAnimationFrame = original_request_animation_frame;
+  globalThis.cancelAnimationFrame = original_cancel_animation_frame;
+  restore_canvas();
 }
 
 const artifact: RangeGateArtifact = {

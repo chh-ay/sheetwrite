@@ -10,7 +10,7 @@ import { makeColumnarData, makeWorkbook, scrollerOf } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let grid: GridImpl | null = null;
 
 beforeAll(async () => {
@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   jest.useFakeTimers();
 });
 
@@ -26,7 +26,7 @@ afterEach(() => {
   grid?.destroy();
   grid = null;
   jest.useRealTimers();
-  restoreStubs();
+  restore_stubs();
 });
 
 function mount(options: { readOnly?: boolean } = {}): { host: HTMLDivElement; grid: GridImpl } {
@@ -43,7 +43,7 @@ function mount(options: { readOnly?: boolean } = {}): { host: HTMLDivElement; gr
 }
 
 /** Client point at the center of a cell; the test viewport starts at (0, 0). */
-function cellPoint(addr: CellAddress) {
+function cell_point(addr: CellAddress) {
   const workbook = makeWorkbook(10);
   const columns = workbook.sheets[0]?.columns ?? [];
   let x = DEFAULT_THEME.rowHeaderWidth;
@@ -56,21 +56,21 @@ function cellPoint(addr: CellAddress) {
 
 function hover(host: HTMLElement, addr: CellAddress): void {
   scrollerOf(host).dispatchEvent(
-    new PointerEvent("pointermove", { ...cellPoint(addr), pointerType: "mouse", bubbles: true }),
+    new PointerEvent("pointermove", { ...cell_point(addr), pointerType: "mouse", bubbles: true }),
   );
 }
 
-function noteCard(host: HTMLElement): HTMLElement | null {
+function note_card(host: HTMLElement): HTMLElement | null {
   return host.querySelector<HTMLElement>(".sheetwrite-note");
 }
 
-function noteEditor(host: HTMLElement): HTMLTextAreaElement {
+function note_editor(host: HTMLElement): HTMLTextAreaElement {
   const editor = host.querySelector(".sheetwrite-note-editor");
   if (!(editor instanceof HTMLTextAreaElement)) throw new Error("expected the note editor");
   return editor;
 }
 
-function openEditor(target: GridImpl, addr: CellAddress): void {
+function open_editor(target: GridImpl, addr: CellAddress): void {
   target.setSelection({ kind: "cell", addr });
   target.actions.editNote();
 }
@@ -86,11 +86,11 @@ describe("note hover card", () => {
 
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS - 1);
-    expectSame(noteCard(host), null);
+    expectSame(note_card(host), null);
 
     jest.advanceTimersByTime(1);
-    expect(noteCard(host)?.textContent).toBe("Check the totals");
-    expect(noteCard(host)?.getAttribute("role")).toBe("tooltip");
+    expect(note_card(host)?.textContent).toBe("Check the totals");
+    expect(note_card(host)?.getAttribute("role")).toBe("tooltip");
     // The card does not take the focus.
     expectSame(document.activeElement, focused);
   });
@@ -113,11 +113,11 @@ describe("note hover card", () => {
     const { host, grid: target } = mount();
     hover(host, NOTED);
     jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS);
-    expect(noteCard(host) === null).toBe(false);
+    expect(note_card(host) === null).toBe(false);
 
     dismiss(host, target);
 
-    expectSame(noteCard(host), null);
+    expectSame(note_card(host), null);
   });
 });
 
@@ -125,8 +125,8 @@ describe("note editor", () => {
   it("commits the typed text with Ctrl+Enter as one undoable step", () => {
     const { host, grid: target } = mount();
 
-    openEditor(target, NOTED);
-    const editor = noteEditor(host);
+    open_editor(target, NOTED);
+    const editor = note_editor(host);
     expectSame(document.activeElement, editor);
     expect(editor.value).toBe("Check the totals");
 
@@ -144,8 +144,8 @@ describe("note editor", () => {
   it("deletes the note when the committed text is empty", () => {
     const { host, grid: target } = mount();
 
-    openEditor(target, NOTED);
-    const editor = noteEditor(host);
+    open_editor(target, NOTED);
+    const editor = note_editor(host);
     editor.value = "   ";
     press(editor, { key: "Enter", metaKey: true });
 
@@ -155,8 +155,8 @@ describe("note editor", () => {
   it("leaves the note unchanged on Escape and returns focus to the grid", () => {
     const { host, grid: target } = mount();
 
-    openEditor(target, NOTED);
-    const editor = noteEditor(host);
+    open_editor(target, NOTED);
+    const editor = note_editor(host);
     editor.value = "Discard this";
     press(editor, { key: "Escape" });
 
@@ -171,7 +171,7 @@ describe("note editor", () => {
 
     press(host, { key: "F2", shiftKey: true });
 
-    const editor = noteEditor(host);
+    const editor = note_editor(host);
     expect(editor.value).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-editor")).toBeNull();
   });
@@ -183,8 +183,8 @@ describe("deleteNote", () => {
     [true, "Check the totals"],
   ] as const)(
     "removes the focus cell's note unless the grid is read-only (%p)",
-    (readOnly, note) => {
-      const { grid: target } = mount({ readOnly });
+    (read_only, note) => {
+      const { grid: target } = mount({ readOnly: read_only });
       target.setSelection({ kind: "cell", addr: NOTED });
       target.actions.deleteNote();
       expect(target.getNote(NOTED)).toBe(note);

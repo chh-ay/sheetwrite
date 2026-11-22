@@ -21,7 +21,7 @@ import {
  * `0.00%` in 18pt Georgia aligned top, xf3 General aligned center. Column A mixes xf1 and
  * xf2; column B uses xf1 for two numbers and General (xf0) for a third.
  */
-const nativeStyledWorkbook = () =>
+const native_styled_workbook = () =>
   rawXlsx({
     styles: stylesXml(
       '<numFmts count="1"><numFmt numFmtId="164" formatCode="$#,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><sz val="18"/><name val="Georgia"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="1" fillId="0" borderId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs>',
@@ -38,8 +38,10 @@ const nativeStyledWorkbook = () =>
 
 describe("XLSX cell font family, vertical alignment, and number formats", () => {
   it("imports native styles per cell, keeping mixed column formats and the default font out", async () => {
-    const { warnings, onWarning } = collectWarnings();
-    const imported = await backend.fromXlsxWorkbook(nativeStyledWorkbook(), { onWarning });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(native_styled_workbook(), {
+      onWarning: on_warning,
+    });
     const prices = sheetAt(imported);
 
     // Column A mixes two formats: no column default, each cell keeps its own.
@@ -61,7 +63,7 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
   });
 
   it("exports font family, vertical alignment, and per-cell number formats natively", async () => {
-    const imported = await backend.fromXlsxWorkbook(nativeStyledWorkbook());
+    const imported = await backend.fromXlsxWorkbook(native_styled_workbook());
     const styles = partText(await backend.toXlsxWorkbook(imported), "xl/styles.xml");
     for (const fragment of [
       '<name val="Georgia"/>',
@@ -74,9 +76,9 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
       expect(styles).toContain(fragment);
     }
     // LibreOffice uses Normal for unstyled cells, independently of cellXfs0.
-    const normalStyle = styles.match(/<cellStyleXfs\b[^>]*>([\s\S]*?)<\/cellStyleXfs>/)?.[1];
-    expect(normalStyle).toContain('applyAlignment="1"');
-    expect(normalStyle).toContain('vertical="center"');
+    const normal_style = styles.match(/<cellStyleXfs\b[^>]*>([\s\S]*?)<\/cellStyleXfs>/)?.[1];
+    expect(normal_style).toContain('applyAlignment="1"');
+    expect(normal_style).toContain('vertical="center"');
   });
 
   it.each([
@@ -87,7 +89,7 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
     ["top", '<alignment vertical="top"/>', "top", "top"],
   ] as const)(
     "maps native %s for cellXfs0, column defaults, and differential styles",
-    async (_name, alignment, verticalAlign, differentialVertical) => {
+    async (_name, alignment, vertical_align, differential_vertical) => {
       const imported = await backend.fromXlsxWorkbook(
         rawXlsx({
           styles: stylesXml(
@@ -105,12 +107,14 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
           ],
         }),
       );
-      const importedSheet = sheetAt(imported);
-      expect(styleAt(imported, 0, 0)?.verticalAlign).toBe(verticalAlign);
-      expect(styleAt(imported, 0, 1)?.verticalAlign).toBe(verticalAlign);
-      expect(importedSheet.columns[1]?.cellStyle?.verticalAlign).toBe(verticalAlign);
-      expect(importedSheet.conditionalFormats?.[0]?.style).toMatchObject({ bold: true });
-      expect(importedSheet.conditionalFormats?.[0]?.style.verticalAlign).toBe(differentialVertical);
+      const imported_sheet = sheetAt(imported);
+      expect(styleAt(imported, 0, 0)?.verticalAlign).toBe(vertical_align);
+      expect(styleAt(imported, 0, 1)?.verticalAlign).toBe(vertical_align);
+      expect(imported_sheet.columns[1]?.cellStyle?.verticalAlign).toBe(vertical_align);
+      expect(imported_sheet.conditionalFormats?.[0]?.style).toMatchObject({ bold: true });
+      expect(imported_sheet.conditionalFormats?.[0]?.style.verticalAlign).toBe(
+        differential_vertical,
+      );
     },
   );
 
@@ -152,8 +156,11 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
     ["middle", "middle", "center"],
   ] as const)(
     "exports %s alignment as native bytes without changing differential absence",
-    async (_name, verticalAlign, nativeVertical) => {
-      const style: CellStyle = { bold: true, ...(verticalAlign ? { verticalAlign } : {}) };
+    async (_name, vertical_align, native_vertical) => {
+      const style: CellStyle = {
+        bold: true,
+        ...(vertical_align ? { verticalAlign: vertical_align } : {}),
+      };
       const cells = block([[1]]);
       const [cell] = cells.cells;
       if (cell) cell.style = style;
@@ -176,13 +183,13 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
       const xfs = styles
         .match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/)?.[1]
         ?.match(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g);
-      const cellStyleId = Number(
+      const cell_style_id = Number(
         partText(bytes, "xl/worksheets/sheet1.xml").match(
           /<c\b[^>]*\br="A1"[^>]*\bs="(\d+)"/,
         )?.[1] ?? 0,
       );
       expect(xfs?.[0]).toContain('vertical="center"');
-      expect(xfs?.[cellStyleId]?.match(/\bvertical="([^"]+)"/)?.[1]).toBe(nativeVertical);
+      expect(xfs?.[cell_style_id]?.match(/\bvertical="([^"]+)"/)?.[1]).toBe(native_vertical);
       expect(styles.match(/<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>/)?.[1]).not.toContain("<alignment");
     },
   );

@@ -85,13 +85,13 @@ export interface NumberFormatParts {
 
 export const MAX_DECIMALS = 30;
 
-function decimalsPart(decimals: number): string {
+function decimals_part(decimals: number): string {
   return decimals > 0 ? `.${"0".repeat(decimals)}` : "";
 }
 
 /** The format code a Number-tab category and its settings make. */
 export function numberFormatCode(parts: NumberFormatParts): string {
-  const decimals = decimalsPart(parts.decimals);
+  const decimals = decimals_part(parts.decimals);
   const negative = (base: string): string => (parts.parentheses ? `${base}_);(${base})` : base);
   switch (parts.category) {
     case "General":
@@ -228,7 +228,7 @@ export const FONT_FAMILIES: readonly string[] = [
 ];
 
 /** Split a format code into its `;` sections, keeping quoted text intact. */
-function formatSections(code: string): string[] {
+function format_sections(code: string): string[] {
   const sections: string[] = [];
   let start = 0;
   let quoted = false;
@@ -253,7 +253,7 @@ const DIGIT_PLACEHOLDERS = "0#?";
  * Returns null when the section has no digits to adjust (a date, time or text
  * section).
  */
-function stepSectionDecimals(section: string, direction: 1 | -1): string | null {
+function step_section_decimals(section: string, direction: 1 | -1): string | null {
   let index = 0;
   while (index < section.length) {
     const char = section[index]!;
@@ -278,7 +278,7 @@ function stepSectionDecimals(section: string, direction: 1 | -1): string | null 
 
     let end = index;
     while (end < section.length && `${DIGIT_PLACEHOLDERS},`.includes(section[end]!)) end += 1;
-    const integerEnd = end;
+    const integer_end = end;
     let decimals = 0;
     if (section[end] === ".") {
       end += 1;
@@ -294,7 +294,7 @@ function stepSectionDecimals(section: string, direction: 1 | -1): string | null 
       continue;
     }
     const next = Math.max(0, decimals + direction);
-    const integer = section.slice(index, integerEnd);
+    const integer = section.slice(index, integer_end);
     const run = next === 0 ? integer : `${integer}.${"0".repeat(next)}`;
     return section.slice(0, index) + run + section.slice(end);
   }
@@ -321,8 +321,8 @@ export function stepNumberFormatDecimals(
     return next === 0 ? "0" : `0.${"0".repeat(next)}`;
   }
 
-  const sections = formatSections(code);
-  const stepped = sections.map((section) => stepSectionDecimals(section, direction));
+  const sections = format_sections(code);
+  const stepped = sections.map((section) => step_section_decimals(section, direction));
   if (stepped.every((section) => section === null)) return undefined;
   const next = stepped.map((section, index) => section ?? sections[index]!).join(";");
   return next === code ? undefined : next;

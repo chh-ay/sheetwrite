@@ -64,7 +64,7 @@ export const RENDER_GATE_POLICIES: Readonly<Record<BenchmarkMode, RenderGatePoli
   },
 };
 
-function equalValues<T extends string | number>(
+function equal_values<T extends string | number>(
   observed: readonly T[],
   expected: readonly T[],
 ): boolean {
@@ -87,29 +87,29 @@ export function validateRenderGateArtifact(
 ): RenderBenchmarkArtifact {
   const artifact = parseRenderArtifact(value, options);
   const policy = RENDER_GATE_POLICIES[mode];
-  const expectedRounds = options.rounds ?? policy.rounds;
+  const expected_rounds = options.rounds ?? policy.rounds;
   const config = artifact.config;
   if (
-    !equalValues(config.engines, policy.config.engines as readonly EngineId[]) ||
-    !equalValues(config.rows, policy.config.rows) ||
-    !equalValues(config.scenarios, policy.config.scenarios as readonly ScenarioId[])
+    !equal_values(config.engines, policy.config.engines as readonly EngineId[]) ||
+    !equal_values(config.rows, policy.config.rows) ||
+    !equal_values(config.scenarios, policy.config.scenarios as readonly ScenarioId[])
   ) {
     throw new Error(`${policy.matrixId} configuration does not match the exact declared matrix`);
   }
   if (
-    artifact.metadata.rounds !== expectedRounds ||
+    artifact.metadata.rounds !== expected_rounds ||
     artifact.metadata.measuredSamples !== policy.measuredSamples ||
     artifact.metadata.warmupSamples !== policy.warmupSamples ||
     artifact.metadata.minimumSampleDurationMs !== policy.minimumSampleDurationMs
   ) {
     throw new Error(`${policy.matrixId} sample/warmup protocol does not match the declared matrix`);
   }
-  const expectedHashes = Object.fromEntries(
+  const expected_hashes = Object.fromEntries(
     policy.config.rows.map((rows) => [String(rows), RENDER_DATASET_HASHES[rows]]),
   );
-  const expectedOrder = counterbalancedOrder(
+  const expected_order = counterbalancedOrder(
     policy.config.engines,
-    expectedRounds,
+    expected_rounds,
     RENDER_ORDER_SEED,
   );
   if (
@@ -117,15 +117,15 @@ export function validateRenderGateArtifact(
     artifact.metadata.orderSeed !== RENDER_ORDER_SEED ||
     artifact.metadata.viewport.width !== RENDER_VIEWPORT.width ||
     artifact.metadata.viewport.height !== RENDER_VIEWPORT.height ||
-    JSON.stringify(artifact.metadata.datasetHashes) !== JSON.stringify(expectedHashes) ||
-    JSON.stringify(artifact.metadata.engineOrder) !== JSON.stringify(expectedOrder)
+    JSON.stringify(artifact.metadata.datasetHashes) !== JSON.stringify(expected_hashes) ||
+    JSON.stringify(artifact.metadata.engineOrder) !== JSON.stringify(expected_order)
   ) {
     throw new Error(`${policy.matrixId} metadata does not match the controlled dataset/run policy`);
   }
   if (
     artifact.metadata.launchAttempts.some(
       (attempt) =>
-        attempt.round > expectedRounds ||
+        attempt.round > expected_rounds ||
         !policy.config.engines.includes(attempt.engine) ||
         !policy.config.rows.includes(attempt.rows),
     )
@@ -140,23 +140,27 @@ export function validateRenderGateArtifact(
   for (const result of artifact.results) {
     if (result.status !== "success") continue;
     const key = renderMatrixKey(result);
-    const { beforeBytes, afterBytes, deltaBytes } = result.memory;
-    if (beforeBytes === null || afterBytes === null || deltaBytes === null) {
+    const {
+      beforeBytes: before_bytes,
+      afterBytes: after_bytes,
+      deltaBytes: delta_bytes,
+    } = result.memory;
+    if (before_bytes === null || after_bytes === null || delta_bytes === null) {
       throw new Error(`${key}.memory is missing`);
     }
     if (
-      !Number.isSafeInteger(beforeBytes) ||
-      !Number.isSafeInteger(afterBytes) ||
-      !Number.isSafeInteger(deltaBytes) ||
-      beforeBytes < 0 ||
-      afterBytes < 0
+      !Number.isSafeInteger(before_bytes) ||
+      !Number.isSafeInteger(after_bytes) ||
+      !Number.isSafeInteger(delta_bytes) ||
+      before_bytes < 0 ||
+      after_bytes < 0
     ) {
       throw new Error(`${key}.memory must contain finite non-negative integer heap samples`);
     }
     if (
-      beforeBytes >= RENDER_HEAP_CEILING_BYTES ||
-      afterBytes >= RENDER_HEAP_CEILING_BYTES ||
-      Math.abs(deltaBytes) >= RENDER_HEAP_DELTA_CEILING_BYTES
+      before_bytes >= RENDER_HEAP_CEILING_BYTES ||
+      after_bytes >= RENDER_HEAP_CEILING_BYTES ||
+      Math.abs(delta_bytes) >= RENDER_HEAP_DELTA_CEILING_BYTES
     ) {
       throw new Error(`${key}.memory exceeded the broad renderer heap safety ceiling`);
     }
@@ -186,16 +190,17 @@ export function validateRenderGateArtifact(
     }
     if (result.scenarioId === "merge-heavy.paint") {
       if (!result.mergeResources) throw new Error(`${key}.mergeResources is missing`);
-      const { indexConstructions, candidatesExamined } = result.mergeResources;
+      const { indexConstructions: index_constructions, candidatesExamined: candidates_examined } =
+        result.mergeResources;
       if (result.engine === "sheetwrite") {
         if (
-          indexConstructions !== 1 ||
-          candidatesExamined <= 0 ||
-          candidatesExamined > (result.operationCount + 1) * 1_000
+          index_constructions !== 1 ||
+          candidates_examined <= 0 ||
+          candidates_examined > (result.operationCount + 1) * 1_000
         ) {
           throw new Error(`${key}.mergeResources exceeded the visible-intersection budget`);
         }
-      } else if (indexConstructions !== 0 || candidatesExamined !== 0) {
+      } else if (index_constructions !== 0 || candidates_examined !== 0) {
         throw new Error(`${key}.mergeResources must be zero for the comparison engine`);
       }
     }

@@ -114,7 +114,7 @@ interface CaptureMeta {
   timestamp: string;
 }
 
-function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined {
+function capture_meta_of(value: Record<string, unknown>): CaptureMeta | undefined {
   const raw = value.metadata ?? value.meta;
   if (raw === null || typeof raw !== "object") return undefined;
   const meta = raw as Record<string, unknown>;
@@ -136,25 +136,25 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
  * missing or invalid the landing renders a "run the protocol" placeholder.
  */
 export async function renderLandingBench(): Promise<string> {
-  const sizeReport = JSON.parse(
+  const size_report = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/size-report.json"), "utf8"),
   ) as Pick<SizeReport, "metrics">;
-  const fullEngine = await loadEvidence(
+  const full_engine = await load_evidence(
     "bench/results/full-engine-results.json",
     "bun run --filter @sheetwrite/bench bench:formula:engines",
     validateFullEngineArtifact,
   );
   const machines = captureMachines();
-  const scale = await loadMachineCaptures(
+  const scale = await load_machine_captures(
     machines,
     "render-scale.json",
     "bun run --filter @sheetwrite/bench bench:render:scale",
-    validateRenderArtifact,
+    validate_render_artifact,
   );
   return landingBenchPayload(
     scale.release,
-    "evidence" in fullEngine
-      ? landingDownloads(sizeReport.metrics, fullEngine.evidence.engines)
+    "evidence" in full_engine
+      ? landingDownloads(size_report.metrics, full_engine.evidence.engines)
       : undefined,
   );
 }
@@ -166,16 +166,16 @@ export async function renderLandingBench(): Promise<string> {
  * carries it (docs/src/routes/index.tsx and showcases.performance.tsx import it).
  */
 export async function renderLandingStory(): Promise<string> {
-  const scale = await loadMachineCaptures(
+  const scale = await load_machine_captures(
     captureMachines(),
     "render-scale.json",
     "bun run --filter @sheetwrite/bench bench:render:scale",
-    validateRenderArtifact,
+    validate_render_artifact,
   );
   return scale.machines.length === 0
     ? ""
     : renderSpeedupStory(
-        { id: "story", baseName: "Handsontable", machines: storyMachines(scale.machines) },
+        { id: "story", baseName: "Handsontable", machines: story_machines(scale.machines) },
         (name) => inlineIcon(name),
       );
 }
@@ -193,7 +193,7 @@ const CORE_FIRST_LOAD_METRICS = ["javascript", "wasm", "css"].map(
 );
 
 /** A size the landing can show: present and a finite number of bytes. */
-function isKnownBytes(value: number | undefined): value is number {
+function is_known_bytes(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value);
 }
 
@@ -206,18 +206,22 @@ export function landingDownloads(
   metrics: Readonly<Record<string, Pick<Metric, "actual">>>,
   engines: ReadonlyArray<{ engine: string; wasm: { brotliBytes: number } }>,
 ): LandingDownloads | undefined {
-  const firstLoad = CORE_FIRST_LOAD_METRICS.map((key) => metrics[key]?.actual);
-  const defaultEngine = engines.find((entry) => entry.engine === "default")?.wasm.brotliBytes;
-  const fullEngine = engines.find((entry) => entry.engine === "full")?.wasm.brotliBytes;
+  const first_load = CORE_FIRST_LOAD_METRICS.map((key) => metrics[key]?.actual);
+  const default_engine = engines.find((entry) => entry.engine === "default")?.wasm.brotliBytes;
+  const full_engine = engines.find((entry) => entry.engine === "full")?.wasm.brotliBytes;
 
-  if (!firstLoad.every(isKnownBytes) || !isKnownBytes(defaultEngine) || !isKnownBytes(fullEngine)) {
+  if (
+    !first_load.every(is_known_bytes) ||
+    !is_known_bytes(default_engine) ||
+    !is_known_bytes(full_engine)
+  ) {
     return undefined;
   }
 
   return {
-    coreFirstLoadBrotliBytes: firstLoad.reduce((sum, bytes) => sum + bytes, 0),
-    defaultEngineBrotliBytes: defaultEngine,
-    fullEngineBrotliBytes: fullEngine,
+    coreFirstLoadBrotliBytes: first_load.reduce((sum, bytes) => sum + bytes, 0),
+    defaultEngineBrotliBytes: default_engine,
+    fullEngineBrotliBytes: full_engine,
   };
 }
 
@@ -229,7 +233,7 @@ const round1 = (value: number): number => Math.round(value * 10) / 10;
  * full-round pairs are omitted rather than emitted as NaN (JSON.stringify
  * silently turns NaN into null, which would render as a number).
  */
-function landingSizes(evidence: ValidatedRenderEvidence) {
+function landing_sizes(evidence: ValidatedRenderEvidence) {
   const successes = (size: number, engine: string, scenario: string): RenderEvidenceResult[] =>
     evidence.results.filter(
       (result) =>
@@ -240,13 +244,13 @@ function landingSizes(evidence: ValidatedRenderEvidence) {
     );
   return evidence.config.rows.flatMap((size) => {
     const ratios: Array<{ scenario: string; ratio: number }> = [];
-    let handsontableIncomplete = 0;
+    let handsontable_incomplete = 0;
     for (const scenario of evidence.config.scenarios) {
       const ours = successes(size, "sheetwrite", scenario);
       const theirs = successes(size, "handsontable", scenario);
       // Round-aware: a bucket with fewer successes than the declared round
       // count is incomplete, and only full-round pairs enter the ratios.
-      if (theirs.length < evidence.metadata.rounds) handsontableIncomplete += 1;
+      if (theirs.length < evidence.metadata.rounds) handsontable_incomplete += 1;
       if (ours.length < evidence.metadata.rounds || theirs.length < evidence.metadata.rounds)
         continue;
       ratios.push({
@@ -263,7 +267,7 @@ function landingSizes(evidence: ValidatedRenderEvidence) {
         medianRatio: round1(median(ratios.map((r) => r.ratio))),
         bestRatio: round1(best.ratio),
         bestScenario: best.scenario,
-        handsontableIncomplete,
+        handsontableIncomplete: handsontable_incomplete,
       },
     ];
   });
@@ -275,9 +279,9 @@ export function landingBenchPayload(
   downloads?: LandingDownloads,
 ): string {
   // Download sizes do not depend on the benchmark, so both payloads carry them.
-  const downloadsField = downloads ? { downloads } : {};
+  const downloads_field = downloads ? { downloads } : {};
   const unavailable = (reason: string): string =>
-    `${JSON.stringify({ available: false, reason, ...downloadsField }, null, 2)}\n`;
+    `${JSON.stringify({ available: false, reason, ...downloads_field }, null, 2)}\n`;
   if (!("evidence" in scale)) return unavailable(scale.reason);
   const { evidence } = scale;
   const successes = (size: number, engine: string, scenario: string): RenderEvidenceResult[] =>
@@ -288,25 +292,25 @@ export function landingBenchPayload(
         result.scenarioId === scenario &&
         result.status === "success",
     );
-  const sizes = landingSizes(evidence);
-  const scenarioMedians: number[] = [];
-  const scenarioHeaps: number[] = [];
+  const sizes = landing_sizes(evidence);
+  const scenario_medians: number[] = [];
+  const scenario_heaps: number[] = [];
   for (const scenario of evidence.config.scenarios) {
     const bucket = successes(1_000_000, "sheetwrite", scenario);
     // Hero stats hold the same full-round bar as the ratio pairs.
     if (bucket.length < evidence.metadata.rounds) continue;
-    scenarioMedians.push(median(bucket.map((r) => r.medianMs)));
-    scenarioHeaps.push(median(bucket.map((r) => r.memory.afterBytes)));
+    scenario_medians.push(median(bucket.map((r) => r.medianMs)));
+    scenario_heaps.push(median(bucket.map((r) => r.memory.afterBytes)));
   }
-  const heroStats = {
-    millionRowScenarios: scenarioMedians.length,
-    millionRowMedianMs: round1(median(scenarioMedians)),
-    millionRowHeapMb: Math.round(median(scenarioHeaps) / 1_000_000),
+  const hero_stats = {
+    millionRowScenarios: scenario_medians.length,
+    millionRowMedianMs: round1(median(scenario_medians)),
+    millionRowHeapMb: Math.round(median(scenario_heaps) / 1_000_000),
   };
   const displayed = [
     ...sizes.flatMap((entry) => [entry.medianRatio, entry.bestRatio]),
-    heroStats.millionRowMedianMs,
-    heroStats.millionRowHeapMb,
+    hero_stats.millionRowMedianMs,
+    hero_stats.millionRowHeapMb,
   ];
 
   // Never publish a payload whose displayed values are not all finite: a
@@ -324,25 +328,25 @@ export function landingBenchPayload(
       rounds: evidence.metadata.rounds,
       engineVersions: evidence.metadata.engineVersions,
     },
-    heroStats,
+    heroStats: hero_stats,
     sizes,
-    ...downloadsField,
+    ...downloads_field,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
-async function loadEvidence<T>(
-  relPath: string,
+async function load_evidence<T>(
+  rel_path: string,
   reproduction: string,
   validate: (value: Record<string, unknown>) => T | string,
 ): Promise<{ evidence: T; source: string } | EvidenceState> {
-  const path = join(repositoryRoot, relPath);
+  const path = join(repositoryRoot, rel_path);
   const source = posix(relative(repositoryRoot, path));
   if (!(await exists(path)))
     return { available: false, reason: "artifact is missing", source, reproduction };
   try {
     const value = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
-    if (captureMetaOf(value) === undefined) {
+    if (capture_meta_of(value) === undefined) {
       return {
         available: false,
         reason:
@@ -381,7 +385,7 @@ const MACHINE_REPRODUCTION =
   "cd bench && bun run bench:release:machine -- --machine mac --release <version> --checkout <clean checkout of the release, packages built> --xlsx-baseline-root <XLSX baseline checkout>";
 
 /** Loads `artifact` from every machine's results directory. */
-async function loadMachineCaptures<T>(
+async function load_machine_captures<T>(
   machines: readonly CaptureMachine[],
   artifact: string,
   reproduction: string,
@@ -390,7 +394,7 @@ async function loadMachineCaptures<T>(
   const loaded = await Promise.all(
     machines.map(async (machine) => ({
       machine,
-      state: await loadEvidence(
+      state: await load_evidence(
         `${machine.directory}/${artifact}`,
         machine.machine === "linux" ? reproduction : MACHINE_REPRODUCTION,
         validate,
@@ -412,7 +416,9 @@ async function loadMachineCaptures<T>(
   };
 }
 
-function validateRenderArtifact(value: Record<string, unknown>): ValidatedRenderEvidence | string {
+function validate_render_artifact(
+  value: Record<string, unknown>,
+): ValidatedRenderEvidence | string {
   const artifact = value as unknown as Partial<ValidatedRenderEvidence>;
   const metadata = artifact.metadata;
   const config = artifact.config;
@@ -477,7 +483,7 @@ interface CorePathsEvidence {
  * each reported scenario needs finite timings and a written validation
  * checkpoint to be publishable.
  */
-function validateCorePathsArtifact(value: Record<string, unknown>): CorePathsEvidence | string {
+function validate_core_paths_artifact(value: Record<string, unknown>): CorePathsEvidence | string {
   const artifact = value as unknown as Partial<CorePathsEvidence>;
   if (
     artifact.schemaVersion !== 1 ||
@@ -535,7 +541,7 @@ interface XlsxEvidence {
   }>;
 }
 
-function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | string {
+function validate_xlsx_artifact(value: Record<string, unknown>): XlsxEvidence | string {
   const artifact = value as unknown as Partial<XlsxEvidence>;
   if (
     (artifact.protocol !== "sheetwrite-xlsx-codec-v1" &&
@@ -603,10 +609,10 @@ export function validateDataArtifact(value: Record<string, unknown>): DataEviden
     ["sheetwrite", [...DATA_HEAD_TO_HEAD_ROWS, ...DATA_SCALE_ROWS]],
     ["handsontable", DATA_HEAD_TO_HEAD_ROWS],
   ] as const;
-  for (const [engine, rowsList] of required) {
+  for (const [engine, rows_list] of required) {
     const block = artifact[engine];
     if (block === undefined || typeof block !== "object") return `artifact lacks ${engine} results`;
-    for (const rows of rowsList) {
+    for (const rows of rows_list) {
       const stats = block[String(rows)]?.stats;
       for (const operation of DATA_OPERATIONS) {
         const stat = stats?.[operation];
@@ -628,7 +634,7 @@ interface FormulaEvidence {
   memory: Array<{ formulas: number; wasmDeltaBytes: number }>;
 }
 
-function validateFormulaArtifact(value: Record<string, unknown>): FormulaEvidence | string {
+function validate_formula_artifact(value: Record<string, unknown>): FormulaEvidence | string {
   const artifact = value as unknown as Partial<FormulaEvidence>;
   if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
     return "artifact is not a full-mode formula protocol capture";
@@ -648,12 +654,12 @@ function validateFormulaArtifact(value: Record<string, unknown>): FormulaEvidenc
 
 const BENCH_SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
 
-function fmtRows(rows: number): string {
+function fmt_rows(rows: number): string {
   return rows >= 1_000_000 ? `${rows / 1_000_000}M` : `${rows / 1_000}k`;
 }
 
 /** The median of per-round values, banded by the lowest and highest round. */
-function acrossRounds(values: readonly number[]): PerfStat | undefined {
+function across_rounds(values: readonly number[]): PerfStat | undefined {
   if (values.length === 0) return undefined;
   return { value: median([...values]), spread: [Math.min(...values), Math.max(...values)] };
 }
@@ -668,14 +674,14 @@ interface TabbedPanels {
 }
 
 /** Size tabs over panels of bars, without client JavaScript. */
-function sizeTabs({ name, sizes, panels, metricTabs }: TabbedPanels): string {
-  const radioName = name === "bench-data" ? "bench-data-size" : name;
+function size_tabs({ name, sizes, panels, metricTabs: metric_tabs }: TabbedPanels): string {
+  const radio_name = name === "bench-data" ? "bench-data-size" : name;
   return [
     `<div class="bench-widget${name === "bench-data" ? " bench-widget--data" : ""}" data-pagefind-ignore>`,
     // No checked attribute: hydrated React treats it as a controlled input
     // and reverts user toggles. The default tab lives in CSS.
-    ...sizes.map((size) => `<input type="radio" name="${radioName}" id="${name}-${size}">`),
-    ...(metricTabs
+    ...sizes.map((size) => `<input type="radio" name="${radio_name}" id="${name}-${size}">`),
+    ...(metric_tabs
       ? [
           '<input type="radio" name="bench-metric" id="bench-metric-speed">',
           '<input type="radio" name="bench-metric" id="bench-metric-memory">',
@@ -683,9 +689,9 @@ function sizeTabs({ name, sizes, panels, metricTabs }: TabbedPanels): string {
       : []),
     '<div class="bench-widget__tabs">',
     '<div class="bench-tabs" aria-label="Workbook size">',
-    ...sizes.map((size) => `<label for="${name}-${size}">${fmtRows(size)} rows</label>`),
+    ...sizes.map((size) => `<label for="${name}-${size}">${fmt_rows(size)} rows</label>`),
     "</div>",
-    ...(metricTabs
+    ...(metric_tabs
       ? [
           '<div class="bench-tabs bench-tabs--metric" aria-label="Metric">',
           '<label for="bench-metric-speed">Speed</label>',
@@ -702,7 +708,7 @@ function sizeTabs({ name, sizes, panels, metricTabs }: TabbedPanels): string {
   ].join("\n");
 }
 
-function benchMethod(
+function bench_method(
   summary: string,
   paragraphs: string[],
   entries: Array<[string, string]>,
@@ -720,7 +726,7 @@ function benchMethod(
   ].join("\n");
 }
 
-const RENDER_METHOD = benchMethod(
+const RENDER_METHOD = bench_method(
   "Methodology: what each scenario does",
   [
     "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
@@ -763,7 +769,7 @@ const RENDER_METHOD = benchMethod(
   ],
 );
 
-const DATA_METHOD = benchMethod(
+const DATA_METHOD = bench_method(
   "Methodology: what each operation does",
   [
     "Identical columnar datasets, per-operation warmup and iteration plans. Fresh instance per ingest; window reads rotate offsets to defeat caches; sort and filter reset between runs; Handsontable edits run with rendering suspended so only its data path is timed.",
@@ -779,7 +785,7 @@ const DATA_METHOD = benchMethod(
   ],
 );
 
-const FORMULA_METHOD = benchMethod(
+const FORMULA_METHOD = bench_method(
   "Methodology: what each workload does",
   [
     "Each workload builds a fresh WASM cell-store of the named dependency shape and times the recalculation from one action - usually a single edit. Sizes are formula-cell counts; bright = median, faded = p95.",
@@ -814,15 +820,15 @@ const FORMULA_METHOD = benchMethod(
 );
 
 /** Each scenario at one size: Handsontable is the base, Sheetwrite the measured bar. */
-function renderRows(
+function render_rows(
   evidence: ValidatedRenderEvidence,
   size: number,
   metric: "speed" | "memory",
 ): PerfRow[] {
-  const roundValue = (result: RenderEvidenceResult): number =>
+  const round_value = (result: RenderEvidenceResult): number =>
     metric === "speed" ? result.medianMs : result.memory.afterBytes;
-  const statOf = (engine: string, scenario: string): PerfStat | undefined =>
-    acrossRounds(
+  const stat_of = (engine: string, scenario: string): PerfStat | undefined =>
+    across_rounds(
       evidence.results
         .filter(
           (result) =>
@@ -831,11 +837,11 @@ function renderRows(
             result.scenarioId === scenario &&
             result.status === "success",
         )
-        .map(roundValue),
+        .map(round_value),
     );
   return evidence.config.scenarios.map((scenario) => {
-    const handsontable = statOf("handsontable", scenario);
-    const sheetwrite = statOf("sheetwrite", scenario);
+    const handsontable = stat_of("handsontable", scenario);
+    const sheetwrite = stat_of("sheetwrite", scenario);
     return {
       label: readableId(scenario),
       id: scenario,
@@ -878,7 +884,7 @@ const STORY_SHORT_LABELS: Readonly<Record<string, string>> = {
 };
 
 /** Each machine's interactions at `STORY_ROWS`: the speed story's data, on the pages and the landing. */
-function storyMachines(
+function story_machines(
   machines: readonly MachineEvidence<ValidatedRenderEvidence>[],
 ): StoryMachine[] {
   return machines.map(({ machine, evidence }) => {
@@ -921,15 +927,15 @@ function storyMachines(
 }
 
 /** Headline cards, the speedup overview and every number, per machine at `STORY_ROWS`. */
-function renderSpeedStory(machines: readonly MachineEvidence<ValidatedRenderEvidence>[]): string {
+function render_speed_story(machines: readonly MachineEvidence<ValidatedRenderEvidence>[]): string {
   return speedStory({
     id: "render-story",
     baseName: "Handsontable",
-    machines: storyMachines(machines),
+    machines: story_machines(machines),
   });
 }
 
-function renderBenchWidget(
+function render_bench_widget(
   evidence: ValidatedRenderEvidence,
   machines: readonly MachineEvidence<ValidatedRenderEvidence>[],
 ): string {
@@ -944,32 +950,32 @@ function renderBenchWidget(
         id: `render-${metric}-${size}`,
         title:
           metric === "speed"
-            ? `Median interaction time at ${fmtRows(size)} rows`
-            : `Renderer heap after the interaction at ${fmtRows(size)} rows`,
+            ? `Median interaction time at ${fmt_rows(size)} rows`
+            : `Renderer heap after the interaction at ${fmt_rows(size)} rows`,
         unit: metric === "speed" ? "ms" : "bytes",
         scale: metric === "speed" ? "log" : "linear",
         rowHeader: "Interaction",
         verdictWords: metric === "speed" ? ["faster", "slower"] : ["smaller heap", "larger heap"],
         series: { base: "Handsontable", measured: "Sheetwrite" },
         spreadLabel: "Lowest to highest round",
-        groups: machineGroups(machines, (capture) => renderRows(capture, size, metric), note),
+        groups: machineGroups(machines, (capture) => render_rows(capture, size, metric), note),
       }),
     })),
   );
   return [
-    sizeTabs({ name: "bench-size", sizes, panels, metricTabs: true }),
+    size_tabs({ name: "bench-size", sizes, panels, metricTabs: true }),
     "",
     "Each bar is the median of the per-round medians; the band runs from the lowest to the highest round. The verdict compares Sheetwrite with Handsontable on the same machine and reads within noise when the two bands overlap. Each machine has its own axis: results from different machines are never compared. A run that did not finish shows as not completed, never as a timing; the failure table below names its recorded error.",
   ].join("\n");
 }
 
 /** Head-to-head store operations at the sizes both engines complete. */
-function dataWidget(machines: readonly MachineEvidence<DataEvidence>[]): string {
+function data_widget(machines: readonly MachineEvidence<DataEvidence>[]): string {
   const panels = DATA_HEAD_TO_HEAD_ROWS.map((rows) => ({
     size: rows,
     figure: perfFigure({
       id: `data-${rows}`,
-      title: `Median operation time at ${fmtRows(rows)} rows`,
+      title: `Median operation time at ${fmt_rows(rows)} rows`,
       unit: "ms",
       scale: "log",
       rowHeader: "Operation",
@@ -1002,11 +1008,16 @@ function dataWidget(machines: readonly MachineEvidence<DataEvidence>[]): string 
       ),
     }),
   }));
-  return sizeTabs({ name: "bench-data", sizes: DATA_HEAD_TO_HEAD_ROWS, panels, metricTabs: false });
+  return size_tabs({
+    name: "bench-data",
+    sizes: DATA_HEAD_TO_HEAD_ROWS,
+    panels,
+    metricTabs: false,
+  });
 }
 
 /** Sheetwrite alone at the sizes Handsontable does not complete headlessly. */
-function dataScaleFigure(machines: readonly MachineEvidence<DataEvidence>[]): string {
+function data_scale_figure(machines: readonly MachineEvidence<DataEvidence>[]): string {
   return perfFigure({
     id: "data-scale",
     title: "Median operation time, Sheetwrite at scale",
@@ -1026,7 +1037,7 @@ function dataScaleFigure(machines: readonly MachineEvidence<DataEvidence>[]): st
               ? []
               : [
                   {
-                    label: `${fmtRows(rows)} rows`,
+                    label: `${fmt_rows(rows)} rows`,
                     role: "measured" as const,
                     stat: fastestToP95(stat),
                   },
@@ -1045,7 +1056,7 @@ function dataScaleFigure(machines: readonly MachineEvidence<DataEvidence>[]): st
  */
 const SCALAR_FAMILY = /^scalar-edit-affects-(\d+)$/u;
 
-function formulaRows(capture: FormulaEvidence): PerfRow[] {
+function formula_rows(capture: FormulaEvidence): PerfRow[] {
   const scalar = capture.workloads.flatMap((workload) => {
     const affected = SCALAR_FAMILY.exec(workload.id)?.[1];
     return affected === undefined ? [] : [{ workload, affected: Number(affected) }];
@@ -1083,7 +1094,7 @@ function formulaRows(capture: FormulaEvidence): PerfRow[] {
   return rows;
 }
 
-function formulaFigure(machines: readonly MachineEvidence<FormulaEvidence>[]): string {
+function formula_figure(machines: readonly MachineEvidence<FormulaEvidence>[]): string {
   return perfFigure({
     id: "formula-workloads",
     title: "Median recalculation time",
@@ -1091,7 +1102,7 @@ function formulaFigure(machines: readonly MachineEvidence<FormulaEvidence>[]): s
     scale: "log",
     rowHeader: "Workload",
     spreadLabel: FASTEST_TO_P95,
-    groups: machineGroups(machines, formulaRows, (capture) => captureNote(capture.meta)),
+    groups: machineGroups(machines, formula_rows, (capture) => captureNote(capture.meta)),
   });
 }
 
@@ -1099,7 +1110,7 @@ function formulaFigure(machines: readonly MachineEvidence<FormulaEvidence>[]): s
  * "countif-100k" at 100,000 cells reads "Countif · 100,000 cells": a size the
  * ID repeats is dropped from the name, so the label states it once.
  */
-function workloadLabel(id: string, size: number): string {
+function workload_label(id: string, size: number): string {
   const scalar = /^scalar-edit-affects-(\d+)$/u.exec(id);
   if (scalar?.[1] !== undefined) {
     return `Scalar edit read by ${formatCount(Number(scalar[1]))} formulas`;
@@ -1131,7 +1142,7 @@ interface EngineComparisonManifest {
 const NEXT_ENGINE = "0.7.0 engine";
 
 /** The workloads both formula captures timed, keyed "id/size". */
-function sharedMedians(
+function shared_medians(
   left: FormulaEvidence,
   right: FormulaEvidence,
 ): Array<readonly [left: number, right: number]> {
@@ -1148,18 +1159,18 @@ function sharedMedians(
  * machine; a machine without a capture reads "pending". Both sides ran in one
  * process tree on the same CPUs, so the comparison holds only within a machine.
  */
-async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<string[]> {
+async function render_engine_change(machines: readonly CaptureMachine[]): Promise<string[]> {
   const entries: ChangeMachine[] = [];
-  let baseName = "";
-  let windowNote = "";
+  let base_name = "";
+  let window_note = "";
   for (const { machine, directory } of ENGINE_COMPARISON_DIRECTORIES) {
     const owner = machines.find((entry) => entry.machine === machine);
     const { name, detail } =
       owner === undefined
         ? { name: machine === "linux" ? "Linux" : "Mac", detail: "" }
         : machineName(owner);
-    const manifestPath = join(repositoryRoot, directory, "capture.json");
-    if (!(await exists(manifestPath))) {
+    const manifest_path = join(repositoryRoot, directory, "capture.json");
+    if (!(await exists(manifest_path))) {
       entries.push({
         machine,
         name,
@@ -1168,14 +1179,14 @@ async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<
       });
       continue;
     }
-    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as EngineComparisonManifest;
+    const manifest = JSON.parse(await readFile(manifest_path, "utf8")) as EngineComparisonManifest;
     if (manifest.protocol !== "sheetwrite-engine-comparison-v3") {
       throw new Error(`${directory}/capture.json is not an engine comparison manifest`);
     }
     const command = "cd bench && bun run bench:engine-comparison";
     const [base, candidate, control] = await Promise.all(
       ["formula-base.json", "formula-candidate.json", "formula-control.json"].map((file) =>
-        loadEvidence(`${directory}/${file}`, command, validateFormulaArtifact),
+        load_evidence(`${directory}/${file}`, command, validate_formula_artifact),
       ),
     );
     if (
@@ -1188,7 +1199,7 @@ async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<
     ) {
       throw new Error(`${directory} holds an engine comparison whose captures do not validate`);
     }
-    baseName = manifest.base.version;
+    base_name = manifest.base.version;
     const workloads = candidate.evidence.workloads.flatMap((measured) => {
       const before = base.evidence.workloads.find(
         (workload) => workload.id === measured.id && workload.size === measured.size,
@@ -1198,7 +1209,7 @@ async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<
         : [
             {
               id: `${measured.id}/${measured.size}`,
-              label: workloadLabel(measured.id, measured.size),
+              label: workload_label(measured.id, measured.size),
               base: fastestToP95(before.stat),
               measured: fastestToP95(measured.stat),
             },
@@ -1215,15 +1226,15 @@ async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<
     const release =
       owner === undefined
         ? undefined
-        : await loadEvidence(
+        : await load_evidence(
             `${owner.directory}/formula-results.json`,
             "bun run --filter @sheetwrite/bench bench:formula",
-            validateFormulaArtifact,
+            validate_formula_artifact,
           );
     if (release !== undefined && "evidence" in release) {
-      const pairs = sharedMedians(control.evidence, release.evidence);
+      const pairs = shared_medians(control.evidence, release.evidence);
       const slowdown = median(pairs.map(([window, captured]) => window / captured));
-      windowNote = `On ${name}, the absolute times here are not comparable with the release capture under "Every workload": ${manifest.base.version}'s own benchmark, run on its own engine in this window, took a median ${formatTimes(slowdown)} its release-capture time (power profile ${manifest.machine.powerProfile}). Compare times only within this figure.`;
+      window_note = `On ${name}, the absolute times here are not comparable with the release capture under "Every workload": ${manifest.base.version}'s own benchmark, run on its own engine in this window, took a median ${formatTimes(slowdown)} its release-capture time (power profile ${manifest.machine.powerProfile}). Compare times only within this figure.`;
     }
   }
   if (entries.every((entry) => entry.workloads === undefined)) return [];
@@ -1232,9 +1243,14 @@ async function renderEngineChange(machines: readonly CaptureMachine[]): Promise<
     "",
     `The formula engine on develop, measured against the last release on the same machine and CPUs. A workload is faster or slower only when its run ranges (fastest to p95 run) do not overlap.`,
     "",
-    releaseChange({ id: "engine-change", baseName, measuredName: NEXT_ENGINE, machines: entries }),
+    releaseChange({
+      id: "engine-change",
+      baseName: base_name,
+      measuredName: NEXT_ENGINE,
+      machines: entries,
+    }),
     "",
-    ...(windowNote === "" ? [] : [windowNote, ""]),
+    ...(window_note === "" ? [] : [window_note, ""]),
     "Reproduce with clean, built checkouts of the last release and of develop, from `bench/`:",
     "",
     '```sh partial="needs clean, built checkouts of the release and of develop" title="Engine comparison"',
@@ -1277,11 +1293,11 @@ const RELEASE_CANDIDATE_CAPTURES: Readonly<Record<string, string>> = {
   "49e05e298c3f39a8cede038fe8d0062343abc21f": "0.5.0",
 };
 
-function sheetwriteLabel(recordedVersion: string, commit: string): string {
+function sheetwrite_label(recorded_version: string, commit: string): string {
   const release = RELEASE_CANDIDATE_CAPTURES[commit];
   return html(
     release === undefined
-      ? `Sheetwrite ${recordedVersion}`
+      ? `Sheetwrite ${recorded_version}`
       : `Sheetwrite ${release} release candidate`,
   );
 }
@@ -1292,7 +1308,7 @@ function sheetwriteLabel(recordedVersion: string, commit: string): string {
  * different commits lists every vintage instead of letting each section's own
  * commit line hide the mismatch.
  */
-function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
+function render_capture_header(captures: readonly EvidenceCapture[]): string[] {
   const first = captures[0];
   if (first === undefined) return [];
   const commits = new Set(captures.map((capture) => capture.meta.commit));
@@ -1343,7 +1359,7 @@ function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
  * never converted into a timing, so the failure list is part of the evidence:
  * it names the stage and the recorded error behind every missing cell.
  */
-function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
+function render_failure_table(evidence: ValidatedRenderEvidence): string[] {
   const failures = evidence.results.filter((result) => result.status !== "success");
   if (failures.length === 0) return [];
   const groups = new Map<
@@ -1386,14 +1402,14 @@ function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
     "| --- | ---: | --- | --- | --- | ---: |",
     ...ordered.map(
       (group) =>
-        `| ${group.engine} | ${fmtRows(group.rows)} | ${group.scenario} | ${group.stage} | ${group.error} | ${group.cells} |`,
+        `| ${group.engine} | ${fmt_rows(group.rows)} | ${group.scenario} | ${group.stage} | ${group.error} | ${group.cells} |`,
     ),
     "",
   ];
 }
 
 /** Markdown table cells cannot carry a raw pipe. */
-const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
+const markdown_cell = (text: string): string => text.replaceAll("|", "\\|");
 
 /** Four representative scenarios lead the complete measurement chart. */
 const CORE_PATH_HEADLINES = [
@@ -1407,7 +1423,7 @@ const CORE_PATH_HEADLINES = [
  * "one fromCsv import of …" reads as a label without the leading count. The
  * first word can be an identifier, so its case stays as written.
  */
-function scenarioLabel(unit: string): string {
+function scenario_label(unit: string): string {
   return unit.replace(/^one /u, "");
 }
 
@@ -1416,7 +1432,7 @@ function scenarioLabel(unit: string): string {
  * and paged residency work. Every scenario carries the checkpoint it proved,
  * so a timing is never published alone.
  */
-function renderCorePathsSection(
+function render_core_paths_section(
   evidence: CorePathsEvidence,
   source: string,
   machines: readonly MachineEvidence<CorePathsEvidence>[],
@@ -1428,7 +1444,7 @@ function renderCorePathsSection(
       : [
           {
             value: formatMs(scenario.timing.median),
-            label: readableText(scenarioLabel(scenario.unit)),
+            label: readableText(scenario_label(scenario.unit)),
           },
         ];
   });
@@ -1460,7 +1476,7 @@ function renderCorePathsSection(
                 {
                   label: readableId(scenario.id),
                   id: scenario.id,
-                  detail: readableText(scenarioLabel(scenario.unit)),
+                  detail: readableText(scenario_label(scenario.unit)),
                   bars: [{ label: "", role: "measured", stat: fastestToP95(scenario.timing) }],
                 },
                 ...(scenario.variants ?? []).map((variant): PerfRow => ({
@@ -1519,7 +1535,7 @@ function renderCorePathsSection(
         "| Scenario | Checkpoint |",
         "| --- | --- |",
         ...evidence.scenarios.map(
-          (scenario) => `| \`${scenario.id}\` | ${markdownCell(scenario.validation)} |`,
+          (scenario) => `| \`${scenario.id}\` | ${markdown_cell(scenario.validation)} |`,
         ),
       ],
     ),
@@ -1533,9 +1549,9 @@ function renderCorePathsSection(
 }
 
 /** Each operation: the baseline codec is the base, the current codec the measured bar. */
-function xlsxRows(capture: XlsxEvidence, metric: "time" | "memory"): PerfRow[] {
-  const baselineCommit = capture.toolchain.baselineCommit;
-  const statOf = (summary: XlsxEvidence["summaries"][number]): PerfStat => {
+function xlsx_rows(capture: XlsxEvidence, metric: "time" | "memory"): PerfRow[] {
+  const baseline_commit = capture.toolchain.baselineCommit;
+  const stat_of = (summary: XlsxEvidence["summaries"][number]): PerfStat => {
     const run = metric === "time" ? summary.durationMs : summary.maxRssBytes;
     // The codec capture records the median absolute deviation, not the fastest run.
     return Number.isFinite(run.mad)
@@ -1546,7 +1562,7 @@ function xlsxRows(capture: XlsxEvidence, metric: "time" | "memory"): PerfRow[] {
     .filter((summary) => summary.engine === "current")
     .map((current) => {
       const baseline =
-        baselineCommit === undefined
+        baseline_commit === undefined
           ? undefined
           : capture.summaries.find(
               (summary) =>
@@ -1561,12 +1577,12 @@ function xlsxRows(capture: XlsxEvidence, metric: "time" | "memory"): PerfRow[] {
             ? []
             : [
                 {
-                  label: `Baseline ${(baselineCommit ?? "").slice(0, 7)}`,
+                  label: `Baseline ${(baseline_commit ?? "").slice(0, 7)}`,
                   role: "base" as const,
-                  stat: statOf(baseline),
+                  stat: stat_of(baseline),
                 },
               ]),
-          { label: "Current", role: "measured" as const, stat: statOf(current) },
+          { label: "Current", role: "measured" as const, stat: stat_of(current) },
         ],
       };
     });
@@ -1577,18 +1593,18 @@ function xlsxRows(capture: XlsxEvidence, metric: "time" | "memory"): PerfRow[] {
  * tree against that codec using the same checked fixture. A ratio below 1 means
  * the current codec is faster; peak RSS is the largest raw process peak.
  */
-function renderXlsxSection(
+function render_xlsx_section(
   evidence: XlsxEvidence,
   source: string,
   machines: readonly MachineEvidence<XlsxEvidence>[],
 ): string[] {
-  const baselineCommit = evidence.toolchain.baselineCommit;
+  const baseline_commit = evidence.toolchain.baselineCommit;
   const provenance = provenanceList([
     ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
     ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
     [
       "Engines",
-      `${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)}${baselineCommit === undefined ? "" : ` at baseline ${shortHash(baselineCommit)}`}`,
+      `${sheetwrite_label(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)}${baseline_commit === undefined ? "" : ` at baseline ${shortHash(baseline_commit)}`}`,
     ],
     [
       "Fixture",
@@ -1612,7 +1628,7 @@ function renderXlsxSection(
       spreadLabel: "Median ± median absolute deviation",
       groups: machineGroups(
         machines,
-        (capture) => xlsxRows(capture, metric),
+        (capture) => xlsx_rows(capture, metric),
         (capture) => `${captureNote(capture.metadata)} · ${capture.rounds} rounds`,
       ),
     });
@@ -1621,10 +1637,10 @@ function renderXlsxSection(
     "",
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
     "",
-    ...(baselineCommit === undefined
+    ...(baseline_commit === undefined
       ? ["This capture ran the current tree only. No codec comparison is claimed.", ""]
       : [
-          `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baselineCommit)}.`,
+          `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baseline_commit)}.`,
           "",
         ]),
     "### Operation time",
@@ -1639,7 +1655,7 @@ function renderXlsxSection(
     "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
     '```sh verify title="XLSX codec evidence"',
-    `git worktree add ../sheetwrite-xlsx-baseline ${baselineCommit ?? "<baseline commit>"}`,
+    `git worktree add ../sheetwrite-xlsx-baseline ${baseline_commit ?? "<baseline commit>"}`,
     "cd ../sheetwrite-xlsx-baseline && bun install --frozen-lockfile && bun run build:packages",
     "cd - && bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root ../sheetwrite-xlsx-baseline",
     "```",
@@ -1737,7 +1753,7 @@ const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
  * section never holds another H2, so nothing reaches the page's H1. Fenced
  * code is left as written: it shows text, not headings.
  */
-function liftHeadings(markdown: string): string {
+function lift_headings(markdown: string): string {
   let fence: string | undefined;
   return markdown
     .split("\n")
@@ -1794,7 +1810,7 @@ export function splitPerformancePages(
       present.length === 0
         ? "This benchmark has no validated evidence yet. See [Pending local evidence](/docs/performance/benchmark-protocol/#pending-local-evidence)."
         : page.sections.length === 1
-          ? liftHeadings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
+          ? lift_headings((present[0] ?? "").replace(/^## [^\n]*\n+/, ""))
           : present.join("\n\n");
     return {
       slug: page.slug,
@@ -1826,68 +1842,68 @@ export function splitPerformancePages(
 /** Every benchmark and delivery section as `##` Markdown; `splitPerformancePages` publishes it. */
 export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Promise<string> {
   const machines = captureMachines();
-  const scaleCaptures = await loadMachineCaptures(
+  const scale_captures = await load_machine_captures(
     machines,
     "render-scale.json",
     "bun run --filter @sheetwrite/bench bench:render:scale",
-    validateRenderArtifact,
+    validate_render_artifact,
   );
-  const dataCaptures = await loadMachineCaptures(
+  const data_captures = await load_machine_captures(
     machines,
     "data-results.json",
     "bun run --filter @sheetwrite/bench bench:data",
     validateDataArtifact,
   );
-  const formulaCaptures = await loadMachineCaptures(
+  const formula_captures = await load_machine_captures(
     machines,
     "formula-results.json",
     "bun run --filter @sheetwrite/bench bench:formula",
-    validateFormulaArtifact,
+    validate_formula_artifact,
   );
-  const fullEngineCaptures = await loadMachineCaptures(
+  const full_engine_captures = await load_machine_captures(
     machines,
     "full-engine-results.json",
     "bun run --filter @sheetwrite/bench bench:formula:engines",
     validateFullEngineArtifact,
   );
-  const matchedEngine = await loadEvidence(
+  const matched_engine = await load_evidence(
     "bench/results/full-engine-matched-results.json",
     "bun run --filter @sheetwrite/bench bench:formula:matched",
     validateMatchedEngineArtifact,
   );
-  const corePathsCaptures = await loadMachineCaptures(
+  const core_paths_captures = await load_machine_captures(
     machines,
     "core-paths-results.json",
     "bun run --filter @sheetwrite/bench bench:core-paths",
-    validateCorePathsArtifact,
+    validate_core_paths_artifact,
   );
-  const xlsxCaptures = await loadMachineCaptures(
+  const xlsx_captures = await load_machine_captures(
     machines,
     "xlsx-results.json",
     "bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>",
-    validateXlsxArtifact,
+    validate_xlsx_artifact,
   );
-  const chartTrackingCaptures = await loadMachineCaptures(
+  const chart_tracking_captures = await load_machine_captures(
     machines,
     "chart-tracking-results.json",
     "bun run --filter @sheetwrite/bench bench:charts",
     validateChartTrackingArtifact,
   );
-  const pivotCaptures = await loadMachineCaptures(
+  const pivot_captures = await load_machine_captures(
     machines,
     "pivot-results.json",
     "bun run --filter @sheetwrite/bench bench:pivot -- --output results/pivot-results.json",
     validatePivotArtifact,
   );
-  const scale = scaleCaptures.release;
-  const data = dataCaptures.release;
-  const formula = formulaCaptures.release;
-  const fullEngine = fullEngineCaptures.release;
-  const corePaths = corePathsCaptures.release;
-  const xlsx = xlsxCaptures.release;
-  const chartTracking = chartTrackingCaptures.release;
-  const pivot = pivotCaptures.release;
-  const releaseComparison = await loadEvidence(
+  const scale = scale_captures.release;
+  const data = data_captures.release;
+  const formula = formula_captures.release;
+  const full_engine = full_engine_captures.release;
+  const core_paths = core_paths_captures.release;
+  const xlsx = xlsx_captures.release;
+  const chart_tracking = chart_tracking_captures.release;
+  const pivot = pivot_captures.release;
+  const release_comparison = await load_evidence(
     "bench/results/release-comparison.json",
     "cd bench && bun src/release-comparison.ts --baseline-results-dir results/releases/<previous release>",
     validateReleaseComparisonArtifact,
@@ -1896,14 +1912,14 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     [
       { label: "Render benchmark", loaded: scale },
       { label: "Data engine benchmark", loaded: data },
-      { label: "Core write path", loaded: corePaths },
+      { label: "Core write path", loaded: core_paths },
       { label: "Formula engine benchmark", loaded: formula },
-      { label: "Formula engines (analysis capture)", loaded: fullEngine },
-      { label: "Formula engines (matched capture)", loaded: matchedEngine },
+      { label: "Formula engines (analysis capture)", loaded: full_engine },
+      { label: "Formula engines (matched capture)", loaded: matched_engine },
       { label: "XLSX codec benchmark", loaded: xlsx },
-      { label: "Chart source tracking", loaded: chartTracking },
+      { label: "Chart source tracking", loaded: chart_tracking },
       { label: "Incremental pivot engine", loaded: pivot },
-      { label: "Release comparison", loaded: releaseComparison },
+      { label: "Release comparison", loaded: release_comparison },
     ] satisfies Array<{ label: string; loaded: CapturedEvidence }>
   ).flatMap(({ label, loaded }) => {
     if (!("evidence" in loaded)) return [];
@@ -1911,24 +1927,24 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     const captured = "meta" in evidence ? evidence.meta : evidence.metadata;
     return [{ label, source: loaded.source, meta: captured }];
   });
-  const sizeHistory =
+  const size_history =
     sizeHistoryOverride ??
     validateSizeHistory(
       JSON.parse(await readFile(resolve(repositoryRoot, "scripts/size-history.json"), "utf8")),
     );
   const pending: EvidenceState[] = [
-    scaleCaptures,
-    dataCaptures,
-    formulaCaptures,
-    fullEngineCaptures,
-    corePathsCaptures,
-    xlsxCaptures,
-    chartTrackingCaptures,
-    pivotCaptures,
+    scale_captures,
+    data_captures,
+    formula_captures,
+    full_engine_captures,
+    core_paths_captures,
+    xlsx_captures,
+    chart_tracking_captures,
+    pivot_captures,
   ].flatMap((captures) => captures.otherPending);
   const lines = ["## Render benchmark", ""];
   // Readers come for results; the method and API notes follow every benchmark.
-  const methodLines = [
+  const method_lines = [
     "## Release retained engine memory",
     "",
     "WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.",
@@ -1945,7 +1961,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     "",
     "`report.wasmBytesBefore` and `report.wasmBytesAfter` are committed linear-memory bytes, not live-cell bytes or process memory. `report.pauseMs` measures migration, excluding the idle wait. A release is not guaranteed to reduce committed bytes: surviving data, compact history, and migration scratch can still require substantial memory. Actual process-memory reclamation depends on garbage collection.",
     "",
-    ...renderCaptureHeader(captures),
+    ...render_capture_header(captures),
     "`bench:release` captures render-scale, the performance showcase's paged storage at `bench/results/paged-results.json`, the interaction evidence at `bench/results/interaction-results.json`, data, core paths, formula, formula engines, matched engines, and XLSX, then re-records the render regression baseline last. Its smoke rehearsal writes only to `bench/results/smoke/`.",
     "",
     "The interaction capture (`bench:interaction`, schema `interaction-current-v2`) measures the current build, not a comparison: packed inverse-index lookup latency in nanoseconds, inverse-index backing bytes, retained bytes after 100 distant edits, and the cold-route long task owned by Sheetwrite. It records the raw samples, the summary derived from them, the runner, and the method, and it holds those four metrics to absolute release ceilings. Version 1 recorded a one-off before/after pair whose baseline build cannot be re-measured at a later release, so no old sample is carried forward into the current capture.",
@@ -1978,20 +1994,20 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "",
       "Both grids run in the same viewport with the same data and the engine versions listed below, and every timed step repaints on both sides.",
       "",
-      renderSpeedStory(scaleCaptures.machines),
+      render_speed_story(scale_captures.machines),
       "",
       "### Every size, speed and memory",
       "",
       "Pick a workbook size and a metric:",
       "",
-      renderBenchWidget(evidence, scaleCaptures.machines),
+      render_bench_widget(evidence, scale_captures.machines),
       "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(metadata.timestamp)} UTC`],
         ["Commit", `${shortHash(metadata.commit)} clean worktree`],
         [
           "Engines",
-          `${sheetwriteLabel(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}`,
+          `${sheetwrite_label(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}`,
         ],
         [
           "Environment",
@@ -1999,7 +2015,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         ],
         ["Protocol", `${metadata.rounds} rounds · raw artifact <code>${html(source)}</code>`],
       ]),
-      ...renderFailureTable(evidence),
+      ...render_failure_table(evidence),
       "",
       RENDER_METHOD,
       "",
@@ -2014,7 +2030,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(scale);
   }
-  methodLines.push(
+  method_lines.push(
     "## Grid lifetime and trimMemory",
     "",
     "A grid owns its DOM, listeners, timers, renderer, worker and caches. Call `grid.destroy()` when the host view goes away. It frees all of them, and the store that the grid created. Caches that are not on the grid are keyed by their owner in a `WeakMap`, so they go with the grid; the few page-wide caches have a fixed size limit. A second `destroy()` call does nothing.",
@@ -2037,7 +2053,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     "```",
     "",
   );
-  methodLines.push(
+  method_lines.push(
     "## Runtime resource ownership",
     "",
     "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
@@ -2066,16 +2082,16 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         ["Commit", `${shortHash(evidence.meta.commit)} clean worktree`],
         [
           "Engines",
-          `${sheetwriteLabel(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}`,
+          `${sheetwrite_label(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}`,
         ],
         ["Environment", `Bun ${html(evidence.meta.bun)}`],
         ["Raw artifact", `<code>${html(source)}</code>`],
       ]),
-      dataWidget(dataCaptures.machines),
+      data_widget(data_captures.machines),
       "",
       "Sheetwrite alone at scale — Handsontable cannot complete these sizes headlessly:",
       "",
-      dataScaleFigure(dataCaptures.machines),
+      data_scale_figure(data_captures.machines),
     );
     lines.push(
       "",
@@ -2091,18 +2107,22 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(data);
   }
-  if ("evidence" in corePaths) {
+  if ("evidence" in core_paths) {
     lines.push(
-      ...renderCorePathsSection(corePaths.evidence, corePaths.source, corePathsCaptures.machines),
+      ...render_core_paths_section(
+        core_paths.evidence,
+        core_paths.source,
+        core_paths_captures.machines,
+      ),
     );
   } else {
-    pending.push(corePaths);
+    pending.push(core_paths);
   }
   lines.push("## Formula engine benchmark", "");
   if ("evidence" in formula) {
     const { evidence, source } = formula;
     // The engine change leads; the release capture's own evidence sits with its figure below.
-    lines.push(...(await renderEngineChange(captureMachines())));
+    lines.push(...(await render_engine_change(captureMachines())));
     lines.push(
       "### Every workload",
       "",
@@ -2114,8 +2134,8 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         ["Raw artifact", `<code>${html(source)}</code>`],
       ]),
       ...allMeasurements(
-        `All ${evidence.workloads.length} workloads · median time · ${formulaCaptures.machines.map(({ machine }) => machineName(machine).name).join(" and ")}`,
-        [formulaFigure(formulaCaptures.machines)],
+        `All ${evidence.workloads.length} workloads · median time · ${formula_captures.machines.map(({ machine }) => machineName(machine).name).join(" and ")}`,
+        [formula_figure(formula_captures.machines)],
       ),
     );
     lines.push(
@@ -2132,43 +2152,43 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(formula);
   }
-  if ("evidence" in fullEngine) {
+  if ("evidence" in full_engine) {
     lines.push(
       renderFullEngineEvidence(
-        fullEngine.evidence,
-        "evidence" in matchedEngine ? matchedEngine.evidence : undefined,
-        fullEngineCaptures.machines,
+        full_engine.evidence,
+        "evidence" in matched_engine ? matched_engine.evidence : undefined,
+        full_engine_captures.machines,
       ),
     );
-    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+    if (!("evidence" in matched_engine)) pending.push(matched_engine);
   } else {
-    pending.push(fullEngine);
-    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+    pending.push(full_engine);
+    if (!("evidence" in matched_engine)) pending.push(matched_engine);
   }
   if ("evidence" in xlsx) {
-    lines.push(...renderXlsxSection(xlsx.evidence, xlsx.source, xlsxCaptures.machines));
+    lines.push(...render_xlsx_section(xlsx.evidence, xlsx.source, xlsx_captures.machines));
   } else {
     pending.push(xlsx);
   }
-  if ("evidence" in chartTracking) {
+  if ("evidence" in chart_tracking) {
     lines.push(
       ...renderChartTrackingSection(
-        chartTracking.evidence,
-        chartTracking.source,
-        chartTrackingCaptures.machines,
+        chart_tracking.evidence,
+        chart_tracking.source,
+        chart_tracking_captures.machines,
       ),
     );
   } else {
-    pending.push(chartTracking);
+    pending.push(chart_tracking);
   }
   if ("evidence" in pivot) {
-    lines.push(...renderPivotSection(pivot.evidence, pivot.source, pivotCaptures.machines));
+    lines.push(...renderPivotSection(pivot.evidence, pivot.source, pivot_captures.machines));
   } else {
     pending.push(pivot);
   }
-  if ("evidence" in releaseComparison) {
+  if ("evidence" in release_comparison) {
     lines.push(
-      ...renderReleaseComparisonSection(releaseComparison.evidence, releaseComparison.source),
+      ...renderReleaseComparisonSection(release_comparison.evidence, release_comparison.source),
     );
   } else {
     lines.push(
@@ -2177,12 +2197,12 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "The release comparison has no validated clean-tree artifact yet. Historical 0.5 evidence is preserved unmodified from `feat/chart-pivot-ui` under `bench/results/releases/0.5.0/`. No old/new timing claims are published until `bench/results/release-comparison.json` is available.",
       "",
     );
-    pending.push(releaseComparison);
+    pending.push(release_comparison);
   }
   lines.push("## Delivery size", "");
-  const latestRelease = sizeHistory.releases.at(-1);
-  if (latestRelease !== undefined) {
-    const packageMetricKeys = Object.keys(latestRelease.metrics).filter((name) =>
+  const latest_release = size_history.releases.at(-1);
+  if (latest_release !== undefined) {
+    const package_metric_keys = Object.keys(latest_release.metrics).filter((name) =>
       name.endsWith(".tarballBytes"),
     );
     // Each package's download size in the last releases, oldest first: the
@@ -2190,24 +2210,24 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
     // from 0, so a package's growth between releases shows as a longer bar.
     // The tables keep every release; the figure keeps few enough bars to read
     // on a phone.
-    const firstShown = Math.max(0, sizeHistory.releases.length - SIZE_FIGURE_RELEASES);
-    const shownReleases = sizeHistory.releases.slice(firstShown);
+    const first_shown = Math.max(0, size_history.releases.length - SIZE_FIGURE_RELEASES);
+    const shown_releases = size_history.releases.slice(first_shown);
     lines.push(
       perfFigure({
         id: "delivery-size-tarballs",
-        title: `Download size per package, v${shownReleases[0]?.version ?? latestRelease.version} to v${latestRelease.version}`,
+        title: `Download size per package, v${shown_releases[0]?.version ?? latest_release.version} to v${latest_release.version}`,
         unit: "bytes",
         scale: "linear",
         rowHeader: "Package",
         groups: [
           {
             label: "npm registry tarballs",
-            rows: packageMetricKeys.map((key) => ({
+            rows: package_metric_keys.map((key) => ({
               label: key.slice("package.".length, -".tarballBytes".length),
-              bars: shownReleases.flatMap((release, index) => {
+              bars: shown_releases.flatMap((release, index) => {
                 const metric = release.metrics[key];
                 if (metric === undefined) return [];
-                const previous = sizeHistory.releases[firstShown + index - 1]?.metrics[key];
+                const previous = size_history.releases[first_shown + index - 1]?.metrics[key];
                 // The change from the release before, as the table below gives it.
                 const label =
                   previous === undefined
@@ -2231,11 +2251,11 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       '<section class="size-history" aria-label="Published package size history">',
       '<p class="size-history__intro">Registry measurements for every published release. Each delta is measured against the release immediately before it.</p>',
     );
-    for (let index = sizeHistory.releases.length - 1; index >= 0; index -= 1) {
-      const release = sizeHistory.releases[index];
+    for (let index = size_history.releases.length - 1; index >= 0; index -= 1) {
+      const release = size_history.releases[index];
       if (release === undefined) continue;
-      const previous = sizeHistory.releases[index - 1];
-      const releaseDate =
+      const previous = size_history.releases[index - 1];
+      const release_date =
         release.capturedAt === undefined
           ? "Date not recorded"
           : new Intl.DateTimeFormat("en", {
@@ -2244,15 +2264,15 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
               year: "numeric",
               timeZone: "UTC",
             }).format(new Date(release.capturedAt));
-      const versionStep =
+      const version_step =
         previous === undefined
           ? `<strong>v${release.version}</strong>`
           : `<span>v${previous.version}</span><svg class="size-history__arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M9 4.5 12.5 8 9 11.5"/></svg><strong>v${release.version}</strong>`;
       lines.push(
-        `<details class="size-history__release"${index === sizeHistory.releases.length - 1 ? ' data-current="true" open' : ""}>`,
+        `<details class="size-history__release"${index === size_history.releases.length - 1 ? ' data-current="true" open' : ""}>`,
         '<summary class="size-history__release-head">',
-        `<span class="size-history__version-step">${versionStep}</span>`,
-        `<time${release.capturedAt === undefined ? "" : ` datetime="${release.capturedAt}"`}>${release.capturedAt === undefined ? releaseDate : `Measured ${releaseDate}`}</time>`,
+        `<span class="size-history__version-step">${version_step}</span>`,
+        `<time${release.capturedAt === undefined ? "" : ` datetime="${release.capturedAt}"`}>${release.capturedAt === undefined ? release_date : `Measured ${release_date}`}</time>`,
         '<svg class="size-history__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>',
         "</summary>",
         '<div class="size-history__table-wrap">',
@@ -2260,37 +2280,37 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
         '<thead><tr><th scope="col">Package</th><th scope="col">Tarball</th><th scope="col">Installed</th></tr></thead>',
         "<tbody>",
       );
-      for (const key of packageMetricKeys) {
-        const packageName = key.slice("package.".length, -".tarballBytes".length);
-        const unpackedKey = `package.${packageName}.unpackedBytes`;
+      for (const key of package_metric_keys) {
+        const package_name = key.slice("package.".length, -".tarballBytes".length);
+        const unpacked_key = `package.${package_name}.unpackedBytes`;
         const tarball = release.metrics[key];
-        const unpacked = release.metrics[unpackedKey];
+        const unpacked = release.metrics[unpacked_key];
         if (!tarball || !unpacked) continue;
-        const previousTarball = previous?.metrics[key];
-        const previousUnpacked = previous?.metrics[unpackedKey];
-        const tarballChange =
-          previousTarball === undefined ? undefined : formatMetricDelta(tarball, previousTarball);
-        const unpackedChange =
-          previousUnpacked === undefined
+        const previous_tarball = previous?.metrics[key];
+        const previous_unpacked = previous?.metrics[unpacked_key];
+        const tarball_change =
+          previous_tarball === undefined ? undefined : formatMetricDelta(tarball, previous_tarball);
+        const unpacked_change =
+          previous_unpacked === undefined
             ? undefined
-            : formatMetricDelta(unpacked, previousUnpacked);
-        const tarballDirection =
-          previousTarball === undefined || tarball.actual === previousTarball.actual
+            : formatMetricDelta(unpacked, previous_unpacked);
+        const tarball_direction =
+          previous_tarball === undefined || tarball.actual === previous_tarball.actual
             ? "flat"
-            : tarball.actual > previousTarball.actual
+            : tarball.actual > previous_tarball.actual
               ? "increase"
               : "decrease";
-        const unpackedDirection =
-          previousUnpacked === undefined || unpacked.actual === previousUnpacked.actual
+        const unpacked_direction =
+          previous_unpacked === undefined || unpacked.actual === previous_unpacked.actual
             ? "flat"
-            : unpacked.actual > previousUnpacked.actual
+            : unpacked.actual > previous_unpacked.actual
               ? "increase"
               : "decrease";
         lines.push(
           "<tr>",
-          `<th scope="row"><code>${packageName}</code></th>`,
-          `<td>${formatMetricDisplay(tarball).join(" ")}${tarballChange ? `<small data-direction="${tarballDirection}"><span>${tarballChange[0]}</span><span>${tarballChange[1]}</span></small>` : ""}</td>`,
-          `<td>${formatMetricDisplay(unpacked).join(" ")}${unpackedChange ? `<small data-direction="${unpackedDirection}"><span>${unpackedChange[0]}</span><span>${unpackedChange[1]}</span></small>` : ""}</td>`,
+          `<th scope="row"><code>${package_name}</code></th>`,
+          `<td>${formatMetricDisplay(tarball).join(" ")}${tarball_change ? `<small data-direction="${tarball_direction}"><span>${tarball_change[0]}</span><span>${tarball_change[1]}</span></small>` : ""}</td>`,
+          `<td>${formatMetricDisplay(unpacked).join(" ")}${unpacked_change ? `<small data-direction="${unpacked_direction}"><span>${unpacked_change[0]}</span><span>${unpacked_change[1]}</span></small>` : ""}</td>`,
           "</tr>",
         );
       }
@@ -2302,7 +2322,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "",
     );
   }
-  lines.push(...methodLines);
+  lines.push(...method_lines);
   if (pending.length > 0) {
     lines.push(
       "## Pending local evidence",
@@ -2313,7 +2333,7 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "| --- | --- | --- |",
       ...pending.map(
         (state) =>
-          `| \`${state.source}\` | ${markdownCell(state.reason)} | \`${state.reproduction}\` |`,
+          `| \`${state.source}\` | ${markdown_cell(state.reason)} | \`${state.reproduction}\` |`,
       ),
       "",
     );

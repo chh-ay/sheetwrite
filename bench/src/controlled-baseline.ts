@@ -76,10 +76,10 @@ export function samplesByControlledCell(
     samples.set(key, values);
   }
   validateExactMatrix("controlled render", expectedControlledCellKeys(), [...samples.keys()]);
-  const expectedSamples = artifact.metadata.rounds * artifact.metadata.measuredSamples;
+  const expected_samples = artifact.metadata.rounds * artifact.metadata.measuredSamples;
   for (const [key, values] of samples) {
-    if (values.length !== expectedSamples) {
-      throw new Error(`${key} must contain ${expectedSamples} post-warmup raw samples`);
+    if (values.length !== expected_samples) {
+      throw new Error(`${key} must contain ${expected_samples} post-warmup raw samples`);
     }
     summarizeFinite(values);
   }
@@ -138,14 +138,14 @@ function record(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function exactKeys(
+function exact_keys(
   value: Record<string, unknown>,
   expected: readonly string[],
   path: string,
 ): void {
-  const expectedSet = new Set(expected);
+  const expected_set = new Set(expected);
   const unexpected = Object.keys(value)
-    .filter((key) => !expectedSet.has(key))
+    .filter((key) => !expected_set.has(key))
     .sort();
   const missing = expected.filter((key) => !(key in value));
   if (missing.length > 0 || unexpected.length > 0) {
@@ -172,22 +172,22 @@ function finite(value: unknown, path: string, minimum = 0): number {
   return value;
 }
 
-function positiveInteger(value: unknown, path: string): number {
+function positive_integer(value: unknown, path: string): number {
   const parsed = finite(value, path, 1);
   if (!Number.isInteger(parsed)) throw new TypeError(`${path} must be an integer`);
   return parsed;
 }
 
-function parseHarness(value: unknown): HarnessFingerprint {
+function parse_harness(value: unknown): HarnessFingerprint {
   const input = record(value, "baseline.harness");
-  exactKeys(
+  exact_keys(
     input,
     ["digest", "protocol", "matrix", "dataset", "sampling", "schema", "sources"],
     "baseline.harness",
   );
-  const sourceInput = record(input.sources, "baseline.harness.sources");
+  const source_input = record(input.sources, "baseline.harness.sources");
   const sources = Object.fromEntries(
-    Object.entries(sourceInput).map(([path, digest]) => [
+    Object.entries(source_input).map(([path, digest]) => [
       path,
       text(digest, `baseline.harness.sources.${path}`),
     ]),
@@ -206,9 +206,9 @@ function parseHarness(value: unknown): HarnessFingerprint {
   };
 }
 
-function parseRunner(value: unknown): ControlledRunnerFingerprint {
+function parse_runner(value: unknown): ControlledRunnerFingerprint {
   const input = record(value, "baseline.runner");
-  exactKeys(
+  exact_keys(
     input,
     ["os", "arch", "cpu", "bun", "node", "browser", "powerMode", "concurrency"],
     "baseline.runner",
@@ -221,13 +221,13 @@ function parseRunner(value: unknown): ControlledRunnerFingerprint {
     node: text(input.node, "baseline.runner.node"),
     browser: text(input.browser, "baseline.runner.browser"),
     powerMode: text(input.powerMode, "baseline.runner.powerMode"),
-    concurrency: positiveInteger(input.concurrency, "baseline.runner.concurrency"),
+    concurrency: positive_integer(input.concurrency, "baseline.runner.concurrency"),
   };
 }
 
-function parseComparison(value: unknown): typeof CONTROLLED_COMPARISON_POLICY {
+function parse_comparison(value: unknown): typeof CONTROLLED_COMPARISON_POLICY {
   const input = record(value, "baseline.comparison");
-  exactKeys(
+  exact_keys(
     input,
     ["method", "familywiseConfidenceLevel", "resamples", "maximumRegressionMs"],
     "baseline.comparison",
@@ -242,7 +242,7 @@ function parseComparison(value: unknown): typeof CONTROLLED_COMPARISON_POLICY {
   return CONTROLLED_COMPARISON_POLICY;
 }
 
-function repositoryArtifactPath(value: unknown): string {
+function repository_artifact_path(value: unknown): string {
   const path = text(value, "baseline.source.rawArtifact");
   const normalized = normalize(path);
   if (
@@ -261,7 +261,7 @@ function repositoryArtifactPath(value: unknown): string {
 
 export function parseControlledBaseline(value: unknown): ControlledRenderBaseline {
   const input = record(value, "baseline");
-  exactKeys(
+  exact_keys(
     input,
     [
       "schemaVersion",
@@ -284,17 +284,17 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
   if (input.matrixId !== MATRIX_IDS.render.full) {
     throw new TypeError(`stale controlled matrix: ${String(input.matrixId)}`);
   }
-  const sourceInput = record(input.source, "baseline.source");
-  exactKeys(sourceInput, ["commit", "rawArtifact", "rawSha256", "rounds"], "baseline.source");
-  const rawSha256 = text(sourceInput.rawSha256, "baseline.source.rawSha256");
-  if (!/^[a-f0-9]{64}$/u.test(rawSha256)) {
+  const source_input = record(input.source, "baseline.source");
+  exact_keys(source_input, ["commit", "rawArtifact", "rawSha256", "rounds"], "baseline.source");
+  const raw_sha256 = text(source_input.rawSha256, "baseline.source.rawSha256");
+  if (!/^[a-f0-9]{64}$/u.test(raw_sha256)) {
     throw new TypeError("baseline.source.rawSha256 must be a lowercase SHA-256 digest");
   }
   const source = {
-    commit: text(sourceInput.commit, "baseline.source.commit"),
-    rawArtifact: repositoryArtifactPath(sourceInput.rawArtifact),
-    rawSha256,
-    rounds: positiveInteger(sourceInput.rounds, "baseline.source.rounds"),
+    commit: text(source_input.commit, "baseline.source.commit"),
+    rawArtifact: repository_artifact_path(source_input.rawArtifact),
+    rawSha256: raw_sha256,
+    rounds: positive_integer(source_input.rounds, "baseline.source.rounds"),
   };
   if (source.rounds < CONTROLLED_BASELINE_MINIMUM_ROUNDS) {
     throw new TypeError(
@@ -302,31 +302,31 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
     );
   }
   if (!Array.isArray(input.cells)) throw new TypeError("baseline.cells must be an array");
-  const expectedSamples = source.rounds * 3;
+  const expected_samples = source.rounds * 3;
   const cells = input.cells.map((value, index): ControlledBaselineCell => {
     const path = `baseline.cells[${index}]`;
     const cell = record(value, path);
-    exactKeys(cell, ["key", "samplesMs", "medianMs", "p95Ms", "observedMadMs"], path);
+    exact_keys(cell, ["key", "samplesMs", "medianMs", "p95Ms", "observedMadMs"], path);
     if (!Array.isArray(cell.samplesMs)) throw new TypeError(`${path}.samplesMs must be an array`);
-    const samplesMs = cell.samplesMs.map((sample, sampleIndex) =>
-      finite(sample, `${path}.samplesMs[${sampleIndex}]`),
+    const samples_ms = cell.samplesMs.map((sample, sample_index) =>
+      finite(sample, `${path}.samplesMs[${sample_index}]`),
     );
-    if (samplesMs.length !== expectedSamples) {
-      throw new TypeError(`${path}.samplesMs must contain ${expectedSamples} raw samples`);
+    if (samples_ms.length !== expected_samples) {
+      throw new TypeError(`${path}.samplesMs must contain ${expected_samples} raw samples`);
     }
-    const summary = summarizeFinite(samplesMs);
-    const medianMs = finite(cell.medianMs, `${path}.medianMs`);
-    const p95Ms = finite(cell.p95Ms, `${path}.p95Ms`);
-    const observedMadMs = finite(cell.observedMadMs, `${path}.observedMadMs`);
-    if (medianMs !== summary.median || p95Ms !== summary.p95 || observedMadMs !== summary.mad) {
+    const summary = summarizeFinite(samples_ms);
+    const median_ms = finite(cell.medianMs, `${path}.medianMs`);
+    const p95_ms = finite(cell.p95Ms, `${path}.p95Ms`);
+    const observed_mad_ms = finite(cell.observedMadMs, `${path}.observedMadMs`);
+    if (median_ms !== summary.median || p95_ms !== summary.p95 || observed_mad_ms !== summary.mad) {
       throw new TypeError(`${path} statistics do not match raw samples`);
     }
     return {
       key: text(cell.key, `${path}.key`),
-      samplesMs,
-      medianMs,
-      p95Ms,
-      observedMadMs,
+      samplesMs: samples_ms,
+      medianMs: median_ms,
+      p95Ms: p95_ms,
+      observedMadMs: observed_mad_ms,
     };
   });
   validateExactMatrix(
@@ -338,10 +338,10 @@ export function parseControlledBaseline(value: unknown): ControlledRenderBaselin
     schemaVersion: CONTROLLED_BASELINE_SCHEMA_VERSION,
     renderProtocolVersion: RENDER_PROTOCOL_VERSION,
     matrixId: MATRIX_IDS.render.full,
-    comparison: parseComparison(input.comparison),
+    comparison: parse_comparison(input.comparison),
     source,
-    harness: parseHarness(input.harness),
-    runner: parseRunner(input.runner),
+    harness: parse_harness(input.harness),
+    runner: parse_runner(input.runner),
     cells,
   };
 }
@@ -351,16 +351,16 @@ export function validateControlledBaselineProvenance(
   repositoryRoot: string,
 ): RenderBenchmarkArtifact {
   const baseline = parseControlledBaseline(value);
-  const rawPath = resolve(repositoryRoot, baseline.source.rawArtifact);
-  const rawBytes = readFileSync(rawPath);
-  const digest = createHash("sha256").update(rawBytes).digest("hex");
+  const raw_path = resolve(repositoryRoot, baseline.source.rawArtifact);
+  const raw_bytes = readFileSync(raw_path);
+  const digest = createHash("sha256").update(raw_bytes).digest("hex");
   if (digest !== baseline.source.rawSha256) {
     throw new Error(
       `baseline raw artifact checksum mismatch: expected ${baseline.source.rawSha256}, observed ${digest}`,
     );
   }
   const artifact = validateRenderGateArtifact(
-    JSON.parse(rawBytes.toString("utf8")) as unknown,
+    JSON.parse(raw_bytes.toString("utf8")) as unknown,
     "full",
     {
       rounds: baseline.source.rounds,
@@ -371,7 +371,7 @@ export function validateControlledBaselineProvenance(
       `baseline raw artifact commit mismatch: expected ${baseline.source.commit}, observed ${artifact.metadata.commit}`,
     );
   }
-  const artifactRunner = {
+  const artifact_runner = {
     os: artifact.metadata.os,
     arch: artifact.metadata.arch,
     cpu: artifact.metadata.cpu,
@@ -379,7 +379,7 @@ export function validateControlledBaselineProvenance(
     node: artifact.metadata.nodeVersion,
     browser: artifact.metadata.browserVersion,
   };
-  const baselineRunner = {
+  const baseline_runner = {
     os: baseline.runner.os,
     arch: baseline.runner.arch,
     cpu: baseline.runner.cpu,
@@ -387,17 +387,17 @@ export function validateControlledBaselineProvenance(
     node: baseline.runner.node,
     browser: baseline.runner.browser,
   };
-  const runnerMismatches = fingerprintMismatches(
-    baselineRunner,
-    artifactRunner,
+  const runner_mismatches = fingerprintMismatches(
+    baseline_runner,
+    artifact_runner,
     "baseline raw runner",
   );
-  if (runnerMismatches.length > 0) {
-    throw new Error(`baseline raw artifact runner mismatch:\n${runnerMismatches.join("\n")}`);
+  if (runner_mismatches.length > 0) {
+    throw new Error(`baseline raw artifact runner mismatch:\n${runner_mismatches.join("\n")}`);
   }
-  const rawSamples = samplesByControlledCell(artifact);
+  const raw_samples = samplesByControlledCell(artifact);
   for (const cell of baseline.cells) {
-    const samples = rawSamples.get(cell.key);
+    const samples = raw_samples.get(cell.key);
     if (!samples || JSON.stringify(samples) !== JSON.stringify(cell.samplesMs)) {
       throw new Error(`baseline ${cell.key} samples do not match checked-in raw artifact`);
     }

@@ -16,14 +16,14 @@ export const USAGE_RANGE = {
 
 /** Metered events retain a receipt checksum for invoice reconciliation. */
 export function makeUsageSheet(): SheetSnapshot {
-  let randomState = 0x4f21c8a7;
+  let random_state = 0x4f21c8a7;
   const receipt = () => {
     let checksum = "";
     for (let digit = 0; digit < 64; digit++) {
-      randomState ^= randomState << 13;
-      randomState ^= randomState >>> 17;
-      randomState ^= randomState << 5;
-      checksum += (randomState >>> 28).toString(16);
+      random_state ^= random_state << 13;
+      random_state ^= random_state >>> 17;
+      random_state ^= random_state << 5;
+      checksum += (random_state >>> 28).toString(16);
     }
     return checksum;
   };

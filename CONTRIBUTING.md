@@ -98,6 +98,36 @@ they cannot check:
   ordering, partial failure) or measures slower, and say why in a comment.
   A faster engine path that TypeScript does not call does not make the
   product faster.
+
+## Naming
+
+A camelCase name marks the public API. Everything internal is snake_case, so
+you can tell from a name alone whether it is public.
+
+- **Public API: camelCase or PascalCase.** Exported functions and variables,
+  the public methods and properties of exported classes, option keys, events
+  and payload fields are camelCase. Types, interfaces and classes are
+  PascalCase. Parameters of exported functions and public methods appear in
+  the declaration files, so they are camelCase too.
+- **Internal TypeScript: snake_case.** Non-exported functions, local variables,
+  other parameters, private class members (`private` and `#name`), internal
+  members and module-private helpers.
+- **Constants: UPPER_SNAKE_CASE**, exported or not.
+- **Names that stay as they are.** Persisted snapshot, operation and sync keys,
+  wire and DOM names, and names a framework requires (React props, DOM event
+  handlers, Vue and Svelte conventions) keep their spelling. Object and
+  interface keys belong to a data shape, so they keep theirs too.
+- **Destructured keys** keep their key and get a snake_case alias:
+  `const { rowIndex: row_index } = cell`.
+
+`bun run naming:check` enforces this, and CI runs it. It lists every
+non-exported function, local variable, parameter and private member whose name
+is not snake_case, and fails when there is one.
+`bun scripts/snake-case-internals.ts apply` renames them with the TypeScript
+checker. When a new name would clash with one already in scope, pick a name in
+`scripts/snake-case-internals.names.json`. Generated `*.gen.ts` files are
+skipped.
+
 ## Adding a glyph
 
 Every command the toolbar, the ribbon, the context menu or the sheet tab menu

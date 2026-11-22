@@ -124,7 +124,7 @@ export function isMac(): boolean {
   return APPLE_PLATFORM.test(navigator.platform) || APPLE_PLATFORM.test(navigator.userAgent);
 }
 
-function invalidShortcut(shortcut: KeyShortcut, reason: string): never {
+function invalid_shortcut(shortcut: KeyShortcut, reason: string): never {
   throw new SheetwriteError("invalid-shortcut", "keyboard-configure", reason, {
     context: { shortcut: typeof shortcut === "string" ? shortcut : shortcut.key },
   });
@@ -142,7 +142,8 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
     key = parts.pop() ?? "";
     const seen = new Set<string>();
     for (const modifier of parts) {
-      if (seen.has(modifier)) invalidShortcut(shortcut, `Repeated shortcut modifier: ${modifier}.`);
+      if (seen.has(modifier))
+        invalid_shortcut(shortcut, `Repeated shortcut modifier: ${modifier}.`);
       seen.add(modifier);
       switch (modifier) {
         case "Mod":
@@ -166,12 +167,12 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
           break;
 
         default:
-          invalidShortcut(shortcut, `Unknown shortcut modifier: ${modifier}.`);
+          invalid_shortcut(shortcut, `Unknown shortcut modifier: ${modifier}.`);
       }
     }
 
     if (parts.length === 0 || ["Mod", "Ctrl", "Meta", "Shift", "Alt"].includes(key)) {
-      invalidShortcut(shortcut, "A compact shortcut must contain modifiers followed by one key.");
+      invalid_shortcut(shortcut, "A compact shortcut must contain modifiers followed by one key.");
     }
   } else {
     key = shortcut.key;
@@ -183,7 +184,7 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
   }
 
   if (key.length === 0 || (key !== " " && key.trim() !== key)) {
-    invalidShortcut(
+    invalid_shortcut(
       shortcut,
       "A shortcut must contain one non-empty key without surrounding spaces.",
     );
@@ -237,11 +238,11 @@ export function formatShortcut(shortcut: ParsedShortcut): string {
     .join("+");
 }
 
-function isSingleShortcut(binding: KeyShortcut | readonly KeyShortcut[]): binding is KeyShortcut {
+function is_single_shortcut(binding: KeyShortcut | readonly KeyShortcut[]): binding is KeyShortcut {
   return typeof binding === "string" || "key" in binding;
 }
 
-function bindingsFor(
+function bindings_for(
   action: KeyboardAction,
   options?: KeyboardOptions,
 ): KeyShortcut | readonly KeyShortcut[] | null {
@@ -251,15 +252,15 @@ function bindingsFor(
 }
 
 export function boundShortcutLabel(action: KeyboardAction, options?: KeyboardOptions): string {
-  const binding = bindingsFor(action, options);
+  const binding = bindings_for(action, options);
   if (binding === null) return "";
-  const shortcut = isSingleShortcut(binding) ? binding : binding[0];
+  const shortcut = is_single_shortcut(binding) ? binding : binding[0];
 
   return shortcut ? formatShortcut(parseShortcut(shortcut)) : "";
 }
 
 /** The (Control, Command) pairs a shortcut accepts. */
-function acceptedModifiers(shortcut: ParsedShortcut): ReadonlyArray<readonly [boolean, boolean]> {
+function accepted_modifiers(shortcut: ParsedShortcut): ReadonlyArray<readonly [boolean, boolean]> {
   return shortcut.either
     ? [
         [true, false],
@@ -296,18 +297,18 @@ export function codeKey(code: string): string | undefined {
  * Only a typed symbol falls back to the physical key, so a letter or digit
  * typed on another layout (AZERTY "a" on the Q key) still matches by meaning.
  */
-function physicalKey(event: KeyboardEvent, typed: string): string | undefined {
+function physical_key(event: KeyboardEvent, typed: string): string | undefined {
   if (!event.shiftKey && !event.altKey) return undefined;
   if (typed.length !== 1 || /[\p{L}\p{N}]/u.test(typed)) return undefined;
   return codeKey(event.code);
 }
 
-function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShortcut): boolean {
+function matches_shortcut(event: KeyboardEvent, key: string, shortcut: ParsedShortcut): boolean {
   return (
-    (key === shortcut.key || physicalKey(event, key) === shortcut.key) &&
+    (key === shortcut.key || physical_key(event, key) === shortcut.key) &&
     event.shiftKey === shortcut.shift &&
     event.altKey === shortcut.alt &&
-    acceptedModifiers(shortcut).some(
+    accepted_modifiers(shortcut).some(
       ([ctrl, meta]) => event.ctrlKey === ctrl && event.metaKey === meta,
     )
   );
@@ -315,13 +316,13 @@ function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShor
 
 /** One identity per accepted key press, so `Mod+C` conflicts with `Ctrl+C`. */
 export function bindingIdentities(shortcut: ParsedShortcut): string[] {
-  return acceptedModifiers(shortcut).map(
+  return accepted_modifiers(shortcut).map(
     ([ctrl, meta]) =>
       `${Number(ctrl)}${Number(meta)}${Number(shortcut.shift)}${Number(shortcut.alt)}:${shortcut.key}`,
   );
 }
 
-function registerBinding(
+function register_binding(
   registered: Map<string, string>,
   shortcut: ParsedShortcut,
   command: string,
@@ -347,7 +348,7 @@ export class Keymap {
   private readonly actions: ActionBinding[] = [];
   private readonly registered = new Map<string, string>();
   private readonly menu: GridConfig["contextMenu"];
-  private readonly staticCustom: readonly CustomBinding[];
+  private readonly static_custom: readonly CustomBinding[];
 
   constructor(
     config?: GridConfig,
@@ -357,17 +358,17 @@ export class Keymap {
     if (config?.keyboard !== false) {
       const options = typeof config?.keyboard === "object" ? config.keyboard : undefined;
       for (const action of ACTIONS) {
-        const binding = bindingsFor(action, options);
+        const binding = bindings_for(action, options);
         if (binding === null) continue;
-        const shortcuts = isSingleShortcut(binding) ? [binding] : binding;
+        const shortcuts = is_single_shortcut(binding) ? [binding] : binding;
         for (const input of shortcuts) {
           const shortcut = parseShortcut(input);
-          registerBinding(this.registered, shortcut, action);
+          register_binding(this.registered, shortcut, action);
           this.actions.push({ action, shortcut });
         }
       }
     }
-    this.staticCustom = this.resolveCustom(context);
+    this.static_custom = this.resolve_custom(context);
   }
 
   label(action: KeyboardAction): string {
@@ -378,7 +379,7 @@ export class Keymap {
   action(event: KeyboardEvent): KeyboardAction | null {
     const key = event.key.toLowerCase();
     for (const binding of this.actions) {
-      if (matchesShortcut(event, key, binding.shortcut)) return binding.action;
+      if (matches_shortcut(event, key, binding.shortcut)) return binding.action;
     }
     return null;
   }
@@ -390,11 +391,11 @@ export class Keymap {
     editing: boolean,
   ): boolean {
     const bindings =
-      typeof this.menu === "function" ? this.resolveCustom(context) : this.staticCustom;
+      typeof this.menu === "function" ? this.resolve_custom(context) : this.static_custom;
     const key = event.key.toLowerCase();
     for (const { command, shortcut } of bindings) {
       if (editing && !shortcut.ctrl && !shortcut.meta) continue;
-      if (!matchesShortcut(event, key, shortcut)) continue;
+      if (!matches_shortcut(event, key, shortcut)) continue;
       if (
         command.visible === false ||
         (typeof command.visible === "function" && !command.visible(context))
@@ -413,7 +414,7 @@ export class Keymap {
     return false;
   }
 
-  private resolveCustom(context: ContextMenuContext): readonly CustomBinding[] {
+  private resolve_custom(context: ContextMenuContext): readonly CustomBinding[] {
     const configured = typeof this.menu === "function" ? this.menu(context) : this.menu;
     if (!Array.isArray(configured)) return [];
     const registered = new Map(this.registered);
@@ -423,7 +424,7 @@ export class Keymap {
       if (!command.onClick || !input || (typeof input === "string" && isKeyboardAction(input)))
         continue;
       const shortcut = parseShortcut(input);
-      registerBinding(
+      register_binding(
         registered,
         shortcut,
         command.id ?? command.label ?? `menu item ${index + 1}`,

@@ -106,10 +106,10 @@ interface GridLink {
   disposeRemote?: () => void;
 }
 
-const COLUMN_HEADERS: readonly string[] = offlineColumnHeaders();
+const COLUMN_HEADERS: readonly string[] = offline_column_headers();
 
 /** Header labels of the offline workbook's first sheet. */
-function offlineColumnHeaders(): readonly string[] {
+function offline_column_headers(): readonly string[] {
   const sheet = createOfflineWorkbook().sheets[0];
   if (!sheet) throw new Error("The offline workbook has no sheet");
 
@@ -125,8 +125,8 @@ const DISPATCH_BASE_WIDTHS = [100, 180, 205, 200, 104, 140, 112] as const;
 const DISPATCH_GUTTER_WIDTH = 48;
 
 /** Widen column weights to cover the measured stage, remainder included. */
-function fitColumnWidths(weights: readonly number[], hostWidth: number | undefined): number[] {
-  const fill = hostWidth === undefined ? 0 : Math.floor(hostWidth) - DISPATCH_GUTTER_WIDTH;
+function fit_column_widths(weights: readonly number[], host_width: number | undefined): number[] {
+  const fill = host_width === undefined ? 0 : Math.floor(host_width) - DISPATCH_GUTTER_WIDTH;
   return (
     fitColumnPixels(weights, fill, {
       minimumScale: 1,
@@ -141,21 +141,21 @@ function fitColumnWidths(weights: readonly number[], hostWidth: number | undefin
  * content-fit weights; every other sheet scales its declared widths, so a
  * switch to that tab shows its named columns across the whole board.
  */
-function fitSheetColumns(
-  sheetId: string,
+function fit_sheet_columns(
+  sheet_id: string,
   columns: readonly Column[],
-  hostWidth?: number,
+  host_width?: number,
 ): Column[] {
   const weights =
-    sheetId === OFFLINE_SHEET_ID ? DISPATCH_BASE_WIDTHS : columns.map((column) => column.width);
-  const widths = fitColumnWidths(weights, hostWidth);
+    sheet_id === OFFLINE_SHEET_ID ? DISPATCH_BASE_WIDTHS : columns.map((column) => column.width);
+  const widths = fit_column_widths(weights, host_width);
   return columns.map((column, index) => ({
     ...column,
     width: widths[index] ?? column.width,
   }));
 }
 
-function describeRemoteCommit(entry: VersionedOperation): string {
+function describe_remote_commit(entry: VersionedOperation): string {
   const first = entry.operations[0];
   const target =
     first?.op === "set"
@@ -165,10 +165,10 @@ function describeRemoteCommit(entry: VersionedOperation): string {
   return `v${entry.version} · ${count} change${count === 1 ? "" : "s"}${target}`;
 }
 
-async function resetOutbox(databaseName: string): Promise<void> {
+async function reset_outbox(database_name: string): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   // Stale records can stay visible; demo cleanup must not prevent boot.
-  await deleteDatabase(databaseName, { error: "resolve", blocked: "resolve" });
+  await deleteDatabase(database_name, { error: "resolve", blocked: "resolve" });
 }
 
 /**
@@ -176,7 +176,7 @@ async function resetOutbox(databaseName: string): Promise<void> {
  * The scenario scripts only write literal values, so cell styles are the
  * only snapshot detail this mount path does not carry.
  */
-function mountFromSnapshot(snapshot: WorkbookSnapshot, hostWidth?: number): WorkbenchMount {
+function mount_from_snapshot(snapshot: WorkbookSnapshot, host_width?: number): WorkbenchMount {
   const active = snapshot.sheets.find((entry) => entry.id === snapshot.workbook.activeSheet);
   const sheet = active ?? snapshot.sheets[0];
   if (!sheet) throw new Error("Offline snapshot lost its dispatch sheet");
@@ -186,7 +186,7 @@ function mountFromSnapshot(snapshot: WorkbookSnapshot, hostWidth?: number): Work
       id: entry.id,
       name: entry.name,
       rowCount: entry.rowCount,
-      columns: fitSheetColumns(entry.id, entry.columns, hostWidth),
+      columns: fit_sheet_columns(entry.id, entry.columns, host_width),
       ...(entry.frozenRows !== undefined ? { frozenRows: entry.frozenRows } : {}),
       ...(entry.frozenCols !== undefined ? { frozenCols: entry.frozenCols } : {}),
     })),
@@ -219,10 +219,13 @@ function mountFromSnapshot(snapshot: WorkbookSnapshot, hostWidth?: number): Work
  * `data` covers the active sheet only, so every other sheet reaches the store
  * as host records instead of mounting empty beside its named headers.
  */
-function secondarySheetPatches(snapshot: WorkbookSnapshot, activeSheetId: string): DocumentOp[] {
+function secondary_sheet_patches(
+  snapshot: WorkbookSnapshot,
+  active_sheet_id: string,
+): DocumentOp[] {
   const patches: DocumentOp[] = [];
   for (const sheet of snapshot.sheets) {
-    if (sheet.id === activeSheetId) continue;
+    if (sheet.id === active_sheet_id) continue;
     for (const block of sheet.cells) {
       for (const cell of block.cells) {
         patches.push({
@@ -248,24 +251,24 @@ function secondarySheetPatches(snapshot: WorkbookSnapshot, activeSheetId: string
 export class SvelteWorkbenchSession {
   private readonly server: ShowcaseCollaborationServer;
   private readonly bus = new ShowcasePresenceBus();
-  private readonly colleagueTransport: PresenceTransport;
+  private readonly colleague_transport: PresenceTransport;
   private readonly storage: IndexedDbPendingCommitStorage;
   private readonly callbacks: WorkbenchCallbacks;
   /** Last state known to match the server head; remounts hydrate from it. */
-  private baseSnapshot: WorkbookSnapshot;
+  private base_snapshot: WorkbookSnapshot;
   private link: GridLink | null = null;
-  private conflictContext: { mutation: SyncMutationRecord; response: ConflictResponse } | null =
+  private conflict_context: { mutation: SyncMutationRecord; response: ConflictResponse } | null =
     null;
-  private lastColleaguePresence: PresenceMessage | null = null;
+  private last_colleague_presence: PresenceMessage | null = null;
   private online = true;
   private destroyed = false;
-  private feedSeq = 0;
-  private mutationSeq = 0;
-  private localStep = 0;
-  private colleagueStep = 0;
+  private feed_seq = 0;
+  private mutation_seq = 0;
+  private local_step = 0;
+  private colleague_step = 0;
 
   static async create(callbacks: WorkbenchCallbacks): Promise<SvelteWorkbenchSession> {
-    await resetOutbox(SVELTE_WORKBENCH_OUTBOX);
+    await reset_outbox(SVELTE_WORKBENCH_OUTBOX);
     return new SvelteWorkbenchSession(callbacks);
   }
 
@@ -273,22 +276,22 @@ export class SvelteWorkbenchSession {
     this.callbacks = callbacks;
     const seed = createOfflineSeedSnapshot();
     this.server = new ShowcaseCollaborationServer(seed);
-    this.baseSnapshot = seed;
-    this.colleagueTransport = this.bus.endpoint();
+    this.base_snapshot = seed;
+    this.colleague_transport = this.bus.endpoint();
     this.storage = new IndexedDbPendingCommitStorage({ databaseName: SVELTE_WORKBENCH_OUTBOX });
   }
 
   /** Pristine construction-bound inputs for the first island generation. */
   initialMount(): WorkbenchMount {
     const workbook = createOfflineWorkbook();
-    const hostWidth = this.hostWidth();
+    const host_width = this.host_width();
     for (const sheet of workbook.sheets) {
-      sheet.columns = fitSheetColumns(sheet.id, sheet.columns, hostWidth);
+      sheet.columns = fit_sheet_columns(sheet.id, sheet.columns, host_width);
     }
     return { workbook, data: createOfflineData(), version: 0 };
   }
 
-  private hostWidth(): number | undefined {
+  private host_width(): number | undefined {
     const width = this.callbacks.measureHostWidth();
     return Number.isFinite(width) && (width ?? 0) > 0 ? width : undefined;
   }
@@ -298,8 +301,8 @@ export class SvelteWorkbenchSession {
    * arrive as host records: one low-level store commit per generation, never a
    * queued edit and never Grid history.
    */
-  private hydrateSecondarySheets(grid: Grid): void {
-    const patches = secondarySheetPatches(this.baseSnapshot, OFFLINE_SHEET_ID);
+  private hydrate_secondary_sheets(grid: Grid): void {
+    const patches = secondary_sheet_patches(this.base_snapshot, OFFLINE_SHEET_ID);
     if (patches.length === 0) return;
     const result = grid.store.applyTransaction({ patches }, { commitReason: "api" });
     if (result.status !== "applied") {
@@ -310,22 +313,22 @@ export class SvelteWorkbenchSession {
   /** Wire one grid generation; replaces any previous link. */
   connect(grid: Grid, mountVersion: number): void {
     this.disconnect();
-    this.conflictContext = null;
+    this.conflict_context = null;
     this.callbacks.onConflict(null);
     const sync = new SyncCoordinator(grid, this.server, {
       documentId: OFFLINE_DOCUMENT_ID,
       serverVersion: mountVersion,
       pendingStorage: this.storage,
       initialConnection: this.online ? "online" : "offline",
-      createMutationId: () => `you-${++this.mutationSeq}`,
+      createMutationId: () => `you-${++this.mutation_seq}`,
     });
     const link: GridLink = { grid, sync, presence: null };
     this.link = link;
-    this.hydrateSecondarySheets(grid);
-    link.offSync = sync.on((event) => this.handleSyncEvent(link, event));
+    this.hydrate_secondary_sheets(grid);
+    link.offSync = sync.on((event) => this.handle_sync_event(link, event));
     if (this.online) {
       link.disposeRemote = sync.subscribe(this.server);
-      this.attachPresence(link);
+      this.attach_presence(link);
     }
     this.callbacks.onState(sync.state);
     this.callbacks.onQueue(sync.pendingCommits());
@@ -374,11 +377,11 @@ export class SvelteWorkbenchSession {
     if (!link) return;
     link.disposeRemote = link.sync.subscribe(this.server);
     link.sync.setOnline(true);
-    this.attachPresence(link);
+    this.attach_presence(link);
     try {
       const responses = await link.sync.flush();
       if (!responses.some((response) => response.status === "conflict")) {
-        await this.reconcileAfterDrain(link);
+        await this.reconcile_after_drain(link);
       }
     } catch (error) {
       this.feed("err", errorText(error));
@@ -389,14 +392,14 @@ export class SvelteWorkbenchSession {
   logNextEntry(): void {
     const link = this.link;
     if (!link || this.destroyed) return;
-    const step = this.localStep;
+    const step = this.local_step;
     const row = offlineLocalEditRow(step);
     const result = link.grid.applyTransaction({ patches: offlineLocalEdit(step) });
     if (result.status !== "applied") {
       this.feed("err", `Edit rejected (${result.status}) — the durable outbox may be full`);
       return;
     }
-    this.localStep += 1;
+    this.local_step += 1;
     link.grid.setSelection({
       kind: "cell",
       addr: { sheet: OFFLINE_SHEET_ID, row, col: OFFLINE_COLUMNS.status },
@@ -406,14 +409,14 @@ export class SvelteWorkbenchSession {
   /** HQ commits directly against the server head — live remote work when online, divergence when offline. */
   async colleagueCommit(): Promise<void> {
     if (this.destroyed) return;
-    const step = this.colleagueStep++;
+    const step = this.colleague_step++;
     const row = offlineColleagueEditRow(step);
     try {
       const version = await this.server.commitServerOperations(
         OFFLINE_DOCUMENT_ID,
         offlineColleagueEdit(step),
       );
-      this.publishColleaguePresence(row);
+      this.publish_colleague_presence(row);
       this.feed(
         this.online ? "ok" : "warn",
         this.online
@@ -431,7 +434,7 @@ export class SvelteWorkbenchSession {
    */
   async mergeAndResync(): Promise<void> {
     const link = this.link;
-    const context = this.conflictContext;
+    const context = this.conflict_context;
     if (!link || !context || this.destroyed) return;
     try {
       const remote = context.response.operationsSinceBase;
@@ -450,7 +453,7 @@ export class SvelteWorkbenchSession {
             link.grid.applyRemoteOperations(record.operations);
           }
         }
-        this.conflictContext = null;
+        this.conflict_context = null;
         this.callbacks.onConflict(null);
         this.feed(
           "ok",
@@ -467,11 +470,11 @@ export class SvelteWorkbenchSession {
       // remount; the rebased durable queue restores on top of it.
       const head = context.response.snapshot ?? (await this.server.load(OFFLINE_DOCUMENT_ID));
       await link.sync.resumeAfterReload(head);
-      this.conflictContext = null;
+      this.conflict_context = null;
       this.callbacks.onConflict(null);
-      this.baseSnapshot = head;
+      this.base_snapshot = head;
       this.feed("info", `Reloading the document at server v${head.version ?? 0}`);
-      this.callbacks.onRemount(mountFromSnapshot(head, this.hostWidth()), "conflict-reload");
+      this.callbacks.onRemount(mount_from_snapshot(head, this.host_width()), "conflict-reload");
     } catch (error) {
       this.feed("err", errorText(error));
     }
@@ -487,7 +490,7 @@ export class SvelteWorkbenchSession {
         ? `Remounting — ${pending} durable edit${pending === 1 ? "" : "s"} will restore from IndexedDB`
         : "Remounting the island",
     );
-    this.callbacks.onRemount(mountFromSnapshot(this.baseSnapshot, this.hostWidth()), "manual");
+    this.callbacks.onRemount(mount_from_snapshot(this.base_snapshot, this.host_width()), "manual");
   }
 
   destroy(): void {
@@ -497,13 +500,13 @@ export class SvelteWorkbenchSession {
     this.storage.close();
   }
 
-  private handleSyncEvent(link: GridLink, event: SyncCoordinatorEvent): void {
+  private handle_sync_event(link: GridLink, event: SyncCoordinatorEvent): void {
     if (this.destroyed || this.link !== link) return;
     switch (event.type) {
       case "state":
         this.callbacks.onState(event.state);
         this.callbacks.onQueue(link.sync.pendingCommits());
-        this.captureBase(link, event.state);
+        this.capture_base(link, event.state);
         break;
       case "restored":
         // Honest first entry: hydration ran against the real IndexedDB outbox.
@@ -530,8 +533,8 @@ export class SvelteWorkbenchSession {
         );
         break;
       case "conflict":
-        this.conflictContext = { mutation: event.mutation, response: event.response };
-        this.callbacks.onConflict(this.buildConflict(event.mutation, event.response));
+        this.conflict_context = { mutation: event.mutation, response: event.response };
+        this.callbacks.onConflict(this.build_conflict(event.mutation, event.response));
         this.feed(
           "warn",
           `Conflict: ${event.mutation.clientMutationId} is based on v${event.mutation.baseVersion} but the server is at v${event.response.currentVersion}`,
@@ -568,9 +571,9 @@ export class SvelteWorkbenchSession {
   }
 
   /** Snapshot the grid whenever it is fully synced; remounts hydrate from it. */
-  private captureBase(link: GridLink, state: SyncStateSnapshot): void {
-    if (state.pendingCount !== 0 || state.activity !== "idle" || this.conflictContext) return;
-    this.baseSnapshot = {
+  private capture_base(link: GridLink, state: SyncStateSnapshot): void {
+    if (state.pendingCount !== 0 || state.activity !== "idle" || this.conflict_context) return;
+    this.base_snapshot = {
       ...link.grid.exportSnapshot(),
       documentId: OFFLINE_DOCUMENT_ID,
       version: state.serverVersion,
@@ -578,19 +581,19 @@ export class SvelteWorkbenchSession {
   }
 
   /** After a clean drain, detect a server that moved ahead while offline. */
-  private async reconcileAfterDrain(link: GridLink): Promise<void> {
+  private async reconcile_after_drain(link: GridLink): Promise<void> {
     const head = await this.server.load(OFFLINE_DOCUMENT_ID);
-    const headVersion = head.version ?? 0;
-    if (this.destroyed || this.link !== link || headVersion <= link.sync.serverVersion) return;
-    this.baseSnapshot = head;
+    const head_version = head.version ?? 0;
+    if (this.destroyed || this.link !== link || head_version <= link.sync.serverVersion) return;
+    this.base_snapshot = head;
     this.feed(
       "info",
-      `Server moved ahead to v${headVersion} while offline — reloading the document`,
+      `Server moved ahead to v${head_version} while offline — reloading the document`,
     );
-    this.callbacks.onRemount(mountFromSnapshot(head, this.hostWidth()), "reload");
+    this.callbacks.onRemount(mount_from_snapshot(head, this.host_width()), "reload");
   }
 
-  private buildConflict(
+  private build_conflict(
     mutation: SyncMutationRecord,
     response: ConflictResponse,
   ): WorkbenchConflict {
@@ -608,12 +611,12 @@ export class SvelteWorkbenchSession {
       clientMutationId: mutation.clientMutationId,
       baseVersion: mutation.baseVersion,
       currentVersion: response.currentVersion,
-      remoteSummaries: remote.map(describeRemoteCommit),
+      remoteSummaries: remote.map(describe_remote_commit),
       rebase,
     };
   }
 
-  private attachPresence(link: GridLink): void {
+  private attach_presence(link: GridLink): void {
     const presence = new PresenceCoordinator(link.grid, this.bus.endpoint(), {
       actor: OFFLINE_LOCAL_ACTOR,
       heartbeatMs: 0,
@@ -627,14 +630,17 @@ export class SvelteWorkbenchSession {
       }
     });
 
-    if (this.lastColleaguePresence) {
-      void this.colleagueTransport.publish({ ...this.lastColleaguePresence, sentAt: Date.now() });
+    if (this.last_colleague_presence) {
+      void this.colleague_transport.publish({
+        ...this.last_colleague_presence,
+        sentAt: Date.now(),
+      });
     } else {
-      this.publishColleaguePresence(offlineColleagueEditRow(this.colleagueStep));
+      this.publish_colleague_presence(offlineColleagueEditRow(this.colleague_step));
     }
   }
 
-  private publishColleaguePresence(row: number): void {
+  private publish_colleague_presence(row: number): void {
     const message: PresenceMessage = {
       actor: OFFLINE_COLLEAGUE_ACTOR,
       activeSheet: OFFLINE_SHEET_ID,
@@ -647,12 +653,12 @@ export class SvelteWorkbenchSession {
       ],
       sentAt: Date.now(),
     };
-    this.lastColleaguePresence = message;
-    void this.colleagueTransport.publish(message);
+    this.last_colleague_presence = message;
+    void this.colleague_transport.publish(message);
   }
 
   private feed(tone: WorkbenchFeedTone, text: string): void {
     if (this.destroyed) return;
-    this.callbacks.onFeed({ id: ++this.feedSeq, tone, text });
+    this.callbacks.onFeed({ id: ++this.feed_seq, tone, text });
   }
 }

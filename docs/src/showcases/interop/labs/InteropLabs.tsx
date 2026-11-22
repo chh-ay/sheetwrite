@@ -124,31 +124,31 @@ const LABS: readonly Lab[] = [
  * record.
  */
 export function InteropLabs() {
-  const [selected, setSelected] = createSignal("vault");
+  const [selected, set_selected] = createSignal("vault");
   const tabs: HTMLButtonElement[] = [];
   let section: HTMLElement | undefined;
 
-  const openFromHash = () => {
+  const open_from_hash = () => {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!LABS.some((lab) => lab.id === id)) return;
-    setSelected(id);
+    set_selected(id);
     section?.scrollIntoView({ block: "start" });
   };
 
   onMount(() => {
-    if (new URLSearchParams(window.location.search).has("compatibility")) setSelected("vault");
-    openFromHash();
-    window.addEventListener("hashchange", openFromHash);
+    if (new URLSearchParams(window.location.search).has("compatibility")) set_selected("vault");
+    open_from_hash();
+    window.addEventListener("hashchange", open_from_hash);
     onCleanup(() => {
-      window.removeEventListener("hashchange", openFromHash);
+      window.removeEventListener("hashchange", open_from_hash);
     });
   });
 
-  const focusTab = (index: number) => {
+  const focus_tab = (index: number) => {
     const count = LABS.length;
     const next = LABS[(index + count) % count];
     if (!next) return;
-    setSelected(next.id);
+    set_selected(next.id);
     tabs[(index + count) % count]?.focus();
   };
 
@@ -173,20 +173,20 @@ export function InteropLabs() {
               class="sw-labs__tile"
               data-testid={`interop-lab-${lab.id}`}
               id={`interop-lab-${lab.id}`}
-              onClick={() => setSelected(lab.id)}
+              onClick={() => set_selected(lab.id)}
               onKeyDown={(event) => {
                 if (event.key === "ArrowRight" || event.key === "ArrowDown") {
                   event.preventDefault();
-                  focusTab(index() + 1);
+                  focus_tab(index() + 1);
                 } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
                   event.preventDefault();
-                  focusTab(index() - 1);
+                  focus_tab(index() - 1);
                 } else if (event.key === "Home") {
                   event.preventDefault();
-                  focusTab(0);
+                  focus_tab(0);
                 } else if (event.key === "End") {
                   event.preventDefault();
-                  focusTab(LABS.length - 1);
+                  focus_tab(LABS.length - 1);
                 }
               }}
               ref={(element) => {

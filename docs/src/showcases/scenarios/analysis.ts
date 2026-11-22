@@ -77,21 +77,21 @@ const CHART_HEIGHT = 340;
 
 /** The orders as the grid's columnar data, with the header row first. */
 export function ordersData(orders: StoryOrders): ColumnarData {
-  const withHeader = (header: string, values: ArrayLike<CellScalar>): CellScalar[] => [
+  const with_header = (header: string, values: ArrayLike<CellScalar>): CellScalar[] => [
     header,
     ...Array.from(values),
   ];
   const columns: Record<OrderColumnKey, CellScalar[]> = {
-    order: withHeader("Order", orders.orderId),
-    date: withHeader("Date", orders.date),
-    month: withHeader("Month", orders.month),
-    region: withHeader("Region", orders.region),
-    product: withHeader("Product", orders.product),
-    channel: withHeader("Channel", orders.channel),
-    account: withHeader("Account", orders.account),
-    units: withHeader("Units", orders.units),
-    price: withHeader("Unit price", orders.unitPrice),
-    revenue: withHeader("Revenue", orders.revenue),
+    order: with_header("Order", orders.orderId),
+    date: with_header("Date", orders.date),
+    month: with_header("Month", orders.month),
+    region: with_header("Region", orders.region),
+    product: with_header("Product", orders.product),
+    channel: with_header("Channel", orders.channel),
+    account: with_header("Account", orders.account),
+    units: with_header("Units", orders.units),
+    price: with_header("Unit price", orders.unitPrice),
+    revenue: with_header("Revenue", orders.revenue),
   };
 
   return { rowCount: orders.rowCount + HEADER_ROWS, columns };
@@ -127,7 +127,7 @@ export function analysisWorkbook(orders: StoryOrders): Workbook {
 
 /** Revenue by month (rows) and region (columns), with totals. */
 export function revenuePivot(orders: StoryOrders): PivotDefinition {
-  const lastRow = orders.rowCount + HEADER_ROWS - 1;
+  const last_row = orders.rowCount + HEADER_ROWS - 1;
 
   return {
     id: PIVOT_ID,
@@ -136,7 +136,7 @@ export function revenuePivot(orders: StoryOrders): PivotDefinition {
       range: {
         sheet: ORDERS_SHEET,
         start: { row: 0, col: 0 },
-        end: { row: lastRow, col: ORDER_COLUMNS.length - 1 },
+        end: { row: last_row, col: ORDER_COLUMNS.length - 1 },
       },
     },
     anchor: { row: 0, col: 0 },
@@ -152,28 +152,28 @@ export function revenuePivot(orders: StoryOrders): PivotDefinition {
  * so the chart stays right when the engine's header layout changes.
  */
 export function revenueChart(pivot: PivotDefinition, result: PivotResultView): ChartDefinition {
-  const { anchor, headerRows, labelCols } = result;
+  const { anchor, headerRows: header_rows, labelCols: label_cols } = result;
   // The grand-total row and column are the last of each: leave them out.
-  const dataRows = result.rows - headerRows - 1;
-  const dataCols = result.cols - labelCols - 1;
-  const firstRow = anchor.row + headerRows;
-  const lastRow = firstRow + dataRows - 1;
+  const data_rows = result.rows - header_rows - 1;
+  const data_cols = result.cols - label_cols - 1;
+  const first_row = anchor.row + header_rows;
+  const last_row = first_row + data_rows - 1;
   // Column field labels fill the first header rows, outermost first; a value
   // caption row ("Revenue") can follow them, so the region names are not
   // simply the row above the data.
-  const regionRow = anchor.row + pivot.columns.length - 1;
-  const range = (startRow: number, endRow: number, col: number): Range => ({
+  const region_row = anchor.row + pivot.columns.length - 1;
+  const range = (start_row: number, end_row: number, col: number): Range => ({
     sheet: SUMMARY_SHEET,
-    start: { row: startRow, col },
-    end: { row: endRow, col },
+    start: { row: start_row, col },
+    end: { row: end_row, col },
   });
-  const categories = range(firstRow, lastRow, anchor.col + labelCols - 1);
-  const series: ChartSeries[] = Array.from({ length: dataCols }, (_, index) => {
-    const col = anchor.col + labelCols + index;
+  const categories = range(first_row, last_row, anchor.col + label_cols - 1);
+  const series: ChartSeries[] = Array.from({ length: data_cols }, (_, index) => {
+    const col = anchor.col + label_cols + index;
 
     return {
-      nameRange: range(regionRow, regionRow, col),
-      values: range(firstRow, lastRow, col),
+      nameRange: range(region_row, region_row, col),
+      values: range(first_row, last_row, col),
       categories,
     };
   });
@@ -216,7 +216,7 @@ export interface AnalysisScenario {
 }
 
 /** Throws with the transaction's first issue, so a broken setup is visible on the page. */
-function requireApplied(
+function require_applied(
   result: { status: string; issues?: ReadonlyArray<{ message: string }> },
   what: string,
 ) {
@@ -231,7 +231,7 @@ function requireApplied(
  */
 export function createAnalysisScenario(host: HTMLElement): AnalysisScenario {
   let shell: SpreadsheetShell | null = null;
-  let dipOrder: CellAddress | null = null;
+  let dip_order: CellAddress | null = null;
   let disposed = false;
 
   const ready = (async () => {
@@ -255,7 +255,7 @@ export function createAnalysisScenario(host: HTMLElement): AnalysisScenario {
     const { grid } = shell;
 
     const pivot = revenuePivot(orders);
-    requireApplied(grid.setPivot(pivot, SUMMARY_SHEET), "The revenue pivot");
+    require_applied(grid.setPivot(pivot, SUMMARY_SHEET), "The revenue pivot");
     const result = grid.getPivotResult(SUMMARY_SHEET, PIVOT_ID);
     if (result?.status !== "ok") {
       throw new Error(
@@ -263,8 +263,8 @@ export function createAnalysisScenario(host: HTMLElement): AnalysisScenario {
       );
     }
 
-    requireApplied(grid.setChart(revenueChart(pivot, result), SUMMARY_SHEET), "The revenue chart");
-    dipOrder = firstDipOrder(orders);
+    require_applied(grid.setChart(revenueChart(pivot, result), SUMMARY_SHEET), "The revenue chart");
+    dip_order = firstDipOrder(orders);
     grid.setActiveSheet(SUMMARY_SHEET);
     // Start in the empty column between the pivot and the chart: a cell inside
     // the pivot would open its field list over the chart before the reader acts.
@@ -274,15 +274,15 @@ export function createAnalysisScenario(host: HTMLElement): AnalysisScenario {
     });
   })();
 
-  const stopTheme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
+  const stop_theme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
 
   return {
     ready,
     grid: () => shell?.grid ?? null,
-    dipOrder: () => dipOrder,
+    dipOrder: () => dip_order,
     dispose() {
       disposed = true;
-      stopTheme();
+      stop_theme();
       shell?.destroy();
       shell = null;
     },

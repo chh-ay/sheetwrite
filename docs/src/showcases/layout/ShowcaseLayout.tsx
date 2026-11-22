@@ -31,9 +31,9 @@ export function ShowcaseStage(props: ShowcaseStageProps) {
   // JSX props are getters that create their elements on each read, and a
   // hydrating island must create each element once: test for a prop by its
   // key, and read it only where it renders.
-  const hasControls = "controls" in props;
+  const has_controls = "controls" in props;
   return (
-    <div class="sw-showcase__stage" data-has-controls={hasControls}>
+    <div class="sw-showcase__stage" data-has-controls={has_controls}>
       <section aria-label={props.demoLabel} class="sw-showcase__demo">
         <Show when={props.demoTitle !== undefined}>
           <header class="sw-showcase__demo-bar">
@@ -46,7 +46,7 @@ export function ShowcaseStage(props: ShowcaseStageProps) {
         </Show>
         {props.demo}
       </section>
-      <Show when={hasControls}>
+      <Show when={has_controls}>
         <aside aria-label="Controls" class="sw-showcase__controls">
           {props.controls}
         </aside>
@@ -94,18 +94,18 @@ export interface ShowcaseSectionProps {
 
 /** A section of explanation; with a figure, the text sits beside its picture. */
 export function ShowcaseSection(props: ShowcaseSectionProps) {
-  const hasFigure = "figure" in props;
+  const has_figure = "figure" in props;
   const layout = props.layout ?? "beside";
   return (
     <section
       aria-labelledby={props.id}
       class="sw-showcase__section sw-prose"
-      data-figure={hasFigure ? layout : undefined}
+      data-figure={has_figure ? layout : undefined}
     >
       <h2 class="sw-showcase__section-title" id={props.id}>
         {props.title}
       </h2>
-      <Show fallback={props.children} when={hasFigure}>
+      <Show fallback={props.children} when={has_figure}>
         <div class="sw-showcase__section-text">{props.children}</div>
         <figure class="sw-showcase__figure">{props.figure}</figure>
       </Show>

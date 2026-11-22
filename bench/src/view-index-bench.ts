@@ -38,7 +38,7 @@ interface MemorySnapshot {
   readonly processExternal: number;
 }
 
-function memorySnapshot(): MemorySnapshot {
+function memory_snapshot(): MemorySnapshot {
   const jsc = heapStats();
   return {
     jscHeapSize: jsc.heapSize,
@@ -47,24 +47,24 @@ function memorySnapshot(): MemorySnapshot {
   };
 }
 
-function retainedMemory(after: MemorySnapshot, before: MemorySnapshot): RetainedMemory {
-  const jscTotalBytes = after.jscHeapSize - before.jscHeapSize;
-  const jscExtraBytes = after.jscExtraMemory - before.jscExtraMemory;
+function retained_memory(after: MemorySnapshot, before: MemorySnapshot): RetainedMemory {
+  const jsc_total_bytes = after.jscHeapSize - before.jscHeapSize;
+  const jsc_extra_bytes = after.jscExtraMemory - before.jscExtraMemory;
   return {
-    jscCellBytes: jscTotalBytes - jscExtraBytes,
-    jscExtraBytes,
-    jscTotalBytes,
+    jscCellBytes: jsc_total_bytes - jsc_extra_bytes,
+    jscExtraBytes: jsc_extra_bytes,
+    jscTotalBytes: jsc_total_bytes,
     processExternalBytes: after.processExternal - before.processExternal,
   };
 }
 
-function collectGarbage(): void {
+function collect_garbage(): void {
   forceGc();
   fullGC();
   forceGc();
 }
 
-function makeOrder(offset: number): Uint32Array {
+function make_order(offset: number): Uint32Array {
   const order = new Uint32Array(ROWS - 1);
   let at = 0;
   for (let i = 0; i < ROWS; i++) {
@@ -74,7 +74,7 @@ function makeOrder(offset: number): Uint32Array {
   return order;
 }
 
-function lookupSamples(lookup: (row: number) => number | null): {
+function lookup_samples(lookup: (row: number) => number | null): {
   readonly medianNs: number;
   readonly p95Ns: number;
 } {
@@ -99,44 +99,44 @@ function lookupSamples(lookup: (row: number) => number | null): {
 }
 
 class MapBaseline {
-  private readonly orderBySheet = new Map<string, Uint32Array>();
-  private readonly rowIndexBySheet = new Map<string, Map<number, number>>();
+  private readonly order_by_sheet = new Map<string, Uint32Array>();
+  private readonly row_index_by_sheet = new Map<string, Map<number, number>>();
 
   setOrder(order: Uint32Array): void {
-    this.orderBySheet.set("bench", order);
-    this.rowIndexBySheet.delete("bench");
+    this.order_by_sheet.set("bench", order);
+    this.row_index_by_sheet.delete("bench");
   }
 
   viewRowOf(sheet: string, dataRow: number): number | null {
-    const order = this.orderBySheet.get(sheet);
+    const order = this.order_by_sheet.get(sheet);
     if (!order) return null;
-    let index = this.rowIndexBySheet.get(sheet);
+    let index = this.row_index_by_sheet.get(sheet);
     if (!index) {
       index = new Map();
-      for (let viewRow = 0; viewRow < order.length; viewRow++) {
-        index.set(order[viewRow]!, viewRow);
+      for (let view_row = 0; view_row < order.length; view_row++) {
+        index.set(order[view_row]!, view_row);
       }
-      this.rowIndexBySheet.set(sheet, index);
+      this.row_index_by_sheet.set(sheet, index);
     }
     return index.get(dataRow) ?? null;
   }
 
   dispose(): void {
-    this.orderBySheet.clear();
-    this.rowIndexBySheet.clear();
+    this.order_by_sheet.clear();
+    this.row_index_by_sheet.clear();
   }
 }
 
-function productionView(
-  rowCount: number,
-  initialOrder: Uint32Array,
+function production_view(
+  row_count: number,
+  initial_order: Uint32Array,
 ): {
   readonly view: StoreViewState;
   setOrder(order: Uint32Array): void;
 } {
-  let activeOrder = initialOrder;
+  let active_order = initial_order;
   const wasm = {
-    sortRowsMulti: () => activeOrder,
+    sortRowsMulti: () => active_order,
   } as unknown as RecomputingCellStore;
   const workbook: Workbook = {
     activeSheet: "bench",
@@ -144,7 +144,7 @@ function productionView(
       {
         id: "bench",
         name: "Benchmark",
-        rowCount,
+        rowCount: row_count,
         columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
         sortKeys: [{ col: 0, ascending: true }],
       },
@@ -157,56 +157,56 @@ function productionView(
   return {
     view,
     setOrder(order) {
-      activeOrder = order;
+      active_order = order;
       view.metadataChanged("bench");
     },
   };
 }
 
-function runWorker(engine: Engine): IndexMetrics {
-  const order = makeOrder(0);
-  const rebuiltOrder = makeOrder(271_828);
+function run_worker(engine: Engine): IndexMetrics {
+  const order = make_order(0);
+  const rebuilt_order = make_order(271_828);
   const map = engine === "map" ? new MapBaseline() : null;
-  const packed = engine === "packed" ? productionView(ROWS, order) : null;
+  const packed = engine === "packed" ? production_view(ROWS, order) : null;
   map?.setOrder(order);
 
-  collectGarbage();
-  const before = memorySnapshot();
+  collect_garbage();
+  const before = memory_snapshot();
   const started = now();
   const first = map
     ? map.viewRowOf("bench", order[0]!)
     : packed!.view.viewRowOf("bench", order[0]!);
   if (first !== 0) throw new Error(`${engine} cold inverse build failed`);
-  const coldBuildMs = now() - started;
-  collectGarbage();
-  const retained = retainedMemory(memorySnapshot(), before);
-  const lookup = lookupSamples((row) =>
+  const cold_build_ms = now() - started;
+  collect_garbage();
+  const retained = retained_memory(memory_snapshot(), before);
+  const lookup = lookup_samples((row) =>
     map ? map.viewRowOf("bench", row) : packed!.view.viewRowOf("bench", row),
   );
-  const absentResult = map
+  const absent_result = map
     ? map.viewRowOf("bench", ABSENT_ROW)
     : packed!.view.viewRowOf("bench", ABSENT_ROW);
-  const actualBackingBytes = packed?.view.inverseIndexByteLength("bench") ?? null;
+  const actual_backing_bytes = packed?.view.inverseIndexByteLength("bench") ?? null;
 
-  map?.setOrder(rebuiltOrder);
-  packed?.setOrder(rebuiltOrder);
-  const rebuildStarted = now();
+  map?.setOrder(rebuilt_order);
+  packed?.setOrder(rebuilt_order);
+  const rebuild_started = now();
   const rebuilt = map
-    ? map.viewRowOf("bench", rebuiltOrder[0]!)
-    : packed!.view.viewRowOf("bench", rebuiltOrder[0]!);
+    ? map.viewRowOf("bench", rebuilt_order[0]!)
+    : packed!.view.viewRowOf("bench", rebuilt_order[0]!);
   if (rebuilt !== 0) throw new Error(`${engine} inverse rebuild was stale`);
-  const rebuildMs = now() - rebuildStarted;
+  const rebuild_ms = now() - rebuild_started;
   map?.dispose();
   packed?.view.dispose();
 
   return {
-    coldBuildMs,
+    coldBuildMs: cold_build_ms,
     retained,
     lookupMedianNs: lookup.medianNs,
     lookupP95Ns: lookup.p95Ns,
-    absentResult,
-    rebuildMs,
-    actualBackingBytes,
+    absentResult: absent_result,
+    rebuildMs: rebuild_ms,
+    actualBackingBytes: actual_backing_bytes,
   };
 }
 
@@ -227,7 +227,7 @@ function aggregate(samples: readonly IndexMetrics[]): IndexMetrics {
   };
 }
 
-function spawnWorker(engine: Engine): IndexMetrics {
+function spawn_worker(engine: Engine): IndexMetrics {
   const child = Bun.spawnSync({
     cmd: [process.execPath, fileURLToPath(import.meta.url), "--worker", engine],
     stdout: "pipe",
@@ -241,7 +241,7 @@ function spawnWorker(engine: Engine): IndexMetrics {
   return JSON.parse(child.stdout.toString()) as IndexMetrics;
 }
 
-function resourceScenarios(): {
+function resource_scenarios(): {
   readonly denseBytes: number;
   readonly sparse: {
     readonly survivors: number;
@@ -265,20 +265,20 @@ function resourceScenarios(): {
     readonly coldBuildMs: number;
   };
 } {
-  const sparseOrder = Uint32Array.from([ROWS - 1, 7, 12_345, 500_000]);
-  const sparse = productionView(ROWS, sparseOrder);
-  const sparseStarted = now();
+  const sparse_order = Uint32Array.from([ROWS - 1, 7, 12_345, 500_000]);
+  const sparse = production_view(ROWS, sparse_order);
+  const sparse_started = now();
   if (sparse.view.viewRowOf("bench", ROWS - 1) !== 0) throw new Error("sparse build failed");
-  const sparseBuildMs = now() - sparseStarted;
-  const sparseLookup = lookupSamples((row) => sparse.view.viewRowOf("bench", row));
-  const sparseBytes = sparse.view.inverseIndexByteLength("bench");
+  const sparse_build_ms = now() - sparse_started;
+  const sparse_lookup = lookup_samples((row) => sparse.view.viewRowOf("bench", row));
+  const sparse_bytes = sparse.view.inverseIndexByteLength("bench");
   sparse.view.dispose();
 
-  const empty = productionView(ROWS, new Uint32Array(0));
-  const emptyStarted = now();
+  const empty = production_view(ROWS, new Uint32Array(0));
+  const empty_started = now();
   if (empty.view.viewRowOf("bench", 0) !== null) throw new Error("empty build failed");
-  const emptyBuildMs = now() - emptyStarted;
-  const emptyBytes = empty.view.inverseIndexByteLength("bench");
+  const empty_build_ms = now() - empty_started;
+  const empty_bytes = empty.view.inverseIndexByteLength("bench");
   empty.view.dispose();
 
   const sheets = Array.from({ length: 256 }, (_, handle) => ({
@@ -289,44 +289,44 @@ function resourceScenarios(): {
     sortKeys: [{ col: 0, ascending: true }],
   }));
   const workbook: Workbook = { activeSheet: "s0", sheets };
-  const orders = sheets.map((_, handle) => (handle % 2 === 0 ? new Uint32Array(0) : sparseOrder));
+  const orders = sheets.map((_, handle) => (handle % 2 === 0 ? new Uint32Array(0) : sparse_order));
   const registry = new SheetRegistry(workbook);
   for (const [handle, sheet] of sheets.entries()) registry.handles.set(sheet.id, handle);
   const wasm = {
     sortRowsMulti: (handle: number) => orders[handle]!,
   } as unknown as RecomputingCellStore;
-  const aggregateView = new StoreViewState(wasm, registry);
-  const aggregateStarted = now();
+  const aggregate_view = new StoreViewState(wasm, registry);
+  const aggregate_started = now();
   for (let handle = 0; handle < sheets.length; handle++) {
     const sheet = sheets[handle]!;
-    aggregateView.metadataChanged(sheet.id);
-    aggregateView.viewRowOf(sheet.id, ROWS - 1);
+    aggregate_view.metadataChanged(sheet.id);
+    aggregate_view.viewRowOf(sheet.id, ROWS - 1);
   }
-  const aggregateBuildMs = now() - aggregateStarted;
-  const aggregateBytes = sheets.reduce(
-    (bytes, sheet) => bytes + aggregateView.inverseIndexByteLength(sheet.id),
+  const aggregate_build_ms = now() - aggregate_started;
+  const aggregate_bytes = sheets.reduce(
+    (bytes, sheet) => bytes + aggregate_view.inverseIndexByteLength(sheet.id),
     0,
   );
-  aggregateView.dispose();
+  aggregate_view.dispose();
 
   return {
     denseBytes: ROWS * Uint32Array.BYTES_PER_ELEMENT,
     sparse: {
-      survivors: sparseOrder.length,
-      backingBytes: sparseBytes,
-      coldBuildMs: sparseBuildMs,
-      lookupMedianNs: sparseLookup.medianNs,
-      lookupP95Ns: sparseLookup.p95Ns,
+      survivors: sparse_order.length,
+      backingBytes: sparse_bytes,
+      coldBuildMs: sparse_build_ms,
+      lookupMedianNs: sparse_lookup.medianNs,
+      lookupP95Ns: sparse_lookup.p95Ns,
     },
-    empty: { survivors: 0, backingBytes: emptyBytes, coldBuildMs: emptyBuildMs },
+    empty: { survivors: 0, backingBytes: empty_bytes, coldBuildMs: empty_build_ms },
     aggregate: {
       sheets: sheets.length,
       emptySheets: 128,
       sparseSheets: 128,
       logicalRows: sheets.length * ROWS,
-      survivors: 128 * sparseOrder.length,
-      backingBytes: aggregateBytes,
-      coldBuildMs: aggregateBuildMs,
+      survivors: 128 * sparse_order.length,
+      backingBytes: aggregate_bytes,
+      coldBuildMs: aggregate_build_ms,
     },
   };
 }
@@ -388,14 +388,14 @@ function main(mode: BenchMode): void {
   const runs: Record<Engine, IndexMetrics[]> = { map: [], packed: [] };
   for (let repeat = 0; repeat < REPEATS; repeat++) {
     const order: readonly Engine[] = repeat % 2 === 0 ? ["map", "packed"] : ["packed", "map"];
-    for (const engine of order) runs[engine].push(spawnWorker(engine));
+    for (const engine of order) runs[engine].push(spawn_worker(engine));
   }
 
   const baseline = aggregate(runs.map);
   const packed = aggregate(runs.packed);
-  const resources = resourceScenarios();
-  const heapReduction = 1 - packed.retained.jscTotalBytes / baseline.retained.jscTotalBytes;
-  const lookupP95Regression = packed.lookupP95Ns / baseline.lookupP95Ns - 1;
+  const resources = resource_scenarios();
+  const heap_reduction = 1 - packed.retained.jscTotalBytes / baseline.retained.jscTotalBytes;
+  const lookup_p95_regression = packed.lookupP95Ns / baseline.lookupP95Ns - 1;
   const lookup = lookupGate(mode, runs.map, runs.packed);
   const gates = {
     absentFilteredRow: baseline.absentResult === null && packed.absentResult === null,
@@ -408,7 +408,7 @@ function main(mode: BenchMode): void {
     heapReduction:
       baseline.retained.jscTotalBytes > 0 &&
       packed.retained.jscTotalBytes >= 0 &&
-      heapReduction >= 0.5,
+      heap_reduction >= 0.5,
     [lookup.name]: lookup.passed,
     coldBuild: packed.coldBuildMs <= baseline.coldBuildMs,
   };
@@ -425,8 +425,8 @@ function main(mode: BenchMode): void {
         baseline,
         packed,
         resources,
-        heapReduction,
-        lookupP95Regression,
+        heapReduction: heap_reduction,
+        lookupP95Regression: lookup_p95_regression,
         lookupGate: lookup,
         gates,
         runs,
@@ -439,9 +439,9 @@ function main(mode: BenchMode): void {
   if (Object.values(gates).some((passed) => !passed)) process.exitCode = 1;
 }
 
-const workerEngine = process.argv[2] === "--worker" ? process.argv[3] : undefined;
-if (workerEngine === "map" || workerEngine === "packed") {
-  console.log(JSON.stringify(runWorker(workerEngine)));
+const worker_engine = process.argv[2] === "--worker" ? process.argv[3] : undefined;
+if (worker_engine === "map" || worker_engine === "packed") {
+  console.log(JSON.stringify(run_worker(worker_engine)));
 } else if (import.meta.main) {
   main(process.argv.includes("--smoke") ? "smoke" : "full");
 }

@@ -6,30 +6,30 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, GridEvents, Workbook } from "../src/types.js";
 import { mountHost } from "./fixtures.js";
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
 });
 
 /** A grid wide enough for the 4,096-cell selection a command-state snapshot is bounded to. */
-function wideWorkbook(rowCount: number, columnCount: number): Workbook {
+function wide_workbook(row_count: number, column_count: number): Workbook {
   return {
     activeSheet: "s1",
     sheets: [
       {
         id: "s1",
         name: "Sheet 1",
-        rowCount,
-        columns: Array.from({ length: columnCount }, (_, index): Column => ({
+        rowCount: row_count,
+        columns: Array.from({ length: column_count }, (_, index): Column => ({
           key: `c${index}`,
           header: `Column ${index + 1}`,
           width: 120,
@@ -44,7 +44,7 @@ describe("createGridController command-state subscriptions", () => {
   it("picks up a live handler before a direct grid emission", async () => {
     const host = mountHost();
     const handlers: GridControllerHandlers = {};
-    const controller = createGridController(host, { workbook: wideWorkbook(4, 2) }, handlers);
+    const controller = createGridController(host, { workbook: wide_workbook(4, 2) }, handlers);
     const events: Array<GridEvents["command-state-change"]> = [];
 
     controller.grid.setReadOnly(true);

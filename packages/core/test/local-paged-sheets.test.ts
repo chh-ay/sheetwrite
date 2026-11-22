@@ -34,7 +34,7 @@ function workbook(): Workbook {
   };
 }
 
-function setNumber(store: SheetwriteStore, row: number, col: number, value: number): void {
+function set_number(store: SheetwriteStore, row: number, col: number, value: number): void {
   const result = store.applyTransaction({
     patches: [{ op: "set", addr: { sheet: SHEET, row, col }, value: { kind: "literal", value } }],
   });
@@ -46,7 +46,7 @@ describe("a sheet past the dense cell limit", () => {
   let store: SheetwriteStore;
   beforeEach(() => {
     store = new SheetwriteStore(workbook());
-    setNumber(store, ROWS - 1, 3, 7);
+    set_number(store, ROWS - 1, 3, 7);
   });
   afterEach(() => store.dispose());
 
@@ -76,31 +76,31 @@ describe("a sheet past the dense cell limit", () => {
 });
 
 describe("the host's dense and local limits", () => {
-  function sheetsOf(...shapes: [rows: number, width: number][]): Workbook {
+  function sheets_of(...shapes: [rows: number, width: number][]): Workbook {
     return {
       activeSheet: "s0",
-      sheets: shapes.map(([rowCount, width], index) => ({
+      sheets: shapes.map(([row_count, width], index) => ({
         id: `s${index}`,
         name: `Sheet ${index}`,
-        rowCount,
+        rowCount: row_count,
         columns: columns(width),
       })),
     };
   }
 
-  function engineOf(store: SheetwriteStore) {
+  function engine_of(store: SheetwriteStore) {
     const engine = storeEngine(store);
     if (!engine) throw new Error("expected a registered engine");
     return engine;
   }
 
   it("place sheets in the engine as validation does when the host lowers them", () => {
-    const store = new SheetwriteStore(sheetsOf([10, 10], [10, 10]), undefined, {
+    const store = new SheetwriteStore(sheets_of([10, 10], [10, 10]), undefined, {
       snapshotResourceLimits: { maxDenseCells: 100, maxLocalPagedCells: 150 },
     });
     try {
-      expect(engineOf(store).isLocalPaged("s0")).toBe(false);
-      expect(engineOf(store).isLocalPaged("s1")).toBe(true);
+      expect(engine_of(store).isLocalPaged("s0")).toBe(false);
+      expect(engine_of(store).isLocalPaged("s1")).toBe(true);
       const fits = store.applyTransaction({
         patches: [{ op: "addRows", sheet: "s1", at: 0, count: 5 }],
       });
@@ -123,7 +123,7 @@ describe("the host's dense and local limits", () => {
     // validation refuses the workbook before the engine allocates anything.
     let refusal: unknown;
     try {
-      new SheetwriteStore(sheetsOf([ROWS, COLUMNS], [1_000_000, 16]), undefined, {
+      new SheetwriteStore(sheets_of([ROWS, COLUMNS], [1_000_000, 16]), undefined, {
         snapshotResourceLimits: limits,
       }).dispose();
     } catch (error) {

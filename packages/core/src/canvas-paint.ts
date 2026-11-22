@@ -98,7 +98,7 @@ const FONT_ANGLE_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$
 /** Gap between a top- or bottom-aligned text block and the cell edge, unzoomed. */
 const VERTICAL_TEXT_PAD = 2;
 
-// Border dash patterns, hoisted so paintBorders allocates no array per cell.
+// Border dash patterns, hoisted so paint_borders allocates no array per cell.
 const SOLID_DASH: number[] = [];
 const DASHED_DASH: number[] = [4, 2];
 const DOTTED_DASH: number[] = [1, 2];
@@ -116,18 +116,18 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
  * `merges × visible-cells`, so each painted cell finds its merge with one
  * `Map.get`. Returns `undefined` when there is nothing to cover (the fast path).
  */
-function buildMergeMap(
+function build_merge_map(
   merges: ReadonlyArray<MergeRect>,
-  rowStart: number,
-  rowEnd: number,
+  row_start: number,
+  row_end: number,
   cols: readonly number[],
 ): Map<number, MergeRect> | undefined {
   if (merges.length === 0 || cols.length === 0) return undefined;
 
   const map = new Map<number, MergeRect>();
   for (const m of merges) {
-    const r0 = Math.max(m.r0, rowStart);
-    const r1 = Math.min(m.r1, rowEnd - 1);
+    const r0 = Math.max(m.r0, row_start);
+    const r1 = Math.min(m.r1, row_end - 1);
     if (r0 > r1) continue;
 
     for (let r = r0; r <= r1; r++) {
@@ -146,42 +146,42 @@ function buildMergeMap(
  * fall back to the uniform height); without geometry it is the uniform height
  * times the spanned row count.
  */
-function mergeRowSpanHeight(
+function merge_row_span_height(
   merge: MergeRect,
-  windowStart: number,
-  windowRowCount: number,
-  rowHeights: Float64Array | undefined,
-  rowHeight: number,
+  window_start: number,
+  window_row_count: number,
+  row_heights: Float64Array | undefined,
+  row_height: number,
 ): number {
-  if (rowHeights === undefined) {
-    return (merge.r1 - merge.r0 + 1) * rowHeight;
+  if (row_heights === undefined) {
+    return (merge.r1 - merge.r0 + 1) * row_height;
   }
 
   let total = 0;
   for (let row = merge.r0; row <= merge.r1; row++) {
-    const index = row - windowStart;
-    const insideWindow = index >= 0 && index < windowRowCount;
-    total += insideWindow ? rowHeights[index]! : rowHeight;
+    const index = row - window_start;
+    const inside_window = index >= 0 && index < window_row_count;
+    total += inside_window ? row_heights[index]! : row_height;
   }
   return total;
 }
 
-/** Cached cumulative edges keyed by columns-array identity (see `columnEdges`). */
-const columnEdgesCache = new WeakMap<RenderLayout["columns"], number[]>();
+/** Cached cumulative edges keyed by columns-array identity (see `column_edges`). */
+const column_edges_cache = new WeakMap<RenderLayout["columns"], number[]>();
 
 /** Cumulative left edges per visible column; `colX[c+1] - colX[c]` is its width. */
-function columnEdges(layout: RenderLayout): number[] {
+function column_edges(layout: RenderLayout): number[] {
   const columns = layout.columns;
-  const cached = columnEdgesCache.get(columns);
+  const cached = column_edges_cache.get(columns);
   if (cached !== undefined) return cached;
 
-  const colX: number[] = new Array(columns.length + 1);
-  colX[0] = 0;
+  const col_x: number[] = new Array(columns.length + 1);
+  col_x[0] = 0;
   for (let c = 0; c < columns.length; c++) {
-    colX[c + 1] = colX[c]! + columns[c]!.width;
+    col_x[c + 1] = col_x[c]! + columns[c]!.width;
   }
-  columnEdgesCache.set(columns, colX);
-  return colX;
+  column_edges_cache.set(columns, col_x);
+  return col_x;
 }
 
 /**
@@ -189,14 +189,14 @@ function columnEdges(layout: RenderLayout): number[] {
  * stay as fallbacks, so a family the browser lacks renders in the theme font.
  * `family` is validated (see cell-style-fields.ts) to need only quoting.
  */
-function withFontFamily(font: string, family: string): string {
-  const sizeMatch = FONT_PX_RE.exec(font);
-  if (!sizeMatch || sizeMatch.index === undefined) return font;
-  const fromSize = font.slice(sizeMatch.index);
-  const sizeToken = /^\S+/.exec(fromSize)?.[0] ?? fromSize;
-  const themeFamilies = fromSize.slice(sizeToken.length).trim();
-  const families = themeFamilies ? `"${family}", ${themeFamilies}` : `"${family}"`;
-  return `${font.slice(0, sizeMatch.index)}${sizeToken} ${families}`;
+function with_font_family(font: string, family: string): string {
+  const size_match = FONT_PX_RE.exec(font);
+  if (!size_match || size_match.index === undefined) return font;
+  const from_size = font.slice(size_match.index);
+  const size_token = /^\S+/.exec(from_size)?.[0] ?? from_size;
+  const theme_families = from_size.slice(size_token.length).trim();
+  const families = theme_families ? `"${family}", ${theme_families}` : `"${family}"`;
+  return `${font.slice(0, size_match.index)}${size_token} ${families}`;
 }
 
 /**
@@ -240,33 +240,33 @@ export function fontFor(
   if (cached !== undefined) return cached;
 
   const sized = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
-  const base = style.fontFamily === undefined ? sized : withFontFamily(sized, style.fontFamily);
-  const sizeMatch = FONT_PX_RE.exec(base);
-  if (!sizeMatch || sizeMatch.index === undefined) return base;
+  const base = style.fontFamily === undefined ? sized : with_font_family(sized, style.fontFamily);
+  const size_match = FONT_PX_RE.exec(base);
+  if (!size_match || size_match.index === undefined) return base;
 
-  const prefix = base.slice(0, sizeMatch.index).trim().split(/\s+/).filter(Boolean);
-  const themeWeight = prefix.find(
+  const prefix = base.slice(0, size_match.index).trim().split(/\s+/).filter(Boolean);
+  const theme_weight = prefix.find(
     (token) => FONT_WEIGHT_TOKEN_RE.test(token) && token !== "normal",
   );
-  const themeStyle = prefix.find((token) => FONT_STYLE_TOKEN_RE.test(token) && token !== "normal");
-  const themeStyleIndex = themeStyle === undefined ? -1 : prefix.indexOf(themeStyle);
-  const retainedPrefix = prefix.filter(
+  const theme_style = prefix.find((token) => FONT_STYLE_TOKEN_RE.test(token) && token !== "normal");
+  const theme_style_index = theme_style === undefined ? -1 : prefix.indexOf(theme_style);
+  const retained_prefix = prefix.filter(
     (token, index) =>
       !FONT_WEIGHT_TOKEN_RE.test(token) &&
       !FONT_STYLE_TOKEN_RE.test(token) &&
       !(
         style.italic &&
-        themeStyle === "oblique" &&
-        index === themeStyleIndex + 1 &&
+        theme_style === "oblique" &&
+        index === theme_style_index + 1 &&
         FONT_ANGLE_TOKEN_RE.test(token)
       ),
   );
 
   const font = [
-    ...(style.italic ? ["italic"] : themeStyle ? [themeStyle] : []),
-    ...retainedPrefix,
-    ...(style.bold ? ["bold"] : themeWeight && themeWeight !== "normal" ? [themeWeight] : []),
-    base.slice(sizeMatch.index),
+    ...(style.italic ? ["italic"] : theme_style ? [theme_style] : []),
+    ...retained_prefix,
+    ...(style.bold ? ["bold"] : theme_weight && theme_weight !== "normal" ? [theme_weight] : []),
+    base.slice(size_match.index),
   ].join(" ");
   cache?.set(key, font);
   return font;
@@ -280,7 +280,7 @@ const WHITESPACE = /\s/;
  * marks, surrogate pairs, ZWJ sequences and Indic clusters span several.
  */
 const MAY_HAVE_CLUSTERS = /[\u0300-\uffff]/;
-let graphemeSegmenter: Intl.Segmenter | undefined;
+let grapheme_segmenter: Intl.Segmenter | undefined;
 
 /**
  * Break units of one paragraph: graphemes, or plain code units when they
@@ -292,17 +292,17 @@ class BreakUnits {
   /** End offset of each grapheme segmented so far; unused for plain code units. */
   private readonly ends: number[] = [];
   private segments: Iterator<Intl.SegmentData> | undefined;
-  private isClustered = false;
+  private is_clustered = false;
   /** Units known to exist. Exact once `segments` is undefined. */
   private known = 0;
 
   /** Starts on `paragraph`, reusing the offset buffer of the previous one. */
   reset(paragraph: string): void {
     this.ends.length = 0;
-    this.isClustered = MAY_HAVE_CLUSTERS.test(paragraph);
-    if (this.isClustered) {
-      graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
-      this.segments = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
+    this.is_clustered = MAY_HAVE_CLUSTERS.test(paragraph);
+    if (this.is_clustered) {
+      grapheme_segmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+      this.segments = grapheme_segmenter.segment(paragraph)[Symbol.iterator]();
       this.known = 0;
     } else {
       this.segments = undefined;
@@ -339,16 +339,16 @@ class BreakUnits {
 
   /** End offset of `unit`, already returned by {@link clamp}. */
   endOf(unit: number): number {
-    return this.isClustered ? (this.ends[unit] ?? 0) : unit + 1;
+    return this.is_clustered ? (this.ends[unit] ?? 0) : unit + 1;
   }
 }
 
 /**
  * Wrapped-only line layout; the ordinary single-line path never calls this.
- * `maxLines` bounds the work for cells whose block cannot fit: the caller only
+ * `max_lines` bounds the work for cells whose block cannot fit: the caller only
  * draws lines that fit the cell height, so generating more than
  * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
- * whose length reaches `maxLines` therefore means "more lines exist".
+ * whose length reaches `max_lines` therefore means "more lines exist".
  *
  * Lines break between graphemes, never inside an emoji or a cluster. Inside
  * a cluster a prefix can be wider than the whole (a half-built ZWJ sequence),
@@ -360,14 +360,14 @@ class BreakUnits {
  * The search gallops forward from the previous line's length, then bisects,
  * so measured text stays close to one line long however long the paragraph is.
  */
-function layoutTextLinesInto(
+function layout_text_lines_into(
   ctx: Ctx,
   text: string,
   width: number,
-  maxLines: number,
+  max_lines: number,
   lines: string[],
 ): string[] {
-  const limit = Math.max(1, maxLines);
+  const limit = Math.max(1, max_lines);
   const units = new BreakUnits();
 
   for (const paragraph of text.split("\n")) {
@@ -410,15 +410,15 @@ function layoutTextLinesInto(
         if (overflows(mid)) high = mid;
         else low = mid + 1;
       }
-      const overflowUnit = low;
+      const overflow_unit = low;
 
       // A first unit too wide for the cell still gets a line of its own.
       // Otherwise break after the last whitespace up to the overflowing unit
       // (it may be that whitespace), or mid-word just before it.
       let last = first;
-      if (overflowUnit > first) {
-        last = overflowUnit - 1;
-        for (let unit = overflowUnit; unit >= first; unit--) {
+      if (overflow_unit > first) {
+        last = overflow_unit - 1;
+        for (let unit = overflow_unit; unit >= first; unit--) {
           if (WHITESPACE.test(paragraph[units.endOf(unit) - 1] ?? "")) {
             last = unit;
             break;
@@ -438,26 +438,26 @@ function layoutTextLinesInto(
 
 /** Full wrapped layout for callers that need every line, such as auto row height. */
 export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
-  return layoutTextLinesInto(ctx, text, width, Number.POSITIVE_INFINITY, []);
+  return layout_text_lines_into(ctx, text, width, Number.POSITIVE_INFINITY, []);
 }
 
 /**
- * Top edge of a text block `blockHeight` tall inside a cell at `y` of height
+ * Top edge of a text block `block_height` tall inside a cell at `y` of height
  * `h`. A block taller than the cell is top-anchored whatever the alignment, so
  * its first lines stay readable.
  */
-function textBlockTop(
-  verticalAlign: CellVerticalAlign | undefined,
+function text_block_top(
+  vertical_align: CellVerticalAlign | undefined,
   y: number,
   h: number,
-  blockHeight: number,
+  block_height: number,
   zoom: number,
 ): number {
-  const free = h - blockHeight;
+  const free = h - block_height;
   if (free <= 0) return y;
   const pad = Math.min(VERTICAL_TEXT_PAD * zoom, free / 2);
-  if (verticalAlign === "top") return y + pad;
-  if (verticalAlign === "bottom") return y + free - pad;
+  if (vertical_align === "top") return y + pad;
+  if (vertical_align === "bottom") return y + free - pad;
   return y + free / 2;
 }
 
@@ -466,7 +466,7 @@ function textBlockTop(
  * vertical center (baseline is "middle"). Deliberately omit Canvas's
  * `maxWidth`: browsers satisfy it by horizontally distorting glyphs.
  */
-function fillAlignedText(
+function fill_aligned_text(
   ctx: Ctx,
   text: string,
   align: CellAlign,
@@ -493,7 +493,7 @@ function fillAlignedText(
  * off the undecorated hot path. Each line is a 1px filled rect spanning the glyph
  * run and reuses the current fill (already set to the text color by the caller).
  */
-function paintTextDecoration(
+function paint_text_decoration(
   ctx: Ctx,
   style: CellStyle,
   text: string,
@@ -501,27 +501,27 @@ function paintTextDecoration(
   x: number,
   w: number,
   cy: number,
-  fontPx: number,
+  font_px: number,
   pad: number,
 ): void {
-  const runWidth = ctx.measureText(text).width;
-  if (runWidth <= 0) return;
+  const run_width = ctx.measureText(text).width;
+  if (run_width <= 0) return;
 
   let left: number;
-  if (align === "right") left = x + w - pad - runWidth;
-  else if (align === "center") left = x + w / 2 - runWidth / 2;
+  if (align === "right") left = x + w - pad - run_width;
+  else if (align === "center") left = x + w / 2 - run_width / 2;
   else left = x + pad;
 
-  const effectiveFontPx = fontPx || 12;
+  const effective_font_px = font_px || 12;
 
   if (style.underline) {
     // Just under the baseline, which sits ~0.4em below the "middle" text origin.
-    ctx.fillRect(left, Math.round(cy + effectiveFontPx * 0.4), runWidth, 1);
+    ctx.fillRect(left, Math.round(cy + effective_font_px * 0.4), run_width, 1);
   }
 
   if (style.strikethrough) {
     // Through the run's visual middle (≈ the "middle" baseline origin at `cy`).
-    ctx.fillRect(left, Math.round(cy), runWidth, 1);
+    ctx.fillRect(left, Math.round(cy), run_width, 1);
   }
 }
 
@@ -543,14 +543,14 @@ interface PaintState {
   headerTextOnFill: Map<string, string>;
 }
 
-function applyFont(ctx: Ctx, state: PaintState, font: string): void {
+function apply_font(ctx: Ctx, state: PaintState, font: string): void {
   if (state.lastFont !== font) {
     ctx.font = font;
     state.lastFont = font;
   }
 }
 
-function applyFill(ctx: Ctx, state: PaintState, fill: string): void {
+function apply_fill(ctx: Ctx, state: PaintState, fill: string): void {
   if (state.lastFill !== fill) {
     ctx.fillStyle = fill;
     state.lastFill = fill;
@@ -562,7 +562,7 @@ function applyFill(ctx: Ctx, state: PaintState, fill: string): void {
  * computed once per distinct fill a frame paints. Resolving a named colour
  * goes through `ctx.fillStyle`, so the applied fill is forgotten afterwards.
  */
-function textOnFill(
+function text_on_fill(
   ctx: Ctx,
   state: PaintState,
   cache: Map<string, string>,
@@ -587,7 +587,7 @@ export interface PaintDamage {
 }
 
 /** Whether `value` is an empty cell, through which text spills. */
-function emptyValue(value: CellScalar | undefined): boolean {
+function empty_value(value: CellScalar | undefined): boolean {
   return value === null || value === "" || value === undefined;
 }
 
@@ -601,16 +601,17 @@ function emptyValue(value: CellScalar | undefined): boolean {
 export function sidewaysBlitSafe(view: VisibleWindowView, layout: RenderLayout): boolean {
   for (const style of view.styles) if (style.border) return false;
   for (const col of view.cols) if (layout.columns[col]?.cellStyle?.border) return false;
-  const nCols = view.cols.length;
+  const n_cols = view.cols.length;
   for (let index = 0; index < view.values.length; index++) {
     const value = view.values[index];
     if (typeof value !== "string" || value === "") continue;
-    const cj = index % nCols;
+    const cj = index % n_cols;
     const col = view.cols[cj] ?? -1;
-    const leftSpill = cj > 0 && view.cols[cj - 1] === col - 1 && emptyValue(view.values[index - 1]);
-    const rightSpill =
-      cj < nCols - 1 && view.cols[cj + 1] === col + 1 && emptyValue(view.values[index + 1]);
-    if (leftSpill || rightSpill) return false;
+    const left_spill =
+      cj > 0 && view.cols[cj - 1] === col - 1 && empty_value(view.values[index - 1]);
+    const right_spill =
+      cj < n_cols - 1 && view.cols[cj + 1] === col + 1 && empty_value(view.values[index + 1]);
+    if (left_spill || right_spill) return false;
   }
   return true;
 }
@@ -640,24 +641,24 @@ export function blitScroll(
   if (prev.contentRevision !== viewport.contentRevision) return undefined;
   if (prev.width !== viewport.width || prev.height !== viewport.height) return undefined;
   if (lastDpr !== dpr) return undefined;
-  const rowsMoved = prev.scrollTop !== viewport.scrollTop;
-  const columnsMoved = prev.scrollLeft !== viewport.scrollLeft;
-  if (rowsMoved === columnsMoved) return undefined;
-  if (columnsMoved && !sidewaysSafe) return undefined;
+  const rows_moved = prev.scrollTop !== viewport.scrollTop;
+  const columns_moved = prev.scrollLeft !== viewport.scrollLeft;
+  if (rows_moved === columns_moved) return undefined;
+  if (columns_moved && !sidewaysSafe) return undefined;
 
   // Blit only exact device-pixel shifts. A fractional shift would copy pixels
   // rounded to the nearest device pixel while the exposed strip repaints at
   // the true offset - each touchpad scroll then strands sub-pixel-shifted
   // stale glyph slices that accumulate into visible ghosting.
-  const deltaDevice = rowsMoved
+  const delta_device = rows_moved
     ? (viewport.scrollTop - prev.scrollTop) * dpr
     : (viewport.scrollLeft - prev.scrollLeft) * dpr;
-  const deltaPx = Math.round(deltaDevice);
-  if (Math.abs(deltaDevice - deltaPx) > 0.001) return undefined;
-  const shift = { deltaPx, dpr };
-  return rowsMoved
-    ? blitRows(ctx, canvas, theme, viewport, shift)
-    : blitColumns(ctx, canvas, theme, viewport, shift);
+  const delta_px = Math.round(delta_device);
+  if (Math.abs(delta_device - delta_px) > 0.001) return undefined;
+  const shift = { deltaPx: delta_px, dpr };
+  return rows_moved
+    ? blit_rows(ctx, canvas, theme, viewport, shift)
+    : blit_columns(ctx, canvas, theme, viewport, shift);
 }
 
 /** A whole device-pixel scroll shift, and the canvas's device pixel ratio. */
@@ -667,71 +668,111 @@ interface PixelShift {
 }
 
 /** {@link blitScroll} along the rows: the body below the header moves. */
-function blitRows(
+function blit_rows(
   ctx: Ctx,
   canvas: HTMLCanvasElement | OffscreenCanvas,
   theme: Theme,
   viewport: Viewport,
-  { deltaPx, dpr }: PixelShift,
+  { deltaPx: delta_px, dpr }: PixelShift,
 ): PaintDamage | undefined {
-  const bodyTop = theme.headerHeight;
-  if (viewport.height - bodyTop <= 0) return undefined;
-  const bodyTopPx = Math.round(bodyTop * dpr);
-  const heightPx = Math.round(viewport.height * dpr);
-  const widthPx = Math.round(viewport.width * dpr);
-  const bodyHPx = heightPx - bodyTopPx;
-  const shiftPx = Math.abs(deltaPx);
-  if (shiftPx === 0 || shiftPx >= bodyHPx) return undefined;
+  const body_top = theme.headerHeight;
+  if (viewport.height - body_top <= 0) return undefined;
+  const body_top_px = Math.round(body_top * dpr);
+  const height_px = Math.round(viewport.height * dpr);
+  const width_px = Math.round(viewport.width * dpr);
+  const body_h_px = height_px - body_top_px;
+  const shift_px = Math.abs(delta_px);
+  if (shift_px === 0 || shift_px >= body_h_px) return undefined;
 
-  const copyH = bodyHPx - shiftPx;
+  const copy_h = body_h_px - shift_px;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  if (deltaPx > 0) {
-    ctx.drawImage(canvas, 0, bodyTopPx + shiftPx, widthPx, copyH, 0, bodyTopPx, widthPx, copyH);
+  if (delta_px > 0) {
+    ctx.drawImage(
+      canvas,
+      0,
+      body_top_px + shift_px,
+      width_px,
+      copy_h,
+      0,
+      body_top_px,
+      width_px,
+      copy_h,
+    );
     return {
       x: 0,
-      y: viewport.height - shiftPx / dpr,
+      y: viewport.height - shift_px / dpr,
       w: viewport.width,
-      h: shiftPx / dpr,
+      h: shift_px / dpr,
     };
   }
 
-  ctx.drawImage(canvas, 0, bodyTopPx, widthPx, copyH, 0, bodyTopPx + shiftPx, widthPx, copyH);
-  return { x: 0, y: bodyTop, w: viewport.width, h: shiftPx / dpr };
+  ctx.drawImage(
+    canvas,
+    0,
+    body_top_px,
+    width_px,
+    copy_h,
+    0,
+    body_top_px + shift_px,
+    width_px,
+    copy_h,
+  );
+  return { x: 0, y: body_top, w: viewport.width, h: shift_px / dpr };
 }
 
 /** {@link blitScroll} along the columns: the header and body right of the gutter move. */
-function blitColumns(
+function blit_columns(
   ctx: Ctx,
   canvas: HTMLCanvasElement | OffscreenCanvas,
   theme: Theme,
   viewport: Viewport,
-  { deltaPx, dpr }: PixelShift,
+  { deltaPx: delta_px, dpr }: PixelShift,
 ): PaintDamage | undefined {
   const gutter = theme.rowHeaderWidth;
   if (viewport.width - gutter <= 0) return undefined;
-  const gutterPx = Math.round(gutter * dpr);
-  const heightPx = Math.round(viewport.height * dpr);
-  const widthPx = Math.round(viewport.width * dpr);
-  const bodyWPx = widthPx - gutterPx;
-  const shiftPx = Math.abs(deltaPx);
-  if (shiftPx === 0 || shiftPx >= bodyWPx) return undefined;
+  const gutter_px = Math.round(gutter * dpr);
+  const height_px = Math.round(viewport.height * dpr);
+  const width_px = Math.round(viewport.width * dpr);
+  const body_w_px = width_px - gutter_px;
+  const shift_px = Math.abs(delta_px);
+  if (shift_px === 0 || shift_px >= body_w_px) return undefined;
 
-  const copyW = bodyWPx - shiftPx;
+  const copy_w = body_w_px - shift_px;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  if (deltaPx > 0) {
-    ctx.drawImage(canvas, gutterPx + shiftPx, 0, copyW, heightPx, gutterPx, 0, copyW, heightPx);
+  if (delta_px > 0) {
+    ctx.drawImage(
+      canvas,
+      gutter_px + shift_px,
+      0,
+      copy_w,
+      height_px,
+      gutter_px,
+      0,
+      copy_w,
+      height_px,
+    );
     return {
-      x: viewport.width - shiftPx / dpr,
+      x: viewport.width - shift_px / dpr,
       y: 0,
-      w: shiftPx / dpr,
+      w: shift_px / dpr,
       h: viewport.height,
     };
   }
 
-  ctx.drawImage(canvas, gutterPx, 0, copyW, heightPx, gutterPx + shiftPx, 0, copyW, heightPx);
-  return { x: gutter, y: 0, w: shiftPx / dpr, h: viewport.height };
+  ctx.drawImage(
+    canvas,
+    gutter_px,
+    0,
+    copy_w,
+    height_px,
+    gutter_px + shift_px,
+    0,
+    copy_w,
+    height_px,
+  );
+  return { x: gutter, y: 0, w: shift_px / dpr, h: viewport.height };
 }
 
 /** Solid lines on the freeze boundaries, drawn over the pane seams (Sheets-style). */
@@ -783,16 +824,16 @@ export function paintFrame(
   const {
     width,
     height,
-    scrollTop,
-    scrollLeft,
-    rowTops,
-    rowHeights,
-    rowNumbers,
-    filteredRows,
-    filterHeader,
+    scrollTop: scroll_top,
+    scrollLeft: scroll_left,
+    rowTops: row_tops,
+    rowHeights: row_heights,
+    rowNumbers: row_numbers,
+    filteredRows: filtered_rows,
+    filterHeader: filter_header,
   } = viewport;
-  const { rowHeight, headerHeight } = theme;
-  const colX = columnEdges(layout);
+  const { rowHeight: row_height, headerHeight: header_height } = theme;
+  const col_x = column_edges(layout);
   const g = theme.rowHeaderWidth;
 
   const state: PaintState = {
@@ -806,25 +847,25 @@ export function paintFrame(
     headerTextOnFill: new Map(),
   };
 
-  const styleCache = new Map<number, CellStyle>();
-  const styleStride = view.styles.length || 1;
+  const style_cache = new Map<number, CellStyle>();
+  const style_stride = view.styles.length || 1;
   const merges = layout.merges;
-  const mergeIndex = merges === undefined ? undefined : prepareMergeIndex(merges);
-  const visibleMerges =
-    mergeIndex === undefined
+  const merge_index = merges === undefined ? undefined : prepareMergeIndex(merges);
+  const visible_merges =
+    merge_index === undefined
       ? undefined
-      : intersectingMerges(mergeIndex, view.rows.start, view.rows.end, view.cols);
-  let minimumVisibleColumn = view.cols[0] ?? 0;
-  let maximumVisibleColumn = view.cols[0] ?? -1;
+      : intersectingMerges(merge_index, view.rows.start, view.rows.end, view.cols);
+  let minimum_visible_column = view.cols[0] ?? 0;
+  let maximum_visible_column = view.cols[0] ?? -1;
   for (let index = 1; index < view.cols.length; index++) {
-    minimumVisibleColumn = Math.min(minimumVisibleColumn, view.cols[index]!);
-    maximumVisibleColumn = Math.max(maximumVisibleColumn, view.cols[index]!);
+    minimum_visible_column = Math.min(minimum_visible_column, view.cols[index]!);
+    maximum_visible_column = Math.max(maximum_visible_column, view.cols[index]!);
   }
 
-  const mergeMap =
-    visibleMerges === undefined
+  const merge_map =
+    visible_merges === undefined
       ? undefined
-      : buildMergeMap(visibleMerges, view.rows.start, view.rows.end, view.cols);
+      : build_merge_map(visible_merges, view.rows.start, view.rows.end, view.cols);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.save();
@@ -841,60 +882,64 @@ export function paintFrame(
   }
 
   ctx.textBaseline = "middle";
-  applyFont(ctx, state, theme.font);
+  apply_font(ctx, state, theme.font);
 
-  applyFill(ctx, state, theme.bg);
+  apply_fill(ctx, state, theme.bg);
   if (damage) ctx.fillRect(damage.x, damage.y, damage.w, damage.h);
   else if (pane) ctx.fillRect(pane.x, pane.y, pane.w, pane.h);
   else ctx.fillRect(0, 0, width, height);
 
-  const nCols = view.cols.length;
-  const nRows = view.rows.end - view.rows.start;
-  const clipTop = Math.max(damage ? damage.y : 0, pane ? pane.y : 0);
-  const clipBottom = Math.min(
+  const n_cols = view.cols.length;
+  const n_rows = view.rows.end - view.rows.start;
+  const clip_top = Math.max(damage ? damage.y : 0, pane ? pane.y : 0);
+  const clip_bottom = Math.min(
     damage ? damage.y + damage.h : height,
     pane ? pane.y + pane.h : height,
   );
-  const paintTop = Math.max(headerHeight, clipTop);
-  const paintBottom = Math.min(height, clipBottom);
+  const paint_top = Math.max(header_height, clip_top);
+  const paint_bottom = Math.min(height, clip_bottom);
   // A sideways blit leaves a strip of columns to paint; cells, headers and the
   // row gutter outside it are skipped, not painted under the clip.
-  const paintLeft = Math.max(damage ? damage.x : 0, pane ? pane.x : 0);
-  const paintRight = Math.min(damage ? damage.x + damage.w : width, pane ? pane.x + pane.w : width);
+  const paint_left = Math.max(damage ? damage.x : 0, pane ? pane.x : 0);
+  const paint_right = Math.min(
+    damage ? damage.x + damage.w : width,
+    pane ? pane.x + pane.w : width,
+  );
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(g, headerHeight, Math.max(0, width - g), Math.max(0, height - headerHeight));
+  ctx.rect(g, header_height, Math.max(0, width - g), Math.max(0, height - header_height));
   ctx.clip();
-  for (let ri = 0; ri < nRows; ri++) {
+  for (let ri = 0; ri < n_rows; ri++) {
     const row = view.rows.start + ri;
-    const rowTop = rowTops !== undefined ? rowTops[ri]! : row * rowHeight;
-    const rowH = rowHeights !== undefined ? rowHeights[ri]! : rowHeight;
-    const y = headerHeight + rowTop - scrollTop;
-    if (y + rowH <= paintTop || y >= paintBottom) continue;
-    for (let cj = 0; cj < nCols; cj++) {
+    const row_top = row_tops !== undefined ? row_tops[ri]! : row * row_height;
+    const row_h = row_heights !== undefined ? row_heights[ri]! : row_height;
+    const y = header_height + row_top - scroll_top;
+    if (y + row_h <= paint_top || y >= paint_bottom) continue;
+    for (let cj = 0; cj < n_cols; cj++) {
       const col = view.cols[cj]!;
-      const x = colX[col]! - scrollLeft + g;
-      const w = colX[col + 1]! - colX[col]!;
+      const x = col_x[col]! - scroll_left + g;
+      const w = col_x[col + 1]! - col_x[col]!;
       if (x + w <= g || x >= width) continue;
-      const merge = mergeMap !== undefined ? mergeMap.get(row * MERGE_KEY_STRIDE + col) : undefined;
+      const merge =
+        merge_map !== undefined ? merge_map.get(row * MERGE_KEY_STRIDE + col) : undefined;
       if (merge && (merge.r0 !== row || merge.c0 !== col)) continue; // covered by a merge
-      const cw = merge ? colX[merge.c1 + 1]! - colX[merge.c0]! : w;
+      const cw = merge ? col_x[merge.c1 + 1]! - col_x[merge.c0]! : w;
       const ch = merge
-        ? mergeRowSpanHeight(merge, view.rows.start, nRows, rowHeights, rowHeight)
-        : rowH;
-      const i = ri * nCols + cj;
+        ? merge_row_span_height(merge, view.rows.start, n_rows, row_heights, row_height)
+        : row_h;
+      const i = ri * n_cols + cj;
       const value = view.values[i] ?? null;
-      const styleId = view.styleIds[i]!;
-      const style = view.styles[styleId] ?? EMPTY_STYLE;
-      const styleKey = col * styleStride + styleId;
+      const style_id = view.styleIds[i]!;
+      const style = view.styles[style_id] ?? EMPTY_STYLE;
+      const style_key = col * style_stride + style_id;
       // An AutoFilter header cell lays out its text in a box that ends a gap
       // before its filter button, for every alignment, as in Excel.
-      const textRight =
-        filterHeader !== undefined &&
-        row === filterHeader.row &&
-        col >= filterHeader.start &&
-        col <= filterHeader.end
+      const text_right =
+        filter_header !== undefined &&
+        row === filter_header.row &&
+        col >= filter_header.start &&
+        col <= filter_header.end
           ? filterTextRight({ x, y, w: cw, h: ch }, layout.zoom ?? 1)
           : undefined;
 
@@ -903,28 +948,29 @@ export function paintFrame(
       // painter chooses the relevant side after resolving alignment. Numbers
       // and custom renderers deliberately keep their own cell bounds, and a
       // filter header cell keeps its text in its box.
-      let spillX = x;
-      let spillRight = x + cw;
-      if (!merge && textRight === undefined && typeof value === "string" && value !== "") {
+      let spill_x = x;
+      let spill_right = x + cw;
+      if (!merge && text_right === undefined && typeof value === "string" && value !== "") {
         for (let k = cj - 1; k >= 0; k--) {
           const adjacent = view.cols[k]! + 1 === view.cols[k + 1]!;
-          const neighbour = view.values[ri * nCols + k];
+          const neighbour = view.values[ri * n_cols + k];
           if (!adjacent || (neighbour !== null && neighbour !== "" && neighbour !== undefined))
             break;
-          spillX = colX[view.cols[k]!]! - scrollLeft + g;
+          spill_x = col_x[view.cols[k]!]! - scroll_left + g;
         }
 
-        for (let k = cj + 1; k < nCols; k++) {
+        for (let k = cj + 1; k < n_cols; k++) {
           const adjacent = view.cols[k - 1]! + 1 === view.cols[k]!;
-          const neighbour = view.values[ri * nCols + k];
+          const neighbour = view.values[ri * n_cols + k];
           if (!adjacent || (neighbour !== null && neighbour !== "" && neighbour !== undefined))
             break;
-          spillRight = colX[view.cols[k]! + 1]! - scrollLeft + g;
+          spill_right = col_x[view.cols[k]! + 1]! - scroll_left + g;
         }
       }
-      if (Math.max(x + cw, spillRight) <= paintLeft || Math.min(x, spillX) >= paintRight) continue;
+      if (Math.max(x + cw, spill_right) <= paint_left || Math.min(x, spill_x) >= paint_right)
+        continue;
 
-      paintCell(
+      paint_cell(
         ctx,
         theme,
         layout,
@@ -935,13 +981,13 @@ export function paintFrame(
         y,
         cw,
         ch,
-        textRight,
-        spillX,
-        spillRight - spillX,
+        text_right,
+        spill_x,
+        spill_right - spill_x,
         renderers,
         state,
-        styleKey,
-        styleCache,
+        style_key,
+        style_cache,
       );
     }
   }
@@ -950,32 +996,32 @@ export function paintFrame(
   // stroked line is not rasterized the same at every offset, so a line copied
   // by a scroll blit could differ by a pixel from the line a full repaint draws.
   ctx.fillStyle = theme.gridLine;
-  for (let ri = 0; ri < nRows; ri++) {
+  for (let ri = 0; ri < n_rows; ri++) {
     const row = view.rows.start + ri;
-    const rowBottom =
-      rowTops !== undefined && rowHeights !== undefined
-        ? rowTops[ri]! + rowHeights[ri]!
-        : (row + 1) * rowHeight;
-    const lineY = Math.round(headerHeight + rowBottom - scrollTop) - 0.5;
-    if (lineY < paintTop || lineY > paintBottom) continue;
-    let cursorX = g;
-    const mergesByColumn =
-      mergeIndex === undefined
+    const row_bottom =
+      row_tops !== undefined && row_heights !== undefined
+        ? row_tops[ri]! + row_heights[ri]!
+        : (row + 1) * row_height;
+    const line_y = Math.round(header_height + row_bottom - scroll_top) - 0.5;
+    if (line_y < paint_top || line_y > paint_bottom) continue;
+    let cursor_x = g;
+    const merges_by_column =
+      merge_index === undefined
         ? undefined
-        : horizontalMergeGaps(mergeIndex, row, minimumVisibleColumn, maximumVisibleColumn);
-    if (mergesByColumn) {
-      for (const merge of mergesByColumn) {
+        : horizontal_merge_gaps(merge_index, row, minimum_visible_column, maximum_visible_column);
+    if (merges_by_column) {
+      for (const merge of merges_by_column) {
         if (merge.r0 > row || row >= merge.r1) continue;
-        const gapStart = Math.max(g, colX[merge.c0]! - scrollLeft + g);
-        const gapEnd = Math.min(width, colX[merge.c1 + 1]! - scrollLeft + g);
-        if (gapEnd <= cursorX || gapStart >= width) continue;
-        if (gapStart > cursorX) ctx.fillRect(cursorX, lineY - 0.5, gapStart - cursorX, 1);
+        const gap_start = Math.max(g, col_x[merge.c0]! - scroll_left + g);
+        const gap_end = Math.min(width, col_x[merge.c1 + 1]! - scroll_left + g);
+        if (gap_end <= cursor_x || gap_start >= width) continue;
+        if (gap_start > cursor_x) ctx.fillRect(cursor_x, line_y - 0.5, gap_start - cursor_x, 1);
 
-        cursorX = Math.max(cursorX, gapEnd);
+        cursor_x = Math.max(cursor_x, gap_end);
       }
     }
 
-    if (cursorX < width) ctx.fillRect(cursorX, lineY - 0.5, width - cursorX, 1);
+    if (cursor_x < width) ctx.fillRect(cursor_x, line_y - 0.5, width - cursor_x, 1);
   }
 
   ctx.restore();
@@ -983,58 +1029,59 @@ export function paintFrame(
 
   ctx.fillStyle = theme.gridLine;
   state.lastFill = theme.gridLine;
-  const appendVerticalGridline = (c: number, lineX: number): void => {
-    if (lineX < g || lineX > width) return;
-    const mergesByRow =
-      mergeIndex === undefined
+  const append_vertical_gridline = (c: number, line_x: number): void => {
+    if (line_x < g || line_x > width) return;
+    const merges_by_row =
+      merge_index === undefined
         ? undefined
-        : verticalMergeGaps(mergeIndex, c, view.rows.start, view.rows.end - 1);
-    let cursorY = 0;
-    if (mergesByRow) {
-      for (const merge of mergesByRow) {
+        : vertical_merge_gaps(merge_index, c, view.rows.start, view.rows.end - 1);
+    let cursor_y = 0;
+    if (merges_by_row) {
+      for (const merge of merges_by_row) {
         if (merge.c0 >= c || c > merge.c1) continue;
-        const mergeIndex = merge.r0 - view.rows.start;
-        const mergeContentTop =
-          rowTops !== undefined && mergeIndex >= 0 && mergeIndex < nRows
-            ? rowTops[mergeIndex]!
-            : merge.r0 * rowHeight;
-        const mergeTop = headerHeight + mergeContentTop - scrollTop;
-        const gapStart = Math.max(0, mergeTop);
-        const gapEnd = Math.min(
+        const merge_index = merge.r0 - view.rows.start;
+        const merge_content_top =
+          row_tops !== undefined && merge_index >= 0 && merge_index < n_rows
+            ? row_tops[merge_index]!
+            : merge.r0 * row_height;
+        const merge_top = header_height + merge_content_top - scroll_top;
+        const gap_start = Math.max(0, merge_top);
+        const gap_end = Math.min(
           height,
-          mergeTop + mergeRowSpanHeight(merge, view.rows.start, nRows, rowHeights, rowHeight),
+          merge_top +
+            merge_row_span_height(merge, view.rows.start, n_rows, row_heights, row_height),
         );
-        if (gapEnd <= cursorY || gapStart >= height) continue;
-        if (gapStart > cursorY) ctx.fillRect(lineX - 0.5, cursorY, 1, gapStart - cursorY);
+        if (gap_end <= cursor_y || gap_start >= height) continue;
+        if (gap_start > cursor_y) ctx.fillRect(line_x - 0.5, cursor_y, 1, gap_start - cursor_y);
 
-        cursorY = Math.max(cursorY, gapEnd);
+        cursor_y = Math.max(cursor_y, gap_end);
       }
     }
 
-    if (cursorY < height) ctx.fillRect(lineX - 0.5, cursorY, 1, height - cursorY);
+    if (cursor_y < height) ctx.fillRect(line_x - 0.5, cursor_y, 1, height - cursor_y);
   };
 
-  for (let cj = 0; cj < nCols; cj++) {
+  for (let cj = 0; cj < n_cols; cj++) {
     const c = view.cols[cj]!;
-    appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
+    append_vertical_gridline(c, Math.round(col_x[c]! - scroll_left + g) - 0.5);
   }
 
-  if (nCols > 0) {
-    const c = view.cols[nCols - 1]! + 1;
-    appendVerticalGridline(c, Math.round(colX[c]! - scrollLeft + g) - 0.5);
+  if (n_cols > 0) {
+    const c = view.cols[n_cols - 1]! + 1;
+    append_vertical_gridline(c, Math.round(col_x[c]! - scroll_left + g) - 0.5);
   }
 
-  if (clipTop < headerHeight) {
-    const strip = { width, left: paintLeft, right: paintRight };
-    paintHeader(ctx, theme, layout, colX, view.cols, strip, scrollLeft, g, state);
+  if (clip_top < header_height) {
+    const strip = { width, left: paint_left, right: paint_right };
+    paint_header(ctx, theme, layout, col_x, view.cols, strip, scroll_left, g, state);
   }
 
-  if (g > 0 && paintLeft < g) {
+  if (g > 0 && paint_left < g) {
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, g, height);
     ctx.clip();
-    applyFill(ctx, state, theme.headerBg);
+    apply_fill(ctx, state, theme.headerBg);
     ctx.fillRect(0, 0, g, height);
 
     ctx.strokeStyle = theme.gridLine;
@@ -1047,30 +1094,30 @@ export function paintFrame(
     // Row numbers stay below the column header, like the cell body: a row
     // scrolled half under the header must not paint its number in the corner.
     ctx.beginPath();
-    ctx.rect(0, headerHeight, g, Math.max(0, height - headerHeight));
+    ctx.rect(0, header_height, g, Math.max(0, height - header_height));
     ctx.clip();
-    applyFont(ctx, state, theme.font);
+    apply_font(ctx, state, theme.font);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    for (let ri = 0; ri < nRows; ri++) {
+    for (let ri = 0; ri < n_rows; ri++) {
       const row = view.rows.start + ri;
-      const bandTop =
-        rowTops !== undefined
-          ? headerHeight + rowTops[ri]! - scrollTop
-          : headerHeight + row * rowHeight - scrollTop;
-      const bandHeight = rowHeights !== undefined ? rowHeights[ri]! : rowHeight;
+      const band_top =
+        row_tops !== undefined
+          ? header_height + row_tops[ri]! - scroll_top
+          : header_height + row * row_height - scroll_top;
+      const band_height = row_heights !== undefined ? row_heights[ri]! : row_height;
       // Cull by row band, not center: a damage strip can cover half a row's
       // glyphs while the center sits outside it - skipping the row would let
       // the strip's background erase that half and slice the digits.
-      if (bandTop + bandHeight < paintTop || bandTop > paintBottom) continue;
-      const cy = bandTop + bandHeight / 2;
-      const number = rowNumbers?.[ri] ?? row + 1;
+      if (band_top + band_height < paint_top || band_top > paint_bottom) continue;
+      const cy = band_top + band_height / 2;
+      const number = row_numbers?.[ri] ?? row + 1;
       const listed =
-        filteredRows !== undefined &&
-        number - 1 >= filteredRows.start &&
-        number - 1 <= filteredRows.end;
-      applyFill(ctx, state, listed ? theme.selectionBorder : theme.headerFg);
+        filtered_rows !== undefined &&
+        number - 1 >= filtered_rows.start &&
+        number - 1 <= filtered_rows.end;
+      apply_fill(ctx, state, listed ? theme.selectionBorder : theme.headerFg);
       ctx.fillText(String(number), g / 2, cy);
     }
 
@@ -1085,7 +1132,7 @@ export function paintFrame(
  * visibly squeezes glyphs. Text may receive a wider Sheets-style spill rect;
  * its height always remains locked to the owning row.
  */
-function clipCell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
+function clip_cell(ctx: Ctx, x: number, y: number, w: number, h: number): void {
   ctx.beginPath();
   ctx.rect(x, y, Math.max(0, w), Math.max(0, h));
   ctx.clip();
@@ -1116,7 +1163,7 @@ export function cellDisplayText(
  * format is not General or no form fits, where Excel shows `####`. Only a
  * number that overflows its cell gets here.
  */
-function narrowGeneral(
+function narrow_general(
   ctx: Ctx,
   value: number,
   format: string | undefined,
@@ -1132,7 +1179,7 @@ function narrowGeneral(
   return null;
 }
 
-function paintCell(
+function paint_cell(
   ctx: Ctx,
   theme: Theme,
   layout: RenderLayout,
@@ -1144,45 +1191,45 @@ function paintCell(
   w: number,
   h: number,
   /** Where a filter header's text box ends, before its button; undefined for other cells. */
-  textRight: number | undefined,
-  spillX: number,
-  spillW: number,
+  text_right: number | undefined,
+  spill_x: number,
+  spill_w: number,
   renderers: ReadonlyMap<string, CellRenderer>,
   state: PaintState,
-  styleKey: number,
-  styleCache: Map<number, CellStyle>,
+  style_key: number,
+  style_cache: Map<number, CellStyle>,
 ): void {
   const column = layout.columns[col];
 
   // The column's `cellStyle` is the base layer and the per-cell style wins on any
   // shared property. Skip the merge (and its allocation) when no column style
   // exists; otherwise reuse a merge cached per (column, view-local style id).
-  const columnStyle = column?.cellStyle;
+  const column_style = column?.cellStyle;
   let effective: CellStyle;
-  if (columnStyle === undefined) {
+  if (column_style === undefined) {
     effective = style;
   } else {
-    const cached = styleCache.get(styleKey);
+    const cached = style_cache.get(style_key);
     if (cached !== undefined) {
       effective = cached;
     } else {
-      effective = { ...columnStyle, ...style };
-      styleCache.set(styleKey, effective);
+      effective = { ...column_style, ...style };
+      style_cache.set(style_key, effective);
     }
   }
 
   if (effective.backgroundColor) {
-    applyFill(ctx, state, effective.backgroundColor);
+    apply_fill(ctx, state, effective.backgroundColor);
     ctx.fillRect(x, y, w, h);
   }
 
-  paintBorders(ctx, effective, x, y, w, h);
+  paint_borders(ctx, effective, x, y, w, h);
 
   const custom = column?.renderer ? renderers.get(column.renderer) : undefined;
   if (custom?.dom || layout.domRendererColumns?.[col] === 1) return;
   if (custom?.canvas) {
     ctx.save();
-    clipCell(ctx, x, y, w, h);
+    clip_cell(ctx, x, y, w, h);
     custom.canvas(ctx as CanvasRenderingContext2D, { value, x, y, w, h, theme, style: effective });
     ctx.restore();
     return;
@@ -1190,20 +1237,20 @@ function paintCell(
 
   if (value === null || value === "") return;
 
-  const effectiveFont = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
-  applyFont(ctx, state, effectiveFont);
+  const effective_font = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
+  apply_font(ctx, state, effective_font);
   const numeric = typeof value === "number";
-  const numberFormat = effective.numberFormat ?? column?.numberFormat;
+  const number_format = effective.numberFormat ?? column?.numberFormat;
   // Excel paints a number in its format section's color, such as `[Red]`, over the font color.
-  const formatColor =
-    numeric && numberFormat !== undefined ? numberFormatColor(value, numberFormat) : undefined;
-  applyFill(
+  const format_color =
+    numeric && number_format !== undefined ? numberFormatColor(value, number_format) : undefined;
+  apply_fill(
     ctx,
     state,
-    formatColor ??
+    format_color ??
       effective.color ??
       (effective.backgroundColor
-        ? textOnFill(
+        ? text_on_fill(
             ctx,
             state,
             state.cellTextOnFill,
@@ -1215,11 +1262,11 @@ function paintCell(
   );
 
   const align = cellAlign(effective, value, column?.type);
-  let text = cellDisplayText(value, numberFormat, column?.numberLocale);
+  let text = cellDisplayText(value, number_format, column?.numberLocale);
   // A filter header's text pads on the left as usual and ends at its text box.
   const pad = cellPadding(layout.zoom ?? 1);
-  const textW = textRight === undefined ? w : textRight + pad - x;
-  const availableTextWidth = Math.max(0, textW - pad * 2);
+  const text_w = text_right === undefined ? w : text_right + pad - x;
+  const available_text_width = Math.max(0, text_w - pad * 2);
   if (numeric) {
     if (state.measuredFont !== state.lastFont) {
       state.measuredFont = state.lastFont;
@@ -1230,56 +1277,57 @@ function paintCell(
     // Most numeric cells are comfortably wider than their formatted value.
     // Only pay for exact measurement when a cached digit-width estimate says
     // the run is close enough to the edge to plausibly overflow.
-    const mayOverflow = text.length * state.digitWidth > availableTextWidth * 0.8;
-    const exactWidth = mayOverflow ? ctx.measureText(text).width : 0;
-    if (exactWidth > availableTextWidth) {
+    const may_overflow = text.length * state.digitWidth > available_text_width * 0.8;
+    const exact_width = may_overflow ? ctx.measureText(text).width : 0;
+    if (exact_width > available_text_width) {
       text =
-        narrowGeneral(ctx, value, numberFormat, column?.numberLocale, availableTextWidth) ??
-        "#".repeat(Math.max(1, Math.floor(availableTextWidth / state.hashWidth)));
+        narrow_general(ctx, value, number_format, column?.numberLocale, available_text_width) ??
+        "#".repeat(Math.max(1, Math.floor(available_text_width / state.hashWidth)));
     }
   }
 
-  const fontPx =
+  const font_px =
     effective.fontSize === undefined
       ? Number.parseFloat(FONT_PX_RE.exec(theme.font)?.[1] ?? "") || 12
       : effective.fontSize * (layout.zoom ?? 1);
   const zoom = layout.zoom ?? 1;
-  const lineHeight = fontPx * 1.2;
+  const line_height = font_px * 1.2;
 
   ctx.save();
   if (effective.wrap && !numeric) {
-    clipCell(ctx, x, y, (textRight ?? x + w) - x, h);
+    clip_cell(ctx, x, y, (text_right ?? x + w) - x, h);
 
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
     // out one line past the last drawable one changes no pixel.
-    const maxLines = Math.floor(h / lineHeight) + 1;
-    const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
-    const blockHeight = lines.length * lineHeight;
-    const firstCy = textBlockTop(effective.verticalAlign, y, h, blockHeight, zoom) + lineHeight / 2;
+    const max_lines = Math.floor(h / line_height) + 1;
+    const lines = layout_text_lines_into(ctx, text, available_text_width, max_lines, []);
+    const block_height = lines.length * line_height;
+    const first_cy =
+      text_block_top(effective.verticalAlign, y, h, block_height, zoom) + line_height / 2;
 
     for (let line = 0; line < lines.length; line++) {
-      const cy = firstCy + line * lineHeight;
-      if (cy - lineHeight / 2 >= y + h) break;
-      const lineText = lines[line]!;
-      fillAlignedText(ctx, lineText, align, x, textW, cy, pad);
+      const cy = first_cy + line * line_height;
+      if (cy - line_height / 2 >= y + h) break;
+      const line_text = lines[line]!;
+      fill_aligned_text(ctx, line_text, align, x, text_w, cy, pad);
       if (effective.underline || effective.strikethrough) {
-        paintTextDecoration(ctx, effective, lineText, align, x, textW, cy, fontPx, pad);
+        paint_text_decoration(ctx, effective, line_text, align, x, text_w, cy, font_px, pad);
       }
     }
   } else {
     // Left-aligned strings spill right, right-aligned strings spill left, and
     // centered strings can use both sides. Numeric output never spills.
-    let textClipX = x;
-    let textClipW = textW;
+    let text_clip_x = x;
+    let text_clip_w = text_w;
     if (!numeric) {
-      if (align === "left") textClipW = spillX + spillW - x;
+      if (align === "left") text_clip_w = spill_x + spill_w - x;
       else if (align === "right") {
-        textClipX = spillX;
-        textClipW = x + textW - spillX;
+        text_clip_x = spill_x;
+        text_clip_w = x + text_w - spill_x;
       } else {
-        textClipX = spillX;
-        textClipW = spillW;
+        text_clip_x = spill_x;
+        text_clip_w = spill_w;
       }
     }
 
@@ -1287,20 +1335,20 @@ function paintCell(
     const cy =
       effective.verticalAlign === undefined || effective.verticalAlign === "middle"
         ? y + h / 2
-        : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
+        : text_block_top(effective.verticalAlign, y, h, line_height, zoom) + line_height / 2;
     // A filter header's text clips at its text box, the gap before the button.
-    if (textRight !== undefined) textClipW = Math.min(textClipW, textRight - textClipX);
-    clipCell(ctx, textClipX, y, textClipW, h);
-    fillAlignedText(ctx, text, align, x, textW, cy, pad);
+    if (text_right !== undefined) text_clip_w = Math.min(text_clip_w, text_right - text_clip_x);
+    clip_cell(ctx, text_clip_x, y, text_clip_w, h);
+    fill_aligned_text(ctx, text, align, x, text_w, cy, pad);
     if (effective.underline || effective.strikethrough) {
-      paintTextDecoration(ctx, effective, text, align, x, textW, cy, fontPx, pad);
+      paint_text_decoration(ctx, effective, text, align, x, text_w, cy, font_px, pad);
     }
   }
 
   ctx.restore();
 }
 
-function paintBorders(
+function paint_borders(
   ctx: Ctx,
   style: CellStyle,
   x: number,
@@ -1338,21 +1386,21 @@ interface PaintStrip {
   right: number;
 }
 
-function paintHeader(
+function paint_header(
   ctx: Ctx,
   theme: Theme,
   layout: RenderLayout,
-  colX: number[],
+  col_x: number[],
   cols: readonly number[],
   strip: PaintStrip,
-  scrollLeft: number,
+  scroll_left: number,
   g: number,
   state: PaintState,
 ): void {
   const h = theme.headerHeight;
 
   // Default header bar; any per-column `headerStyle` background paints over it.
-  applyFill(ctx, state, theme.headerBg);
+  apply_fill(ctx, state, theme.headerBg);
   ctx.fillRect(0, 0, strip.width, h);
 
   const cy = h / 2;
@@ -1360,53 +1408,53 @@ function paintHeader(
   const right = Math.min(strip.width, strip.right);
   for (const c of cols) {
     const column = layout.columns[c]!;
-    const x = colX[c]! - scrollLeft + g;
-    const w = colX[c + 1]! - colX[c]!;
+    const x = col_x[c]! - scroll_left + g;
+    const w = col_x[c + 1]! - col_x[c]!;
     if (x + w <= left || x >= right) continue;
 
-    const headerStyle = column.headerStyle;
+    const header_style = column.headerStyle;
 
-    if (headerStyle?.backgroundColor) {
-      applyFill(ctx, state, headerStyle.backgroundColor);
+    if (header_style?.backgroundColor) {
+      apply_fill(ctx, state, header_style.backgroundColor);
       ctx.fillRect(x, 0, w, h);
     }
 
-    // Theme header defaults are bold and centered; `headerStyle` overrides where set.
-    const bold = headerStyle?.bold ?? true;
-    applyFont(
+    // Theme header defaults are bold and centered; `header_style` overrides where set.
+    const bold = header_style?.bold ?? true;
+    apply_font(
       ctx,
       state,
       fontFor(
         theme,
-        { bold, italic: headerStyle?.italic, fontSize: headerStyle?.fontSize },
+        { bold, italic: header_style?.italic, fontSize: header_style?.fontSize },
         layout.zoom ?? 1,
         state.fontCache,
       ),
     );
-    applyFill(
+    apply_fill(
       ctx,
       state,
-      headerStyle?.color ??
-        (headerStyle?.backgroundColor
-          ? textOnFill(
+      header_style?.color ??
+        (header_style?.backgroundColor
+          ? text_on_fill(
               ctx,
               state,
               state.headerTextOnFill,
-              headerStyle.backgroundColor,
+              header_style.backgroundColor,
               theme.headerFg,
               theme.headerBg,
             )
           : theme.headerFg),
     );
 
-    const align = headerStyle?.align ?? "center";
+    const align = header_style?.align ?? "center";
     ctx.save();
-    clipCell(ctx, x, 0, w, h);
-    fillAlignedText(ctx, column.header, align, x, w, cy, cellPadding(layout.zoom ?? 1));
+    clip_cell(ctx, x, 0, w, h);
+    fill_aligned_text(ctx, column.header, align, x, w, cy, cellPadding(layout.zoom ?? 1));
     ctx.restore();
   }
 
-  applyFill(ctx, state, theme.gridLine);
+  apply_fill(ctx, state, theme.gridLine);
   ctx.fillRect(0, h - 1, strip.width, 1);
 }
 
@@ -1428,25 +1476,25 @@ export interface MergeIndexResourceStats {
   readonly candidatesExamined: number;
 }
 
-let mergeResourceStats: [indexConstructions: number, candidatesExamined: number] | undefined;
-const mergeIndexCache = new WeakMap<ReadonlyArray<MergeRect>, PreparedMergeIndex>();
-const axisStart = (merge: MergeRect, rows: boolean): number => (rows ? merge.r0 : merge.c0);
-const axisEnd = (merge: MergeRect, rows: boolean): number => (rows ? merge.r1 : merge.c1);
+let merge_resource_stats: [indexConstructions: number, candidatesExamined: number] | undefined;
+const merge_index_cache = new WeakMap<ReadonlyArray<MergeRect>, PreparedMergeIndex>();
+const axis_start = (merge: MergeRect, rows: boolean): number => (rows ? merge.r0 : merge.c0);
+const axis_end = (merge: MergeRect, rows: boolean): number => (rows ? merge.r1 : merge.c1);
 
-function buildMergeAxis(merges: ReadonlyArray<MergeRect>, rows: boolean): MergeAxisIndex {
+function build_merge_axis(merges: ReadonlyArray<MergeRect>, rows: boolean): MergeAxisIndex {
   const entries = [...merges].sort(
-    (a, b) => axisStart(a, rows) - axisStart(b, rows) || axisEnd(a, rows) - axisEnd(b, rows),
+    (a, b) => axis_start(a, rows) - axis_start(b, rows) || axis_end(a, rows) - axis_end(b, rows),
   );
-  const prefixMaxEnd = new Array<number>(entries.length);
+  const prefix_max_end = new Array<number>(entries.length);
   let maximum = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < entries.length; index++) {
-    maximum = Math.max(maximum, axisEnd(entries[index]!, rows));
-    prefixMaxEnd[index] = maximum;
+    maximum = Math.max(maximum, axis_end(entries[index]!, rows));
+    prefix_max_end[index] = maximum;
   }
-  return [entries, prefixMaxEnd, rows];
+  return [entries, prefix_max_end, rows];
 }
 
-function mergeCandidateRange(
+function merge_candidate_range(
   index: MergeAxisIndex,
   minimum: number,
   maximum: number,
@@ -1462,7 +1510,7 @@ function mergeCandidateRange(
   last = index[0].length;
   while (end < last) {
     const middle = (end + last) >>> 1;
-    if (axisStart(index[0][middle]!, index[2]) <= maximum) end = middle + 1;
+    if (axis_start(index[0][middle]!, index[2]) <= maximum) end = middle + 1;
     else last = middle;
   }
   return [first, end];
@@ -1471,28 +1519,28 @@ function mergeCandidateRange(
 /** Prepared interval projections shared by interaction, clipboard, and paint paths. */
 export type PreparedMergeIndex = readonly [rows: MergeAxisIndex, columns: MergeAxisIndex];
 
-function queryMerges(
+function query_merges(
   prepared: PreparedMergeIndex,
-  rowMinimum: number,
-  rowMaximum: number,
-  columnMinimum: number,
-  columnMaximum: number,
+  row_minimum: number,
+  row_maximum: number,
+  column_minimum: number,
+  column_maximum: number,
 ): MergeRect[] {
-  const rowRange = mergeCandidateRange(prepared[0], rowMinimum, rowMaximum);
-  const columnRange = mergeCandidateRange(prepared[1], columnMinimum, columnMaximum);
-  const rows = rowRange[1] - rowRange[0] <= columnRange[1] - columnRange[0];
+  const row_range = merge_candidate_range(prepared[0], row_minimum, row_maximum);
+  const column_range = merge_candidate_range(prepared[1], column_minimum, column_maximum);
+  const rows = row_range[1] - row_range[0] <= column_range[1] - column_range[0];
   const index = prepared[rows ? 0 : 1];
-  const range = rows ? rowRange : columnRange;
-  const minimum = rows ? rowMinimum : columnMinimum;
+  const range = rows ? row_range : column_range;
+  const minimum = rows ? row_minimum : column_minimum;
   const matches: MergeRect[] = [];
   for (let position = range[0]; position < range[1]; position++) {
     const merge = index[0][position]!;
-    if (mergeResourceStats) mergeResourceStats[1] += 1;
+    if (merge_resource_stats) merge_resource_stats[1] += 1;
     if (
-      axisEnd(merge, index[2]) >= minimum &&
+      axis_end(merge, index[2]) >= minimum &&
       (rows
-        ? merge.c1 >= columnMinimum && merge.c0 <= columnMaximum
-        : merge.r1 >= rowMinimum && merge.r0 <= rowMaximum)
+        ? merge.c1 >= column_minimum && merge.c0 <= column_maximum
+        : merge.r1 >= row_minimum && merge.r0 <= row_maximum)
     ) {
       matches.push(merge);
     }
@@ -1505,7 +1553,7 @@ export function mergeAnchorAt(
   row: number,
   column: number,
 ): MergeRect | null {
-  return queryMerges(prepared, row, row, column, column)[0] ?? null;
+  return query_merges(prepared, row, row, column, column)[0] ?? null;
 }
 
 export function intersectingMerges(
@@ -1515,54 +1563,54 @@ export function intersectingMerges(
   columns: readonly number[],
 ): readonly MergeRect[] {
   if (rowStart >= rowEnd || columns.length === 0) return [];
-  let minimumColumn = columns[0]!;
-  let maximumColumn = minimumColumn;
+  let minimum_column = columns[0]!;
+  let maximum_column = minimum_column;
   for (let index = 1; index < columns.length; index++) {
-    minimumColumn = Math.min(minimumColumn, columns[index]!);
-    maximumColumn = Math.max(maximumColumn, columns[index]!);
+    minimum_column = Math.min(minimum_column, columns[index]!);
+    maximum_column = Math.max(maximum_column, columns[index]!);
   }
-  return queryMerges(prepared, rowStart, rowEnd - 1, minimumColumn, maximumColumn);
+  return query_merges(prepared, rowStart, rowEnd - 1, minimum_column, maximum_column);
 }
 
-function horizontalMergeGaps(
+function horizontal_merge_gaps(
   prepared: PreparedMergeIndex,
   row: number,
-  columnMinimum = Number.NEGATIVE_INFINITY,
-  columnMaximum = Number.POSITIVE_INFINITY,
+  column_minimum = Number.NEGATIVE_INFINITY,
+  column_maximum = Number.POSITIVE_INFINITY,
 ): readonly MergeRect[] {
-  return queryMerges(prepared, row, row, columnMinimum, columnMaximum)
+  return query_merges(prepared, row, row, column_minimum, column_maximum)
     .filter((merge) => row < merge.r1)
     .sort((a, b) => a.c0 - b.c0 || a.c1 - b.c1);
 }
 
-function verticalMergeGaps(
+function vertical_merge_gaps(
   prepared: PreparedMergeIndex,
   column: number,
-  rowMinimum = Number.NEGATIVE_INFINITY,
-  rowMaximum = Number.POSITIVE_INFINITY,
+  row_minimum = Number.NEGATIVE_INFINITY,
+  row_maximum = Number.POSITIVE_INFINITY,
 ): readonly MergeRect[] {
-  return queryMerges(prepared, rowMinimum, rowMaximum, column, column)
+  return query_merges(prepared, row_minimum, row_maximum, column, column)
     .filter((merge) => merge.c0 < column)
     .sort((a, b) => a.r0 - b.r0 || a.r1 - b.r1);
 }
 
 export function prepareMergeIndex(merges: ReadonlyArray<MergeRect>): PreparedMergeIndex {
-  let prepared = mergeIndexCache.get(merges);
+  let prepared = merge_index_cache.get(merges);
   if (!prepared) {
-    prepared = [buildMergeAxis(merges, true), buildMergeAxis(merges, false)];
-    mergeIndexCache.set(merges, prepared);
-    if (mergeResourceStats) mergeResourceStats[0] += 1;
+    prepared = [build_merge_axis(merges, true), build_merge_axis(merges, false)];
+    merge_index_cache.set(merges, prepared);
+    if (merge_resource_stats) merge_resource_stats[0] += 1;
   }
   return prepared;
 }
 
 export function getMergeIndexResourceStatsForTest(): MergeIndexResourceStats {
   return {
-    indexConstructions: mergeResourceStats?.[0] ?? 0,
-    candidatesExamined: mergeResourceStats?.[1] ?? 0,
+    indexConstructions: merge_resource_stats?.[0] ?? 0,
+    candidatesExamined: merge_resource_stats?.[1] ?? 0,
   };
 }
 
 export function resetMergeIndexResourceStatsForTest(): void {
-  mergeResourceStats = [0, 0];
+  merge_resource_stats = [0, 0];
 }

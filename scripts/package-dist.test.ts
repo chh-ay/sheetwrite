@@ -9,17 +9,17 @@ import {
   pruneUnreachableDeclarations,
 } from "./package-dist.js";
 
-const temporaryRoots: string[] = [];
+const temporary_roots: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    temporaryRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
+    temporary_roots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
   );
 });
 
-async function writePackage(files: Record<string, string>): Promise<string> {
+async function write_package(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-package-dist-"));
-  temporaryRoots.push(root);
+  temporary_roots.push(root);
   for (const [path, contents] of Object.entries(files)) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await writeFile(join(root, path), contents);
@@ -84,7 +84,7 @@ const UNREACHABLE = ["dist/commented.d.ts", "dist/internal.d.ts", "dist/string-t
 
 describe("published declarations", () => {
   it("accepts exactly the declarations the type entries reach", async () => {
-    const root = await writePackage(TYPED_PACKAGE);
+    const root = await write_package(TYPED_PACKAGE);
 
     await assertPublishedDeclarations(root, ["package.json", "dist/index.js", ...REACHABLE]);
     expect(
@@ -93,8 +93,8 @@ describe("published declarations", () => {
   });
 
   it("rejects a reached declaration that is not published", async () => {
-    const { "dist/style.d.ts": _style, ...withoutStyle } = TYPED_PACKAGE;
-    const root = await writePackage(withoutStyle);
+    const { "dist/style.d.ts": _style, ...without_style } = TYPED_PACKAGE;
+    const root = await write_package(without_style);
 
     expect(
       await rejection(
@@ -107,7 +107,7 @@ describe("published declarations", () => {
   });
 
   it("leaves source-typed packages to their framework tooling", async () => {
-    const root = await writePackage({
+    const root = await write_package({
       "package.json": JSON.stringify({ exports: { ".": { types: "./src/index.ts" } } }),
       "src/index.ts": "export const value = 1;\n",
     });
@@ -118,7 +118,7 @@ describe("published declarations", () => {
 
 describe("built declaration pruning", () => {
   it("deletes only the declarations no type entry reaches", async () => {
-    const root = await writePackage(TYPED_PACKAGE);
+    const root = await write_package(TYPED_PACKAGE);
 
     const removed = await pruneUnreachableDeclarations(root);
 
@@ -127,8 +127,8 @@ describe("built declaration pruning", () => {
   });
 
   it("fails the build when a reached declaration was never emitted", async () => {
-    const { "dist/grid/index.d.ts": _grid, ...withoutGrid } = TYPED_PACKAGE;
-    const root = await writePackage(withoutGrid);
+    const { "dist/grid/index.d.ts": _grid, ...without_grid } = TYPED_PACKAGE;
+    const root = await write_package(without_grid);
 
     expect(await rejection(pruneUnreachableDeclarations(root))).toContain(
       "dist/index.d.ts -> ./grid/index.js",
@@ -137,7 +137,7 @@ describe("built declaration pruning", () => {
   });
 
   it("refuses to prune a package without declaration-file type entries", async () => {
-    const root = await writePackage({
+    const root = await write_package({
       "package.json": JSON.stringify({ name: "untyped", exports: { ".": "./dist/index.js" } }),
       "dist/index.d.ts": "export declare const value: number;\n",
     });
@@ -163,7 +163,7 @@ describe("built JavaScript formatting", () => {
       "}",
       "",
     ].join("\n");
-    const root = await writePackage({ "dist/render.js": source });
+    const root = await write_package({ "dist/render.js": source });
 
     await formatBuiltJavaScript(root);
 

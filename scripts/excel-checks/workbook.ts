@@ -51,17 +51,19 @@ export async function loadSheetwrite(): Promise<Sheetwrite> {
   GlobalRegistrator.register();
   const formulas: typeof Formulas = await import(NODE_LOADER);
   const core: Core = await import("../../packages/core/dist/index.js");
-  const { xlsxAddon } = await import("../../packages/xlsx/dist/index.js");
-  const { loadPowerQueryCodec } = await import("../../packages/queries/dist/node.js");
-  await core.initSheetwrite({ engine: formulas, addons: [xlsxAddon()] });
-  const { installCanvasTestStubs } = await import("../../packages/core/dist/testing.js");
-  installCanvasTestStubs();
-  installMemoryClipboard();
-  return { core, powerQuery: await loadPowerQueryCodec() };
+  const { xlsxAddon: xlsx_addon } = await import("../../packages/xlsx/dist/index.js");
+  const { loadPowerQueryCodec: load_power_query_codec } =
+    await import("../../packages/queries/dist/node.js");
+  await core.initSheetwrite({ engine: formulas, addons: [xlsx_addon()] });
+  const { installCanvasTestStubs: install_canvas_test_stubs } =
+    await import("../../packages/core/dist/testing.js");
+  install_canvas_test_stubs();
+  install_memory_clipboard();
+  return { core, powerQuery: await load_power_query_codec() };
 }
 
 /** Paste Special reads the copied cells back from the system clipboard; keep them in memory. */
-function installMemoryClipboard(): void {
+function install_memory_clipboard(): void {
   let items: MemoryClipboardItem[] = [];
   Object.defineProperty(globalThis, "ClipboardItem", {
     configurable: true,
@@ -132,19 +134,19 @@ const ERROR_TEXTS = [
 ];
 
 const quoted = (text: string) => `"${text.replaceAll('"', '""')}"`;
-const errorText = (expression: string) =>
+const error_text = (expression: string) =>
   `CHOOSE(ERROR.TYPE(${expression}),${ERROR_TEXTS.map(quoted).join(",")})`;
 
 /** A value as text, an error as its name: the same text in Excel and in Sheetwrite. */
 export const shown = (expression: string) =>
-  `=IF(ISERROR(${expression}),${errorText(expression)},${expression}&"")`;
+  `=IF(ISERROR(${expression}),${error_text(expression)},${expression}&"")`;
 
 /** What a cell holds: its formula, "(blank)", or its value as text. */
 const content = (ref: string) =>
-  `=IF(ISFORMULA(${ref}),FORMULATEXT(${ref}),IF(ISBLANK(${ref}),"(blank)",IF(ISERROR(${ref}),${errorText(ref)},${ref}&"")))`;
+  `=IF(ISFORMULA(${ref}),FORMULATEXT(${ref}),IF(ISBLANK(${ref}),"(blank)",IF(ISERROR(${ref}),${error_text(ref)},${ref}&"")))`;
 
 /** A date cell's day, or what another cell holds. */
-const dateContent = (ref: string) =>
+const date_content = (ref: string) =>
   `=IF(ISBLANK(${ref}),"(blank)",TEXT(${ref},${quoted(DATE_FORMAT)}))`;
 
 export function columnName(col: number): string {
@@ -159,14 +161,14 @@ export const a1 = (row: number, col: number) => `${columnName(col)}${row + 1}`;
 
 const range = (
   sheet: string,
-  startRow: number,
-  startCol: number,
-  endRow: number,
-  endCol: number,
+  start_row: number,
+  start_col: number,
+  end_row: number,
+  end_col: number,
 ) => ({
   sheet,
-  start: { row: startRow, col: startCol },
-  end: { row: endRow, col: endCol },
+  start: { row: start_row, col: start_col },
+  end: { row: end_row, col: end_col },
 });
 
 interface ResultRow {
@@ -232,17 +234,17 @@ class CheckSheet {
 
   /** A table of inputs from (`row`, `col`); with `header`, its first row is bold. */
   grid(row: number, col: number, rows: readonly (readonly Input[])[], header = true): void {
-    rows.forEach((values, rowIndex) =>
-      values.forEach((value, colIndex) => {
+    rows.forEach((values, row_index) =>
+      values.forEach((value, col_index) => {
         if (value === null) return;
         if (typeof value === "object") {
-          this.formula(row + rowIndex, col + colIndex, value.formula);
+          this.formula(row + row_index, col + col_index, value.formula);
         } else {
           this.put(
-            row + rowIndex,
-            col + colIndex,
+            row + row_index,
+            col + col_index,
             value,
-            header && rowIndex === 0 ? BOLD : undefined,
+            header && row_index === 0 ? BOLD : undefined,
           );
         }
       }),
@@ -270,20 +272,20 @@ class CheckSheet {
 
   snapshot(order: number): SheetSnapshot {
     const cells = [...this.cells.values()];
-    const rowCount = Math.max(...cells.map((cell) => cell.rowOffset)) + 1;
-    const colCount = Math.max(...cells.map((cell) => cell.colOffset), ...this.widths.keys()) + 1;
+    const row_count = Math.max(...cells.map((cell) => cell.rowOffset)) + 1;
+    const col_count = Math.max(...cells.map((cell) => cell.colOffset), ...this.widths.keys()) + 1;
     return {
       id: this.id,
       name: this.name,
       order,
-      rowCount: Math.max(rowCount, MIN_ROWS),
-      columns: Array.from({ length: Math.max(colCount, MIN_COLUMNS) }, (_, col) => ({
+      rowCount: Math.max(row_count, MIN_ROWS),
+      columns: Array.from({ length: Math.max(col_count, MIN_COLUMNS) }, (_, col) => ({
         key: `c${col}`,
         header: columnName(col),
         width: this.widths.get(col) ?? DEFAULT_WIDTH,
         type: "text" as const,
       })),
-      cells: [{ startRow: 0, startCol: 0, rowCount, colCount, cells }],
+      cells: [{ startRow: 0, startCol: 0, rowCount: row_count, colCount: col_count, cells }],
       ...(this.tables.length > 0 ? { tables: this.tables } : {}),
       ...(this.pivots.length > 0 ? { pivots: this.pivots } : {}),
       ...(this.charts.length > 0 ? { charts: this.charts } : {}),
@@ -311,14 +313,14 @@ interface BuiltCheck {
   readonly steps?: SheetwriteSteps;
 }
 
-const contentRows = (refs: readonly [what: string, row: number, col: number][]) =>
+const content_rows = (refs: readonly [what: string, row: number, col: number][]) =>
   refs.map(([what, row, col]) => ({ what, excel: content(a1(row, col)) }));
 
-/** Each cell of rows `fromRow`..`toRow` and columns `fromCol`..`toCol`, row by row. */
-function cellsOf(fromRow: number, toRow: number, fromCol: number, toCol: number) {
+/** Each cell of rows `from_row`..`to_row` and columns `from_col`..`to_col`, row by row. */
+function cells_of(from_row: number, to_row: number, from_col: number, to_col: number) {
   const refs: [string, number, number][] = [];
-  for (let row = fromRow; row <= toRow; row++) {
-    for (let col = fromCol; col <= toCol; col++) refs.push([a1(row, col), row, col]);
+  for (let row = from_row; row <= to_row; row++) {
+    for (let col = from_col; col <= to_col; col++) refs.push([a1(row, col), row, col]);
   }
   return refs;
 }
@@ -326,7 +328,7 @@ function cellsOf(fromRow: number, toRow: number, fromCol: number, toCol: number)
 // ---------------------------------------------------------------- Sorting (#353)
 
 /** Check 1: the sort-order cases, stacked by case, sorted with two levels at once. */
-async function sortOrderCheck(sheetwrite: Sheetwrite): Promise<BuiltCheck> {
+async function sort_order_check(sheetwrite: Sheetwrite): Promise<BuiltCheck> {
   const sheet = new CheckSheet("c01", "1 Sort order");
   const fixture = await sheetwrite.core.fromXlsxWorkbook(
     readFileSync(resolve(ROOT, "packages/xlsx/test/fixtures/excel-sort-order-input.xlsx")),
@@ -405,7 +407,7 @@ async function sortOrderCheck(sheetwrite: Sheetwrite): Promise<BuiltCheck> {
 }
 
 /** Check 2: formulas that move with the rows a sort moves. */
-function sortFormulasCheck(): BuiltCheck {
+function sort_formulas_check(): BuiltCheck {
   const sheet = new CheckSheet("c02", "2 Sort formulas");
   const self = `'${sheet.name}'`;
   sheet.grid(
@@ -422,8 +424,8 @@ function sortFormulasCheck(): BuiltCheck {
   );
   sheet.formula(INPUT_ROW, 3, "=A9*2");
   sheet.results(INPUT_ROW, 5, [
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 4, 0, 1)),
-    ...contentRows([["D9", INPUT_ROW, 3]]),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 4, 0, 1)),
+    ...content_rows([["D9", INPUT_ROW, 3]]),
     { what: "D9 value", excel: shown("D9") },
   ]);
   sheet.intro(
@@ -455,7 +457,7 @@ function sortFormulasCheck(): BuiltCheck {
 }
 
 /** Check 3: quick sort guesses whether the region's first row is a header. */
-function quickSortCheck(): BuiltCheck {
+function quick_sort_check(): BuiltCheck {
   const sheet = new CheckSheet("c03", "3 Quick sort header");
   // No bold: Excel's header guess would follow the formatting instead of the values.
   sheet.grid(
@@ -481,8 +483,8 @@ function quickSortCheck(): BuiltCheck {
     false,
   );
   sheet.results(INPUT_ROW, 6, [
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 3, 0, 1)),
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 3, 3, 4)),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 3, 0, 1)),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 3, 3, 4)),
   ]);
   sheet.intro(
     "Check 3 (#353): quick sort and the header row",
@@ -508,7 +510,7 @@ function quickSortCheck(): BuiltCheck {
 }
 
 /** Check 4: a table Sheetwrite sorted keeps its order and its sort state in Excel. */
-function sortedTableCheck(): BuiltCheck {
+function sorted_table_check(): BuiltCheck {
   const sheet = new CheckSheet("c04", "4 Table sorted");
   const rows: [string, number][] = [
     ["kiwi", 5],
@@ -545,7 +547,7 @@ function sortedTableCheck(): BuiltCheck {
       },
     },
   ];
-  sheet.results(INPUT_ROW, 3, contentRows(cellsOf(INPUT_ROW + 1, INPUT_ROW + rows.length, 0, 1)));
+  sheet.results(INPUT_ROW, 3, content_rows(cells_of(INPUT_ROW + 1, INPUT_ROW + rows.length, 0, 1)));
   sheet.intro(
     "Check 4 (#353): a table sorted in Sheetwrite",
     "Sheetwrite sorted table Fruit by Qty, largest first. The script reads the sort state Excel saves.",
@@ -563,7 +565,7 @@ function sortedTableCheck(): BuiltCheck {
 }
 
 /** Check 5: a range sorted in Excel with a header row. */
-function sortRangeCheck(): BuiltCheck {
+function sort_range_check(): BuiltCheck {
   const sheet = new CheckSheet("c05", "5 Sort range");
   sheet.grid(INPUT_ROW, 0, [
     ["Name", "Qty"],
@@ -572,7 +574,7 @@ function sortRangeCheck(): BuiltCheck {
     ["fig", 2],
     ["kiwi", 5],
   ]);
-  sheet.results(INPUT_ROW, 3, contentRows(cellsOf(INPUT_ROW + 1, INPUT_ROW + 4, 0, 1)));
+  sheet.results(INPUT_ROW, 3, content_rows(cells_of(INPUT_ROW + 1, INPUT_ROW + 4, 0, 1)));
   sheet.intro(
     "Check 5 (#353): a range sorted in Excel",
     "Sheetwrite keeps Excel's order on import and applies no view sort; the script reads the file back.",
@@ -611,7 +613,7 @@ const CUSTOMERS: [string, string][] = [
 ];
 
 /** Orders and customers tables named after their check, on `sheet` from row 9. */
-function customerTables(sheet: CheckSheet, suffix: string): void {
+function customer_tables(sheet: CheckSheet, suffix: string): void {
   sheet.grid(INPUT_ROW, 0, [["Customer", "Amount"], ...CUSTOMER_ORDERS]);
   sheet.grid(INPUT_ROW, 3, [["ID", "Region"], ...CUSTOMERS]);
   sheet.tables = [
@@ -641,9 +643,9 @@ function customerTables(sheet: CheckSheet, suffix: string): void {
 }
 
 /** Check 6: a relationship made in Excel's data model. */
-function excelRelationshipCheck(): BuiltCheck {
+function excel_relationship_check(): BuiltCheck {
   const sheet = new CheckSheet("c06", "6 Relationship");
-  customerTables(sheet, "6");
+  customer_tables(sheet, "6");
   sheet.intro(
     "Check 6 (#229): a relationship from Excel's data model",
     "Excel for Windows only; on a Mac, skip it. The script reads the relationship Excel saves, and Sheetwrite's import of it.",
@@ -666,9 +668,9 @@ function excelRelationshipCheck(): BuiltCheck {
 const MODEL_PIVOT_ROW = INPUT_ROW + 7;
 
 /** Check 7: a model pivot over related tables, written as cells. */
-function modelPivotCheck(): BuiltCheck {
+function model_pivot_check(): BuiltCheck {
   const sheet = new CheckSheet("c07", "7 Model pivot");
-  customerTables(sheet, "7");
+  customer_tables(sheet, "7");
   sheet.pivots = [
     {
       id: "by-region-7",
@@ -688,7 +690,7 @@ function modelPivotCheck(): BuiltCheck {
       values: [{ field: 1, aggregation: "SUM" }],
     },
   ];
-  sheet.results(INPUT_ROW, 6, contentRows(cellsOf(MODEL_PIVOT_ROW, MODEL_PIVOT_ROW + 4, 0, 1)));
+  sheet.results(INPUT_ROW, 6, content_rows(cells_of(MODEL_PIVOT_ROW, MODEL_PIVOT_ROW + 4, 0, 1)));
   sheet.intro(
     "Check 7 (#229): a Sheetwrite model pivot in Excel",
     "Sheetwrite cannot write Excel's data model, so the pivot at A16 is written as plain values.",
@@ -726,7 +728,7 @@ const MEASURES = [
   },
 ];
 
-const modelPivot = (id: string, anchorRow: number, anchorCol: number): PivotDefinition => ({
+const model_pivot = (id: string, anchor_row: number, anchor_col: number): PivotDefinition => ({
   id,
   name: "Revenue by region",
   source: {
@@ -738,7 +740,7 @@ const modelPivot = (id: string, anchorRow: number, anchorCol: number): PivotDefi
       ],
     },
   },
-  anchor: { row: anchorRow, col: anchorCol },
+  anchor: { row: anchor_row, col: anchor_col },
   rows: [0],
   columns: [],
   values: [
@@ -752,14 +754,14 @@ const MEASURES_PIVOT_ROWS = 6;
 const MEASURES_PIVOT_COLS = 4;
 
 /** Check 12: a model pivot with measures, written as cells. */
-function measuresPivotCheck(): BuiltCheck {
+function measures_pivot_check(): BuiltCheck {
   const sheet = new CheckSheet("c12", "12 Measures pivot");
-  sheet.pivots = [modelPivot("by-region-12", INPUT_ROW, 0)];
+  sheet.pivots = [model_pivot("by-region-12", INPUT_ROW, 0)];
   sheet.results(
     INPUT_ROW,
     MEASURES_PIVOT_COLS + 1,
-    contentRows(
-      cellsOf(INPUT_ROW, INPUT_ROW + MEASURES_PIVOT_ROWS - 1, 0, MEASURES_PIVOT_COLS - 1),
+    content_rows(
+      cells_of(INPUT_ROW, INPUT_ROW + MEASURES_PIVOT_ROWS - 1, 0, MEASURES_PIVOT_COLS - 1),
     ),
   );
   sheet.intro(
@@ -782,7 +784,7 @@ const ORDERS_EDIT_ROW = INPUT_ROW + 1;
 const ORDERS_EDITED_AMOUNT = 125;
 
 /** Check 13: the measures stay in Sheetwrite's metadata through an Excel save. */
-function measuresModelCheck(): BuiltCheck {
+function measures_model_check(): BuiltCheck {
   const sheet = new CheckSheet("c13", "13 Measures model");
   sheet.grid(INPUT_ROW, 0, [["Region", "Amount"], ...ORDERS]);
   sheet.tables = [
@@ -798,7 +800,7 @@ function measuresModelCheck(): BuiltCheck {
       totalsRow: false,
     },
   ];
-  sheet.results(INPUT_ROW, 3, contentRows([[a1(ORDERS_EDIT_ROW, 1), ORDERS_EDIT_ROW, 1]]));
+  sheet.results(INPUT_ROW, 3, content_rows([[a1(ORDERS_EDIT_ROW, 1), ORDERS_EDIT_ROW, 1]]));
   sheet.intro(
     "Check 13 (#230): measures kept through Excel",
     "The measures Revenue and Share live in Sheetwrite's hidden metadata sheet. The script imports the saved file.",
@@ -827,15 +829,15 @@ function measuresModelCheck(): BuiltCheck {
 }
 
 /** Check 14: a dashboard, written as a worksheet of values and a chart. */
-function dashboardCheck(): BuiltCheck {
+function dashboard_check(): BuiltCheck {
   const name = "14 Dashboard";
   return {
     info: { sheet: name, check: "14. A dashboard in Excel", issues: "#231", seconds: 0 },
-    dashboards: [dashboardSheet(name)],
+    dashboards: [dashboard_sheet(name)],
   };
 }
 
-function dashboardSheet(name: string): SheetSnapshot {
+function dashboard_sheet(name: string): SheetSnapshot {
   return {
     id: "c14",
     name,
@@ -863,7 +865,7 @@ function dashboardSheet(name: string): SheetSnapshot {
         },
       ],
     },
-    pivots: [modelPivot("by-region-14", 0, 0)],
+    pivots: [model_pivot("by-region-14", 0, 0)],
     charts: [
       {
         id: "revenue-chart",
@@ -881,7 +883,7 @@ function dashboardSheet(name: string): SheetSnapshot {
 // ---------------------------------------------------------------- Queries and links (#227, #226)
 
 /** Check 8: a saved query refreshes in Excel. Its output starts out stale. */
-function queryCheck(): { check: BuiltCheck; query: SavedQuery } {
+function query_check(): { check: BuiltCheck; query: SavedQuery } {
   const sheet = new CheckSheet("c08", "8 Query refresh");
   const csv = readFileSync(resolve(ROOT, "test/fixtures/excel-checks/people.csv"), "utf8")
     .trim()
@@ -905,7 +907,7 @@ function queryCheck(): { check: BuiltCheck; query: SavedQuery } {
     INPUT_ROW,
     3,
     people.flatMap((_, index) =>
-      contentRows(cellsOf(INPUT_ROW + 1 + index, INPUT_ROW + 1 + index, 0, 1)),
+      content_rows(cells_of(INPUT_ROW + 1 + index, INPUT_ROW + 1 + index, 0, 1)),
     ),
   );
   sheet.intro(
@@ -972,18 +974,18 @@ function queryCheck(): { check: BuiltCheck; query: SavedQuery } {
 }
 
 /** Check 10: links with saved values; check 11: a link Sheetwrite added for a formula. */
-function linkChecks(): BuiltCheck[] {
+function link_checks(): BuiltCheck[] {
   const saved = new CheckSheet("c10", "10 Links");
-  const savedFormulas: [string, Input][] = [
+  const saved_formulas: [string, Input][] = [
     ["Budget C10", formula("=[Budget.xlsx]Annual!C10")],
     ["Budget C10 + C11", formula("=SUM([Budget.xlsx]Annual!C10:C11)")],
     ["Twice C10", formula("=[Budget.xlsx]Annual!C10*2")],
   ];
-  saved.grid(INPUT_ROW, 0, [["Reads", "Formula"], ...savedFormulas]);
+  saved.grid(INPUT_ROW, 0, [["Reads", "Formula"], ...saved_formulas]);
   saved.results(
     INPUT_ROW,
     3,
-    savedFormulas.flatMap((_, index) => {
+    saved_formulas.flatMap((_, index) => {
       const ref = a1(INPUT_ROW + 1 + index, 1);
       return [
         { what: `${ref} value`, excel: shown(ref) },
@@ -1050,10 +1052,10 @@ const SEGMENT_PIVOT_ROW = SEGMENT_TABLE_ROW + SEGMENT_ORDERS.length + 3;
 export const RENAMED_REGION_ROW = INPUT_ROW + 3;
 
 /** Check 15: two levels of category labels, from cells and from a pivot. */
-function chartLevelsCheck(afterSteps: boolean): BuiltCheck {
+function chart_levels_check(after_steps: boolean): BuiltCheck {
   const sheet = new CheckSheet("c15", "15 Chart levels");
   const sales = SALES.map(([region, segment, amount], index) =>
-    afterSteps && INPUT_ROW + 1 + index === RENAMED_REGION_ROW
+    after_steps && INPUT_ROW + 1 + index === RENAMED_REGION_ROW
       ? ["North", segment, amount]
       : [region, segment, amount],
   );
@@ -1073,17 +1075,17 @@ function chartLevelsCheck(afterSteps: boolean): BuiltCheck {
       totalsRow: false,
     },
   ];
-  const segmentPivot = (id: string, name: string, anchorRow: number): PivotDefinition => ({
+  const segment_pivot = (id: string, name: string, anchor_row: number): PivotDefinition => ({
     id,
     name,
     source: { table: "segment-orders" },
-    anchor: { row: anchorRow, col: 0 },
+    anchor: { row: anchor_row, col: 0 },
     rows: [0, 1],
     columns: [],
     values: [{ field: 2, aggregation: "SUM" }],
   });
-  sheet.pivots = [segmentPivot("by-segment", "Sales by segment", SEGMENT_PIVOT_ROW)];
-  const salesChart = (
+  sheet.pivots = [segment_pivot("by-segment", "Sales by segment", SEGMENT_PIVOT_ROW)];
+  const sales_chart = (
     id: string,
     kind: "column" | "bar",
     row: number,
@@ -1102,9 +1104,9 @@ function chartLevelsCheck(afterSteps: boolean): BuiltCheck {
     ],
   });
   sheet.charts = [
-    salesChart("levels", "column", INPUT_ROW, "Amount by region and segment"),
+    sales_chart("levels", "column", INPUT_ROW, "Amount by region and segment"),
     {
-      ...salesChart("one-row", "bar", INPUT_ROW + 16, "One row of labels"),
+      ...sales_chart("one-row", "bar", INPUT_ROW + 16, "One row of labels"),
       axes: { multiLevelLabels: false },
     },
     {
@@ -1135,7 +1137,7 @@ function chartLevelsCheck(afterSteps: boolean): BuiltCheck {
         { id: "chart-item", box: { x: 0, y: 0, w: 6, h: 12 }, kind: "chart", chart: "board-chart" },
       ],
     },
-    pivots: [segmentPivot("board-pivot", "Board sales", 0)],
+    pivots: [segment_pivot("board-pivot", "Board sales", 0)],
     charts: [
       {
         id: "board-chart",
@@ -1162,7 +1164,7 @@ function chartLevelsCheck(afterSteps: boolean): BuiltCheck {
 // ---------------------------------------------------------------- Formulas (#433, #799, #605)
 
 /** Check 9: TEXT with a percent code past the largest number. */
-function textOverflowCheck(): BuiltCheck {
+function text_overflow_check(): BuiltCheck {
   const sheet = new CheckSheet("c09", "9 TEXT overflow");
   const formulas = [
     'TEXT(9.99999999999999E+307,"0%")',
@@ -1191,7 +1193,7 @@ function textOverflowCheck(): BuiltCheck {
 }
 
 /** Check 16: the number format cases no Excel capture has confirmed. */
-function numberFormatCheck(): BuiltCheck {
+function number_format_check(): BuiltCheck {
   const sheet = new CheckSheet("c16", "16 Number formats");
   const fixture: unknown = JSON.parse(
     readFileSync(resolve(ROOT, "test/fixtures/number-format-cases.json"), "utf8"),
@@ -1250,7 +1252,7 @@ const GROUPBY_RESULT_ROWS = 9;
 const GROUPBY_COLUMNS = 3;
 
 /** #605: where GROUPBY puts a blank key next to 0 and FALSE under one parent. */
-function groupByBlankKeyCheck(): BuiltCheck {
+function group_by_blank_key_check(): BuiltCheck {
   const sheet = new CheckSheet("c605", "605 GROUPBY blank keys");
   const first = ["x", "x", "x", "y", "y", "y", "x", "y"];
   const second: (number | boolean | null)[] = [null, 0, false, null, 0, false, null, 0];
@@ -1259,12 +1261,12 @@ function groupByBlankKeyCheck(): BuiltCheck {
     ...first.map((key, index) => [key, second[index] ?? null, index + 1]),
   ]);
   const last = INPUT_ROW + first.length + 1;
-  const groupBy = `GROUPBY(A${INPUT_ROW + 2}:B${last},C${INPUT_ROW + 2}:C${last},SUM)`;
+  const group_by = `GROUPBY(A${INPUT_ROW + 2}:B${last},C${INPUT_ROW + 2}:C${last},SUM)`;
   const rows: ResultRow[] = [];
   for (let row = 1; row <= GROUPBY_RESULT_ROWS; row++) {
     const parts = Array.from(
       { length: GROUPBY_COLUMNS },
-      (_, col) => `INDEX(${groupBy},${row},${col + 1})`,
+      (_, col) => `INDEX(${group_by},${row},${col + 1})`,
     );
     rows.push({
       what: `Result row ${row}`,
@@ -1274,7 +1276,7 @@ function groupByBlankKeyCheck(): BuiltCheck {
   sheet.results(INPUT_ROW, 4, rows);
   sheet.intro(
     "Check #605: GROUPBY with a blank key beside 0 and FALSE",
-    `=${groupBy}, row by row; B${INPUT_ROW + 2}, B${INPUT_ROW + 5} and B${INPUT_ROW + 8} are blank. "#REF!" means the result has fewer rows.`,
+    `=${group_by}, row by row; B${INPUT_ROW + 2}, B${INPUT_ROW + 5} and B${INPUT_ROW + 8} are blank. "#REF!" means the result has fewer rows.`,
     [],
   );
   return {
@@ -1286,7 +1288,7 @@ function groupByBlankKeyCheck(): BuiltCheck {
 const SPILL_LENGTH = 3;
 
 /** A spilling formula from Sheetwrite's export still spills in Excel. */
-function spillExportCheck(): BuiltCheck {
+function spill_export_check(): BuiltCheck {
   const sheet = new CheckSheet("c-spill", "Spill export");
   sheet.formula(INPUT_ROW, 0, `=SEQUENCE(${SPILL_LENGTH})`);
   sheet.results(
@@ -1316,16 +1318,16 @@ function spillExportCheck(): BuiltCheck {
 // ---------------------------------------------------------------- Clipboard and AutoFill (#821, #827, #824)
 
 /** Check 17: Paste Special's operations on formulas and text. */
-function pasteSpecialCheck(): BuiltCheck {
+function paste_special_check(): BuiltCheck {
   const sheet = new CheckSheet("c17", "17 Paste Special");
   const source: Input[] = [10, formula("=A9*2"), "abc", null];
-  const zeroSource: Input[] = [0, formula("=I9*2"), "abc", null];
+  const zero_source: Input[] = [0, formula("=I9*2"), "abc", null];
   const target: Input[] = [1, formula("=5"), 7, "xyz"];
   const blocks: [col: number, label: string, values: Input[]][] = [
     [0, "Copy", source],
     [2, "Values, Add", target],
     [4, "All, Add", target],
-    [8, "Copy", zeroSource],
+    [8, "Copy", zero_source],
     [10, "All, Divide", target],
   ];
   for (const [col, label, values] of blocks) {
@@ -1338,9 +1340,9 @@ function pasteSpecialCheck(): BuiltCheck {
     );
   }
   sheet.results(INPUT_ROW - 1, 12, [
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 3, 2, 2)),
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 3, 4, 4)),
-    ...contentRows(cellsOf(INPUT_ROW, INPUT_ROW + 3, 10, 10)),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 3, 2, 2)),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 3, 4, 4)),
+    ...content_rows(cells_of(INPUT_ROW, INPUT_ROW + 3, 10, 10)),
   ]);
   sheet.intro(
     "Check 17 (#821): Paste Special's operations on formulas and text",
@@ -1351,8 +1353,8 @@ function pasteSpecialCheck(): BuiltCheck {
       "Select I9:I12, copy. Select K9, Paste Special…, choose All and Divide, OK. Press Esc.",
     ],
   );
-  const select = (grid: Grid, fromRow: number, col: number, toRow = fromRow) =>
-    grid.setSelection({ kind: "range", range: range(sheet.id, fromRow, col, toRow, col) });
+  const select = (grid: Grid, from_row: number, col: number, to_row = from_row) =>
+    grid.setSelection({ kind: "range", range: range(sheet.id, from_row, col, to_row, col) });
   return {
     info: {
       sheet: sheet.name,
@@ -1390,7 +1392,7 @@ interface FillCase {
 }
 
 /** Check 18: AutoFill series that Excel's AutoFill table does not list. */
-function autoFillCheck(): BuiltCheck {
+function auto_fill_check(): BuiltCheck {
   const sheet = new CheckSheet("c18", "18 AutoFill");
   const cases: FillCase[] = [
     { col: 0, source: ["A1", "B1"], length: 6 },
@@ -1402,22 +1404,26 @@ function autoFillCheck(): BuiltCheck {
   const filled: { row: number; col: number; value: string | number }[] = [];
   const rows: ResultRow[] = [];
   for (const fill of cases) {
-    const isDate = fill.options?.unit === "weekday";
+    const is_date = fill.options?.unit === "weekday";
     fill.source.forEach((value, index) =>
       sheet.put(
         INPUT_ROW + index,
         fill.col,
         value,
-        isDate ? { numberFormat: DATE_FORMAT } : undefined,
+        is_date ? { numberFormat: DATE_FORMAT } : undefined,
       ),
     );
     const plan = detectFillSeries(
-      fill.source.map((value) => ({ value, isFormula: false, ...(isDate ? { isDate } : {}) })),
+      fill.source.map((value) => ({
+        value,
+        isFormula: false,
+        ...(is_date ? { isDate: is_date } : {}),
+      })),
       fill.options,
     );
     for (let place = fill.source.length; place < fill.length; place++) {
       const ref = a1(INPUT_ROW + place, fill.col);
-      rows.push({ what: ref, excel: isDate ? dateContent(ref) : content(ref) });
+      rows.push({ what: ref, excel: is_date ? date_content(ref) : content(ref) });
       const step = plan.stepAt(place);
       const value = step.kind === "value" ? step.value : fill.source[step.sourceIndex];
       if (typeof value !== "string" && typeof value !== "number") {
@@ -1460,14 +1466,14 @@ function autoFillCheck(): BuiltCheck {
 
 // ---------------------------------------------------------------- The workbook
 
-const startSheetId = "start";
+const start_sheet_id = "start";
 /** Row of the Start sheet's repair question; the answer goes in column B. */
 export const REPAIR_ROW = 3;
 const START_TABLE_ROW = 6;
 const START_COLUMNS = ["Sheet", "Check", "Issues", "Your time (s)", "Differences"] as const;
 
-function startSheet(checks: readonly BuiltCheck[]): CheckSheet {
-  const sheet = new CheckSheet(startSheetId, "Start");
+function start_sheet(checks: readonly BuiltCheck[]): CheckSheet {
+  const sheet = new CheckSheet(start_sheet_id, "Start");
   sheet.put(0, 0, "Sheetwrite 0.7.0: the open Excel checks in one file", BOLD);
   sheet.put(
     1,
@@ -1505,9 +1511,9 @@ function startSheet(checks: readonly BuiltCheck[]): CheckSheet {
       sheet.put(row, 4, "read by the script");
     }
   });
-  const totalRow = START_TABLE_ROW + checks.length;
-  sheet.put(totalRow, 1, "Total", BOLD);
-  sheet.formula(totalRow, 3, `=SUM(D${START_TABLE_ROW + 1}:D${totalRow})`, BOLD);
+  const total_row = START_TABLE_ROW + checks.length;
+  sheet.put(total_row, 1, "Total", BOLD);
+  sheet.formula(total_row, 3, `=SUM(D${START_TABLE_ROW + 1}:D${total_row})`, BOLD);
   sheet.widths.set(0, WIDE);
   sheet.widths.set(1, WIDE);
   return sheet;
@@ -1519,35 +1525,35 @@ interface Layout {
   readonly query: SavedQuery;
 }
 
-async function layout(sheetwrite: Sheetwrite, afterSteps: boolean): Promise<Layout> {
-  const query = queryCheck();
+async function layout(sheetwrite: Sheetwrite, after_steps: boolean): Promise<Layout> {
+  const query = query_check();
   return {
     checks: [
-      await sortOrderCheck(sheetwrite),
-      sortFormulasCheck(),
-      quickSortCheck(),
-      sortedTableCheck(),
-      sortRangeCheck(),
-      excelRelationshipCheck(),
-      modelPivotCheck(),
+      await sort_order_check(sheetwrite),
+      sort_formulas_check(),
+      quick_sort_check(),
+      sorted_table_check(),
+      sort_range_check(),
+      excel_relationship_check(),
+      model_pivot_check(),
       query.check,
-      textOverflowCheck(),
-      ...linkChecks(),
-      measuresPivotCheck(),
-      measuresModelCheck(),
-      dashboardCheck(),
-      chartLevelsCheck(afterSteps),
-      numberFormatCheck(),
-      pasteSpecialCheck(),
-      autoFillCheck(),
-      groupByBlankKeyCheck(),
-      spillExportCheck(),
+      text_overflow_check(),
+      ...link_checks(),
+      measures_pivot_check(),
+      measures_model_check(),
+      dashboard_check(),
+      chart_levels_check(after_steps),
+      number_format_check(),
+      paste_special_check(),
+      auto_fill_check(),
+      group_by_blank_key_check(),
+      spill_export_check(),
     ],
     query: query.query,
   };
 }
 
-function sheetOrder({ checks }: Layout, start: CheckSheet): SheetSnapshot[] {
+function sheet_order({ checks }: Layout, start: CheckSheet): SheetSnapshot[] {
   const sheets: SheetSnapshot[] = [start.snapshot(0)];
   for (const check of checks) {
     if (check.sheet) sheets.push(check.sheet.snapshot(0));
@@ -1556,11 +1562,11 @@ function sheetOrder({ checks }: Layout, start: CheckSheet): SheetSnapshot[] {
   return sheets.map((sheet, order) => ({ ...sheet, order }));
 }
 
-function workbookSnapshot(built: Layout, start: CheckSheet): WorkbookSnapshot {
+function workbook_snapshot(built: Layout, start: CheckSheet): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     workbook: {
-      activeSheet: startSheetId,
+      activeSheet: start_sheet_id,
       dataModel: {
         relationships: [
           {
@@ -1588,11 +1594,11 @@ function workbookSnapshot(built: Layout, start: CheckSheet): WorkbookSnapshot {
         },
       ],
     },
-    sheets: sheetOrder(built, start),
+    sheets: sheet_order(built, start),
   };
 }
 
-function createGrid(
+function create_grid(
   sheetwrite: Sheetwrite,
   snapshot: WorkbookSnapshot,
 ): { grid: Grid; dispose(): void } {
@@ -1614,13 +1620,13 @@ function createGrid(
  * edits the orders that 12's pivot reads) do not change them; Excel keeps
  * those pivots as plain values.
  */
-async function sheetwriteAnswers(
+async function sheetwrite_answers(
   sheetwrite: Sheetwrite,
   built: Layout,
   start: CheckSheet,
 ): Promise<void> {
-  const scratch = createGrid(sheetwrite, workbookSnapshot(built, start));
-  const readAnswers = (checks: readonly BuiltCheck[]) => {
+  const scratch = create_grid(sheetwrite, workbook_snapshot(built, start));
+  const read_answers = (checks: readonly BuiltCheck[]) => {
     for (const { sheet } of checks) {
       const block = sheet?.result;
       if (!sheet || !block) continue;
@@ -1636,9 +1642,9 @@ async function sheetwriteAnswers(
     }
   };
   try {
-    readAnswers(built.checks.filter((check) => !check.steps));
+    read_answers(built.checks.filter((check) => !check.steps));
     for (const check of built.checks) await check.steps?.(scratch.grid);
-    readAnswers(built.checks.filter((check) => check.steps));
+    read_answers(built.checks.filter((check) => check.steps));
   } finally {
     scratch.dispose();
   }
@@ -1664,9 +1670,9 @@ export async function excelChecksWorkbook(
   options: { afterSteps?: boolean } = {},
 ): Promise<ExcelChecksWorkbook> {
   const built = await layout(sheetwrite, options.afterSteps === true);
-  const start = startSheet(built.checks);
-  await sheetwriteAnswers(sheetwrite, built, start);
-  const final = createGrid(sheetwrite, workbookSnapshot(built, start));
+  const start = start_sheet(built.checks);
+  await sheetwrite_answers(sheetwrite, built, start);
+  const final = create_grid(sheetwrite, workbook_snapshot(built, start));
   try {
     const warnings: string[] = [];
     const bytes = await sheetwrite.core.toXlsxWorkbook(final.grid, {

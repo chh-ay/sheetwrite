@@ -59,7 +59,7 @@ if (typeof globalThis.matchMedia === "undefined") {
 
 /** Call only after disposing a sample's store/grid, never while a grid is live. */
 export async function resetBenchmarkDocument(): Promise<void> {
-  const previousDocument = new WeakRef(document);
+  const previous_document = new WeakRef(document);
   await GlobalRegistrator.unregister();
   GlobalRegistrator.register();
   Object.defineProperty(window, "frameElement", {
@@ -67,7 +67,7 @@ export async function resetBenchmarkDocument(): Promise<void> {
     configurable: true,
     writable: true,
   });
-  if (document === previousDocument.deref()) {
+  if (document === previous_document.deref()) {
     throw new Error("happy-dom failed to replace the benchmark document");
   }
 }

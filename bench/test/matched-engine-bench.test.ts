@@ -17,18 +17,22 @@ const CURRENT_WASM_DIGEST = "d".repeat(64);
 const WASM = (name: string) => `packages/${name}/pkg/sheetwrite_wasm_bg.wasm`;
 
 /** The capture digest is derived, so the fixture recomputes it the way the runner does. */
-function withDigest(capture: MatchedEngineResult): MatchedEngineResult {
-  const { meta, sourceFiles: files, baselineContext } = capture;
-  const bound = { commit: meta.commit, files, ...(baselineContext ? { baselineContext } : {}) };
+function with_digest(capture: MatchedEngineResult): MatchedEngineResult {
+  const { meta, sourceFiles: files, baselineContext: baseline_context } = capture;
+  const bound = {
+    commit: meta.commit,
+    files,
+    ...(baseline_context ? { baselineContext: baseline_context } : {}),
+  };
   const digest = createHash("sha256").update(JSON.stringify(bound)).digest("hex");
   return { ...capture, sourceDigest: digest };
 }
 
 /** The recorded capture, relabelled as an earlier engine measured under this harness. */
-function baselineCapture(): MatchedEngineResult {
+function baseline_capture(): MatchedEngineResult {
   const capture = recorded();
-  const engineFiles: Record<string, string> = {};
-  const currentWasmFiles: Record<string, string> = {};
+  const engine_files: Record<string, string> = {};
+  const current_wasm_files: Record<string, string> = {};
   for (const name of ["wasm", "formulas"]) {
     for (const file of [
       "loader-node.mjs",
@@ -36,24 +40,24 @@ function baselineCapture(): MatchedEngineResult {
       "pkg/sheetwrite_wasm.js",
       "pkg/sheetwrite_wasm_factory.js",
     ]) {
-      engineFiles[`packages/${name}/${file}`] = SOURCE_DIGEST;
+      engine_files[`packages/${name}/${file}`] = SOURCE_DIGEST;
     }
-    engineFiles[WASM(name)] = must(capture.sourceFiles[WASM(name)], WASM(name));
-    currentWasmFiles[WASM(name)] = CURRENT_WASM_DIGEST;
+    engine_files[WASM(name)] = must(capture.sourceFiles[WASM(name)], WASM(name));
+    current_wasm_files[WASM(name)] = CURRENT_WASM_DIGEST;
   }
-  const baselineContext = {
+  const baseline_context = {
     label: "0.5.4 engine (WASM) under 0.6 core and harness",
     engineCommit: BASELINE_COMMIT,
     harnessCommit: capture.meta.commit,
-    engineFiles,
-    currentWasmFiles,
+    engineFiles: engine_files,
+    currentWasmFiles: current_wasm_files,
   };
-  return withDigest({ ...capture, baselineContext });
+  return with_digest({ ...capture, baselineContext: baseline_context });
 }
 
 it("accepts the recorded capture and a baseline engine under a distinct current harness", () => {
   expect(() => validateMatchedEngineResult(recorded())).not.toThrow();
-  expect(() => validateMatchedEngineResult(baselineCapture())).not.toThrow();
+  expect(() => validateMatchedEngineResult(baseline_capture())).not.toThrow();
 });
 
 it("rejects baseline evidence that is not bound to the baseline engine", () => {
@@ -76,11 +80,11 @@ it("rejects baseline evidence that is not bound to the baseline engine", () => {
     [(capture) => Object.assign(context(capture), { root: "/not-portable" }), "context fields"],
   ];
   for (const [edit, error] of cases) {
-    const capture = baselineCapture();
+    const capture = baseline_capture();
     edit(capture);
-    expect(() => validateMatchedEngineResult(withDigest(capture)), String(error)).toThrow(error);
+    expect(() => validateMatchedEngineResult(with_digest(capture)), String(error)).toThrow(error);
   }
-  const unbound = baselineCapture();
+  const unbound = baseline_capture();
   context(unbound).engineCommit = "f".repeat(40);
   expect(() => validateMatchedEngineResult(unbound)).toThrow("Matched source digest mismatch");
 });

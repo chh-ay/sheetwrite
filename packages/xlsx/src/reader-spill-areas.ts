@@ -6,18 +6,18 @@ const WORD_BITS = 32;
 const LAST_BIT = WORD_BITS - 1;
 
 /** The highest set bit of `word` at or below bit `bit`, or -1. */
-function highestBitAtOrBelow(word: number, bit: number): number {
+function highest_bit_at_or_below(word: number, bit: number): number {
   const masked = word & (0xffff_ffff >>> (LAST_BIT - bit));
   return masked === 0 ? -1 : LAST_BIT - Math.clz32(masked);
 }
 
 /** The highest set bit at or below `index` in the bitset `words`, scanning word by word, or -1. */
-function previousBit(words: Uint32Array, index: number): number {
+function previous_bit(words: Uint32Array, index: number): number {
   let word = index >>> 5;
-  let found = highestBitAtOrBelow(words[word] ?? 0, index & LAST_BIT);
+  let found = highest_bit_at_or_below(words[word] ?? 0, index & LAST_BIT);
   while (found < 0 && word > 0) {
     word -= 1;
-    found = highestBitAtOrBelow(words[word] ?? 0, LAST_BIT);
+    found = highest_bit_at_or_below(words[word] ?? 0, LAST_BIT);
   }
   return found < 0 ? -1 : word * WORD_BITS + found;
 }
@@ -33,13 +33,13 @@ function previousBit(words: Uint32Array, index: number): number {
  */
 export class SpillAreas {
   /** Each active area, at its first column. */
-  readonly #byStart: (CellRect | undefined)[] = [];
+  readonly #by_start: (CellRect | undefined)[] = [];
   /** Bit `c` is set when an active area starts at column `c`. */
   readonly #starts: Uint32Array;
   /** Bit `w` is set when word `w` of `#starts` is not zero. */
   readonly #words: Uint32Array;
   /** The last column `#starts` can hold. */
-  readonly #lastColumn: number;
+  readonly #last_column: number;
   /** Active areas as a binary min-heap on their last row. */
   readonly #ends: CellRect[] = [];
 
@@ -49,15 +49,15 @@ export class SpillAreas {
     const words = Math.ceil(capacity / WORD_BITS);
     this.#starts = new Uint32Array(words);
     this.#words = new Uint32Array(Math.ceil(words / WORD_BITS));
-    this.#lastColumn = capacity - 1;
+    this.#last_column = capacity - 1;
   }
 
   /** Drop the areas that end above `row`. */
   expire(row: number): void {
     for (let top = this.#ends[0]; top !== undefined && top.r1 < row; top = this.#ends[0]) {
       this.#pop();
-      if (this.#byStart[top.c0] === top) {
-        this.#byStart[top.c0] = undefined;
+      if (this.#by_start[top.c0] === top) {
+        this.#by_start[top.c0] = undefined;
         this.#clear(top.c0);
       }
     }
@@ -65,7 +65,7 @@ export class SpillAreas {
 
   /** Whether an active area covers the cell at `row`, `col`, other than its formula's own cell. */
   covers(row: number, col: number): boolean {
-    const area = this.#areaAtOrBefore(col);
+    const area = this.#area_at_or_before(col);
     return (
       area !== undefined &&
       col <= area.c1 &&
@@ -81,24 +81,24 @@ export class SpillAreas {
    * active area.
    */
   add(area: CellRect): boolean {
-    const before = this.#areaAtOrBefore(area.c1);
+    const before = this.#area_at_or_before(area.c1);
     if (before !== undefined && before.c1 >= area.c0) return false;
-    this.#byStart[area.c0] = area;
+    this.#by_start[area.c0] = area;
     this.#set(area.c0);
     this.#push(area);
     return true;
   }
 
   /** The active area that starts last at or before `col`. */
-  #areaAtOrBefore(col: number): CellRect | undefined {
-    const column = Math.min(col, this.#lastColumn);
+  #area_at_or_before(col: number): CellRect | undefined {
+    const column = Math.min(col, this.#last_column);
     const word = column >>> 5;
-    const own = highestBitAtOrBelow(this.#starts[word] ?? 0, column & LAST_BIT);
-    if (own >= 0) return this.#byStart[word * WORD_BITS + own];
-    const previous = word === 0 ? -1 : previousBit(this.#words, word - 1);
+    const own = highest_bit_at_or_below(this.#starts[word] ?? 0, column & LAST_BIT);
+    if (own >= 0) return this.#by_start[word * WORD_BITS + own];
+    const previous = word === 0 ? -1 : previous_bit(this.#words, word - 1);
     if (previous < 0) return undefined;
-    const bit = highestBitAtOrBelow(this.#starts[previous] ?? 0, LAST_BIT);
-    return this.#byStart[previous * WORD_BITS + bit];
+    const bit = highest_bit_at_or_below(this.#starts[previous] ?? 0, LAST_BIT);
+    return this.#by_start[previous * WORD_BITS + bit];
   }
 
   #set(col: number): void {
@@ -140,11 +140,11 @@ export class SpillAreas {
     for (;;) {
       const left = ends[index * 2 + 1];
       const right = ends[index * 2 + 2];
-      const childIndex = right !== undefined && left !== undefined && right.r1 < left.r1 ? 2 : 1;
-      const child = ends[index * 2 + childIndex];
+      const child_index = right !== undefined && left !== undefined && right.r1 < left.r1 ? 2 : 1;
+      const child = ends[index * 2 + child_index];
       if (child === undefined || child.r1 >= last.r1) break;
       ends[index] = child;
-      index = index * 2 + childIndex;
+      index = index * 2 + child_index;
     }
     ends[index] = last;
   }

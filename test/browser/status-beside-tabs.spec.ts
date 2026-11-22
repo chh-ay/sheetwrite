@@ -32,9 +32,9 @@ test("the tabs give way to half the row, then the status drops parts, Sum last",
     }
     grid?.setActiveSheet("sales");
   });
-  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
-  await nameBox.fill("A1:G50");
-  await nameBox.press("Enter");
+  const name_box = page.getByRole("textbox", { name: "Cell reference" });
+  await name_box.fill("A1:G50");
+  await name_box.press("Enter");
   await expect(page.locator(".sheetwrite-shell-status")).toContainText("Sum:");
 
   const problems: string[] = [];
@@ -44,22 +44,22 @@ test("the tabs give way to half the row, then the status drops parts, Sum last",
     await nextFrames(page);
     const layout = await page.evaluate(() => {
       const element = (selector: string) => document.querySelector<HTMLElement>(selector);
-      const rowElement = element(".sheetwrite-shell-bottom-row");
+      const row_element = element(".sheetwrite-shell-bottom-row");
       const tabs = element(".sheetwrite-shell-tabs");
-      const statusElement = element(".sheetwrite-shell-status");
+      const status_element = element(".sheetwrite-shell-status");
       const mode = element(".sheetwrite-shell-mode")?.getBoundingClientRect();
-      if (!rowElement || !tabs || !statusElement || !mode) return null;
-      const row = rowElement.getBoundingClientRect();
-      const rowStyle = getComputedStyle(rowElement);
-      const rowContent =
-        rowElement.clientWidth -
-        Number.parseFloat(rowStyle.paddingLeft) -
-        Number.parseFloat(rowStyle.paddingRight);
-      const tabsBox = tabs.getBoundingClientRect();
-      const status = statusElement.getBoundingClientRect();
+      if (!row_element || !tabs || !status_element || !mode) return null;
+      const row = row_element.getBoundingClientRect();
+      const row_style = getComputedStyle(row_element);
+      const row_content =
+        row_element.clientWidth -
+        Number.parseFloat(row_style.paddingLeft) -
+        Number.parseFloat(row_style.paddingRight);
+      const tabs_box = tabs.getBoundingClientRect();
+      const status = status_element.getBoundingClientRect();
       const parts = element(".sheetwrite-shell-status-parts");
       // The drawn text; the screen-reader copy of the line does not count.
-      const drawn = [...statusElement.querySelectorAll("span")]
+      const drawn = [...status_element.querySelectorAll("span")]
         .filter(
           (span) =>
             span.childElementCount === 0 &&
@@ -69,12 +69,12 @@ test("the tabs give way to half the row, then the status drops parts, Sum last",
         .map((span) => span.textContent ?? "")
         .join(" ");
       return {
-        overlap: tabsBox.right - status.left,
+        overlap: tabs_box.right - status.left,
         outOfRow: status.right - row.right,
         modeCut: mode.right > status.right + 0.5,
         partCut: parts !== null && parts.scrollWidth > parts.clientWidth,
         tabsWidth: tabs.clientWidth,
-        tabsFloor: Math.min(tabs.scrollWidth, rowContent / 2),
+        tabsFloor: Math.min(tabs.scrollWidth, row_content / 2),
         sum: drawn.includes("Sum:"),
         average: drawn.includes("Average:"),
         count: drawn.includes("Count:"),

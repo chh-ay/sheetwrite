@@ -7,7 +7,7 @@ const ENGINE_RELOAD_KEY = "sheetwrite:formulas-engine-reload";
 const STYLES_WAIT_CAP_MS = 3_000;
 
 /** Core's one engine-selection conflict; wrapped errors keep the original as `cause`. */
-function isEngineConflict(error: unknown): boolean {
+function is_engine_conflict(error: unknown): boolean {
   for (let current = error; current instanceof Error; current = current.cause) {
     if (current.message.includes("the engine cannot change")) return true;
   }
@@ -27,7 +27,7 @@ export async function initFullEngine(): Promise<boolean> {
   try {
     await initSheetwrite({ engine: formulas });
   } catch (cause) {
-    if (isEngineConflict(cause) && !sessionStorage.getItem(ENGINE_RELOAD_KEY)) {
+    if (is_engine_conflict(cause) && !sessionStorage.getItem(ENGINE_RELOAD_KEY)) {
       sessionStorage.setItem(ENGINE_RELOAD_KEY, "1");
       location.reload();
       return false;

@@ -41,7 +41,7 @@ type EngineId = (typeof ENGINES)[number];
 const MATCHED_MINIMUM_SAMPLE_MS = SAMPLE_AGGREGATE_MS;
 const MATCHED_WARMUP_FIXTURES = SAMPLE_WARMUP_FIXTURES;
 /** Protocol description of one capture; the round count is part of the protocol. */
-function matchedMethod(rounds: number): string {
+function matched_method(rounds: number): string {
   return `${rounds} ABAB paired rounds per workload; each timed sample uses a fresh Bun process, runs ${MATCHED_WARMUP_FIXTURES} untimed warm-up fixtures, then repeats the fixture until at least ${MATCHED_MINIMUM_SAMPLE_MS} ms of measured time and records the per-iteration mean`;
 }
 const SOURCE_PATHS = [
@@ -87,7 +87,7 @@ const SAMPLE_MEAN_TOLERANCE_MS = 1e-6;
 function hash(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
-function sourceDigest(
+function source_digest(
   result: Pick<MatchedEngineResult, "meta" | "sourceFiles" | "baselineContext">,
 ): string {
   return hash(
@@ -98,10 +98,10 @@ function sourceDigest(
     }),
   );
 }
-function workloadKey(workload: { id: string; size: number }): string {
+function workload_key(workload: { id: string; size: number }): string {
   return `${workload.id}:${workload.size}`;
 }
-function rowSamples(samples: readonly MatchedSample[], engine: EngineId): number[] {
+function row_samples(samples: readonly MatchedSample[], engine: EngineId): number[] {
   return samples
     .filter((sample) => sample.engine === engine)
     .map((sample) => {
@@ -116,7 +116,7 @@ function rowSamples(samples: readonly MatchedSample[], engine: EngineId): number
  * untimed warm-up fixtures, at least the declared floor of measured time, and a
  * per-iteration mean that matches its own total and iteration count.
  */
-function validateAggregatedSample(sample: MatchedSample, label: string): void {
+function validate_aggregated_sample(sample: MatchedSample, label: string): void {
   if (
     sample.warmupFixtures !== MATCHED_WARMUP_FIXTURES ||
     !Number.isInteger(sample.iterations) ||
@@ -127,10 +127,10 @@ function validateAggregatedSample(sample: MatchedSample, label: string): void {
   ) {
     throw new Error(`${label}: sample is not an aggregate of the declared matched protocol`);
   }
-  const observedMean = sample.samplesMs[0];
+  const observed_mean = sample.samplesMs[0];
   if (
-    observedMean === undefined ||
-    Math.abs(observedMean - sample.totalMs / sample.iterations) > SAMPLE_MEAN_TOLERANCE_MS
+    observed_mean === undefined ||
+    Math.abs(observed_mean - sample.totalMs / sample.iterations) > SAMPLE_MEAN_TOLERANCE_MS
   ) {
     throw new Error(`${label}: sample mean does not match its total and iteration count`);
   }
@@ -141,7 +141,7 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
     result.schemaVersion !== 2 ||
     !Number.isInteger(result.rounds) ||
     result.rounds < MINIMUM_ROUNDS ||
-    result.method !== matchedMethod(result.rounds) ||
+    result.method !== matched_method(result.rounds) ||
     result.minimumSampleDurationMs !== MATCHED_MINIMUM_SAMPLE_MS ||
     result.warmupFixtures !== MATCHED_WARMUP_FIXTURES ||
     result.runner.concurrency !== 1
@@ -164,7 +164,7 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
   );
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
-    result.sourceDigest !== sourceDigest(result)
+    result.sourceDigest !== source_digest(result)
   )
     throw new Error("Matched source digest mismatch");
   if (result.baselineContext !== undefined) {
@@ -177,8 +177,8 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
   }
   validateExactMatrix(
     "matched workloads",
-    MATCHED_ENGINE_WORKLOADS.map(workloadKey),
-    result.rows.map(workloadKey),
+    MATCHED_ENGINE_WORKLOADS.map(workload_key),
+    result.rows.map(workload_key),
   );
   for (const row of result.rows) {
     if (row.samples.length !== result.rounds * ENGINES.length)
@@ -193,7 +193,10 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
         sample.allocationSamples.length !== 1
       )
         throw new Error("Matched sample order or identity mismatch");
-      validateAggregatedSample(sample, `matched sample ${workloadKey(row)} round ${sample.round}`);
+      validate_aggregated_sample(
+        sample,
+        `matched sample ${workload_key(row)} round ${sample.round}`,
+      );
       validateRawStat(sample.samplesMs, sample.stat, "matched timing");
       const expected = expectedFormulaOutput(row.id, row.size);
       if (sample.output !== expected) throw new Error("Matched checksum mismatch");
@@ -208,15 +211,15 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
         validateRawStat(allocations, sample.allocationStat[field], "matched allocation");
       }
     }
-    const defaultSamples = rowSamples(row.samples, "default");
-    const fullSamples = rowSamples(row.samples, "full");
-    const ratios = defaultSamples.map((duration, index) => {
-      const fullDuration = fullSamples[index];
-      if (fullDuration === undefined) throw new Error("Missing paired full sample");
-      return fullDuration / duration;
+    const default_samples = row_samples(row.samples, "default");
+    const full_samples = row_samples(row.samples, "full");
+    const ratios = default_samples.map((duration, index) => {
+      const full_duration = full_samples[index];
+      if (full_duration === undefined) throw new Error("Missing paired full sample");
+      return full_duration / duration;
     });
-    validateRawStat(defaultSamples, row.defaultStat, "matched default summary");
-    validateRawStat(fullSamples, row.fullStat, "matched full summary");
+    validateRawStat(default_samples, row.defaultStat, "matched default summary");
+    validateRawStat(full_samples, row.fullStat, "matched full summary");
     validateRawStat(ratios, row.ratioStat, "matched ratio summary");
     if (row.ratioP10 !== quantile(ratios, 0.1) || row.ratioP90 !== quantile(ratios, 0.9))
       throw new Error("Matched spread does not match samples");
@@ -228,7 +231,10 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
  * the child's warm-up fixtures and aggregation remove the per-process cold-run
  * bias that made single short runs unusable.
  */
-function runMatchedSample(workload: { id: string; size: number }, engine: EngineId): MatchedSample {
+function run_matched_sample(
+  workload: { id: string; size: number },
+  engine: EngineId,
+): MatchedSample {
   const child = Bun.spawnSync(
     [
       "bun",
@@ -253,35 +259,35 @@ function runMatchedSample(workload: { id: string; size: number }, engine: Engine
   return JSON.parse(child.stdout.toString()) as MatchedSample;
 }
 
-async function captureMatchedEngines(rounds: number, resultsDir: string): Promise<void> {
+async function capture_matched_engines(rounds: number, results_dir: string): Promise<void> {
   const meta = protocolCaptureMeta();
-  const baselineContext = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
+  const baseline_context = captureEngineBaselineContext(meta.commit, ["wasm", "formulas"]);
   const rows: MatchedEngineRow[] = [];
   for (const workload of MATCHED_ENGINE_WORKLOADS) {
     const samples: MatchedSample[] = [];
     for (let round = 0; round < rounds; round++) {
       for (const engine of ENGINES) {
-        samples.push({ ...runMatchedSample(workload, engine), engine, round });
+        samples.push({ ...run_matched_sample(workload, engine), engine, round });
       }
     }
-    const defaultSamples = rowSamples(samples, "default");
-    const fullSamples = rowSamples(samples, "full");
-    const ratios = defaultSamples.map((duration, index) => {
-      const fullDuration = fullSamples[index];
-      if (fullDuration === undefined) throw new Error("Missing paired full sample");
-      return fullDuration / duration;
+    const default_samples = row_samples(samples, "default");
+    const full_samples = row_samples(samples, "full");
+    const ratios = default_samples.map((duration, index) => {
+      const full_duration = full_samples[index];
+      if (full_duration === undefined) throw new Error("Missing paired full sample");
+      return full_duration / duration;
     });
     rows.push({
       ...workload,
       samples,
-      defaultStat: summarize(defaultSamples),
-      fullStat: summarize(fullSamples),
+      defaultStat: summarize(default_samples),
+      fullStat: summarize(full_samples),
       ratioStat: summarize(ratios),
       ratioP10: quantile(ratios, 0.1),
       ratioP90: quantile(ratios, 0.9),
     });
   }
-  const sourceFiles = Object.fromEntries(
+  const source_files = Object.fromEntries(
     SOURCE_PATHS.map((path) => [
       path,
       hash(
@@ -303,28 +309,32 @@ async function captureMatchedEngines(rounds: number, resultsDir: string): Promis
       arch: process.arch,
       concurrency: 1,
     },
-    method: matchedMethod(rounds),
+    method: matched_method(rounds),
     rounds,
     minimumSampleDurationMs: MATCHED_MINIMUM_SAMPLE_MS,
     warmupFixtures: MATCHED_WARMUP_FIXTURES,
-    sourceFiles,
-    ...(baselineContext === undefined ? {} : { baselineContext }),
-    sourceDigest: sourceDigest({ meta, sourceFiles, baselineContext }),
+    sourceFiles: source_files,
+    ...(baseline_context === undefined ? {} : { baselineContext: baseline_context }),
+    sourceDigest: source_digest({
+      meta,
+      sourceFiles: source_files,
+      baselineContext: baseline_context,
+    }),
     rows,
   };
   validateMatchedEngineResult(result);
   await Bun.write(
-    resolve(resultsDir, "full-engine-matched-results.json"),
+    resolve(results_dir, "full-engine-matched-results.json"),
     `${JSON.stringify(result, null, 2)}\n`,
   );
 }
 
 if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  const roundsText = optionValue(args, "--rounds");
-  const rounds = roundsText === undefined ? DEFAULT_ROUNDS : Number(roundsText);
+  const rounds_text = optionValue(args, "--rounds");
+  const rounds = rounds_text === undefined ? DEFAULT_ROUNDS : Number(rounds_text);
   if (!Number.isInteger(rounds) || rounds < MINIMUM_ROUNDS) {
     throw new TypeError(`--rounds must be an integer >= ${MINIMUM_ROUNDS}`);
   }
-  await captureMatchedEngines(rounds, resultsDirectory(args));
+  await capture_matched_engines(rounds, resultsDirectory(args));
 }

@@ -8,15 +8,17 @@ const PART = "xl/test.xml";
 
 type Parser = (xml: string, maxXmlTextBytes?: number) => Promise<XmlElement>;
 
-function context(maxXmlTextBytes?: number) {
+function context(max_xml_text_bytes?: number) {
   return createCodecContext(
     "import",
-    maxXmlTextBytes === undefined ? undefined : { resourceLimits: { maxXmlTextBytes } },
+    max_xml_text_bytes === undefined
+      ? undefined
+      : { resourceLimits: { maxXmlTextBytes: max_xml_text_bytes } },
   );
 }
 
 /** One byte per chunk, so chunk ends fall inside characters, entities and tags. */
-async function* byteChunks(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
+async function* byte_chunks(bytes: Uint8Array): AsyncGenerator<Uint8Array> {
   for (let index = 0; index < bytes.length; index++) yield bytes.subarray(index, index + 1);
 }
 
@@ -25,7 +27,7 @@ const parsers: [name: string, parse: Parser][] = [
   [
     "parseXmlChunks",
     (xml, limit) =>
-      parseXmlChunks(byteChunks(ENCODER.encode(xml)), PART, context(limit), {
+      parseXmlChunks(byte_chunks(ENCODER.encode(xml)), PART, context(limit), {
         parent: "none",
         parentIsRoot: true,
         child: () => {},

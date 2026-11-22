@@ -30,10 +30,10 @@ export function displayText(element: XmlElement): string {
   if (xmlLocalName(element.name) === "t") return decodeXstring(element.text);
   let text = "";
   for (const child of element.children) {
-    const localName = xmlLocalName(child.name);
-    if (localName === "t") text += decodeXstring(child.text);
-    else if (localName === "r") {
-      for (const runText of xmlChildren(child, "t")) text += decodeXstring(runText.text);
+    const local_name = xmlLocalName(child.name);
+    if (local_name === "t") text += decodeXstring(child.text);
+    else if (local_name === "r") {
+      for (const run_text of xmlChildren(child, "t")) text += decodeXstring(run_text.text);
     }
   }
   return text;
@@ -58,21 +58,21 @@ export function parseSharedStrings(
 ): string[] {
   if (!part) return [];
   const strings: string[] = [];
-  let warnedRichText = false;
-  let warnedPhonetic = false;
-  const processItem = (item: XmlElement): void => {
+  let warned_rich_text = false;
+  let warned_phonetic = false;
+  const process_item = (item: XmlElement): void => {
     assertResource(context, "maxSharedStrings", strings.length + 1);
-    const richRuns = xmlChildren(item, "r");
-    if (richRuns.length > 0 && !warnedRichText) {
-      warnedRichText = true;
+    const rich_runs = xmlChildren(item, "r");
+    if (rich_runs.length > 0 && !warned_rich_text) {
+      warned_rich_text = true;
       emitWarning(context, {
         code: "rich-text",
         message: "Rich text formatting was flattened",
         part,
       });
     }
-    if (!warnedPhonetic && (xmlChildren(item, "rPh").length > 0 || xmlChild(item, "phoneticPr"))) {
-      warnedPhonetic = true;
+    if (!warned_phonetic && (xmlChildren(item, "rPh").length > 0 || xmlChild(item, "phoneticPr"))) {
+      warned_phonetic = true;
       emitWarning(context, {
         code: "rich-text",
         message: "Phonetic guide text was omitted from the displayed shared string",
@@ -85,10 +85,10 @@ export function parseSharedStrings(
   const root = parseXml(packageFile.read(name), name, context, {
     parent: "sst",
     parentIsRoot: true,
-    shouldStream: (rootElement) => xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
+    shouldStream: (root_element) => xmlRootMatches(root_element, "sst", MAIN_NAMESPACES),
     // The tree path reads only `si` children; other children are skipped alike.
     child: (item) => {
-      if (xmlLocalName(item.name) === "si") processItem(item);
+      if (xmlLocalName(item.name) === "si") process_item(item);
     },
   });
   assertXmlRoot(root, "sst", MAIN_NAMESPACES, part);
@@ -105,7 +105,7 @@ export function literalFromCell(
   address: string,
   date1904: boolean,
 ): CellValue | null {
-  const valueText = xmlChild(cell, "v")?.text ?? "";
+  const value_text = xmlChild(cell, "v")?.text ?? "";
   if (type === "inlineStr") {
     const inline = xmlChild(cell, "is") ?? cell;
     if (xmlChild(inline, "r")) {
@@ -127,17 +127,18 @@ export function literalFromCell(
     return { kind: "literal", value: displayText(inline) };
   }
   if (type === "s") {
-    const index = parseUnsigned(valueText, `shared string index at ${address}`);
+    const index = parseUnsigned(value_text, `shared string index at ${address}`);
     const value = sharedStrings[index];
     if (value === undefined)
       return readerFailure(`shared string index ${index} at ${address} is out of range`);
     return { kind: "literal", value };
   }
-  if (type === "str") return { kind: "literal", value: decodeXstring(valueText) };
+  if (type === "str") return { kind: "literal", value: decodeXstring(value_text) };
   if (type === "b")
-    return { kind: "literal", value: valueText === "1" || valueText.toLowerCase() === "true" };
+    return { kind: "literal", value: value_text === "1" || value_text.toLowerCase() === "true" };
   if (type === "d") {
-    const serial = isoDateSerial(valueText) ?? readerFailure(`date value at ${address} is invalid`);
+    const serial =
+      isoDateSerial(value_text) ?? readerFailure(`date value at ${address} is invalid`);
     return { kind: "literal", value: serial };
   }
   if (type === "e") {
@@ -147,10 +148,10 @@ export function literalFromCell(
       sheet,
       cell: address,
     });
-    return { kind: "literal", value: valueText };
+    return { kind: "literal", value: value_text };
   }
-  if (valueText === "") return style.style ? { kind: "literal", value: null } : null;
-  const number = Number(valueText);
+  if (value_text === "") return style.style ? { kind: "literal", value: null } : null;
+  const number = Number(value_text);
   if (!Number.isFinite(number)) return readerFailure(`numeric value at ${address} is invalid`);
   return { kind: "literal", value: style.date && date1904 ? number + 1462 : number };
 }

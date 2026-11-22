@@ -27,12 +27,12 @@ import { extractFigureAssets, perfFigure } from "./perf-figures.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
-function apiExport(
+function api_export(
   name: string,
   kind: string,
   signature: string,
   documentation = `${name} summary.`,
-  memberDocs: ApiExport["memberDocs"] = [],
+  member_docs: ApiExport["memberDocs"] = [],
 ): ApiExport {
   return {
     name,
@@ -42,11 +42,11 @@ function apiExport(
     source: "src/index.ts#L1",
     jsDocTags: [],
     documentation,
-    memberDocs,
+    memberDocs: member_docs,
   };
 }
 
-function entryPoint(subpath: string, exports: ApiExport[]): ApiEntryPoint {
+function entry_point(subpath: string, exports: ApiExport[]): ApiEntryPoint {
   return {
     subpath,
     target: "./dist/index.d.ts",
@@ -57,7 +57,7 @@ function entryPoint(subpath: string, exports: ApiExport[]): ApiEntryPoint {
   };
 }
 
-function exportNamed(entry: ApiEntryPoint, name: string): ApiExport {
+function export_named(entry: ApiEntryPoint, name: string): ApiExport {
   const found = entry.exports.find((item) => item.name === name);
   if (found === undefined) throw new Error(`fixture has no export ${name}`);
   return found;
@@ -67,8 +67,8 @@ function section(page: string, pattern: RegExp): string {
   return pattern.exec(page)?.[0] ?? "";
 }
 
-const coreEntry = entryPoint(".", [
-  apiExport(
+const core_entry = entry_point(".", [
+  api_export(
     "Grid",
     "interface",
     'interface Grid { applyTransaction(tx: unknown): unknown; rendererKind(): "canvas" | "worker"; parse(x: string): number; parse(x: number): number; }',
@@ -80,8 +80,8 @@ const coreEntry = entryPoint(".", [
       },
     ],
   ),
-  apiExport("CommitReason", "type", 'type CommitReason = "api" | "edit-enter";'),
-  apiExport(
+  api_export("CommitReason", "type", 'type CommitReason = "api" | "edit-enter";'),
+  api_export(
     "ChangeEvent",
     "interface",
     "interface ChangeEvent { commitReason: CommitReason; }",
@@ -94,40 +94,40 @@ const coreEntry = entryPoint(".", [
     ],
   ),
 ]);
-const corePackage: ApiPackage = { name: "@sheetwrite/core", entryPoints: [coreEntry] };
+const core_package: ApiPackage = { name: "@sheetwrite/core", entryPoints: [core_entry] };
 
 describe("API reference pages", () => {
   it("links symbols and gives every member and overload row a unique anchor", async () => {
-    const symbolPage = await renderSymbolPage(
-      corePackage,
-      coreEntry,
-      exportNamed(coreEntry, "Grid"),
+    const symbol_page = await renderSymbolPage(
+      core_package,
+      core_entry,
+      export_named(core_entry, "Grid"),
     );
-    expect(renderEntryPage(corePackage, coreEntry)).toContain('href="/docs/api/core/grid/"');
+    expect(renderEntryPage(core_package, core_entry)).toContain('href="/docs/api/core/grid/"');
 
-    const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
+    const anchors = [...symbol_page.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
     expect(new Set(anchors).size).toBe(anchors.length);
     expect(anchors).toEqual(expect.arrayContaining(["applytransaction", "rendererkind"]));
     const members = [
-      ...symbolPage.matchAll(/<article class="api-card api-member" id="([^"]+)"/gu),
+      ...symbol_page.matchAll(/<article class="api-card api-member" id="([^"]+)"/gu),
     ].map((match) => match[1]);
     expect(members.filter((id) => id?.startsWith("grid-parse"))).toHaveLength(2);
     expect(members).toContain("grid-parse");
-    expect(symbolPage).toContain("Bypasses history.");
-    expect(symbolPage).toContain('<a href="/docs/api/core/grid/"><code>Grid</code></a>');
-    const changeEventPage = await renderSymbolPage(
-      corePackage,
-      coreEntry,
-      exportNamed(coreEntry, "ChangeEvent"),
+    expect(symbol_page).toContain("Bypasses history.");
+    expect(symbol_page).toContain('<a href="/docs/api/core/grid/"><code>Grid</code></a>');
+    const change_event_page = await renderSymbolPage(
+      core_package,
+      core_entry,
+      export_named(core_entry, "ChangeEvent"),
     );
-    expect(changeEventPage).toContain(
+    expect(change_event_page).toContain(
       '<a href="/docs/api/core/commit-reason/"><code>CommitReason</code></a>',
     );
   });
 
   it("renders examples and related links on symbols and member rows", async () => {
     const grid: ApiExport = {
-      ...exportNamed(coreEntry, "Grid"),
+      ...export_named(core_entry, "Grid"),
       documentation: [
         "Imperative grid handle.",
         "@example",
@@ -151,8 +151,8 @@ describe("API reference pages", () => {
         },
       ],
     };
-    const entry = entryPoint(".", [grid, ...coreEntry.exports.slice(1)]);
-    const pkg = { ...corePackage, entryPoints: [entry] };
+    const entry = entry_point(".", [grid, ...core_entry.exports.slice(1)]);
+    const pkg = { ...core_package, entryPoints: [entry] };
     const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
 
     const page = await renderSymbolPage(pkg, entry, grid, routes);
@@ -177,23 +177,23 @@ describe("API reference pages", () => {
   });
 
   it("lists members, parameters and return values the reference shows without a description", async () => {
-    const shape = apiExport(
+    const shape = api_export(
       "CountShape",
       "interface",
       "interface CountShape {\n  documented: number;\n  bare: string;\n  call(x: number): void;\n  call(x: string): void;\n}",
       "CountShape summary.",
       [{ name: "documented", documentation: "Has docs." }],
     );
-    const make = apiExport(
+    const make = api_export(
       "makeThing",
       "function",
       "(shape: CountShape, size: number, label?: string): number",
       "Makes a thing.\n@param size - How big.",
     );
-    const run = apiExport("runThing", "function", "(): Promise<void>", "Runs a thing.");
-    const entry = entryPoint(".", [shape, make, run]);
+    const run = api_export("runThing", "function", "(): Promise<void>", "Runs a thing.");
+    const entry = entry_point(".", [shape, make, run]);
     // A re-export from a second entry point counts once.
-    const adapter = entryPoint("./adapter", [make]);
+    const adapter = entry_point("./adapter", [make]);
     const manifest: PublicApiManifest = {
       formatVersion: 2,
       packages: [{ name: "@sheetwrite/core", entryPoints: [entry, adapter] }],
@@ -210,18 +210,18 @@ describe("API reference pages", () => {
         returns: ["makeThing"],
       },
     ]);
-    const runPage = await renderSymbolPage(manifest.packages[0]!, entry, run);
-    expect(runPage).not.toContain("## Returns");
+    const run_page = await renderSymbolPage(manifest.packages[0]!, entry, run);
+    expect(run_page).not.toContain("## Returns");
   });
 
   it("shows @throws on function pages and param, returns and throws as lines on member cards", async () => {
-    const resolve = apiExport(
+    const resolve = api_export(
       "resolveLimits",
       "function",
       "(overrides?: object): object",
       "Merge limits.\n@param overrides Limits to change.\n@returns A frozen copy.\n@throws SheetwriteError with code `invalid-limits` when a value is negative.",
     );
-    const backend = apiExport(
+    const backend = api_export(
       "Backend",
       "interface",
       "interface Backend {\n  write(workbook: object): Promise<Uint8Array>;\n}",
@@ -234,7 +234,7 @@ describe("API reference pages", () => {
         },
       ],
     );
-    const entry = entryPoint(".", [resolve, backend]);
+    const entry = entry_point(".", [resolve, backend]);
     const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
     const page = await renderSymbolPage(pkg, entry, resolve);
     expect(section(page, /## Throws[\s\S]*?<\/div>\n/)).toContain(
@@ -253,28 +253,28 @@ describe("API reference pages", () => {
   });
 
   it("leaves wasm-bindgen glue off the count: InitOutput's members, and free() on generated classes", async () => {
-    const output = apiExport(
+    const output = api_export(
       "InitOutput",
       "interface",
       "interface InitOutput {\n  readonly memory: WebAssembly.Memory;\n  readonly cellstore_new: () => number;\n}",
     );
     const generated = {
-      ...apiExport("CellOut", "class", "class CellOut {\n  free(): void;\n}"),
+      ...api_export("CellOut", "class", "class CellOut {\n  free(): void;\n}"),
       source: "pkg/sheetwrite_wasm.d.ts#L7",
     };
-    const entry = entryPoint(".", [output, generated]);
+    const entry = entry_point(".", [output, generated]);
     const pkg: ApiPackage = { name: "@sheetwrite/wasm", entryPoints: [entry] };
     const page = await renderSymbolPage(pkg, entry, output);
     expect(page).not.toContain("## Members");
     // The declaration still shows the whole type.
     expect(page).toContain("cellstore_new");
-    const generatedPage = await renderSymbolPage(pkg, entry, generated);
-    expect(generatedPage).toContain("Releases the object's WASM memory");
+    const generated_page = await renderSymbolPage(pkg, entry, generated);
+    expect(generated_page).toContain("Releases the object's WASM memory");
     // wasm-bindgen writes the source file at build time; the repository has no copy.
-    expect(generatedPage).toContain(
+    expect(generated_page).toContain(
       "<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L7</code> (generated at build time)</dd></div>",
     );
-    expect(generatedPage).not.toContain("blob/develop/packages/wasm/pkg/");
+    expect(generated_page).not.toContain("blob/develop/packages/wasm/pkg/");
     expect(undocumentedApi({ formatVersion: 2, packages: [pkg] })).toEqual([
       { packageName: "@sheetwrite/wasm", members: [], parameters: [], returns: [] },
     ]);
@@ -297,27 +297,28 @@ describe("API reference pages", () => {
   });
 
   it("links Source to a file in the repository, never to build output", async () => {
-    const chartAnchor: ApiExport = {
-      ...apiExport("ChartAnchor", "interface", "interface ChartAnchor { row: number; }"),
+    const chart_anchor: ApiExport = {
+      ...api_export("ChartAnchor", "interface", "interface ChartAnchor { row: number; }"),
       // A re-export resolves to the declaration file of the package it comes from.
       source: "../core/dist/types/chart.d.ts#L7",
     };
-    const chartsEntry = entryPoint(".", [chartAnchor]);
-    const chartsPage = await renderSymbolPage(
-      { name: "@sheetwrite/charts", entryPoints: [chartsEntry] },
-      chartsEntry,
-      chartAnchor,
+    const charts_entry = entry_point(".", [chart_anchor]);
+    const charts_page = await renderSymbolPage(
+      { name: "@sheetwrite/charts", entryPoints: [charts_entry] },
+      charts_entry,
+      chart_anchor,
     );
     // The link names the line that declares the symbol in the repository source.
-    const chartSource = await readFile(
+    const chart_source = await readFile(
       resolve(import.meta.dir, "../packages/core/src/types/chart.ts"),
       "utf8",
     );
     const line =
-      chartSource.split("\n").findIndex((text) => text.startsWith("export interface ChartAnchor")) +
-      1;
+      chart_source
+        .split("\n")
+        .findIndex((text) => text.startsWith("export interface ChartAnchor")) + 1;
     expect(line).toBeGreaterThan(0);
-    expect(chartsPage).toContain(
+    expect(charts_page).toContain(
       `<a href="https://github.com/chh-ay/sheetwrite/blob/develop/packages/core/src/types/chart.ts#L${line}"><code>packages/core/src/types/chart.ts#L${line}</code></a>`,
     );
   });
@@ -370,10 +371,10 @@ describe("documentation content", () => {
   });
 
   it("rejects moved pages, moved headings and site links that resolve nowhere", () => {
-    const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
+    const content_root = resolve(import.meta.dir, "../docs/src/content/docs");
     const documents = [
-      { path: `${contentRoot}/features/grid/search.md`, content: "## Replace\n\nText.\n" },
-      { path: `${contentRoot}/guides/kept.md`, content: "Kept.\n" },
+      { path: `${content_root}/features/grid/search.md`, content: "## Replace\n\nText.\n" },
+      { path: `${content_root}/guides/kept.md`, content: "Kept.\n" },
     ];
     const moved = {
       "/docs/guides/old/": {
@@ -383,13 +384,13 @@ describe("documentation content", () => {
     };
     expect(movedPageIssues(moved, documents)).toEqual([]);
 
-    const keptContent = {
+    const kept_content = {
       "/docs/guides/kept/": {
         to: "/docs/features/grid/search/",
         anchors: { gone: "/docs/features/grid/search/#gone" },
       },
     };
-    expect(movedPageIssues(keptContent, documents)).toEqual([
+    expect(movedPageIssues(kept_content, documents)).toEqual([
       "moved page still has content: /docs/guides/kept/",
       "moved page /docs/guides/kept/#gone forwards to a missing target: /docs/features/grid/search/#gone",
     ]);
@@ -449,26 +450,26 @@ describe("documentation content", () => {
 });
 
 describe("landing benchmark data", () => {
-  const benchResult = (
+  const bench_result = (
     engine: string,
-    scenarioId: string,
+    scenario_id: string,
     round: number,
     rows: number,
-    medianMs: number,
+    median_ms: number,
     status = "success",
   ) => ({
     engine,
-    scenarioId,
+    scenarioId: scenario_id,
     round,
     rows,
     status,
-    medianMs,
-    p95Ms: medianMs * 1.1,
+    medianMs: median_ms,
+    p95Ms: median_ms * 1.1,
     madMs: 0.01,
     memory: { beforeBytes: 1_000_000, afterBytes: 2_000_000, deltaBytes: 1_000_000 },
     validation: [],
   });
-  const benchEvidence = (results: ReturnType<typeof benchResult>[], scenarios = ["a", "b"]) => ({
+  const bench_evidence = (results: ReturnType<typeof bench_result>[], scenarios = ["a", "b"]) => ({
     protocolVersion: 1,
     metadata: {
       commit: "c".repeat(40),
@@ -487,7 +488,7 @@ describe("landing benchmark data", () => {
     config: { engines: ["sheetwrite", "handsontable"], rows: [1_000, 1_000_000], scenarios },
     results,
   });
-  const payloadOf = (evidence: ReturnType<typeof benchEvidence>) =>
+  const payload_of = (evidence: ReturnType<typeof bench_evidence>) =>
     JSON.parse(landingBenchPayload({ evidence, source: "x" }));
 
   it("never double-counts failed runs in the completion summary", () => {
@@ -505,22 +506,22 @@ describe("landing benchmark data", () => {
   it("omits partial-round pairs and never publishes non-finite landing values", () => {
     const results = [
       // scenario a at 1k: Handsontable completes only 1 of 2 rounds.
-      benchResult("sheetwrite", "a", 1, 1_000, 1),
-      benchResult("sheetwrite", "a", 2, 1_000, 1),
-      benchResult("handsontable", "a", 1, 1_000, 10),
-      benchResult("handsontable", "a", 2, 1_000, 10, "failed"),
+      bench_result("sheetwrite", "a", 1, 1_000, 1),
+      bench_result("sheetwrite", "a", 2, 1_000, 1),
+      bench_result("handsontable", "a", 1, 1_000, 10),
+      bench_result("handsontable", "a", 2, 1_000, 10, "failed"),
       // scenario b at 1k: full-round pair with a 5x gap.
-      benchResult("sheetwrite", "b", 1, 1_000, 1),
-      benchResult("sheetwrite", "b", 2, 1_000, 1),
-      benchResult("handsontable", "b", 1, 1_000, 5),
-      benchResult("handsontable", "b", 2, 1_000, 5),
+      bench_result("sheetwrite", "b", 1, 1_000, 1),
+      bench_result("sheetwrite", "b", 2, 1_000, 1),
+      bench_result("handsontable", "b", 1, 1_000, 5),
+      bench_result("handsontable", "b", 2, 1_000, 5),
       // 1M: Sheetwrite full rounds, no Handsontable at all.
-      benchResult("sheetwrite", "a", 1, 1_000_000, 2),
-      benchResult("sheetwrite", "a", 2, 1_000_000, 2),
-      benchResult("sheetwrite", "b", 1, 1_000_000, 2),
-      benchResult("sheetwrite", "b", 2, 1_000_000, 2),
+      bench_result("sheetwrite", "a", 1, 1_000_000, 2),
+      bench_result("sheetwrite", "a", 2, 1_000_000, 2),
+      bench_result("sheetwrite", "b", 1, 1_000_000, 2),
+      bench_result("sheetwrite", "b", 2, 1_000_000, 2),
     ];
-    const payload = payloadOf(benchEvidence(results));
+    const payload = payload_of(bench_evidence(results));
     // The 1M size has zero full-round pairs and must be omitted, not NaN.
     expect(payload.sizes).toEqual([
       expect.objectContaining({
@@ -533,13 +534,16 @@ describe("landing benchmark data", () => {
     expect(payload.heroStats).toMatchObject({ millionRowScenarios: 2, millionRowMedianMs: 2 });
 
     // No comparable pairs downgrades to the placeholder: null must never reach the landing.
-    const none = landingBenchPayload({ evidence: benchEvidence(results.slice(0, 4)), source: "x" });
+    const none = landingBenchPayload({
+      evidence: bench_evidence(results.slice(0, 4)),
+      source: "x",
+    });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
   });
 
   it("publishes download sizes only when every part is known", () => {
-    const firstLoad = (javascript: number, wasm: number, css: number) => ({
+    const first_load = (javascript: number, wasm: number, css: number) => ({
       "bundler.vite.coreInitial.javascript.brotliBytes": { actual: javascript },
       "bundler.vite.coreInitial.wasm.brotliBytes": { actual: wasm },
       "bundler.vite.coreInitial.css.brotliBytes": { actual: css },
@@ -548,7 +552,7 @@ describe("landing benchmark data", () => {
       { engine: "default", wasm: { brotliBytes: 250 } },
       { engine: "full", wasm: { brotliBytes: 340 } },
     ];
-    const downloads = landingDownloads(firstLoad(130, 256, 2), engines);
+    const downloads = landingDownloads(first_load(130, 256, 2), engines);
     expect(downloads).toEqual({
       coreFirstLoadBrotliBytes: 388,
       defaultEngineBrotliBytes: 250,
@@ -556,10 +560,10 @@ describe("landing benchmark data", () => {
     });
 
     // A partial report would understate the download, so the landing shows none.
-    const { "bundler.vite.coreInitial.css.brotliBytes": _css, ...noCss } = firstLoad(1, 1, 1);
-    expect(landingDownloads(noCss, engines)).toBeUndefined();
-    expect(landingDownloads(firstLoad(130, 256, 2), engines.slice(0, 1))).toBeUndefined();
-    expect(landingDownloads(firstLoad(130, Number.NaN, 2), engines)).toBeUndefined();
+    const { "bundler.vite.coreInitial.css.brotliBytes": _css, ...no_css } = first_load(1, 1, 1);
+    expect(landingDownloads(no_css, engines)).toBeUndefined();
+    expect(landingDownloads(first_load(130, 256, 2), engines.slice(0, 1))).toBeUndefined();
+    expect(landingDownloads(first_load(130, Number.NaN, 2), engines)).toBeUndefined();
 
     // Sizes are published even when no benchmark capture is available.
     const missing = { available: false as const, reason: "x", source: "x", reproduction: "x" };
@@ -575,11 +579,11 @@ describe("performance pages", () => {
   const evidence = PERFORMANCE_PAGES.flatMap((page) => page.sections)
     .map((heading) => `## ${heading}\n\n${heading} body.\n`)
     .join("\n");
-  const pagesOf = (markdown: string) =>
+  const pages_of = (markdown: string) =>
     new Map(splitPerformancePages(markdown).map((page) => [page.route, page.content]));
 
   it("splits sections onto their pages and rejects a section no page lists", () => {
-    const pages = pagesOf(evidence);
+    const pages = pages_of(evidence);
     expect(pages.get("performance/memory.md")).toContain("## Grid lifetime and trimMemory");
     expect(pages.get("performance/index.md")).toContain("](/docs/performance/memory/)");
     expect(() => splitPerformancePages(`${evidence}\n## New benchmark\n\nBody.\n`)).toThrow(
@@ -589,7 +593,7 @@ describe("performance pages", () => {
 
   it("lifts a one-section page's headings to sit right under its title", () => {
     const fenced = "```md\n### Not a heading\n<h4>Literal</h4>\n```\n";
-    const pages = pagesOf(
+    const pages = pages_of(
       evidence
         .replace(
           "Formula engine benchmark body.\n",
@@ -638,7 +642,7 @@ describe("performance pages", () => {
 
 describe("adapter documentation contract", () => {
   it("fails when GridOptions or the Vue emits drift from the contract", () => {
-    const gridOptions = apiExport(
+    const grid_options = api_export(
       "GridOptions",
       "interface",
       "interface GridOptions { uncoveredInput?: unknown; }",
@@ -648,8 +652,8 @@ describe("adapter documentation contract", () => {
     const manifest: PublicApiManifest = {
       formatVersion: 2,
       packages: [
-        { name: "@sheetwrite/core", entryPoints: [entryPoint(".", [gridOptions])] },
-        { name: "@sheetwrite/vue", entryPoints: [entryPoint(".", [])] },
+        { name: "@sheetwrite/core", entryPoints: [entry_point(".", [grid_options])] },
+        { name: "@sheetwrite/vue", entryPoints: [entry_point(".", [])] },
       ],
     };
 
@@ -664,8 +668,8 @@ describe("adapter documentation contract", () => {
 
 describe("API page paths", () => {
   /** The page route of each export of one `@sheetwrite/core/testing` entry. */
-  const pageRoutes = (exports: ApiExport[]): Map<string, string> => {
-    const entry = entryPoint("./testing", exports);
+  const page_routes = (exports: ApiExport[]): Map<string, string> => {
+    const entry = entry_point("./testing", exports);
     const routes = documentationLinkRoutes({
       formatVersion: 2,
       packages: [{ name: "@sheetwrite/core", entryPoints: [entry] }],
@@ -674,10 +678,10 @@ describe("API page paths", () => {
   };
 
   it("gives two names that differ only in letter case their own pages, the type's with its kind", () => {
-    const routes = pageRoutes([
-      apiExport("ShownSuggestion", "interface", "interface ShownSuggestion { text: string; }"),
-      apiExport("shownSuggestion", "function", "function shownSuggestion(): ShownSuggestion;"),
-      apiExport("GhostOnScreen", "interface", "interface GhostOnScreen { text: string; }"),
+    const routes = page_routes([
+      api_export("ShownSuggestion", "interface", "interface ShownSuggestion { text: string; }"),
+      api_export("shownSuggestion", "function", "function shownSuggestion(): ShownSuggestion;"),
+      api_export("GhostOnScreen", "interface", "interface GhostOnScreen { text: string; }"),
     ]);
     // The function keeps the address it had before the type was exported.
     expect(routes.get("shownSuggestion")).toBe("/docs/api/core-testing/shown-suggestion/");
@@ -689,10 +693,10 @@ describe("API page paths", () => {
 
   it("fails when names still fold to one page after the kind", () => {
     expect(() =>
-      pageRoutes([
-        apiExport("fooBar", "function", "function fooBar(): void;"),
-        apiExport("foo_bar", "function", "function foo_bar(): void;"),
-        apiExport("FOO_BAR", "function", "function FOO_BAR(): void;"),
+      page_routes([
+        api_export("fooBar", "function", "function fooBar(): void;"),
+        api_export("foo_bar", "function", "function foo_bar(): void;"),
+        api_export("FOO_BAR", "function", "function FOO_BAR(): void;"),
       ]),
     ).toThrow(/fold to the same path "foo-bar-function"/);
   });

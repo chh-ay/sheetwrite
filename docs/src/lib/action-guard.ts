@@ -23,11 +23,11 @@ interface ActionGuard {
 
 const IDLE: ActionState = { pending: false, error: null };
 
-function createActionGuard(onChange: (state: ActionState) => void): ActionGuard {
+function createActionGuard(on_change: (state: ActionState) => void): ActionGuard {
   let state = IDLE;
   const set = (next: ActionState): void => {
     state = next;
-    onChange(next);
+    on_change(next);
   };
   return {
     get state() {

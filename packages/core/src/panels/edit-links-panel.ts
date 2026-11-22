@@ -16,24 +16,24 @@ const STATUS_TEXT: Readonly<Record<ExternalLinkUpdate["status"], string>> = {
   failed: "Update failed; saved values kept",
 };
 
-function button(label: string, focusKey: string, run: () => void): HTMLButtonElement {
+function button(label: string, focus_key: string, run: () => void): HTMLButtonElement {
   const control = document.createElement("button");
   control.type = "button";
   control.className = "sheetwrite-panel-control";
   control.textContent = label;
-  control.dataset.focusKey = focusKey;
+  control.dataset.focusKey = focus_key;
   control.addEventListener("click", run);
   return control;
 }
 
-function line(text: string, className = "sheetwrite-panel-note"): HTMLParagraphElement {
+function line(text: string, class_name = "sheetwrite-panel-note"): HTMLParagraphElement {
   const paragraph = document.createElement("p");
-  paragraph.className = className;
+  paragraph.className = class_name;
   paragraph.textContent = text;
   return paragraph;
 }
 
-function textInput(value: string): HTMLInputElement {
+function text_input(value: string): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "text";
   input.autocomplete = "off";
@@ -72,7 +72,7 @@ export function editLinksPanel(grid: Grid): GridPanel {
         draw();
       };
 
-      const linkSection = (link: ExternalLink, canUpdate: boolean): HTMLElement => {
+      const link_section = (link: ExternalLink, can_update: boolean): HTMLElement => {
         const key = link.book.toLowerCase();
         const section = panelSection(link.book);
         section.append(
@@ -82,8 +82,8 @@ export function editLinksPanel(grid: Grid): GridPanel {
 
         if (editing?.book === link.book && editing.mode === "source") {
           const form = document.createElement("form");
-          const book = panelField("File name", textInput(link.book), `source-book-${key}`);
-          const target = panelField("Location", textInput(link.target), `source-target-${key}`);
+          const book = panelField("File name", text_input(link.book), `source-book-${key}`);
+          const target = panelField("Location", text_input(link.target), `source-target-${key}`);
           const save = document.createElement("button");
           save.type = "submit";
           save.className = "sheetwrite-panel-control";
@@ -136,12 +136,12 @@ export function editLinksPanel(grid: Grid): GridPanel {
           return section;
         }
 
-        const updateButton = button("Update Values", `update-${key}`, () => {
+        const update_button = button("Update Values", `update-${key}`, () => {
           void update([link.book]);
         });
-        updateButton.disabled = !canUpdate;
+        update_button.disabled = !can_update;
         section.append(
-          updateButton,
+          update_button,
           button("Change Source", `source-${key}`, () => {
             editing = { book: link.book, mode: "source" };
             draw();
@@ -162,13 +162,13 @@ export function editLinksPanel(grid: Grid): GridPanel {
             return;
           }
 
-          const canUpdate = externalLinkResolverOf(grid) !== undefined && !busy;
+          const can_update = externalLinkResolverOf(grid) !== undefined && !busy;
           const all = button("Update All", "update-all", () => {
             void update(links.map((link) => link.book));
           });
-          all.disabled = !canUpdate;
+          all.disabled = !can_update;
           target.append(all);
-          if (!canUpdate && !busy) {
+          if (!can_update && !busy) {
             target.append(line("Update Values needs a source that the application connects."));
           }
           if (message !== null) {
@@ -176,7 +176,7 @@ export function editLinksPanel(grid: Grid): GridPanel {
             status.setAttribute("role", "status");
             target.append(status);
           }
-          for (const link of links) target.append(linkSection(link, canUpdate));
+          for (const link of links) target.append(link_section(link, can_update));
         });
 
       draw();

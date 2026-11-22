@@ -15,18 +15,18 @@ const HEADER_HEIGHT = DEFAULT_THEME.headerHeight;
 /** Data rows 1, 3, ..., 13 are on screen at the top of the sheet. */
 const TOP_MATCH_TOPS = [60, 116, 172, 228, 284, 340, 396];
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs({ width: 800, height: 400 });
+  restore_stubs = installCanvasTestStubs({ width: 800, height: 400 });
 });
 
 afterEach(() => {
-  restoreStubs();
+  restore_stubs();
   document.body.replaceChildren();
 });
 
@@ -57,7 +57,7 @@ function fixture(): { workbook: Workbook; data: ColumnarData } {
 }
 
 /** The tops of the overlay rects a viewer can actually see, in paint order. */
-function topsOf(host: HTMLElement): number[] {
+function tops_of(host: HTMLElement): number[] {
   const overlay = host.querySelector(".sheetwrite-overlay");
   if (!(overlay instanceof HTMLElement)) throw new Error("expected grid overlay");
   return [...overlay.children]
@@ -66,11 +66,11 @@ function topsOf(host: HTMLElement): number[] {
 }
 
 /** Screen top of data row `row` for a uniform 28px row grid. */
-function bodyTop(row: number, contentTop: number): number {
-  return HEADER_HEIGHT + row * ROW_HEIGHT - contentTop;
+function body_top(row: number, content_top: number): number {
+  return HEADER_HEIGHT + row * ROW_HEIGHT - content_top;
 }
 
-function mountGrid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivElement } {
+function mount_grid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivElement } {
   const { workbook, data } = fixture();
   const host = document.createElement("div");
   Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
@@ -89,7 +89,7 @@ function mountGrid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivE
 
 describe("search highlights follow the active view", () => {
   it("re-maps every highlight when a sort reverses the view", () => {
-    const { grid, host } = mountGrid();
+    const { grid, host } = mount_grid();
     grid.search("hit");
     grid.refresh();
 
@@ -98,19 +98,19 @@ describe("search highlights follow the active view", () => {
     // Match order is data-row order, which the reversed view paints last-first.
     grid.setViewSort([{ col: 1, ascending: true }]);
     grid.refresh();
-    expect(topsOf(host)).toEqual([368, 312, 256, 200, 144, 88, 32]);
+    expect(tops_of(host)).toEqual([368, 312, 256, 200, 144, 88, 32]);
 
     // A second sort of the same length restores the identity view.
     grid.setViewSort([{ col: 1, ascending: false }]);
     grid.refresh();
-    expect(topsOf(host)).toEqual(TOP_MATCH_TOPS);
+    expect(tops_of(host)).toEqual(TOP_MATCH_TOPS);
     grid.destroy();
   });
 });
 
 describe("note indicators follow the active view", () => {
   it("keeps a pinned-row note marker on its row while the body scrolls", () => {
-    const { grid, host, scroller } = mountGrid();
+    const { grid, host, scroller } = mount_grid();
     grid.setFrozen(1, 0);
     grid.setNote({ sheet: "s1", row: 0, col: 0 }, "pinned");
     grid.setNote({ sheet: "s1", row: 20, col: 0 }, "body");
@@ -118,7 +118,7 @@ describe("note indicators follow the active view", () => {
     scroller.scrollTop = 19 * ROW_HEIGHT;
     grid.refresh();
 
-    expect(topsOf(host)).toEqual([HEADER_HEIGHT, bodyTop(20, 19 * ROW_HEIGHT)]);
+    expect(tops_of(host)).toEqual([HEADER_HEIGHT, body_top(20, 19 * ROW_HEIGHT)]);
     grid.destroy();
   });
 });

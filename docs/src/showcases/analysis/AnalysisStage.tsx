@@ -40,9 +40,9 @@ export interface AnalysisStageProps {
 }
 
 /** The walkthrough; the second step gets its "Go to the order" control at render. */
-function analysisSteps(
+function analysis_steps(
   props: AnalysisStageProps,
-  goToOrder: ShowcaseStep["control"],
+  go_to_order: ShowcaseStep["control"],
 ): ShowcaseStep[] {
   return [
     {
@@ -54,7 +54,7 @@ function analysisSteps(
       action: "Edit an order",
       how: `Go to an ${props.dipRegion} order from ${props.priceChangeMonth}, type a new revenue and press Enter.`,
       result: "The pivot's total for that month and the chart move together.",
-      control: goToOrder,
+      control: go_to_order,
     },
     {
       action: "Rearrange the pivot",
@@ -76,9 +76,12 @@ function analysisSteps(
 
 /** The analysis showcase's island: the orders workbook with its pivot and chart. */
 export function AnalysisStage(props: AnalysisStageProps) {
-  let hostElement: HTMLElement | undefined;
+  let host_element: HTMLElement | undefined;
   const live = createLiveScenario<AnalysisScenario>(
-    () => import("./boot.js").then(({ createAnalysisScenario }) => createAnalysisScenario),
+    () =>
+      import("./boot.js").then(
+        ({ createAnalysisScenario: create_analysis_scenario }) => create_analysis_scenario,
+      ),
     {
       onReady: (scenario) => {
         const grid = scenario.grid();
@@ -90,7 +93,7 @@ export function AnalysisStage(props: AnalysisStageProps) {
     },
   );
 
-  const goToDipOrder = () => {
+  const go_to_dip_order = () => {
     const scenario = live.scenario();
     const grid = scenario?.grid();
     const addr = scenario?.dipOrder();
@@ -99,7 +102,7 @@ export function AnalysisStage(props: AnalysisStageProps) {
     grid.setSelection({ kind: "cell", addr });
     grid.scrollToCell(addr);
     // Typing then edits the order, so the step works without a click.
-    hostElement?.querySelector<HTMLElement>(".sheetwrite")?.focus();
+    host_element?.querySelector<HTMLElement>(".sheetwrite")?.focus();
   };
 
   return (
@@ -108,9 +111,9 @@ export function AnalysisStage(props: AnalysisStageProps) {
         <>
           <ShowcaseControlGroup title="Try it">
             <ShowcaseSteps
-              steps={analysisSteps(
+              steps={analysis_steps(
                 props,
-                <Button disabled={live.scenario()?.grid() == null} onClick={goToDipOrder}>
+                <Button disabled={live.scenario()?.grid() == null} onClick={go_to_dip_order}>
                   <Icon name="search" />
                   Go to the order
                 </Button>,
@@ -128,7 +131,7 @@ export function AnalysisStage(props: AnalysisStageProps) {
             class="sw-showcase__grid"
             data-testid="analysis-window"
             ref={(element) => {
-              hostElement = element;
+              host_element = element;
               live.host(element);
             }}
           />

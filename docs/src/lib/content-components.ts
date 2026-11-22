@@ -146,7 +146,7 @@ function required(node: ContentNode, name: string): string {
 }
 
 /** A `{["a", "b"]}` list attribute, or a comma-separated string. */
-function listAttribute(node: ContentNode, name: string): string[] {
+function list_attribute(node: ContentNode, name: string): string[] {
   const value = attribute(node, name);
   if (value === undefined) return [];
   if (value.startsWith("[")) return JSON.parse(value) as string[];
@@ -219,7 +219,7 @@ function step(node: ContentNode): ContentNode {
   );
 }
 
-function cardGroup(node: ContentNode): ContentNode {
+function card_group(node: ContentNode): ContentNode {
   const cols = Number(attribute(node, "cols") ?? "2");
   if (![1, 2, 3, 4].includes(cols)) throw new Error("<CardGroup cols> is 1, 2, 3 or 4");
   return element("div", node.children ?? [], {
@@ -265,13 +265,13 @@ export interface DocCard {
 }
 
 /** What a card shows above its title: a screenshot, an illustration, an icon or nothing. */
-function cardArt(
+function card_art(
   icon: string | undefined,
   illustration: string | undefined,
   screenshot: DocCard["screenshot"],
 ): HastNode[] {
   if (screenshot !== undefined) {
-    const shots = themedShots(screenshot.name, screenshot.alt, screenshot.size, CARD_SHOT_SIZES);
+    const shots = themed_shots(screenshot.name, screenshot.alt, screenshot.size, CARD_SHOT_SIZES);
     return [{ ...shots, properties: { className: ["sw-shots", "sw-card__shot"] } }];
   }
   if (illustration !== undefined) {
@@ -304,7 +304,7 @@ export function docCard({
   cta,
   badge,
 }: DocCard): HastNode {
-  const art = cardArt(icon, illustration, screenshot);
+  const art = card_art(icon, illustration, screenshot);
   const heading = element("span", [text(title)], { className: ["sw-card__title"] });
   const content = [
     ...art,
@@ -322,7 +322,7 @@ export function docCard({
 }
 
 /** Paragraph wrappers MDX adds around inline content of block components. */
-function unwrapParagraph(children: ContentNode[]): ContentNode[] {
+function unwrap_paragraph(children: ContentNode[]): ContentNode[] {
   const elements = children.filter((child) => !(child.type === "text" && !child.value?.trim()));
   const only = elements[0];
   return elements.length === 1 && only?.tagName === "p" ? (only.children ?? []) : children;
@@ -353,25 +353,25 @@ function accordion(node: ContentNode): ContentNode {
   );
 }
 
-function accordionGroup(node: ContentNode): ContentNode {
+function accordion_group(node: ContentNode): ContentNode {
   return element("div", node.children ?? [], { className: ["sw-accordion-group"] });
 }
 
 function frame(node: ContentNode): ContentNode {
   const caption = attribute(node, "caption");
-  const tabletCaption = attribute(node, "tabletCaption");
-  const phoneCaption = attribute(node, "phoneCaption");
+  const tablet_caption = attribute(node, "tabletCaption");
+  const phone_caption = attribute(node, "phoneCaption");
   const hint = attribute(node, "hint");
   // With narrow crops inside, each width shows the caption of its own image.
-  const captionText =
+  const caption_text =
     caption === undefined
       ? []
-      : tabletCaption === undefined || phoneCaption === undefined
+      : tablet_caption === undefined || phone_caption === undefined
         ? [text(caption)]
         : [
             element("span", [text(caption)], { className: ["sw-frame__caption--wide"] }),
-            element("span", [text(tabletCaption)], { className: ["sw-frame__caption--tablet"] }),
-            element("span", [text(phoneCaption)], { className: ["sw-frame__caption--narrow"] }),
+            element("span", [text(tablet_caption)], { className: ["sw-frame__caption--tablet"] }),
+            element("span", [text(phone_caption)], { className: ["sw-frame__caption--narrow"] }),
           ];
   return element(
     "figure",
@@ -380,7 +380,7 @@ function frame(node: ContentNode): ContentNode {
         ? []
         : [element("p", [text(hint)], { className: ["sw-frame__hint"] })]),
       element("div", node.children ?? [], { className: ["sw-frame__media"] }),
-      ...(captionText.length === 0 ? [] : [element("figcaption", captionText, {})]),
+      ...(caption_text.length === 0 ? [] : [element("figcaption", caption_text, {})]),
     ],
     { className: ["sw-frame"] },
   );
@@ -397,7 +397,7 @@ const NARROW_SHOT_SIZES = "calc(100vw - 4rem)";
  * One theme's capture: the 1× and 2× AVIF files, lazy, so only the shown
  * theme's file loads, and only the resolution the layout needs.
  */
-function themedShot(
+function themed_shot(
   name: string,
   theme: "light" | "dark",
   alt: string,
@@ -420,7 +420,7 @@ function themedShot(
 }
 
 /** Both themes' captures; CSS shows the one that matches the page. */
-function themedShots(
+function themed_shots(
   name: string,
   alt: string,
   size: ShotSize,
@@ -429,7 +429,7 @@ function themedShots(
 ): ContentNode {
   return element(
     "span",
-    [themedShot(name, "light", alt, size, sizes), themedShot(name, "dark", alt, size, sizes)],
+    [themed_shot(name, "light", alt, size, sizes), themed_shot(name, "dark", alt, size, sizes)],
     { className: variant === undefined ? ["sw-shots"] : ["sw-shots", `sw-shots--${variant}`] },
   );
 }
@@ -465,19 +465,19 @@ export function framedShot(shot: FramedShot): HastNode {
   const size = shot.size ?? "app";
   const media =
     narrow === undefined
-      ? themedShots(shot.name, shot.alt, size, PAGE_SHOT_SIZES)
+      ? themed_shots(shot.name, shot.alt, size, PAGE_SHOT_SIZES)
       : element(
           "span",
           [
-            themedShots(shot.name, shot.alt, size, PAGE_SHOT_SIZES, "wide"),
-            themedShots(
+            themed_shots(shot.name, shot.alt, size, PAGE_SHOT_SIZES, "wide"),
+            themed_shots(
               narrow.tablet.name,
               narrow.tablet.alt,
               "sectionTablet",
               NARROW_SHOT_SIZES,
               "tablet",
             ),
-            themedShots(
+            themed_shots(
               narrow.phone.name,
               narrow.phone.alt,
               "sectionPhone",
@@ -523,16 +523,16 @@ function screenshot(node: ContentNode): ContentNode {
   const tablet = attribute(node, "tablet");
   const phone = attribute(node, "phone");
   if (tablet === undefined || phone === undefined) {
-    return themedShots(name, alt, size, PAGE_SHOT_SIZES);
+    return themed_shots(name, alt, size, PAGE_SHOT_SIZES);
   }
   // Tablets and phones show their own crops, each with its own alt text; CSS
   // shows one of the three, and the hidden ones never load.
   return element(
     "span",
     [
-      themedShots(name, alt, size, PAGE_SHOT_SIZES, "wide"),
-      themedShots(tablet, required(node, "tabletAlt"), "tablet", NARROW_SHOT_SIZES, "tablet"),
-      themedShots(phone, required(node, "phoneAlt"), "phone", NARROW_SHOT_SIZES, "narrow"),
+      themed_shots(name, alt, size, PAGE_SHOT_SIZES, "wide"),
+      themed_shots(tablet, required(node, "tabletAlt"), "tablet", NARROW_SHOT_SIZES, "tablet"),
+      themed_shots(phone, required(node, "phoneAlt"), "phone", NARROW_SHOT_SIZES, "narrow"),
     ],
     { className: ["sw-shots-set"] },
   );
@@ -548,18 +548,18 @@ function diagram(node: ContentNode): ContentNode {
   const caption = attribute(node, "caption");
   const width = required(node, "width");
   const height = required(node, "height");
-  const titleId = `diagram-${name}`;
+  const title_id = `diagram-${name}`;
   const svg = element(
     "svg",
     [
-      element("title", [text(alt)], { id: titleId }),
+      element("title", [text(alt)], { id: title_id }),
       element("use", [], { href: `${DIAGRAMS_PATH}${name}.svg#fig` }),
     ],
     {
       className: ["sw-diagram"],
       viewBox: `0 0 ${width} ${height}`,
       role: "img",
-      ariaLabelledBy: titleId,
+      ariaLabelledBy: title_id,
     },
   );
   return element(
@@ -630,22 +630,22 @@ function badge(node: ContentNode): ContentNode {
   if (tone === undefined) {
     throw new Error(`<Badge color> is one of ${Object.keys(BADGE_TONES).join(", ")}`);
   }
-  return element("span", unwrapParagraph(node.children ?? []), {
+  return element("span", unwrap_paragraph(node.children ?? []), {
     className: ["sw-badge"],
     dataTone: tone,
     dataSize: attribute(node, "size") ?? "md",
   });
 }
 
-let tooltipCount = 0;
+let tooltip_count = 0;
 
 /** A term with a definition shown on hover and focus, by CSS. */
 function tooltip(node: ContentNode): ContentNode {
   const tip = required(node, "tip");
   const headline = attribute(node, "headline");
   const href = attribute(node, "href");
-  const id = `tooltip-${(tooltipCount += 1)}`;
-  const term = unwrapParagraph(node.children ?? []);
+  const id = `tooltip-${(tooltip_count += 1)}`;
+  const term = unwrap_paragraph(node.children ?? []);
   const bubble = element(
     "span",
     [
@@ -671,7 +671,7 @@ function update(node: ContentNode): ContentNode {
   const release = RELEASES.find((entry) => entry.version === version);
   if (release === undefined)
     throw new Error(`<Update version="${version}"> is not in lib/releases.ts`);
-  const tags = listAttribute(node, "tags");
+  const tags = list_attribute(node, "tags");
   // An id such as v0-7-0: a version's dots do not survive a slug.
   const id = `v${version.replaceAll(".", "-")}`;
   const when =
@@ -732,9 +732,9 @@ function update(node: ContentNode): ContentNode {
 
 const STATIC: Partial<Record<ComponentName, (node: ContentNode) => ContentNode>> = {
   Steps: steps,
-  CardGroup: cardGroup,
+  CardGroup: card_group,
   Card: card,
-  AccordionGroup: accordionGroup,
+  AccordionGroup: accordion_group,
   Accordion: accordion,
   Frame: frame,
   Screenshot: screenshot,
@@ -746,14 +746,14 @@ const STATIC: Partial<Record<ComponentName, (node: ContentNode) => ContentNode>>
   Update: update,
 };
 
-const jsxAttribute = (name: string, value: string): JsxAttribute => ({
+const jsx_attribute = (name: string, value: string): JsxAttribute => ({
   type: "mdxJsxAttribute",
   name,
   value,
 });
 
 /** The `title="…"` of a fence's meta, and the meta without it. */
-function fenceTitle(pre: ContentNode): string {
+function fence_title(pre: ContentNode): string {
   const code = pre.children?.find((child) => child.tagName === "code");
   const meta = typeof code?.data?.meta === "string" ? code.data.meta : "";
   const match = /\btitle="([^"]*)"/.exec(meta);
@@ -769,21 +769,21 @@ function fenceTitle(pre: ContentNode): string {
  * title, drawn as the code block's title bar. The fences stay children, so
  * Expressive Code and the "Try it" step see ordinary code blocks.
  */
-function codeGroup(node: ContentNode): ContentNode {
+function code_group(node: ContentNode): ContentNode {
   const fences = (node.children ?? []).filter((child) => child.tagName === "pre");
   const sync = attribute(node, "sync");
   return {
     type: "mdxJsxFlowElement",
     name: "Tabs",
     attributes: [
-      jsxAttribute("variant", "code"),
-      jsxAttribute("label", "Code examples"),
-      ...(sync === undefined ? [] : [jsxAttribute("sync", sync)]),
+      jsx_attribute("variant", "code"),
+      jsx_attribute("label", "Code examples"),
+      ...(sync === undefined ? [] : [jsx_attribute("sync", sync)]),
     ],
     children: fences.map((pre) => ({
       type: "mdxJsxFlowElement",
       name: "Tab",
-      attributes: [jsxAttribute("title", fenceTitle(pre))],
+      attributes: [jsx_attribute("title", fence_title(pre))],
       children: [pre],
     })),
   };
@@ -801,7 +801,10 @@ const RUNTIME_MODULES = {
 type RuntimeComponent = keyof typeof RUNTIME_MODULES;
 
 /** `import { …names } from "<module>"`, as an MDX ESM node. */
-function runtimeImport({ module, names }: (typeof RUNTIME_MODULES)[RuntimeComponent]): ContentNode {
+function runtime_import({
+  module,
+  names,
+}: (typeof RUNTIME_MODULES)[RuntimeComponent]): ContentNode {
   const specifiers = names.map((name) => ({
     type: "ImportSpecifier",
     imported: { type: "Identifier", name },
@@ -850,7 +853,7 @@ const PAGE_STYLESHEETS: Partial<Record<ComponentName, string>> = {
  * `import s0 from "<sheet>?url"; … export const stylesheets = [s0, …]`, as one
  * MDX ESM node: the URLs of the page's stylesheets after the build.
  */
-function stylesheetsExport(sheets: readonly string[]): ContentNode {
+function stylesheets_export(sheets: readonly string[]): ContentNode {
   const local = (index: number) => ({ type: "Identifier", name: `stylesheet${index}` });
   return {
     type: "mdxjsEsm",
@@ -898,7 +901,7 @@ const RELEASE_POST = /\/content\/docs\/releases\/(\d+\.\d+\.\d+)\.mdx?$/;
  * release), steps to the older and newer posts, and, once published, the
  * install command for that version. Static, so only release posts carry it.
  */
-function releaseStrip(href: string): ContentNode[] {
+function release_strip(href: string): ContentNode[] {
   const context = releaseContext(href);
   if (context === undefined) throw new Error(`${href} is not in lib/releases.ts`);
   const { release, newer, older } = context;
@@ -945,18 +948,18 @@ function releaseStrip(href: string): ContentNode[] {
       type: "mdxJsxFlowElement",
       name: "PackageCommand",
       attributes: [
-        jsxAttribute(
+        jsx_attribute(
           "note",
           `Update each adapter and add-on you use to ${release.version} too: all packages release together.`,
         ),
-        jsxAttribute("packages", `@sheetwrite/core@${release.version}`),
+        jsx_attribute("packages", `@sheetwrite/core@${release.version}`),
       ],
       children: [],
     },
   ];
 }
 
-function isComponent(node: ContentNode): node is ContentNode & { name: ComponentName } {
+function is_component(node: ContentNode): node is ContentNode & { name: ComponentName } {
   return (
     (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
     typeof node.name === "string" &&
@@ -975,7 +978,7 @@ export function contentComponents() {
     const sheets = new Set<string>();
     const visit = (node: ContentNode): ContentNode => {
       if (node.children !== undefined) node.children = node.children.map(visit);
-      if (!isComponent(node)) return node;
+      if (!is_component(node)) return node;
       const sheet = PAGE_STYLESHEETS[node.name];
       if (sheet !== undefined) sheets.add(sheet);
       // A card's screenshot swaps with the theme, as figure screenshots do.
@@ -988,7 +991,7 @@ export function contentComponents() {
       }
       if (node.name === "CodeGroup") {
         used.add("Tabs");
-        return codeGroup(node);
+        return code_group(node);
       }
       if (node.name === "LiveGrid") {
         used.add("LiveGrid");
@@ -1001,10 +1004,10 @@ export function contentComponents() {
       return render === undefined ? node : render(node);
     };
     visit(tree);
-    const imports = [...used].map((name) => runtimeImport(RUNTIME_MODULES[name]));
-    const styles = sheets.size === 0 ? [] : [stylesheetsExport([...sheets])];
+    const imports = [...used].map((name) => runtime_import(RUNTIME_MODULES[name]));
+    const styles = sheets.size === 0 ? [] : [stylesheets_export([...sheets])];
     const version = RELEASE_POST.exec(file.path ?? "")?.[1];
-    const strip = version === undefined ? [] : releaseStrip(releaseHref(version));
+    const strip = version === undefined ? [] : release_strip(releaseHref(version));
     tree.children = [...imports, ...styles, ...strip, ...(tree.children ?? [])];
   };
 }

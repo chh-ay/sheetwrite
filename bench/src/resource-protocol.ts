@@ -141,11 +141,11 @@ export function validateResourceBenchmark(
         throw new Error("teardown after-destroy snapshot identity drift");
       }
     }
-    const transientOwners = new Set<string>();
+    const transient_owners = new Set<string>();
     for (const transient of scenario.transientPeaks) {
       if (
         !transient.owner ||
-        transientOwners.has(transient.owner) ||
+        transient_owners.has(transient.owner) ||
         transient.measurement !== "instrumented-operation-peak" ||
         !Number.isSafeInteger(transient.peakBytes) ||
         transient.peakBytes < 0 ||
@@ -154,7 +154,7 @@ export function validateResourceBenchmark(
       ) {
         throw new Error(`${scenario.id} has invalid transient resource accounting`);
       }
-      transientOwners.add(transient.owner);
+      transient_owners.add(transient.owner);
     }
     if (scenario.id === "formula-recompute" && scenario.transientPeaks.length === 0) {
       throw new Error("formula-recompute is missing transient matrix accounting");
@@ -174,12 +174,12 @@ export function validateResourceBenchmark(
   if (scenarios.size !== expected.length) {
     throw new Error(`unexpected resource scenarios for ${expectedMode}`);
   }
-  const optimizationOwners = new Set<string>();
+  const optimization_owners = new Set<string>();
   for (const optimization of artifact.optimizations) {
-    if (optimizationOwners.has(optimization.owner)) {
+    if (optimization_owners.has(optimization.owner)) {
       throw new Error(`duplicate optimization owner ${optimization.owner}`);
     }
-    optimizationOwners.add(optimization.owner);
+    optimization_owners.add(optimization.owner);
     if (!scenarios.has(optimization.scenario)) {
       throw new Error(`optimization scenario ${optimization.scenario} was not measured`);
     }

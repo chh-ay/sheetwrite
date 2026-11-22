@@ -39,7 +39,8 @@ export function parseRangeText(
   const match = RANGE_TEXT.exec(text.trim());
   if (!match) return { error: RANGE_ERROR };
 
-  const [, quoted, plain, startCol = "", startRow, endCol = startCol, endRow = startRow] = match;
+  const [, quoted, plain, start_col = "", start_row, end_col = start_col, end_row = start_row] =
+    match;
   const name = quoted === undefined ? plain : quoted.replaceAll("''", "'");
   const sheet =
     name === undefined
@@ -51,8 +52,8 @@ export function parseRangeText(
     row: Number(row) - 1,
     col: labelToCol(col.toUpperCase()),
   });
-  const a = corner(startCol, startRow);
-  const b = corner(endCol, endRow);
+  const a = corner(start_col, start_row);
+  const b = corner(end_col, end_row);
   const inside = ({ row, col }: { row: number; col: number }): boolean =>
     row >= 0 && row < sheet.rowCount && col >= 0 && col < sheet.columns.length;
   if (!inside(a) || !inside(b)) return { error: BOUNDS_ERROR };

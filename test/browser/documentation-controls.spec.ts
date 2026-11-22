@@ -10,7 +10,7 @@ const FIRST_GRID_URL = siteUrl("/docs/start/first-grid/");
 /** The page clock runs on to this point, then stops; timers then fire only on demand. */
 const CLOCK_PAUSE_LEAD_MS = 1_000;
 
-function frameworkTabs(page: Page): Locator {
+function framework_tabs(page: Page): Locator {
   return page.getByRole("tablist", { name: "Framework" }).first().getByRole("tab");
 }
 
@@ -19,12 +19,12 @@ test("framework tabs keep one tab stop, follow the keys, and synchronize and per
 }) => {
   await page.goto(INSTALLATION_URL);
   await waitForHydration(page);
-  const tabs = frameworkTabs(page);
+  const tabs = framework_tabs(page);
   // The article mounts after hydration; wait for its tabs before counting them.
   await expect(tabs.first()).toBeVisible();
   const count = await tabs.count();
   expect(count).toBeGreaterThan(2);
-  const expectActive = async (index: number) => {
+  const expect_active = async (index: number) => {
     const tab = tabs.nth(index);
     await expect(tab).toHaveAttribute("aria-selected", "true");
     await expect(tab).toBeFocused();
@@ -32,7 +32,7 @@ test("framework tabs keep one tab stop, follow the keys, and synchronize and per
     await expect(tab).toHaveAttribute("tabindex", "0");
   };
   await tabs.first().click();
-  await expectActive(0);
+  await expect_active(0);
   for (const [key, index] of [
     ["ArrowRight", 1],
     ["ArrowLeft", 0],
@@ -41,15 +41,15 @@ test("framework tabs keep one tab stop, follow the keys, and synchronize and per
     ["End", count - 1],
   ] as const) {
     await page.keyboard.press(key);
-    await expectActive(index);
+    await expect_active(index);
   }
 
-  const frameworkPanel = page.getByRole("tabpanel", { name: /^(Vanilla|React|Vue|Svelte)$/ });
+  const framework_panel = page.getByRole("tabpanel", { name: /^(Vanilla|React|Vue|Svelte)$/ });
   const tab = (name: string) => page.getByRole("tab", { name, exact: true });
-  const storedFramework = () => page.evaluate(() => localStorage.getItem("sheetwrite-framework"));
+  const stored_framework = () => page.evaluate(() => localStorage.getItem("sheetwrite-framework"));
   // The shown panel's code is highlighted, also in a panel that was hidden at load.
-  const expectHighlighted = async (language: string) => {
-    const colors = await frameworkPanel
+  const expect_highlighted = async (language: string) => {
+    const colors = await framework_panel
       .locator(`pre[data-language="${language}"] .code`)
       .first()
       .evaluate((code) => ({
@@ -65,20 +65,20 @@ test("framework tabs keep one tab stop, follow the keys, and synchronize and per
     ).toBe(true);
   };
   await tab("React").click();
-  await expect(frameworkPanel).toContainText("@sheetwrite/react");
-  await expectHighlighted("tsx");
-  expect(await storedFramework()).toBe("React");
+  await expect(framework_panel).toContainText("@sheetwrite/react");
+  await expect_highlighted("tsx");
+  expect(await stored_framework()).toBe("React");
 
   await page.goto("/docs/frameworks/lifecycle/");
   await expect(tab("React")).toHaveAttribute("aria-selected", "true");
-  await expect(frameworkPanel).toContainText("SheetwriteGrid");
+  await expect(framework_panel).toContainText("SheetwriteGrid");
   await tab("Vue").click();
-  expect(await storedFramework()).toBe("Vue");
+  expect(await stored_framework()).toBe("Vue");
   await page.goto(INSTALLATION_URL);
   await expect(tab("Vue")).toHaveAttribute("aria-selected", "true");
-  await expectHighlighted("vue");
+  await expect_highlighted("vue");
   await tab("Svelte").click();
-  await expectHighlighted("svelte");
+  await expect_highlighted("svelte");
 });
 
 test("with storage blocked, a malformed fragment and forced colors, preference controls work and show focus", async ({
@@ -96,7 +96,7 @@ test("with storage blocked, a malformed fragment and forced colors, preference c
   // The fixture fails the test on any page error.
   await page.goto(`${INSTALLATION_URL}#%`);
   await waitForHydration(page);
-  const outlineOfFocused = () =>
+  const outline_of_focused = () =>
     page.evaluate(() => {
       const focused = document.activeElement;
       return focused === null ? "none" : getComputedStyle(focused).outlineStyle;
@@ -104,12 +104,12 @@ test("with storage blocked, a malformed fragment and forced colors, preference c
   // Keyboard focus shows in forced colors: the skip link, then the theme button.
   await page.keyboard.press("Tab");
   expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("A");
-  expect(await outlineOfFocused()).toBe("solid");
-  const themeButton = page.getByRole("button", { name: /^Use (light|dark) theme$/ });
-  await themeButton.focus();
-  expect(await outlineOfFocused()).toBe("solid");
+  expect(await outline_of_focused()).toBe("solid");
+  const theme_button = page.getByRole("button", { name: /^Use (light|dark) theme$/ });
+  await theme_button.focus();
+  expect(await outline_of_focused()).toBe("solid");
 
-  const tabs = frameworkTabs(page);
+  const tabs = framework_tabs(page);
   await tabs.nth(1).click();
   await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
   // Each framework tab holds its own install command; use the visible one.
@@ -118,7 +118,7 @@ test("with storage blocked, a malformed fragment and forced colors, preference c
   await expect(terminal.locator("pre")).toContainText("pnpm add");
 
   const theme = await page.evaluate(() => document.documentElement.dataset.theme);
-  await themeButton.click();
+  await theme_button.click();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme", theme ?? "");
 });
 
@@ -134,29 +134,32 @@ test("the package command shares the code block's copy button, and its feedback 
   await page.clock.pauseAt(Date.now() + CLOCK_PAUSE_LEAD_MS);
   const tab = page.getByRole("tabpanel").filter({ visible: true }).first();
   const terminal = tab.locator(".sw-terminal").first();
-  const commandCopy = terminal.locator(".sw-terminal__copy");
-  const blockCopy = tab.locator(".expressive-code .copy button").first();
+  const command_copy = terminal.locator(".sw-terminal__copy");
+  const block_copy = tab.locator(".expressive-code .copy button").first();
   await tab.locator(".expressive-code .frame").first().hover();
-  const [command, block] = await Promise.all([commandCopy.boundingBox(), blockCopy.boundingBox()]);
+  const [command, block] = await Promise.all([
+    command_copy.boundingBox(),
+    block_copy.boundingBox(),
+  ]);
   if (command === null || block === null) throw new Error("A copy button has no box.");
   expect([command.width, command.height]).toEqual([block.width, block.height]);
   // Both show only the icon; the label is for screen readers.
-  const visibleLabelWidth = await commandCopy
+  const visible_label_width = await command_copy
     .locator("span")
     .evaluate((label) => label.getBoundingClientRect().width);
-  expect(visibleLabelWidth).toBeLessThanOrEqual(1);
-  const [commandRadius, blockRadius] = await Promise.all(
-    [commandCopy, blockCopy].map((button) =>
+  expect(visible_label_width).toBeLessThanOrEqual(1);
+  const [command_radius, block_radius] = await Promise.all(
+    [command_copy, block_copy].map((button) =>
       button.evaluate((element) => getComputedStyle(element).borderTopLeftRadius),
     ),
   );
-  expect(commandRadius).toBe(blockRadius);
+  expect(command_radius).toBe(block_radius);
 
   await terminal.getByRole("tab", { name: "npm", exact: true }).click();
   await terminal.getByRole("button", { name: "Copy" }).click();
   await expect(terminal.getByRole("button", { name: "Copied" })).toBeVisible();
   await terminal.getByRole("tab", { name: "pnpm", exact: true }).click();
-  await expect(commandCopy).toHaveText("Copy");
+  await expect(command_copy).toHaveText("Copy");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("npm install");
 });
 
@@ -164,13 +167,13 @@ test("the package command shares the code block's copy button, and its feedback 
 const AFTER_POPOVER_CLOSE_MS = 300;
 
 /** The first code trigger whose hover panel holds a link the reader can focus. */
-async function popoverWithLink(page: Page): Promise<{ trigger: Locator; panelId: string }> {
+async function popover_with_link(page: Page): Promise<{ trigger: Locator; panelId: string }> {
   // The URL and shell can change before lazy MDX replaces the old article.
   // Scope discovery to this page's example, never the outgoing page's triggers.
   const example = page.getByRole("figure", { name: "Complete first grid", exact: true });
   await expect(example).toBeVisible();
   // Panels wait in the page's inert store until a trigger opens one.
-  const findPanelId = () =>
+  const find_panel_id = () =>
     example.evaluate((element) => {
       const stores = [
         ...document.querySelectorAll<HTMLTemplateElement>("template.sw-code-popover-store"),
@@ -186,11 +189,11 @@ async function popoverWithLink(page: Page): Promise<{ trigger: Locator; panelId:
       return "";
     });
   // The article mounts after hydration and after client-side navigation.
-  await expect.poll(findPanelId).not.toBe("");
-  const panelId = await findPanelId();
+  await expect.poll(find_panel_id).not.toBe("");
+  const panel_id = await find_panel_id();
   return {
-    trigger: page.locator(`[data-sw-code-popover-trigger="${panelId}"]`).first(),
-    panelId,
+    trigger: page.locator(`[data-sw-code-popover-trigger="${panel_id}"]`).first(),
+    panelId: panel_id,
   };
 }
 
@@ -200,14 +203,14 @@ test("a code popover opens alike on focus and hover, holds while its link has fo
   await page.clock.install();
   await page.goto(FIRST_GRID_URL);
   await waitForHydration(page);
-  const { trigger, panelId } = await popoverWithLink(page);
-  const panel = page.locator(`[id="${panelId}"]`);
+  const { trigger, panelId: panel_id } = await popover_with_link(page);
+  const panel = page.locator(`[id="${panel_id}"]`);
 
   await trigger.focus();
   await expect(panel).toBeVisible();
   await expect(trigger).toHaveAccessibleDescription(/\S/);
-  await expect(page.locator(`body > [id="${panelId}"]`)).toHaveCount(1);
-  const focusedText = await panel.innerText();
+  await expect(page.locator(`body > [id="${panel_id}"]`)).toHaveCount(1);
+  const focused_text = await panel.innerText();
   await panel.locator("a[href]").first().focus();
   await page.mouse.move(0, 0);
   await page.clock.runFor(AFTER_POPOVER_CLOSE_MS);
@@ -219,7 +222,7 @@ test("a code popover opens alike on focus and hover, holds while its link has fo
   await trigger.blur();
   await trigger.hover();
   await expect(panel).toBeVisible();
-  expect(await panel.innerText()).toBe(focusedText);
+  expect(await panel.innerText()).toBe(focused_text);
 
   await page
     .getByRole("navigation", { name: "Documentation" })
@@ -229,7 +232,7 @@ test("a code popover opens alike on focus and hover, holds while its link has fo
   await expect(panel).toHaveCount(0);
   await page.goBack();
   await expect(page).toHaveURL(FIRST_GRID_URL);
-  await (await popoverWithLink(page)).trigger.focus();
+  await (await popover_with_link(page)).trigger.focus();
   await expect(panel).toHaveCount(1);
 });
 
@@ -269,7 +272,7 @@ for (const { scrolled, ...viewport } of [
         code.scrollLeft +=
           symbol.getBoundingClientRect().left - code.getBoundingClientRect().left - inset;
         const shown = symbol.getBoundingClientRect();
-        const panelBox = code.getBoundingClientRect();
+        const panel_box = code.getBoundingClientRect();
         const hit = document.elementFromPoint(
           shown.left + shown.width / 2,
           shown.top + shown.height / 2,
@@ -277,7 +280,7 @@ for (const { scrolled, ...viewport } of [
         return {
           ...before,
           scrollLeft: code.scrollLeft,
-          insidePanel: shown.left >= panelBox.left && shown.right <= panelBox.right,
+          insidePanel: shown.left >= panel_box.left && shown.right <= panel_box.right,
           symbolOnTop: hit !== null && symbol.contains(hit),
         };
       }, SCROLLED_SYMBOL_INSET_PX);
@@ -292,8 +295,8 @@ for (const { scrolled, ...viewport } of [
     const symbol = await trigger.boundingBox();
     const box = await panel.boundingBox();
     if (symbol === null || box === null) throw new Error("The symbol or its panel has no box.");
-    const opensBelow = box.y >= symbol.y + symbol.height;
-    const gap = opensBelow ? box.y - (symbol.y + symbol.height) : symbol.y - (box.y + box.height);
+    const opens_below = box.y >= symbol.y + symbol.height;
+    const gap = opens_below ? box.y - (symbol.y + symbol.height) : symbol.y - (box.y + box.height);
     expect(Math.abs(gap - POPOVER_GAP_PX)).toBeLessThanOrEqual(POPOVER_GAP_TOLERANCE_PX);
     // The panel starts at the symbol's column, unless that would push it past the viewport.
     expect(box.x).toBeLessThanOrEqual(symbol.x + POPOVER_GAP_TOLERANCE_PX);

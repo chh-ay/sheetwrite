@@ -107,7 +107,7 @@ function finite(value: unknown, path: string, minimum = Number.NEGATIVE_INFINITY
 }
 
 /** Run one isolated worker process and read the artifact it prints last. */
-function workerArtifact(command: readonly string[]): unknown {
+function worker_artifact(command: readonly string[]): unknown {
   const child = Bun.spawnSync([process.execPath, "run", ...command], {
     cwd: BENCH_ROOT,
     stdout: "pipe",
@@ -118,11 +118,11 @@ function workerArtifact(command: readonly string[]): unknown {
       `interaction worker ${command.join(" ")} exited ${child.exitCode}: ${child.stderr.toString().trim()}`,
     );
   }
-  const lastLine = child.stdout.toString().trim().split("\n").at(-1);
-  if (lastLine === undefined) {
+  const last_line = child.stdout.toString().trim().split("\n").at(-1);
+  if (last_line === undefined) {
     throw new Error(`interaction worker ${command.join(" ")} produced no artifact`);
   }
-  return JSON.parse(lastLine) as unknown;
+  return JSON.parse(last_line) as unknown;
 }
 
 /**
@@ -130,12 +130,12 @@ function workerArtifact(command: readonly string[]): unknown {
  * one million rows, {@link LOOKUP_BATCHES} batches of {@link LOOKUP_BATCH_SIZE}
  * deterministic lookups, reported in nanoseconds per lookup.
  */
-function lookupSample(): { medianNs: number; p95Ns: number; inverseIndexBytes: number } {
+function lookup_sample(): { medianNs: number; p95Ns: number; inverseIndexBytes: number } {
   const value = record(
-    workerArtifact(["src/view-index-bench.ts", "--worker", "packed"]),
+    worker_artifact(["src/view-index-bench.ts", "--worker", "packed"]),
     "view-index worker artifact",
   );
-  const inverseIndexBytes = finite(
+  const inverse_index_bytes = finite(
     value.actualBackingBytes,
     "view-index worker artifact.actualBackingBytes",
     0,
@@ -143,7 +143,7 @@ function lookupSample(): { medianNs: number; p95Ns: number; inverseIndexBytes: n
   return {
     medianNs: finite(value.lookupMedianNs, "view-index worker artifact.lookupMedianNs", 0),
     p95Ns: finite(value.lookupP95Ns, "view-index worker artifact.lookupP95Ns", 0),
-    inverseIndexBytes,
+    inverseIndexBytes: inverse_index_bytes,
   };
 }
 
@@ -152,9 +152,9 @@ function lookupSample(): { medianNs: number; p95Ns: number; inverseIndexBytes: n
  * process, applying {@link DISTANT_EDITS} distant edits without loading a clean
  * page, and reporting the clean plus sparse dirty allocation it retains.
  */
-function dirtySample(): number {
+function dirty_sample(): number {
   const value = record(
-    workerArtifact([
+    worker_artifact([
       "src/paged-bench.ts",
       "--probe",
       "dirty-100",
@@ -172,7 +172,7 @@ function dirtySample(): number {
   return finite(value.retainedBytes, "paged dirty-100 probe.retainedBytes", 0);
 }
 
-function traceEventOf(value: unknown): TraceEvent | null {
+function trace_event_of(value: unknown): TraceEvent | null {
   if (typeof value !== "object" || value === null) return null;
   if (!("name" in value && "ph" in value && "ts" in value && "pid" in value && "tid" in value)) {
     return null;
@@ -188,38 +188,38 @@ function traceEventOf(value: unknown): TraceEvent | null {
     return null;
   }
   const dur = "dur" in value && typeof value.dur === "number" ? value.dur : undefined;
-  const data = traceEventData(value);
-  return { name, ph, ts, dur, pid, tid, url: urlOf(data), profile: profileOf(data) };
+  const data = trace_event_data(value);
+  return { name, ph, ts, dur, pid, tid, url: url_of(data), profile: profile_of(data) };
 }
 
-function traceEventData(value: object): Record<string, unknown> | undefined {
+function trace_event_data(value: object): Record<string, unknown> | undefined {
   if (!("args" in value) || typeof value.args !== "object" || value.args === null) return undefined;
   if (!("data" in value.args)) return undefined;
   const data = value.args.data;
   return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : undefined;
 }
 
-function urlOf(data: Record<string, unknown> | undefined): string | undefined {
+function url_of(data: Record<string, unknown> | undefined): string | undefined {
   if (data === undefined || !("url" in data)) return undefined;
   return typeof data.url === "string" ? data.url : undefined;
 }
 
-function profileOf(data: Record<string, unknown> | undefined): TraceProfile | undefined {
+function profile_of(data: Record<string, unknown> | undefined): TraceProfile | undefined {
   if (data === undefined) return undefined;
-  const startTime = typeof data.startTime === "number" ? data.startTime : undefined;
+  const start_time = typeof data.startTime === "number" ? data.startTime : undefined;
   const raw = data.cpuProfile;
   if (typeof raw !== "object" || raw === null) return undefined;
   return {
-    startTime,
-    nodes: profileNodesOf(raw),
-    samples: numbersOf("samples" in raw ? raw.samples : undefined),
-    timeDeltas: numbersOf(
+    startTime: start_time,
+    nodes: profile_nodes_of(raw),
+    samples: numbers_of("samples" in raw ? raw.samples : undefined),
+    timeDeltas: numbers_of(
       "timeDeltas" in raw && Array.isArray(raw.timeDeltas) ? raw.timeDeltas : data.timeDeltas,
     ),
   };
 }
 
-function profileNodesOf(profile: object): TraceProfile["nodes"] {
+function profile_nodes_of(profile: object): TraceProfile["nodes"] {
   if (!("nodes" in profile) || !Array.isArray(profile.nodes)) return [];
   const nodes: Array<{ id: number; url: string | undefined }> = [];
   for (const node of profile.nodes) {
@@ -233,13 +233,13 @@ function profileNodesOf(profile: object): TraceProfile["nodes"] {
   return nodes;
 }
 
-function numbersOf(value: unknown): number[] {
+function numbers_of(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is number => typeof item === "number");
 }
 
 /** One CPU profile sample per rendered frame, on the trace clock. */
-function profileSamplesOf(events: readonly TraceEvent[]): ProfileSample[] {
+function profile_samples_of(events: readonly TraceEvent[]): ProfileSample[] {
   const urls = new Map<number, string | undefined>();
   for (const event of events) {
     for (const node of event.profile?.nodes ?? []) urls.set(node.id, node.url);
@@ -251,9 +251,9 @@ function profileSamplesOf(events: readonly TraceEvent[]): ProfileSample[] {
     if (profile === undefined || profile.samples.length === 0) continue;
     const thread = `${event.pid}:${event.tid}`;
     let at = profile.startTime ?? clocks.get(thread) ?? event.ts;
-    for (const [index, nodeId] of profile.samples.entries()) {
+    for (const [index, node_id] of profile.samples.entries()) {
       at += profile.timeDeltas[index] ?? 0;
-      samples.push({ ts: at, pid: event.pid, tid: event.tid, url: urls.get(nodeId) });
+      samples.push({ ts: at, pid: event.pid, tid: event.tid, url: urls.get(node_id) });
     }
     clocks.set(thread, at);
   }
@@ -275,16 +275,16 @@ export function coldTaskDurations(events: readonly TraceEvent[]): {
   ownedMs: number;
   unattributedMs: number;
 } {
-  const samples = profileSamplesOf(events);
-  const longTasks = events.filter(
+  const samples = profile_samples_of(events);
+  const long_tasks = events.filter(
     (event) =>
       event.name === "RunTask" &&
       event.ph === "X" &&
       (event.dur ?? 0) >= LONG_TASK_MS * TRACE_MICROSECONDS_PER_MS,
   );
-  let ownedMs = 0;
-  let unattributedMs = 0;
-  for (const task of longTasks) {
+  let owned_ms = 0;
+  let unattributed_ms = 0;
+  for (const task of long_tasks) {
     const duration = task.dur ?? 0;
     const end = task.ts + duration;
     const inside = samples.filter(
@@ -303,39 +303,39 @@ export function coldTaskDurations(events: readonly TraceEvent[]): {
       profiled += step;
       if (OWNED_PACKAGE_PATHS.test(sample.url ?? "")) owned += step;
     }
-    const durationMs = duration / TRACE_MICROSECONDS_PER_MS;
-    if (profiled > 0 && owned * 2 >= profiled) ownedMs = Math.max(ownedMs, durationMs);
-    else unattributedMs = Math.max(unattributedMs, durationMs);
+    const duration_ms = duration / TRACE_MICROSECONDS_PER_MS;
+    if (profiled > 0 && owned * 2 >= profiled) owned_ms = Math.max(owned_ms, duration_ms);
+    else unattributed_ms = Math.max(unattributed_ms, duration_ms);
   }
-  return { ownedMs, unattributedMs };
+  return { ownedMs: owned_ms, unattributedMs: unattributed_ms };
 }
 
-function traceEventsOf(events: TraceEvent[], value: unknown): void {
+function trace_events_of(events: TraceEvent[], value: unknown): void {
   if (!Array.isArray(value)) return;
   for (const entry of value) {
-    const event = traceEventOf(entry);
+    const event = trace_event_of(entry);
     if (event !== null) events.push(event);
   }
 }
 
-async function coldRouteSample(browser: Browser, route: string): Promise<ColdRouteSample> {
+async function cold_route_sample(browser: Browser, route: string): Promise<ColdRouteSample> {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
     const session = await context.newCDPSession(page);
     const events: TraceEvent[] = [];
-    session.on("Tracing.dataCollected", ({ value }) => traceEventsOf(events, value));
-    const tracingComplete = new Promise<void>((resolveComplete) =>
-      session.once("Tracing.tracingComplete", () => resolveComplete()),
+    session.on("Tracing.dataCollected", ({ value }) => trace_events_of(events, value));
+    const tracing_complete = new Promise<void>((resolve_complete) =>
+      session.once("Tracing.tracingComplete", () => resolve_complete()),
     );
     await session.send("Tracing.start", {
       categories: TRACE_CATEGORIES,
       transferMode: "ReportEvents",
     });
-    const usableMs = await loadUsableRoute(page, route);
+    const usable_ms = await load_usable_route(page, route);
     await session.send("Tracing.end");
-    await tracingComplete;
-    return { ...coldTaskDurations(events), usableMs };
+    await tracing_complete;
+    return { ...coldTaskDurations(events), usableMs: usable_ms };
   } finally {
     await context.close();
   }
@@ -347,27 +347,27 @@ async function coldRouteSample(browser: Browser, route: string): Promise<ColdRou
  * own cold work, and every sample still starts from an empty context, cache,
  * and code cache.
  */
-async function warmRoute(browser: Browser, route: string): Promise<void> {
+async function warm_route(browser: Browser, route: string): Promise<void> {
   const context = await browser.newContext();
   try {
-    await loadUsableRoute(await context.newPage(), route);
+    await load_usable_route(await context.newPage(), route);
   } finally {
     await context.close();
   }
 }
 
 /** Navigate, prove the route renders, and wait until its first page is resident. */
-async function loadUsableRoute(page: Page, route: string): Promise<number> {
+async function load_usable_route(page: Page, route: string): Promise<number> {
   // The route can answer 200 while its grid island fails to load, for example
   // on a tree without the committed bench/results evidence the showcase
   // imports. A page error ends the wait at once, naming the failed requests.
-  const failedRequests: string[] = [];
-  page.on("requestfailed", (request) => failedRequests.push(`failed ${request.url()}`));
+  const failed_requests: string[] = [];
+  page.on("requestfailed", (request) => failed_requests.push(`failed ${request.url()}`));
   page.on("response", (response) => {
-    if (!response.ok()) failedRequests.push(`${response.status()} ${response.url()}`);
+    if (!response.ok()) failed_requests.push(`${response.status()} ${response.url()}`);
   });
-  const firstPageError = Promise.withResolvers<Error>();
-  page.once("pageerror", firstPageError.resolve);
+  const first_page_error = Promise.withResolvers<Error>();
+  page.once("pageerror", first_page_error.resolve);
   const response = await page.goto(route);
   if (response === null || !response.ok()) {
     throw new Error(
@@ -390,11 +390,11 @@ async function loadUsableRoute(page: Page, route: string): Promise<number> {
     );
   const outcome = await Promise.race([
     ready,
-    firstPageError.promise.then((error) => ({ usable: false as const, error })),
+    first_page_error.promise.then((error) => ({ usable: false as const, error })),
   ]);
   if (!outcome.usable) {
     const message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
-    const requests = failedRequests.length === 0 ? "none" : failedRequests.join(", ");
+    const requests = failed_requests.length === 0 ? "none" : failed_requests.join(", ");
     throw new Error(
       `the showcase grid did not become usable on ${route}: ${message}; failed requests: ${requests}`,
       { cause: outcome.error },
@@ -404,7 +404,7 @@ async function loadUsableRoute(page: Page, route: string): Promise<number> {
 }
 
 /** Poll the route until the docs server this capture started serves it. */
-async function waitForRoute(route: string, server: Bun.Subprocess): Promise<void> {
+async function wait_for_route(route: string, server: Bun.Subprocess): Promise<void> {
   const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
   let refusal: string | undefined;
   while (Date.now() < deadline) {
@@ -433,7 +433,7 @@ async function waitForRoute(route: string, server: Bun.Subprocess): Promise<void
  * The docs server uses a fixed port with --strictPort, so a server another tree
  * left on that port would answer every request while this tree's server exits.
  */
-async function assertDocsPortFree(route: string): Promise<void> {
+async function assert_docs_port_free(route: string): Promise<void> {
   try {
     await fetch(route);
   } catch (error) {
@@ -446,11 +446,11 @@ async function assertDocsPortFree(route: string): Promise<void> {
 }
 
 /** The capture already at this path, when it is a capture of this schema. */
-async function readPreviousCapture(path: string): Promise<InteractionPreviousCapture | null> {
+async function read_previous_capture(path: string): Promise<InteractionPreviousCapture | null> {
   const file = Bun.file(path);
   if (!(await file.exists())) return null;
   try {
-    return previousCaptureOf(await file.json());
+    return previous_capture_of(await file.json());
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(
@@ -465,7 +465,7 @@ async function readPreviousCapture(path: string): Promise<InteractionPreviousCap
  * again here: a capture that breached a ceiling is still the honest reference
  * for how the current numbers moved, and only its raw samples are read.
  */
-function previousCaptureOf(value: unknown): InteractionPreviousCapture {
+function previous_capture_of(value: unknown): InteractionPreviousCapture {
   const input = record(value, "previous capture");
   if (
     input.protocolVersion !== INTERACTION_PROTOCOL_VERSION ||
@@ -475,11 +475,11 @@ function previousCaptureOf(value: unknown): InteractionPreviousCapture {
   }
   const mode = input.mode;
   if (mode !== "full" && mode !== "smoke") throw new TypeError("previous capture mode is unknown");
-  const inputSamples = record(input.samples, "previous capture.samples");
+  const input_samples = record(input.samples, "previous capture.samples");
   const expected = INTERACTION_SAMPLE_COUNTS[mode];
   const samples = {} as Record<InteractionMetric, readonly number[]>;
   for (const key of INTERACTION_SAMPLE_KEYS) {
-    const raw = inputSamples[key];
+    const raw = input_samples[key];
     if (!Array.isArray(raw) || raw.length !== expected) {
       throw new TypeError(`previous capture.samples.${key} needs ${expected} raw samples`);
     }
@@ -503,11 +503,11 @@ function previousCaptureOf(value: unknown): InteractionPreviousCapture {
     mode,
     commit: commit.commit,
     timestamp,
-    values: summarizeSamples(samples),
+    values: summarize_samples(samples),
   };
 }
 
-function summarizeSamples(samples: InteractionSamples): InteractionValues {
+function summarize_samples(samples: InteractionSamples): InteractionValues {
   return {
     lookupMedianNs: summarize(samples.lookupMedianNs),
     lookupP95Ns: summarize(samples.lookupP95Ns),
@@ -519,7 +519,7 @@ function summarizeSamples(samples: InteractionSamples): InteractionValues {
   };
 }
 
-function methodNotes(): InteractionPerformanceArtifact["method"] {
+function method_notes(): InteractionPerformanceArtifact["method"] {
   return {
     lookup: `Fresh packed view-index worker process per sample: ${INTERACTION_ROWS.toLocaleString("en-US")} rows of one column, ${LOOKUP_BATCHES} batches of ${LOOKUP_BATCH_SIZE.toLocaleString("en-US")} deterministic lookups (${INTERACTION_LOOKUPS_PER_RUN.toLocaleString("en-US")} lookups), nanoseconds per lookup measured over the batches. inverseIndexBytes is the inverse view-index backing store of that worker.`,
     dirty: `Fresh paged dirty-100 probe process per sample: ${INTERACTION_ROWS.toLocaleString("en-US")} rows, ${DISTANT_EDITS} distant edits, no clean page loaded. dirty100Bytes is allocated plus sparse dirty bytes retained.`,
@@ -538,33 +538,33 @@ const SERVER_ERROR_LINE = /error|fail/i;
  * whose imports fail (for example a missing bench/results file) still answers,
  * and only the server log names the file it could not load.
  */
-function forwardServerErrors(stream: ReadableStream<Uint8Array>): {
+function forward_server_errors(stream: ReadableStream<Uint8Array>): {
   readonly recentErrors: () => string;
   readonly drained: Promise<void>;
 } {
-  const errorLines: string[] = [];
+  const error_lines: string[] = [];
   const decoder = new TextDecoder();
   const drained = (async () => {
     for await (const chunk of stream) {
       process.stderr.write(chunk);
       for (const line of decoder.decode(chunk, { stream: true }).split("\n")) {
-        if (SERVER_ERROR_LINE.test(line)) errorLines.push(line.trim());
+        if (SERVER_ERROR_LINE.test(line)) error_lines.push(line.trim());
       }
-      errorLines.splice(0, Math.max(0, errorLines.length - SERVER_ERROR_LINES));
+      error_lines.splice(0, Math.max(0, error_lines.length - SERVER_ERROR_LINES));
     }
   })();
-  return { recentErrors: () => errorLines.join("\n"), drained };
+  return { recentErrors: () => error_lines.join("\n"), drained };
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const mode = args.includes("--smoke") ? "smoke" : "full";
-  const outputPath = resolve(BENCH_ROOT, optionValue(args, "--output") ?? DEFAULT_OUTPUT);
+  const output_path = resolve(BENCH_ROOT, optionValue(args, "--output") ?? DEFAULT_OUTPUT);
   const route = `http://127.0.0.1:${DOCS_PORT}${ROUTE_PATH}`;
   const samples = INTERACTION_SAMPLE_COUNTS[mode];
 
-  const previous = await readPreviousCapture(outputPath);
-  await assertDocsPortFree(route);
+  const previous = await read_previous_capture(output_path);
+  await assert_docs_port_free(route);
   const server = Bun.spawn(
     [
       process.execPath,
@@ -580,7 +580,7 @@ async function main(): Promise<void> {
     // Vite, which would otherwise keep the port and the stderr pipe open.
     { cwd: DOCS_ROOT, stdout: "ignore", stderr: "pipe", detached: true },
   );
-  const serverErrors = forwardServerErrors(server.stderr);
+  const server_errors = forward_server_errors(server.stderr);
   const browser = await chromium.launch();
   const collected: Record<InteractionMetric, number[]> = {
     lookupMedianNs: [],
@@ -592,15 +592,15 @@ async function main(): Promise<void> {
     usableMs: [],
   };
   try {
-    await waitForRoute(route, server);
-    await warmRoute(browser, route);
+    await wait_for_route(route, server);
+    await warm_route(browser, route);
     for (let sample = 0; sample < samples; sample++) {
-      const lookup = lookupSample();
+      const lookup = lookup_sample();
       collected.lookupMedianNs.push(lookup.medianNs);
       collected.lookupP95Ns.push(lookup.p95Ns);
       collected.inverseIndexBytes.push(lookup.inverseIndexBytes);
-      collected.dirty100Bytes.push(dirtySample());
-      const cold = await coldRouteSample(browser, route);
+      collected.dirty100Bytes.push(dirty_sample());
+      const cold = await cold_route_sample(browser, route);
       collected.ownedColdLongTaskMs.push(cold.ownedMs);
       collected.unattributedColdLongTaskMs.push(cold.unattributedMs);
       collected.usableMs.push(cold.usableMs);
@@ -609,18 +609,18 @@ async function main(): Promise<void> {
       );
     }
   } catch (error) {
-    const recentErrors = serverErrors.recentErrors();
-    if (recentErrors === "") throw error;
+    const recent_errors = server_errors.recentErrors();
+    if (recent_errors === "") throw error;
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${message}\nthe docs server reported:\n${recentErrors}`, { cause: error });
+    throw new Error(`${message}\nthe docs server reported:\n${recent_errors}`, { cause: error });
   } finally {
     await browser.close();
     if (server.exitCode === null) process.kill(-server.pid, "SIGTERM");
     await server.exited;
-    await serverErrors.drained;
+    await server_errors.drained;
   }
 
-  const values = summarizeSamples(collected);
+  const values = summarize_samples(collected);
   const artifact: InteractionPerformanceArtifact = {
     protocolVersion: INTERACTION_PROTOCOL_VERSION,
     matrixId: INTERACTION_MATRIX_ID,
@@ -634,7 +634,7 @@ async function main(): Promise<void> {
       browser: `Chromium ${browser.version()}`,
       cpu: cpus()[0]?.model ?? "unknown",
     },
-    method: methodNotes(),
+    method: method_notes(),
     rows: INTERACTION_ROWS,
     lookupsPerRun: INTERACTION_LOOKUPS_PER_RUN,
     samples: collected,
@@ -643,11 +643,11 @@ async function main(): Promise<void> {
     ceilings: INTERACTION_CEILINGS,
   };
   validateInteractionArtifact(artifact);
-  await Bun.write(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  await Bun.write(output_path, `${JSON.stringify(artifact, null, 2)}\n`);
   process.stderr.write(
     [
       "",
-      `interaction ${mode} capture written to ${outputPath} over ${samples} samples; every release ceiling passed`,
+      `interaction ${mode} capture written to ${output_path} over ${samples} samples; every release ceiling passed`,
       ...INTERACTION_SAMPLE_KEYS.map((key) => {
         const ceiling = INTERACTION_CEILING_KEYS.find((candidate) => candidate === key);
         const limit =

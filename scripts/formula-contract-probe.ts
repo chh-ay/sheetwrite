@@ -58,8 +58,8 @@ assert.ok(
   build === "@sheetwrite/wasm" || build === "@sheetwrite/formulas",
   "expected engine package argument",
 );
-const isAnalysis = build === "@sheetwrite/formulas";
-const [selected, other] = isAnalysis ? [formulas, defaultEngine] : [defaultEngine, formulas];
+const is_analysis = build === "@sheetwrite/formulas";
+const [selected, other] = is_analysis ? [formulas, defaultEngine] : [defaultEngine, formulas];
 // Concurrent selection of one engine shares initialization; a later call without
 // an engine keeps it, and a different engine is rejected without being loaded.
 await Promise.all([initSheetwrite({ engine: selected }), initSheetwrite({ engine: selected })]);
@@ -67,7 +67,7 @@ await initSheetwrite();
 await assert.rejects(initSheetwrite({ engine: other }), { message: ENGINE_SWITCH_ERROR });
 assert.equal(selected.isLoaded(), true, "selected engine must be loaded");
 assert.equal(other.isLoaded(), false, "the other engine must never be initialized");
-if (isAnalysis) {
+if (is_analysis) {
   const inventory = JSON.parse(
     readFileSync(
       new URL("../test/conformance/formula-contract.inventory.json", import.meta.url),
@@ -76,13 +76,13 @@ if (isAnalysis) {
   ) as {
     functions: Array<{ canonical: string; aliases: string[]; builds: string[] }>;
   };
-  const expectedNames = inventory.functions
+  const expected_names = inventory.functions
     .filter((formula) => formula.builds.includes(build))
     .flatMap((formula) => [formula.canonical, ...formula.aliases])
     .sort();
   assert.deepEqual(
     formulas.functionNames(),
-    expectedNames,
+    expected_names,
     "active engine names must match build-aware contract including aliases",
   );
 }
@@ -107,7 +107,7 @@ try {
       "engine selection must preserve formula source",
     );
     const actual = store.getCell(address).resolved;
-    if (isAnalysis) {
+    if (is_analysis) {
       assert.equal(typeof actual, "number", source);
       assert.ok(
         typeof actual === "number" &&
@@ -122,7 +122,7 @@ try {
   for (const [offset, source] of DOMAIN_ERRORS.entries()) {
     assert.equal(
       store.getCell({ sheet: "s1", row: DISTRIBUTION_CASES.length + offset, col: 1 }).resolved,
-      isAnalysis ? "#NUM!" : "#NAME?",
+      is_analysis ? "#NUM!" : "#NAME?",
       source,
     );
   }
@@ -137,7 +137,7 @@ try {
   assert.deepEqual(
     completion?.matches.map((fn) => fn.name) ?? [],
     // Completion lists shorter names first, then names in alphabetical order.
-    isAnalysis ? ["NORM.INV", "NORM.DIST", "NORM.S.INV", "NORM.S.DIST"] : [],
+    is_analysis ? ["NORM.INV", "NORM.DIST", "NORM.S.INV", "NORM.S.DIST"] : [],
     "autocomplete must use the selected engine's distribution names",
   );
 } finally {

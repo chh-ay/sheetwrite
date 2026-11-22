@@ -63,8 +63,8 @@ test("saved queries round-trip through Power Query M", () => {
 
   expect(exported.members).toEqual(["Sales", "Regions"]);
   expect(imported.unsupported).toEqual([]);
-  const { output: _output, ...withoutOutput } = sales;
-  expect(imported.queries).toEqual([regions, withoutOutput]);
+  const { output: _output, ...without_output } = sales;
+  expect(imported.queries).toEqual([regions, without_output]);
   expect(exported.losses).toContainEqual({
     query: "Sales",
     step: null,

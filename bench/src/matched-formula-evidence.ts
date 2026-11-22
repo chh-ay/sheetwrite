@@ -94,7 +94,7 @@ function finite(value: unknown, label: string): asserts value is number {
 function delta(before: readonly number[], after: readonly number[], p: number): number {
   return (quantile(after, p) / quantile(before, p) - 1) * 100;
 }
-function nextRandom(state: { value: number }): number {
+function next_random(state: { value: number }): number {
   state.value ^= state.value << 13;
   state.value ^= state.value >>> 17;
   state.value ^= state.value << 5;
@@ -108,16 +108,16 @@ function bootstrap(
   p: number,
 ): Percentile {
   const estimates = new Array<number>(resamples);
-  const sampledBefore = new Array<number>(before.length);
-  const sampledAfter = new Array<number>(after.length);
+  const sampled_before = new Array<number>(before.length);
+  const sampled_after = new Array<number>(after.length);
   const state = { value: seed >>> 0 || 1 };
   for (let sample = 0; sample < resamples; sample++) {
     for (let index = 0; index < before.length; index++) {
-      const picked = nextRandom(state) % before.length;
-      sampledBefore[index] = before[picked]!;
-      sampledAfter[index] = after[picked]!;
+      const picked = next_random(state) % before.length;
+      sampled_before[index] = before[picked]!;
+      sampled_after[index] = after[picked]!;
     }
-    estimates[sample] = delta(sampledBefore, sampledAfter, p);
+    estimates[sample] = delta(sampled_before, sampled_after, p);
   }
   return {
     value: delta(before, after, p),
@@ -127,10 +127,10 @@ function bootstrap(
 function sha256(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
-function exactAllocation(before: RawSample, after: RawSample): boolean {
+function exact_allocation(before: RawSample, after: RawSample): boolean {
   return ALLOCATION_FIELDS.every((field) => before[field] === after[field]);
 }
-function assertRaw(raw: MatchedRawArtifact): void {
+function assert_raw(raw: MatchedRawArtifact): void {
   if (raw.protocol !== MATCHED_FORMULA_PROTOCOL)
     throw new Error("unexpected matched formula protocol");
   if (!/^[0-9a-f]{64}$/u.test(raw.harnessSha256)) throw new Error("malformed harness hash");
@@ -162,11 +162,11 @@ function assertRaw(raw: MatchedRawArtifact): void {
     throw new Error("workload boundary matrix drift");
   if (!Array.isArray(raw.rounds) || raw.rounds.length !== 20)
     throw new Error("expected exactly 20 rounds");
-  for (const [roundIndex, round] of raw.rounds.entries()) {
-    if (round.round !== roundIndex + 1) throw new Error("round numbering is not contiguous");
-    const expectedOrder: Side[] =
-      roundIndex % 2 === 0 ? ["baseline", "post94"] : ["post94", "baseline"];
-    if (JSON.stringify(round.order) !== JSON.stringify(expectedOrder))
+  for (const [round_index, round] of raw.rounds.entries()) {
+    if (round.round !== round_index + 1) throw new Error("round numbering is not contiguous");
+    const expected_order: Side[] =
+      round_index % 2 === 0 ? ["baseline", "post94"] : ["post94", "baseline"];
+    if (JSON.stringify(round.order) !== JSON.stringify(expected_order))
       throw new Error("round order is not alternating");
     if (Object.keys(round.samples).sort().join("|") !== [...WORKLOADS].sort().join("|"))
       throw new Error("workload matrix drift");
@@ -180,12 +180,12 @@ function assertRaw(raw: MatchedRawArtifact): void {
         for (const field of ALLOCATION_FIELDS.slice(1))
           if (sample[field] !== null) finite(sample[field], `${workload}/${side}.${field}`);
       }
-      if (!exactAllocation(round.samples[workload].baseline, round.samples[workload].post94))
+      if (!exact_allocation(round.samples[workload].baseline, round.samples[workload].post94))
         throw new Error(`${workload} allocation mismatch`);
     }
   }
 }
-function validateHashes(evidence: MatchedFormulaEvidence): void {
+function validate_hashes(evidence: MatchedFormulaEvidence): void {
   for (const [label, hash] of Object.entries(evidence.wasmSha256))
     if (!/^[0-9a-f]{64}$/u.test(hash)) throw new Error(`malformed ${label} WASM hash`);
   if (!/^[0-9a-f]{64}$/u.test(evidence.harnessSha256))
@@ -202,7 +202,7 @@ export function buildMatchedEvidence(
   raw: MatchedRawArtifact,
   options: BuildOptions,
 ): MatchedFormulaEvidence {
-  assertRaw(raw);
+  assert_raw(raw);
   const resamples = MATCHED_BOOTSTRAP_RESAMPLES;
   const seed = MATCHED_BOOTSTRAP_SEED;
   if (
@@ -213,12 +213,12 @@ export function buildMatchedEvidence(
   const workloads = {} as Record<Workload, WorkloadEvidence>;
   const failures: string[] = [];
   for (const workload of WORKLOADS) {
-    const baselineMs = raw.rounds.map((round) => round.samples[workload].baseline.ms);
-    const candidateMs = raw.rounds.map((round) => round.samples[workload].post94.ms);
-    const median = bootstrap(baselineMs, candidateMs, resamples, seed ^ workload.length, 0.5);
-    const p95 = bootstrap(baselineMs, candidateMs, resamples, seed ^ workload.length, 0.95);
+    const baseline_ms = raw.rounds.map((round) => round.samples[workload].baseline.ms);
+    const candidate_ms = raw.rounds.map((round) => round.samples[workload].post94.ms);
+    const median = bootstrap(baseline_ms, candidate_ms, resamples, seed ^ workload.length, 0.5);
+    const p95 = bootstrap(baseline_ms, candidate_ms, resamples, seed ^ workload.length, 0.95);
     workloads[workload] = {
-      raw: { baselineMs, candidateMs },
+      raw: { baselineMs: baseline_ms, candidateMs: candidate_ms },
       median,
       p95,
       allocation: { exact: true },
@@ -260,7 +260,7 @@ export function validateMatchedEvidence(
     evidence.protocol !== MATCHED_FORMULA_PROTOCOL
   )
     throw new Error("matched formula evidence version/protocol mismatch");
-  validateHashes(evidence);
+  validate_hashes(evidence);
   if (
     (expectedProvenance?.rawArtifactSha256 !== undefined &&
       evidence.rawArtifactSha256 !== expectedProvenance.rawArtifactSha256) ||
@@ -268,7 +268,7 @@ export function validateMatchedEvidence(
       evidence.harnessSha256 !== expectedProvenance.harnessSha256)
   )
     throw new Error("evidence provenance hash mismatch");
-  assertRaw({
+  assert_raw({
     protocol: evidence.protocol,
     harnessSha256: evidence.harnessSha256,
     sides: {
@@ -296,30 +296,30 @@ export function validateMatchedEvidence(
     const observed = evidence.workloads[workload];
     if (observed?.raw.baselineMs.length !== 20 || observed.raw.candidateMs.length !== 20)
       throw new Error(`${workload} raw matrix drift`);
-    const expectedBaseline = evidence.rounds.map((round) => round.samples[workload].baseline.ms);
-    const expectedCandidate = evidence.rounds.map((round) => round.samples[workload].post94.ms);
+    const expected_baseline = evidence.rounds.map((round) => round.samples[workload].baseline.ms);
+    const expected_candidate = evidence.rounds.map((round) => round.samples[workload].post94.ms);
     if (
-      JSON.stringify(observed.raw.baselineMs) !== JSON.stringify(expectedBaseline) ||
-      JSON.stringify(observed.raw.candidateMs) !== JSON.stringify(expectedCandidate)
+      JSON.stringify(observed.raw.baselineMs) !== JSON.stringify(expected_baseline) ||
+      JSON.stringify(observed.raw.candidateMs) !== JSON.stringify(expected_candidate)
     )
       throw new Error(`${workload} derived raw samples drift`);
-    const expectedMedian = bootstrap(
-      expectedBaseline,
-      expectedCandidate,
+    const expected_median = bootstrap(
+      expected_baseline,
+      expected_candidate,
       evidence.bootstrap.resamples,
       evidence.bootstrap.seed ^ workload.length,
       0.5,
     );
-    const expectedP95 = bootstrap(
-      expectedBaseline,
-      expectedCandidate,
+    const expected_p95 = bootstrap(
+      expected_baseline,
+      expected_candidate,
       evidence.bootstrap.resamples,
       evidence.bootstrap.seed ^ workload.length,
       0.95,
     );
     if (
-      JSON.stringify(observed.median) !== JSON.stringify(expectedMedian) ||
-      JSON.stringify(observed.p95) !== JSON.stringify(expectedP95)
+      JSON.stringify(observed.median) !== JSON.stringify(expected_median) ||
+      JSON.stringify(observed.p95) !== JSON.stringify(expected_p95)
     )
       throw new Error(`${workload} derived bootstrap statistics drift`);
     if (observed.allocation.exact !== true)

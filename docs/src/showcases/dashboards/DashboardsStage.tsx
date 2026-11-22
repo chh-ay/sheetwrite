@@ -19,7 +19,9 @@ export interface DashboardsStageProps {
 
 export function DashboardsStage(props: DashboardsStageProps) {
   const live = createLiveScenario<DashboardScenario, DashboardSnapshot>(() =>
-    import("./boot.js").then(({ createDashboardScenario }) => createDashboardScenario),
+    import("./boot.js").then(
+      ({ createDashboardScenario: create_dashboard_scenario }) => create_dashboard_scenario,
+    ),
   );
   const action = createScenarioAction(live.scenario);
   createEffect(() => setItemCount(live.snapshot()?.items.length ?? 0));

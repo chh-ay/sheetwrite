@@ -17,8 +17,8 @@ const recorded: unknown = await Bun.file(
 validateBillionCellBenchmark(recorded);
 const RECORDED: BillionCellBenchmarkArtifact = recorded;
 const copy = () => mutableCopy(RECORDED);
-const firstScale = (artifact: Artifact) => must(artifact.scales[0], "scale");
-const firstScenario = (artifact: Artifact) => must(firstScale(artifact).scenarios[0], "scenario");
+const first_scale = (artifact: Artifact) => must(artifact.scales[0], "scale");
+const first_scenario = (artifact: Artifact) => must(first_scale(artifact).scenarios[0], "scenario");
 
 /** A platform and architecture that differ from the running process. */
 const OTHER_MACHINE = {
@@ -38,7 +38,7 @@ it("stores every derived ceiling result and rejects a tampered gate", () => {
 
 it("derives an exact failed artifact when a stated bound is exceeded", () => {
   const artifact = copy();
-  firstScale(artifact).startupRuntimeMetadataBytes = STARTUP_METADATA_LIMIT_BYTES + 1;
+  first_scale(artifact).startupRuntimeMetadataBytes = STARTUP_METADATA_LIMIT_BYTES + 1;
   // The scales are measured values; only their readonly modifiers differ from the recorded type.
   const scales = artifact.scales as unknown as BillionCellBenchmarkArtifact["scales"];
   artifact.gate.checks = mutableCopy(deriveBillionCellGateChecks(scales));
@@ -61,23 +61,23 @@ it("derives an exact failed artifact when a stated bound is exceeded", () => {
 it("rejects schema, geometry, traffic, residency, owner-sum and toolchain corruption", () => {
   expectRejections(copy, validateBillionCellBenchmark, [
     [(artifact) => artifact.scales.pop()],
-    [(artifact) => (firstScenario(artifact).timing.samplesMs[0] = Number.NaN)],
+    [(artifact) => (first_scenario(artifact).timing.samplesMs[0] = Number.NaN)],
     [
       (artifact) => {
-        const exchange = must(firstScale(artifact).protocol.exchanges[0], "exchange");
+        const exchange = must(first_scale(artifact).protocol.exchanges[0], "exchange");
         must(exchange.request.columns[0], "column").keys[0] = "not-a-column";
       },
     ],
     [
       (artifact) =>
         (must(
-          firstScale(artifact).protocol.exchanges[0],
+          first_scale(artifact).protocol.exchanges[0],
           "exchange",
         ).page.everyRowHasEveryDeclaredKey = false),
     ],
     [
       (artifact) => {
-        const scenarios = firstScale(artifact).scenarios;
+        const scenarios = first_scale(artifact).scenarios;
         must(
           scenarios.find(({ id }) => id === "first-visible-tile"),
           "first tile",
@@ -86,18 +86,18 @@ it("rejects schema, geometry, traffic, residency, owner-sum and toolchain corrup
     ],
     [
       (artifact) => {
-        const { resources } = firstScenario(artifact);
-        resources.loadedCleanCells = firstScale(artifact).logicalCells;
-        resources.residentCells = firstScale(artifact).logicalCells;
+        const { resources } = first_scenario(artifact);
+        resources.loadedCleanCells = first_scale(artifact).logicalCells;
+        resources.residentCells = first_scale(artifact).logicalCells;
       },
     ],
     [
       (artifact) => {
-        const { owners } = firstScenario(artifact).resources;
+        const { owners } = first_scenario(artifact).resources;
         owners.push(structuredClone(must(owners[0], "owner")));
       },
     ],
-    [(artifact) => (firstScenario(artifact).resources.ownerSums.allocatedBytes += 1)],
+    [(artifact) => (first_scenario(artifact).resources.ownerSums.allocatedBytes += 1)],
     ...(["bunVersion", "typescriptVersion", "platform", "architecture"] as const).map(
       (field) => [(artifact: Artifact) => (artifact.toolchain[field] = "")] as const,
     ),

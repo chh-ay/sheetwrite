@@ -22,18 +22,18 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
 const grids: Grid[] = [];
 afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
 });
 
-const byRegion: PivotDefinition = {
+const by_region: PivotDefinition = {
   id: "by-region",
   name: "By region",
   source: { table: "orders" },
@@ -43,7 +43,7 @@ const byRegion: PivotDefinition = {
   values: [{ field: 1, aggregation: "SUM" }],
 };
 
-const pivotItem: DashboardItem = {
+const pivot_item: DashboardItem = {
   id: "sales",
   box: { x: 0, y: 0, w: 8, h: 6 },
   kind: "pivot",
@@ -93,10 +93,10 @@ function snapshot(): WorkbookSnapshot {
         name: "Dash",
         order: 1,
         kind: "dashboard",
-        dashboard: { items: [pivotItem, slicer] },
+        dashboard: { items: [pivot_item, slicer] },
         rowCount: 0,
         columns: [],
-        pivots: [byRegion],
+        pivots: [by_region],
         cells: [],
       },
     ],
@@ -111,7 +111,7 @@ function mount(input: WorkbookSnapshot = snapshot(), host = document.createEleme
 }
 
 /** The items of the dashboard Dash, as the grid holds them. */
-const dashboardOf = (grid: Grid) =>
+const dashboard_of = (grid: Grid) =>
   grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "dash")?.dashboard;
 
 const apply = (grid: Grid, ...patches: DocumentOp[]) => grid.applyTransaction({ patches }).status;
@@ -121,7 +121,7 @@ describe("dashboard sheets", () => {
     const store = SheetwriteStore.fromSnapshot(snapshot());
     const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
 
-    expect(restored.getDashboard("dash")).toEqual({ items: [pivotItem, slicer] });
+    expect(restored.getDashboard("dash")).toEqual({ items: [pivot_item, slicer] });
     expect(restored.getDashboard("data")).toBeNull();
 
     const grid = mount();
@@ -153,36 +153,36 @@ describe("dashboard sheets", () => {
   });
 
   it("refuses an invalid snapshot dashboard", () => {
-    const withCells = snapshot();
-    const dash = withCells.sheets[1];
+    const with_cells = snapshot();
+    const dash = with_cells.sheets[1];
     if (dash === undefined) throw new Error("the fixture has a dashboard");
     dash.rowCount = 2;
-    expect(validateWorkbookSnapshot(withCells).ok).toBe(false);
+    expect(validateWorkbookSnapshot(with_cells).ok).toBe(false);
 
-    const onWorksheet = snapshot();
-    const data = onWorksheet.sheets[0];
+    const on_worksheet = snapshot();
+    const data = on_worksheet.sheets[0];
     if (data === undefined) throw new Error("the fixture has a worksheet");
     data.dashboard = { items: [] };
-    expect(validateWorkbookSnapshot(onWorksheet).ok).toBe(false);
+    expect(validateWorkbookSnapshot(on_worksheet).ok).toBe(false);
 
     const overlapping = snapshot();
     overlapping.sheets[1]?.dashboard?.items.push({ ...slicer, id: "again" });
     expect(validateWorkbookSnapshot(overlapping).ok).toBe(false);
 
-    const rangePivot = snapshot();
+    const range_pivot = snapshot();
     const range = { sheet: "data", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } };
-    rangePivot.sheets[1]?.pivots?.splice(0, 1, { ...byRegion, source: { range } });
-    expect(validateWorkbookSnapshot(rangePivot).ok).toBe(false);
+    range_pivot.sheets[1]?.pivots?.splice(0, 1, { ...by_region, source: { range } });
+    expect(validateWorkbookSnapshot(range_pivot).ok).toBe(false);
   });
 
   it("keeps a pivot item whose pivot is removed, and undo brings the pivot back", () => {
     const grid = mount();
 
     expect(apply(grid, { op: "removePivot", sheet: "dash", id: "by-region" })).toBe("applied");
-    expect(dashboardOf(grid)?.items).toEqual([pivotItem, slicer]);
+    expect(dashboard_of(grid)?.items).toEqual([pivot_item, slicer]);
 
     grid.undo();
-    expect(grid.getPivots("dash")).toEqual([byRegion]);
+    expect(grid.getPivots("dash")).toEqual([by_region]);
 
     expect(
       apply(
@@ -192,13 +192,13 @@ describe("dashboard sheets", () => {
       ),
     ).toBe("applied");
     grid.undo();
-    expect(dashboardOf(grid)?.items).toEqual([pivotItem, slicer]);
-    expect(grid.getPivots("dash")).toEqual([byRegion]);
+    expect(dashboard_of(grid)?.items).toEqual([pivot_item, slicer]);
+    expect(grid.getPivots("dash")).toEqual([by_region]);
   });
 });
 
 /** Dash shown in a sized host, with Orders holding East and West. */
-async function mountView() {
+async function mount_view() {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 1200 }, clientHeight: { value: 600 } });
   const grid = mount(snapshot(), host);
@@ -228,7 +228,7 @@ async function mountView() {
 }
 
 it("keeps one slicer value on a click and adds one with Ctrl, as saved changes", async () => {
-  const { grid, host, press } = await mountView();
+  const { grid, host, press } = await mount_view();
   const value = (label: string) => {
     const button = [
       ...host.querySelectorAll<HTMLElement>(".sheetwrite-dashboard-slicer-value"),
@@ -236,7 +236,7 @@ it("keeps one slicer value on a click and adds one with Ctrl, as saved changes",
     if (button === undefined) throw new Error(`no slicer value ${label}`);
     return button;
   };
-  const region = () => dashboardOf(grid)?.items.find((item) => item.id === "region");
+  const region = () => dashboard_of(grid)?.items.find((item) => item.id === "region");
   const { selected: _selected, ...unfiltered } = slicer;
 
   press(value("West"));
@@ -262,10 +262,10 @@ it("adds a dashboard from Insert › New Dashboard and shows it", async () => {
 });
 
 it("moves an item with the keyboard, one undo step per arrow, and refuses an occupied place", async () => {
-  const { grid, host, labelled, press } = await mountView();
+  const { grid, host, labelled, press } = await mount_view();
   const key = (name: string) =>
     labelled("Region").dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
-  const box = () => dashboardOf(grid)?.items.find((item) => item.id === "region")?.box;
+  const box = () => dashboard_of(grid)?.items.find((item) => item.id === "region")?.box;
 
   press(labelled("Region item actions"));
   const move = [...host.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
@@ -305,7 +305,7 @@ describe("dashboard XLSX export", () => {
   it("passes the slicer selection, and pivot captions without values, from the default engine", async () => {
     const grid = mount();
     // A backend that keeps what core passes to it, in place of any installed one.
-    const restoreXlsxSlots = keepXlsxSlots();
+    const restore_xlsx_slots = keepXlsxSlots();
     let passed: readonly DashboardExport[] | undefined;
     setXlsxWorkbookBackend({
       name: "capture",
@@ -320,7 +320,7 @@ describe("dashboard XLSX export", () => {
     try {
       await toXlsxWorkbook(grid);
     } finally {
-      restoreXlsxSlots();
+      restore_xlsx_slots();
     }
 
     // The default engine computes no dashboard pivot, so the pivot item has only its name.

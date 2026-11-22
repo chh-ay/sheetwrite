@@ -51,37 +51,37 @@ export type ChartViewCache = ChartViewProvider;
 export function createChartViewCache(store: Store): ChartViewCache {
   const views = new Map<SheetId, Map<string, ChartView | null>>();
   const listeners = new Set<ChartChangeListener>();
-  let isDisposed = false;
+  let is_disposed = false;
 
-  const unsubscribeStore = subscribeChartChanges(store, (event: ChartChangeEvent) => {
+  const unsubscribe_store = subscribeChartChanges(store, (event: ChartChangeEvent) => {
     for (const chart of event.charts) views.get(chart.sheet)?.delete(chart.id);
 
     for (const listener of listeners) listener(event);
   });
 
-  const assertLive = (): void => {
+  const assert_live = (): void => {
     // The Vite bundler fixture checks this text to detect the optional chart chunk.
-    if (isDisposed) throw new Error("Sheetwrite: chart view cache was disposed");
+    if (is_disposed) throw new Error("Sheetwrite: chart view cache was disposed");
   };
 
   return {
     get(chart) {
-      assertLive();
+      assert_live();
 
-      let sheetViews = views.get(chart.sheet);
-      const cached = sheetViews?.get(chart.id);
+      let sheet_views = views.get(chart.sheet);
+      const cached = sheet_views?.get(chart.id);
       if (cached !== undefined) return cached;
 
       const view = resolveChartView(store, chart.sheet, chart.id);
-      if (!sheetViews) {
-        sheetViews = new Map<string, ChartView | null>();
-        views.set(chart.sheet, sheetViews);
+      if (!sheet_views) {
+        sheet_views = new Map<string, ChartView | null>();
+        views.set(chart.sheet, sheet_views);
       }
-      sheetViews.set(chart.id, view);
+      sheet_views.set(chart.id, view);
       return view;
     },
     subscribe(listener) {
-      assertLive();
+      assert_live();
 
       listeners.add(listener);
       return () => {
@@ -89,10 +89,10 @@ export function createChartViewCache(store: Store): ChartViewCache {
       };
     },
     dispose() {
-      if (isDisposed) return;
+      if (is_disposed) return;
 
-      isDisposed = true;
-      unsubscribeStore();
+      is_disposed = true;
+      unsubscribe_store();
       views.clear();
       listeners.clear();
     },

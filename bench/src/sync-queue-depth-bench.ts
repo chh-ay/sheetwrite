@@ -80,7 +80,7 @@ function fail(message: string): never {
   throw new Error(`sync-queue-depth: ${message}`);
 }
 
-function parseDepths(argv: readonly string[]): readonly number[] {
+function parse_depths(argv: readonly string[]): readonly number[] {
   const value = optionValue(argv, "--depths");
   if (value === undefined) return DEFAULT_DEPTHS;
   return value.split(",").map((part) => {
@@ -90,7 +90,7 @@ function parseDepths(argv: readonly string[]): readonly number[] {
   });
 }
 
-function cellAddress(row: number): CellAddress {
+function cell_address(row: number): CellAddress {
   return { sheet: SHEET, row, col: 0 };
 }
 
@@ -107,12 +107,12 @@ function snapshot(): WorkbookSnapshot {
 }
 
 /** Commit number `commit` writes its own number, so the last value names the last commit. */
-function commitOne(grid: Grid, commit: number): void {
+function commit_one(grid: Grid, commit: number): void {
   const result = grid.applyTransaction({
     patches: [
       {
         op: "set",
-        addr: cellAddress(commit % COMMIT_ROWS),
+        addr: cell_address(commit % COMMIT_ROWS),
         value: { kind: "literal", value: commit },
       },
     ],
@@ -120,7 +120,7 @@ function commitOne(grid: Grid, commit: number): void {
   if (result.status !== "applied") fail(`commit ${commit} was ${result.status}`);
 }
 
-function validateQueue(coordinator: SyncCoordinator, expected: number): void {
+function validate_queue(coordinator: SyncCoordinator, expected: number): void {
   if (coordinator.pendingCount !== expected) {
     fail(`queue holds ${coordinator.pendingCount} commits, expected ${expected}`);
   }
@@ -138,22 +138,22 @@ function validateQueue(coordinator: SyncCoordinator, expected: number): void {
     ids.add(record.clientMutationId);
   }
   if (ids.size !== expected) fail("queue reused a mutation identity");
-  const lastOperation = records[records.length - 1]?.operations[0];
+  const last_operation = records[records.length - 1]?.operations[0];
   if (
-    lastOperation?.op !== "set" ||
-    lastOperation.value.kind !== "literal" ||
-    lastOperation.value.value !== expected - 1
+    last_operation?.op !== "set" ||
+    last_operation.value.kind !== "literal" ||
+    last_operation.value.value !== expected - 1
   ) {
     fail("queue does not carry the last committed value");
   }
 }
 
-function collectGarbage(): void {
+function collect_garbage(): void {
   forceGc();
   fullGC();
 }
 
-function measureDepth(
+function measure_depth(
   depth: number,
 ): Omit<DepthResult, "maxRssMiB" | "drainMs" | "drainSwappedMs"> {
   const host = document.createElement("div");
@@ -172,24 +172,24 @@ function measureDepth(
     limits: { maxPendingCommits: depth + PENDING_HEADROOM },
   });
   try {
-    collectGarbage();
-    const heapBefore = heapStats().heapSize;
+    collect_garbage();
+    const heap_before = heapStats().heapSize;
     let commit = 0;
-    while (commit < depth) commitOne(grid, commit++);
-    const samplesMs = collect(() => commitOne(grid, commit++), {
+    while (commit < depth) commit_one(grid, commit++);
+    const samples_ms = collect(() => commit_one(grid, commit++), {
       warmup: WARMUP_COMMITS,
       iters: TIMED_COMMITS,
     });
-    validateQueue(coordinator, commit);
-    collectGarbage();
-    const retainedHeapMiB = (heapStats().heapSize - heapBefore) / BYTES_PER_MIB;
-    const stat = summarize(samplesMs);
+    validate_queue(coordinator, commit);
+    collect_garbage();
+    const retained_heap_mi_b = (heapStats().heapSize - heap_before) / BYTES_PER_MIB;
+    const stat = summarize(samples_ms);
     return {
       depth,
       medianMs: stat.median,
       p95Ms: stat.p95,
       samples: stat.iters,
-      retainedHeapMiB,
+      retainedHeapMiB: retained_heap_mi_b,
     };
   } finally {
     coordinator.destroy();
@@ -198,7 +198,7 @@ function measureDepth(
   }
 }
 
-function drainRecords(depth: number): SyncMutationRecord[] {
+function drain_records(depth: number): SyncMutationRecord[] {
   return Array.from({ length: depth }, (_, index) => ({
     documentId: DOCUMENT_ID,
     baseVersion: index,
@@ -209,7 +209,7 @@ function drainRecords(depth: number): SyncMutationRecord[] {
 }
 
 /** Mutation IDs in acknowledgement order; `swapped` exchanges each pair. */
-function acknowledgementOrder(records: readonly SyncMutationRecord[], swapped: boolean): string[] {
+function acknowledgement_order(records: readonly SyncMutationRecord[], swapped: boolean): string[] {
   const ids = records.map((record) => record.clientMutationId);
   if (swapped) {
     for (let index = 0; index + 1 < ids.length; index += 2) {
@@ -223,21 +223,21 @@ function acknowledgementOrder(records: readonly SyncMutationRecord[], swapped: b
   return ids;
 }
 
-function filledQueue(records: readonly SyncMutationRecord[]): PendingRecordQueue {
+function filled_queue(records: readonly SyncMutationRecord[]): PendingRecordQueue {
   const queue = new PendingRecordQueue();
   for (const record of records) queue.add(record);
   return queue;
 }
 
-function assertDrained(queue: PendingRecordQueue): void {
+function assert_drained(queue: PendingRecordQueue): void {
   if (queue.head() !== undefined || queue.versionCount !== 0 || queue.count("pending") !== 0) {
     fail("drain left records in the queue");
   }
 }
 
 /** Untimed: after every acknowledgement the head is the oldest record still queued. */
-function validateDrain(records: readonly SyncMutationRecord[], acks: readonly string[]): void {
-  const queue = filledQueue(records);
+function validate_drain(records: readonly SyncMutationRecord[], acks: readonly string[]): void {
+  const queue = filled_queue(records);
   const acknowledged = new Set<string>();
   let oldest = 0;
   for (const id of acks) {
@@ -248,15 +248,15 @@ function validateDrain(records: readonly SyncMutationRecord[], acks: readonly st
     }
     if (queue.head() !== records[oldest]) fail(`drain head is wrong after ${id}`);
   }
-  assertDrained(queue);
+  assert_drained(queue);
 }
 
-function measureDrain(depth: number, swapped: boolean): number {
-  const records = drainRecords(depth);
-  const acks = acknowledgementOrder(records, swapped);
-  validateDrain(records, acks);
-  let queue = filledQueue([]);
-  const samplesMs = collect(
+function measure_drain(depth: number, swapped: boolean): number {
+  const records = drain_records(depth);
+  const acks = acknowledgement_order(records, swapped);
+  validate_drain(records, acks);
+  let queue = filled_queue([]);
+  const samples_ms = collect(
     () => {
       for (const id of acks) queue.remove(id);
     },
@@ -264,35 +264,35 @@ function measureDrain(depth: number, swapped: boolean): number {
       warmup: DRAIN_WARMUPS,
       iters: DRAIN_SAMPLES,
       before: () => {
-        queue = filledQueue(records);
+        queue = filled_queue(records);
       },
-      after: () => assertDrained(queue),
+      after: () => assert_drained(queue),
     },
   );
-  return summarize(samplesMs).median;
+  return summarize(samples_ms).median;
 }
 
-async function runWorker(depth: number): Promise<DepthResult> {
+async function run_worker(depth: number): Promise<DepthResult> {
   await initSheetwrite({ source: readFileSync(WASM_PATH) });
-  const restoreCanvas = installCanvasTestStubs();
+  const restore_canvas = installCanvasTestStubs();
   try {
     // The first Grid and coordinator in a process run cold code; discard them so
     // every depth is measured against an equally warm JIT.
-    measureDepth(JIT_WARMUP_DEPTH);
-    const result = measureDepth(depth);
-    const maxRssMiB = process.resourceUsage().maxRSS / KIB_PER_MIB;
+    measure_depth(JIT_WARMUP_DEPTH);
+    const result = measure_depth(depth);
+    const max_rss_mi_b = process.resourceUsage().maxRSS / KIB_PER_MIB;
     return {
       ...result,
-      maxRssMiB,
-      drainMs: measureDrain(depth, false),
-      drainSwappedMs: measureDrain(depth, true),
+      maxRssMiB: max_rss_mi_b,
+      drainMs: measure_drain(depth, false),
+      drainSwappedMs: measure_drain(depth, true),
     };
   } finally {
-    restoreCanvas();
+    restore_canvas();
   }
 }
 
-function spawnWorker(depth: number): string {
+function spawn_worker(depth: number): string {
   const child = Bun.spawnSync({
     cmd: [process.execPath, fileURLToPath(import.meta.url), "--worker", String(depth)],
     stdout: "pipe",
@@ -308,7 +308,7 @@ const argv = process.argv.slice(2);
 const worker = optionValue(argv, "--worker");
 if (worker !== undefined) {
   const depth = Number(worker);
-  process.stdout.write(`${JSON.stringify(await runWorker(depth))}\n`);
+  process.stdout.write(`${JSON.stringify(await run_worker(depth))}\n`);
 } else {
-  for (const depth of parseDepths(argv)) process.stdout.write(spawnWorker(depth));
+  for (const depth of parse_depths(argv)) process.stdout.write(spawn_worker(depth));
 }

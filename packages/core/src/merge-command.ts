@@ -44,22 +44,22 @@ export function mergeSelection(
   center: boolean,
   warn?: (message: string) => Promise<boolean>,
 ): void {
-  const merge = mergeBounds(deps);
+  const merge = merge_bounds(deps);
   if (merge === null) return;
   if (!warn) {
-    commitMerge(deps, merge, center);
+    commit_merge(deps, merge, center);
     return;
   }
 
-  const values = mergeValues(deps, merge);
+  const values = merge_values(deps, merge);
   if (values.held < 2) {
-    commitMerge(deps, merge, center);
+    commit_merge(deps, merge, center);
     return;
   }
 
-  void warn(mergeWarning(values)).then((ok) => {
+  void warn(merge_warning(values)).then((ok) => {
     // The selection or the sheet may have changed while the warning was open.
-    const now = mergeBounds(deps);
+    const now = merge_bounds(deps);
     if (
       ok &&
       now !== null &&
@@ -68,18 +68,18 @@ export function mergeSelection(
       now.r1 === merge.r1 &&
       now.c1 === merge.c1
     ) {
-      commitMerge(deps, merge, center);
+      commit_merge(deps, merge, center);
     }
   });
 }
 
 /** The selected range as a merge, or null when it cannot merge. */
-function mergeBounds(deps: StyleActionsDeps): MergeBounds | null {
+function merge_bounds(deps: StyleActionsDeps): MergeBounds | null {
   if (deps.readOnly()) return null;
-  const activeSheet = deps.activeSheet();
-  if (deps.loadable?.hasView(activeSheet)) return null;
+  const active_sheet = deps.activeSheet();
+  if (deps.loadable?.hasView(active_sheet)) return null;
 
-  const sel = deps.selection().toSelection(activeSheet);
+  const sel = deps.selection().toSelection(active_sheet);
   if (sel?.kind !== "range") return null;
   const { start, end } = sel.range;
   const merge = {
@@ -113,15 +113,19 @@ interface MergeValues {
  * Read the values of `merge`. The listed values are formatted as their cells
  * show them; the rest are only counted.
  */
-function mergeValues(deps: StyleActionsDeps, merge: MergeBounds): MergeValues {
-  const sheetId = deps.activeSheet();
+function merge_values(deps: StyleActionsDeps, merge: MergeBounds): MergeValues {
+  const sheet_id = deps.activeSheet();
   const columns = deps.sheet().columns;
   const cols = Array.from({ length: merge.c1 - merge.c0 + 1 }, (_, index) => merge.c0 + index);
   const band = Math.max(1, Math.floor(MERGE_SCAN_CELLS / cols.length));
   const result: MergeValues = { held: 0, listed: [], discarded: 0 };
   for (let start = merge.r0; start <= merge.r1; start += band) {
     const rows = { start, end: Math.min(merge.r1 + 1, start + band) };
-    const { values, styleIds, styles } = deps.store.getVisibleWindow(sheetId, rows, cols);
+    const {
+      values,
+      styleIds: style_ids,
+      styles,
+    } = deps.store.getVisibleWindow(sheet_id, rows, cols);
     for (let index = 0; index < values.length; index++) {
       const value = values[index];
       if (value === null || value === undefined || value === "") continue;
@@ -132,7 +136,7 @@ function mergeValues(deps: StyleActionsDeps, merge: MergeBounds): MergeValues {
 
       result.discarded += 1;
       if (result.listed.length === LISTED_VALUES) continue;
-      const format = styles[styleIds[index]!]?.numberFormat ?? columns[col]?.numberFormat;
+      const format = styles[style_ids[index]!]?.numberFormat ?? columns[col]?.numberFormat;
       const text = cellDisplayText(value, format);
       const shown =
         text.length > LISTED_TEXT_LENGTH ? `${text.slice(0, LISTED_TEXT_LENGTH - 1)}…` : text;
@@ -144,23 +148,23 @@ function mergeValues(deps: StyleActionsDeps, merge: MergeBounds): MergeValues {
 }
 
 /** Excel's warning, then the values the merge would discard and where they are. */
-function mergeWarning({ listed, discarded }: MergeValues): string {
+function merge_warning({ listed, discarded }: MergeValues): string {
   const more = discarded - listed.length;
   const values = more > 0 ? `${listed.join(", ")} and ${more} more` : listed.join(", ");
   return `${MERGE_WARNING} ${discarded === 1 ? "This value" : "These values"} will be discarded: ${values}.`;
 }
 
-function commitMerge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean): void {
-  const activeSheet = deps.activeSheet();
+function commit_merge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean): void {
+  const active_sheet = deps.activeSheet();
   const sheet = deps.sheet();
   const range = {
-    sheet: activeSheet,
+    sheet: active_sheet,
     start: { row: merge.r0, col: merge.c0 },
     end: { row: merge.r1, col: merge.c1 },
   };
   const engine = storeEngine(deps.store);
   // Per-cell operations preserve policy issue indices and partial spill rejection.
-  const scalarWrites =
+  const scalar_writes =
     !engine ||
     Boolean(
       sheet.validationRules?.length ||
@@ -168,15 +172,15 @@ function commitMerge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean
       engine.hasSpillChildren(range),
     );
   const cells: SnapshotCell[] = [];
-  const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
+  const patches: DocumentOp[] = [{ op: "addMerge", sheet: active_sheet, merge }];
   for (let row = merge.r0; row <= merge.r1; row++) {
     for (let col = merge.c0; col <= merge.c1; col++) {
       if (row === merge.r0 && col === merge.c0) continue;
       const value: CellValue = { kind: "literal", value: null };
-      if (scalarWrites) {
+      if (scalar_writes) {
         patches.push({
           op: "set",
-          addr: { sheet: activeSheet, row: deps.toDataRow(row), col },
+          addr: { sheet: active_sheet, row: deps.toDataRow(row), col },
           value,
         });
       } else cells.push({ rowOffset: row - merge.r0, colOffset: col - merge.c0, value });
@@ -188,7 +192,7 @@ function commitMerge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean
     patches.push({
       op: "setRangeStyle",
       range: {
-        sheet: activeSheet,
+        sheet: active_sheet,
         start: { row: merge.r0, col: merge.c0 },
         end: { row: merge.r0, col: merge.c0 },
       },

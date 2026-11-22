@@ -8,26 +8,26 @@ const RECORDED = (await Bun.file(
   new URL("../results/full-engine-results.json", import.meta.url),
 ).json()) as FullEngineResult;
 const recorded = () => structuredClone(RECORDED);
-const firstEngine = (result: FullEngineResult) => must(result.engines[0], "engine");
-const sharedWorkload = (result: FullEngineResult) =>
-  must(firstEngine(result).shared.workloads[0], "shared workload");
+const first_engine = (result: FullEngineResult) => must(result.engines[0], "engine");
+const shared_workload = (result: FullEngineResult) =>
+  must(first_engine(result).shared.workloads[0], "shared workload");
 const analysis = (result: FullEngineResult) => must(result.analysis[0], "analysis workload");
 const ZERO_DIGEST = "0".repeat(64);
 
-/** Files the shared capture's engine hashes under `packages/<enginePackage>/`, as a new capture does. */
-function rekeyShared(
+/** Files the shared capture's engine hashes under `packages/<engine_package>/`, as a new capture does. */
+function rekey_shared(
   result: FullEngineResult,
-  engineId: string,
-  enginePackage: string,
+  engine_id: string,
+  engine_package: string,
 ): FullEngineResult {
   const source = must(
-    result.engines.find((engine) => engine.engine === engineId)?.shared.source,
-    engineId,
+    result.engines.find((engine) => engine.engine === engine_id)?.shared.source,
+    engine_id,
   );
   source.files = Object.fromEntries(
     Object.entries(source.files)
       .map(([path, digest]) => [
-        path.replace("packages/wasm/", `packages/${enginePackage}/`),
+        path.replace("packages/wasm/", `packages/${engine_package}/`),
         digest,
       ])
       .toSorted(([left = ""], [right = ""]) => left.localeCompare(right)),
@@ -38,14 +38,16 @@ function rekeyShared(
 
 it("accepts the recorded matrix and engine hashes keyed by the package the full engine loaded", () => {
   expect(() => validateFullEngineResult(recorded())).not.toThrow();
-  expect(() => validateFullEngineResult(rekeyShared(recorded(), "full", "formulas"))).not.toThrow();
+  expect(() =>
+    validateFullEngineResult(rekey_shared(recorded(), "full", "formulas")),
+  ).not.toThrow();
 });
 
 it("rejects drifted engines, shared workloads, analysis and engine evidence", () => {
   const rejections: Rejection<FullEngineResult>[] = [
-    [(result) => rekeyShared(result, "default", "formulas")],
+    [(result) => rekey_shared(result, "default", "formulas")],
     [(result) => result.engines.pop()],
-    [(result) => (sharedWorkload(result).output = "wrong")],
+    [(result) => (shared_workload(result).output = "wrong")],
     [(result) => (analysis(result).output = 0)],
     [(result) => result.analysis.pop()],
     [
@@ -57,27 +59,27 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
     ],
     [
       (result) => {
-        const { allocationStat } = analysis(result);
-        allocationStat.retainedBytes = {
-          ...allocationStat.retainedBytes,
-          mean: allocationStat.retainedBytes.mean + 1,
+        const { allocationStat: allocation_stat } = analysis(result);
+        allocation_stat.retainedBytes = {
+          ...allocation_stat.retainedBytes,
+          mean: allocation_stat.retainedBytes.mean + 1,
         };
       },
     ],
-    [(result) => firstEngine(result).initialization.samplesMs.pop()],
+    [(result) => first_engine(result).initialization.samplesMs.pop()],
     [
       (result) => {
-        const { initialization } = firstEngine(result);
+        const { initialization } = first_engine(result);
         initialization.stat = { ...initialization.stat, mean: initialization.stat.mean + 1 };
       },
     ],
-    [(result) => (firstEngine(result).wasm.sha256 = ZERO_DIGEST)],
+    [(result) => (first_engine(result).wasm.sha256 = ZERO_DIGEST)],
     [(result) => (result.sourceDigest = ZERO_DIGEST)],
-    [(result) => (firstEngine(result).shared.meta.commit = "0".repeat(40))],
-    [(result) => (firstEngine(result).initialization.node = "")],
+    [(result) => (first_engine(result).shared.meta.commit = "0".repeat(40))],
+    [(result) => (first_engine(result).initialization.node = "")],
     [
       (result) => {
-        const engine = firstEngine(result);
+        const engine = first_engine(result);
         const other = must(
           result.engines.find((capture) => capture.engine !== engine.engine),
           "second engine",

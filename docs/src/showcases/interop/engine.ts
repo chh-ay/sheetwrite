@@ -91,43 +91,43 @@ type WorkbenchSource =
   | { kind: "snapshot"; label: string; snapshot: WorkbookSnapshot }
   | { kind: "columnar"; label: string; columns: Column[]; data: ColumnarData };
 
-function describeError(error: unknown): string {
+function describe_error(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
-function modelNumber(grid: Grid, sheet: string, row: number, col: number): number | null {
+function model_number(grid: Grid, sheet: string, row: number, col: number): number | null {
   const resolved = grid.store.getCell({ sheet, row, col }).resolved;
   return typeof resolved === "number" && Number.isFinite(resolved) ? resolved : null;
 }
 
-function readAnalyticalModel(grid: Grid): AnalyticalReadout | null {
+function read_analytical_model(grid: Grid): AnalyticalReadout | null {
   const sheets = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheet.id));
   if (!sheets.has(INTEROP_ASSUMPTIONS_SHEET) || !sheets.has(INTEROP_ANALYSIS_SHEET)) {
     return null;
   }
-  const spillAnchor = { sheet: INTEROP_ANALYSIS_SHEET, row: 0, col: 4 };
+  const spill_anchor = { sheet: INTEROP_ANALYSIS_SHEET, row: 0, col: 4 };
   const spill = Array.from({ length: 6 }, (_, row) => {
-    const address = { ...spillAnchor, row };
+    const address = { ...spill_anchor, row };
     const owner = grid.store.getSpillAnchor(address);
-    return owner?.sheet === spillAnchor.sheet &&
-      owner.row === spillAnchor.row &&
-      owner.col === spillAnchor.col
-      ? modelNumber(grid, address.sheet, address.row, address.col)
+    return owner?.sheet === spill_anchor.sheet &&
+      owner.row === spill_anchor.row &&
+      owner.col === spill_anchor.col
+      ? model_number(grid, address.sheet, address.row, address.col)
       : null;
   });
   return {
-    selectedRate: modelNumber(grid, INTEROP_ASSUMPTIONS_SHEET, 1, 1),
-    payment: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 0, 3),
-    statistical: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 1, 3),
-    letResult: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 2, 3),
-    npv: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 3, 3),
-    irr: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 4, 3),
-    scheduleEnd: modelNumber(grid, INTEROP_ANALYSIS_SHEET, 4, 0),
+    selectedRate: model_number(grid, INTEROP_ASSUMPTIONS_SHEET, 1, 1),
+    payment: model_number(grid, INTEROP_ANALYSIS_SHEET, 0, 3),
+    statistical: model_number(grid, INTEROP_ANALYSIS_SHEET, 1, 3),
+    letResult: model_number(grid, INTEROP_ANALYSIS_SHEET, 2, 3),
+    npv: model_number(grid, INTEROP_ANALYSIS_SHEET, 3, 3),
+    irr: model_number(grid, INTEROP_ANALYSIS_SHEET, 4, 3),
+    scheduleEnd: model_number(grid, INTEROP_ANALYSIS_SHEET, 4, 0),
     spill,
   };
 }
 
-function changedAnalyticalResults(
+function changed_analytical_results(
   previous: AnalyticalReadout,
   next: AnalyticalReadout,
 ): readonly string[] {
@@ -176,18 +176,18 @@ export interface InteropEngine {
 
 /** Starts the exchange workbook in its hosts and hashes the committed fixtures. */
 export function createInteropEngine(hosts: InteropHosts): InteropEngine {
-  const bytesCache = new Map<string, Uint8Array>();
+  const bytes_cache = new Map<string, Uint8Array>();
   let probed = false;
   let grid: Grid | null = null;
   let unmount: (() => void) | null = null;
   let disposed = false;
   let generation = 0;
 
-  const fixtureBytes = async (fixture: InteropFixture): Promise<Uint8Array> => {
-    const cached = bytesCache.get(fixture.file);
+  const fixture_bytes = async (fixture: InteropFixture): Promise<Uint8Array> => {
+    const cached = bytes_cache.get(fixture.file);
     if (cached) return cached;
     const bytes = await fetchFixtureBytes(fixture);
-    bytesCache.set(fixture.file, bytes);
+    bytes_cache.set(fixture.file, bytes);
     return bytes;
   };
 
@@ -200,8 +200,8 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
     setGridReady(false);
     let mounted: Grid | null = null;
     const pieces: ShellPiece[] = [];
-    let unsubscribeChange: (() => void) | null = null;
-    let previousModel: AnalyticalReadout | null = null;
+    let unsubscribe_change: (() => void) | null = null;
+    let previous_model: AnalyticalReadout | null = null;
 
     void initSheetwrite()
       .then(async () => {
@@ -221,8 +221,8 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
               { action: "copy", label: "Copy imported value" },
               { action: "paste" },
               { action: "separator" },
-              { label: "Export XLSX with fidelity report", onClick: () => void handleDownload() },
-              { label: "Compare XLSX round-trip", onClick: () => void handleRoundTrip() },
+              { label: "Export XLSX with fidelity report", onClick: () => void handle_download() },
+              { label: "Compare XLSX round-trip", onClick: () => void handle_round_trip() },
             ],
           },
         };
@@ -256,22 +256,22 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         );
         grid = live;
         window.__sheetwriteInteropGrid = live;
-        previousModel = readAnalyticalModel(live);
-        setModelReadout(previousModel);
+        previous_model = read_analytical_model(live);
+        setModelReadout(previous_model);
         setModelChange(null);
-        unsubscribeChange = live.on("change", (event) => {
-          const nextModel = readAnalyticalModel(live);
-          setModelReadout(nextModel);
-          if (previousModel && nextModel) {
+        unsubscribe_change = live.on("change", (event) => {
+          const next_model = read_analytical_model(live);
+          setModelReadout(next_model);
+          if (previous_model && next_model) {
             setModelChange({
               address: event.changes
                 .map(({ addr }) => `${String(addr.sheet)}!R${addr.row + 1}C${addr.col + 1}`)
                 .join(", "),
               committedCells: event.changes.length,
-              changedResults: changedAnalyticalResults(previousModel, nextModel),
+              changedResults: changed_analytical_results(previous_model, next_model),
             });
           }
-          previousModel = nextModel;
+          previous_model = next_model;
         });
         setGridReady(true);
         setStatus(
@@ -281,12 +281,12 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
       .catch((error: unknown) => {
         if (!disposed && current === generation) {
           setGridReady(false);
-          setStatus(`Workbook could not load — ${describeError(error)}`);
+          setStatus(`Workbook could not load — ${describe_error(error)}`);
         }
       });
 
     unmount = () => {
-      unsubscribeChange?.();
+      unsubscribe_change?.();
       setGridReady(false);
       for (const piece of pieces) piece.destroy();
       if (grid === mounted) {
@@ -301,7 +301,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
   void (async () => {
     for (const fixture of [...POSITIVE_FIXTURES, ...ADVERSARIAL_FIXTURES]) {
       try {
-        const bytes = await fixtureBytes(fixture);
+        const bytes = await fixture_bytes(fixture);
         const actual = await sha256Hex(bytes);
         if (disposed) return;
         setDigests(fixture.id, {
@@ -311,16 +311,16 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         });
       } catch (error) {
         if (disposed) return;
-        setDigests(fixture.id, { state: "mismatch", actual: describeError(error) });
+        setDigests(fixture.id, { state: "mismatch", actual: describe_error(error) });
       }
     }
   })();
 
   // The engine resolves --sheetwrite-* custom properties at grid mount. When
   // the site theme flips, re-run that resolution so the canvas repaints.
-  const stopTheme = observeSiteTheme(() => grid?.replaceTheme(CANVAS_THEME));
+  const stop_theme = observeSiteTheme(() => grid?.replaceTheme(CANVAS_THEME));
 
-  const handleDownload = async () => {
+  const handle_download = async () => {
     if (!grid) return;
     try {
       const outcome = await exportWorkbook(grid);
@@ -328,12 +328,12 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
       downloadBytes(outcome.bytes, "sheetwrite-interoperability.xlsx", XLSX_MIME);
       setStatus(`Downloaded ${outcome.bytes.byteLength.toLocaleString("en")} bytes of .xlsx.`);
     } catch (error) {
-      setStatus(`Export failed — ${describeError(error)}`);
+      setStatus(`Export failed — ${describe_error(error)}`);
       throw new Error("Cannot export the workbook.", { cause: error });
     }
   };
 
-  const handleRoundTrip = async () => {
+  const handle_round_trip = async () => {
     if (!grid) return;
     setStatus("Exporting and re-importing the live document…");
     try {
@@ -347,14 +347,14 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         `Compared ${report.cellsCompared.toLocaleString("en")} stored cells. ${report.cellsMatched.toLocaleString("en")} matched; ${report.formulasPreserved}/${report.formulasBefore} formula sources preserved.`,
       );
     } catch (error) {
-      setStatus(`Round-trip failed — ${describeError(error)}`);
+      setStatus(`Round-trip failed — ${describe_error(error)}`);
       throw new Error("Cannot compare the workbook round-trip.", { cause: error });
     }
   };
 
   const rich = () => POSITIVE_FIXTURES.find((fixture) => fixture.file === "libreoffice-rich.xlsx");
 
-  const resetWorkbench = () => {
+  const reset_workbench = () => {
     setFileReport(null);
     setBulkReport(null);
     setRoundTrip(null);
@@ -366,8 +366,8 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
   mount({ kind: "snapshot", label: STARTING_SOURCE_LABEL, snapshot: createInteropSnapshot() });
 
   return {
-    handleDownload,
-    handleRoundTrip,
+    handleDownload: handle_download,
+    handleRoundTrip: handle_round_trip,
     handleModelInput(row, col, value, label) {
       if (!grid) return;
       const outcome = grid.applyTransaction({
@@ -432,7 +432,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         setRoundTrip(null);
         setFixtureLoad(null);
       } catch (error) {
-        setStatus(`Import rejected — ${describeError(error)}`);
+        setStatus(`Import rejected — ${describe_error(error)}`);
         throw new Error("Cannot import this file. Check the file and try again.", {
           cause: error,
         });
@@ -464,7 +464,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
           data,
         });
       } catch (error) {
-        setStatus(`Generated CSV import failed — ${describeError(error)}`);
+        setStatus(`Generated CSV import failed — ${describe_error(error)}`);
         throw new Error("Cannot import the generated CSV.", { cause: error });
       }
     },
@@ -472,7 +472,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
       setStatus(`Importing committed fixture ${fixture.file}…`);
       setFixtureLoad({ id: fixture.id, state: "loading", detail: "Importing committed bytes…" });
       try {
-        const outcome = await importWorkbook(await fixtureBytes(fixture));
+        const outcome = await importWorkbook(await fixture_bytes(fixture));
         setWarningLog({
           operation: `Import of ${fixture.file} (${fixture.producer})`,
           warnings: outcome.warnings,
@@ -497,9 +497,9 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         setFixtureLoad({
           id: fixture.id,
           state: "failed",
-          detail: `Import failed — ${describeError(error)}`,
+          detail: `Import failed — ${describe_error(error)}`,
         });
-        setStatus(`Fixture import failed — ${describeError(error)}`);
+        setStatus(`Fixture import failed — ${describe_error(error)}`);
         throw new Error("Cannot import this fixture.", { cause: error });
       }
     },
@@ -507,20 +507,20 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
       setStatus("Feeding hostile packages to the import path…");
       for (const fixture of ADVERSARIAL_FIXTURES) {
         try {
-          setRejections(fixture.id, await expectRejection(await fixtureBytes(fixture)));
+          setRejections(fixture.id, await expectRejection(await fixture_bytes(fixture)));
         } catch (error) {
           setRejections(fixture.id, {
             rejected: false,
             errorName: null,
             code: null,
             limit: null,
-            message: describeError(error),
+            message: describe_error(error),
           });
         }
       }
       const workbook = rich();
       if (workbook) {
-        const bytes = await fixtureBytes(workbook);
+        const bytes = await fixture_bytes(workbook);
         setAbortReport(await abortedImport(bytes));
         setCellCapReport(await expectRejection(bytes, { maxCells: 8 }));
       }
@@ -534,7 +534,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         setCsvPreview(csvOfActiveSheet(grid));
         setStatus("Active sheet exported to CSV through the hardened text path.");
       } catch (error) {
-        setStatus(`CSV export failed — ${describeError(error)}`);
+        setStatus(`CSV export failed — ${describe_error(error)}`);
         throw new Error("Cannot export CSV.", { cause: error });
       }
     },
@@ -543,7 +543,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
       try {
         downloadBytes(csvOfActiveSheet(grid), "sheetwrite-interoperability.csv", "text/csv");
       } catch (error) {
-        setStatus(`CSV download failed — ${describeError(error)}`);
+        setStatus(`CSV download failed — ${describe_error(error)}`);
         throw new Error("Cannot download CSV.", { cause: error });
       }
     },
@@ -558,7 +558,7 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
             : "Selection exported as clipboard-format TSV.",
         );
       } catch (error) {
-        setStatus(`TSV export failed — ${describeError(error)}`);
+        setStatus(`TSV export failed — ${describe_error(error)}`);
         throw new Error("Cannot export TSV.", { cause: error });
       }
     },
@@ -591,10 +591,10 @@ export function createInteropEngine(hosts: InteropHosts): InteropEngine {
         snapshot: createInjectionSnapshot(),
       });
     },
-    resetWorkbench,
+    resetWorkbench: reset_workbench,
     dispose() {
       disposed = true;
-      stopTheme();
+      stop_theme();
       unmount?.();
       unmount = null;
     },

@@ -13,7 +13,7 @@ import {
 export default defineComponent({
   name: "FrameworkLifecycleVueFixture",
   setup() {
-    const wasmSource = shallowRef<Uint8Array | undefined>(INVALID_WASM_SOURCE);
+    const wasm_source = shallowRef<Uint8Array | undefined>(INVALID_WASM_SOURCE);
     const data = shallowRef(LIFECYCLE_DATA);
     const mounted = ref(true);
     const status = ref<"loading" | "error" | "ready">("loading");
@@ -29,7 +29,7 @@ export default defineComponent({
             "data-lifecycle-retry": "",
             onClick: () => {
               status.value = "loading";
-              wasmSource.value = undefined;
+              wasm_source.value = undefined;
             },
           },
           "Retry Vue",
@@ -66,7 +66,7 @@ export default defineComponent({
                 workbook: LIFECYCLE_WORKBOOK,
                 data: data.value,
                 height: 320,
-                wasmSource: wasmSource.value,
+                wasmSource: wasm_source.value,
                 onInitializationError: () => {
                   errors.value += 1;
                   status.value = "error";

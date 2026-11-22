@@ -56,14 +56,14 @@ export async function startFormattingBudget(
   grid.setSelection({ kind: "range", range: FORMATTING_TARGET });
   const pieces = [createNameBox(formulaHost, grid), createFormulaBar(formulaHost, grid)];
   window.__sheetwriteFormattingGrid = grid;
-  const stopTheme = observeSiteTheme(() => grid.replaceTheme(theme()));
+  const stop_theme = observeSiteTheme(() => grid.replaceTheme(theme()));
   return {
     styleTarget: (style) => grid.styleRange(FORMATTING_TARGET, style),
     applyStyleCommand: (command) => applyStyleCommand(grid, command),
     applyNumberFormat: (code) => applyNumberFormat(grid, code),
     roundTrip: () => roundTripFormatting(grid),
     dispose() {
-      stopTheme();
+      stop_theme();
       for (const piece of pieces) piece.destroy();
       grid.destroy();
       delete window.__sheetwriteFormattingGrid;
@@ -77,9 +77,9 @@ export function showImportedBudget(host: HTMLElement, snapshot: WorkbookSnapshot
     theme: theme(),
     config: { toolbar: false },
   });
-  const stopTheme = observeSiteTheme(() => imported.replaceTheme(theme()));
+  const stop_theme = observeSiteTheme(() => imported.replaceTheme(theme()));
   return () => {
-    stopTheme();
+    stop_theme();
     imported.destroy();
   };
 }

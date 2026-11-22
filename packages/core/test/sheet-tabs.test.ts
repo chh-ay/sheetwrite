@@ -42,11 +42,11 @@ function rejected(
   };
 }
 
-function tabButtons(host: HTMLElement): HTMLButtonElement[] {
+function tab_buttons(host: HTMLElement): HTMLButtonElement[] {
   return [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
 }
 
-function inputText(input: HTMLInputElement, value: string): void {
+function input_text(input: HTMLInputElement, value: string): void {
   input.value = value;
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
@@ -95,9 +95,9 @@ describe("SheetTabs", () => {
       onRename: (id) => applied(id),
     });
 
-    const menuEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
-    tabButtons(host)[2]!.dispatchEvent(menuEvent);
-    expect(menuEvent.defaultPrevented).toBe(true);
+    const menu_event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    tab_buttons(host)[2]!.dispatchEvent(menu_event);
+    expect(menu_event.defaultPrevented).toBe(true);
     expect(activated).toEqual(["c"]);
     const menu = host.querySelector('[role="menu"]');
     expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
@@ -142,12 +142,12 @@ describe("SheetTabs", () => {
       [{ id: "a", name: "Only" }],
       "a",
     );
-    tabButtons(host)[0]?.focus();
+    tab_buttons(host)[0]?.focus();
     key(host, "Delete");
     expect(removed).toEqual([]);
 
     tabs.update(SHEETS, "a");
-    tabButtons(host)[0]?.focus();
+    tab_buttons(host)[0]?.focus();
     key(host, "Backspace");
     expect(removed).toEqual([]);
   });
@@ -162,33 +162,33 @@ describe("SheetTabs", () => {
       },
     });
 
-    tabButtons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    tab_buttons(host)[1]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     // The editor sits outside the tab list, which keeps the selected tab.
     expect(input.closest('[role="tablist"]')).toBeNull();
     expect(
       host.querySelector('[role="tablist"] [role="tab"][aria-selected="true"]'),
     ).not.toBeNull();
-    inputText(input, "Revenue");
+    input_text(input, "Revenue");
     key(input, "Enter");
     expect(renames).toEqual([["b", "Revenue"]]);
     expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
 
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
-    inputText(input, "Forecast");
+    input_text(input, "Forecast");
     input.blur();
     expect(renames.at(-1)).toEqual(["b", "Forecast"]);
     expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
 
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
-    inputText(input, "Cancelled");
+    input_text(input, "Cancelled");
     key(input, "Escape");
     expect(renames).toHaveLength(2);
-    expectSame(document.activeElement, tabButtons(host)[1]!);
+    expectSame(document.activeElement, tab_buttons(host)[1]!);
 
     key(host, "F2");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
@@ -205,11 +205,11 @@ describe("SheetTabs", () => {
         return applied(id);
       },
     });
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     const input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     input.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
-    inputText(input, "売上");
+    input_text(input, "売上");
     key(input, "Enter");
     expect(renames).toEqual([]);
     expectSame(host.querySelector(".sheetwrite-tab-input"), input);
@@ -221,36 +221,36 @@ describe("SheetTabs", () => {
 
   it("keeps invalid Enter and blur edits focused with their structured lifecycle error associated", () => {
     // Rejection messages come from the host; the tabs forward them unchanged.
-    const duplicateMessage = "host duplicate message";
-    const blankMessage = "host blank message";
+    const duplicate_message = "host duplicate message";
+    const blank_message = "host blank message";
     const attempts: string[] = [];
     remount({
       onActivate: () => {},
       onRename: (id, name) => {
         attempts.push(name);
         return name.length === 0
-          ? rejected(id, blankMessage, "blank")
-          : rejected(id, duplicateMessage, "duplicate");
+          ? rejected(id, blank_message, "blank")
+          : rejected(id, duplicate_message, "duplicate");
       },
     });
     host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Rename Sales sheet"]')!.click();
 
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
-    inputText(input, "Summary");
+    input_text(input, "Summary");
     key(input, "Enter");
     input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
     const error = host.querySelector<HTMLElement>('[role="alert"]')!;
     expectSame(document.activeElement, input);
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toBe(error.id);
-    expect(error.textContent).toBe(duplicateMessage);
+    expect(error.textContent).toBe(duplicate_message);
     expect(error.dataset.code).toBe("duplicate");
 
     // A blur keeps the rejected edit open as Enter does.
-    inputText(input, "");
+    input_text(input, "");
     input.blur();
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe(blankMessage);
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(blank_message);
     expect(attempts).toEqual(["Summary", ""]);
   });
 
@@ -326,45 +326,45 @@ describe("SheetTabs", () => {
     host.querySelector<HTMLButtonElement>('[aria-label="Remove Sales sheet"]')!.click();
     host.querySelector<HTMLButtonElement>('[aria-label="Add sheet"]')!.click();
     const unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
-    const hiddenChoices = host.querySelector<HTMLElement>(
+    const hidden_choices = host.querySelector<HTMLElement>(
       '[role="group"][aria-label="Hidden sheets"]',
     )!;
     expect(
-      [...hiddenChoices.querySelectorAll("button")].map((button) => button.textContent),
+      [...hidden_choices.querySelectorAll("button")].map((button) => button.textContent),
     ).toEqual(["Hidden"]);
-    expect(hiddenChoices.hidden).toBe(true);
+    expect(hidden_choices.hidden).toBe(true);
     unhide.click();
     expect(unhide.getAttribute("aria-expanded")).toBe("true");
-    expect(hiddenChoices.hidden).toBe(false);
-    key(hiddenChoices.querySelector("button")!, "Escape");
+    expect(hidden_choices.hidden).toBe(false);
+    key(hidden_choices.querySelector("button")!, "Escape");
     expect(unhide.getAttribute("aria-expanded")).toBe("false");
-    expect(hiddenChoices.hidden).toBe(true);
+    expect(hidden_choices.hidden).toBe(true);
     expectSame(document.activeElement, unhide);
     unhide.click();
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     expect(unhide.getAttribute("aria-expanded")).toBe("false");
-    expect(hiddenChoices.hidden).toBe(true);
+    expect(hidden_choices.hidden).toBe(true);
     expectSame(document.activeElement, unhide);
     unhide.click();
     expect(host.textContent).not.toContain("Secret");
-    hiddenChoices.querySelector("button")!.click();
+    hidden_choices.querySelector("button")!.click();
 
-    let active = tabButtons(host)[1]!;
+    let active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "ArrowLeft", { ctrlKey: true, shiftKey: true });
-    active = tabButtons(host)[1]!;
+    active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "ArrowRight", { ctrlKey: true, shiftKey: true });
-    active = tabButtons(host)[1]!;
+    active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "h", { ctrlKey: true, shiftKey: true });
-    active = tabButtons(host)[1]!;
+    active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "Delete");
-    active = tabButtons(host)[1]!;
+    active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "F11", { shiftKey: true });
-    active = tabButtons(host)[1]!;
+    active = tab_buttons(host)[1]!;
     active.focus();
     key(host, "u", { ctrlKey: true, shiftKey: true });
 
@@ -432,7 +432,7 @@ describe("SheetTabs", () => {
       ],
       "a",
     );
-    const buttons = tabButtons(host);
+    const buttons = tab_buttons(host);
     expect(buttons.every((button) => button.draggable)).toBe(true);
     buttons[0]!.dispatchEvent(new Event("dragstart", { bubbles: true }));
     buttons[1]!.dispatchEvent(new Event("dragover", { bubbles: true, cancelable: true }));
@@ -445,10 +445,10 @@ describe("SheetTabs", () => {
       onActivate: () => {},
       onRename: (id) => applied(id),
     });
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
-    inputText(input, "Local draft");
+    input_text(input, "Local draft");
 
     tabs.update(
       [
@@ -463,13 +463,13 @@ describe("SheetTabs", () => {
     expect(input.dataset.sheetId).toBe("b");
     expectSame(document.activeElement, input);
     key(input, "Escape");
-    expect(tabButtons(host).map((button) => button.textContent)).toEqual([
+    expect(tab_buttons(host).map((button) => button.textContent)).toEqual([
       "Summary",
       "Remote Sales",
       "Sales",
     ]);
 
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     tabs.update(
       [
@@ -491,8 +491,8 @@ describe("SheetTabs", () => {
       "c",
     );
     expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
-    expectSame(document.activeElement, tabButtons(host)[1]!);
-    expect(tabButtons(host).map((button) => button.tabIndex)).toEqual([-1, 0]);
+    expectSame(document.activeElement, tab_buttons(host)[1]!);
+    expect(tab_buttons(host).map((button) => button.tabIndex)).toEqual([-1, 0]);
   });
 
   it("suppresses mutation affordances in read-only mode while preserving navigation", () => {
@@ -518,7 +518,7 @@ describe("SheetTabs", () => {
     expect(host.querySelector('[aria-label="Add sheet"]')).toBeNull();
     expect(host.querySelector('[aria-label="Unhide sheet"]')).toBeNull();
     expect(host.querySelector(".sheetwrite-tab-options-button")).toBeNull();
-    const buttons = tabButtons(host);
+    const buttons = tab_buttons(host);
     expect(buttons.every((button) => !button.draggable)).toBe(true);
     buttons[1]!.focus();
     key(host, "F2");
@@ -528,7 +528,7 @@ describe("SheetTabs", () => {
 
     tabs.setReadOnly(false);
     expect(host.querySelector('[aria-label="Add sheet"]')).not.toBeNull();
-    tabButtons(host)[1]!.focus();
+    tab_buttons(host)[1]!.focus();
     key(host, "F2");
     expect(host.querySelector("input")).not.toBeNull();
     tabs.setReadOnly(true);

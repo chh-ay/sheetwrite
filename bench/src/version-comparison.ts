@@ -103,15 +103,15 @@ interface LoadedVersion {
   engineWasmSha256: string;
 }
 
-function packageRoot(dir: string, name: string): string {
+function package_root(dir: string, name: string): string {
   const root = join(dir, "node_modules", "@sheetwrite", name);
   if (!existsSync(join(root, "package.json"))) throw new Error(`${dir} has no @sheetwrite/${name}`);
   return root;
 }
 
-function packageVersion(dir: string, name: string): string {
+function package_version(dir: string, name: string): string {
   const manifest: unknown = JSON.parse(
-    readFileSync(join(packageRoot(dir, name), "package.json"), "utf8"),
+    readFileSync(join(package_root(dir, name), "package.json"), "utf8"),
   );
   if (typeof manifest !== "object" || manifest === null || !("version" in manifest)) {
     throw new Error(`@sheetwrite/${name} in ${dir} has no version`);
@@ -119,11 +119,11 @@ function packageVersion(dir: string, name: string): string {
   return String(manifest.version);
 }
 
-async function importFrom(dir: string, specifier: string): Promise<Record<string, unknown>> {
+async function import_from(dir: string, specifier: string): Promise<Record<string, unknown>> {
   return import(pathToFileURL(Bun.resolveSync(specifier, dir)).href);
 }
 
-function requireFunctions(
+function require_functions(
   module: Record<string, unknown>,
   names: readonly string[],
   label: string,
@@ -133,47 +133,51 @@ function requireFunctions(
   }
 }
 
-async function loadVersion(dir: string, engine: EngineName): Promise<LoadedVersion> {
-  const coreExports = await importFrom(dir, "@sheetwrite/core");
-  requireFunctions(
-    coreExports,
+async function load_version(dir: string, engine: EngineName): Promise<LoadedVersion> {
+  const core_exports = await import_from(dir, "@sheetwrite/core");
+  require_functions(
+    core_exports,
     ["initSheetwrite", "SheetwriteStore", "toXlsxWorkbook", "fromXlsxWorkbook"],
     "@sheetwrite/core",
   );
-  const core = coreExports as unknown as CoreModule;
-  const xlsx = (await importFrom(dir, "@sheetwrite/xlsx")) as XlsxModule;
-  const engineModule = await importFrom(dir, `@sheetwrite/${ENGINE_PACKAGE[engine]}`);
+  const core = core_exports as unknown as CoreModule;
+  const xlsx = (await import_from(dir, "@sheetwrite/xlsx")) as XlsxModule;
+  const engine_module = await import_from(dir, `@sheetwrite/${ENGINE_PACKAGE[engine]}`);
 
-  let setupCall: string;
+  let setup_call: string;
   if (typeof xlsx.xlsxAddon === "function") {
-    await core.initSheetwrite({ engine: engineModule, addons: [xlsx.xlsxAddon()] });
-    setupCall = "initSheetwrite({ engine, addons: [xlsxAddon()] })";
+    await core.initSheetwrite({ engine: engine_module, addons: [xlsx.xlsxAddon()] });
+    setup_call = "initSheetwrite({ engine, addons: [xlsxAddon()] })";
   } else if (typeof xlsx.registerXlsxBackends === "function") {
-    await core.initSheetwrite(undefined, engineModule);
+    await core.initSheetwrite(undefined, engine_module);
     xlsx.registerXlsxBackends();
-    setupCall = "initSheetwrite(undefined, engine); registerXlsxBackends()";
+    setup_call = "initSheetwrite(undefined, engine); registerXlsxBackends()";
   } else {
     throw new Error(`@sheetwrite/xlsx in ${dir} has neither xlsxAddon nor registerXlsxBackends`);
   }
 
-  const wasmPath = join(packageRoot(dir, ENGINE_PACKAGE[engine]), "pkg", "sheetwrite_wasm_bg.wasm");
+  const wasm_path = join(
+    package_root(dir, ENGINE_PACKAGE[engine]),
+    "pkg",
+    "sheetwrite_wasm_bg.wasm",
+  );
   return {
     core,
-    setupCall,
+    setupCall: setup_call,
     packageVersions: Object.fromEntries(
-      ["core", "wasm", "formulas", "xlsx"].map((name) => [name, packageVersion(dir, name)]),
+      ["core", "wasm", "formulas", "xlsx"].map((name) => [name, package_version(dir, name)]),
     ),
-    engineWasmSha256: sha256(readFileSync(wasmPath)),
+    engineWasmSha256: sha256(readFileSync(wasm_path)),
   };
 }
 
 /** The full engine computes SUMSQ; the default engine does not have it. */
-function assertEngine(core: CoreModule, engine: EngineName): void {
+function assert_engine(core: CoreModule, engine: EngineName): void {
   const store = new core.SheetwriteStore(workbook(1, 2), { rowCount: 1, columns: {} });
   try {
-    applyAll(store, [formulaPatch(0, 0, "=SUMSQ(3)")]);
-    const hasFullFunctions = store.getCell(address(0, 0)).resolved === 9;
-    if (hasFullFunctions !== (engine === "full")) {
+    apply_all(store, [formula_patch(0, 0, "=SUMSQ(3)")]);
+    const has_full_functions = store.getCell(address(0, 0)).resolved === 9;
+    if (has_full_functions !== (engine === "full")) {
       throw new Error(
         `Loaded engine does not match ${engine}: SUMSQ(3) gave ${String(store.getCell(address(0, 0)).resolved)}`,
       );
@@ -191,9 +195,9 @@ function sha256(bytes: Uint8Array): string {
 }
 
 const address = (row: number, col: number): CellAddress => ({ sheet: SHEET, row, col });
-const columnKey = (col: number): string => `c${col}`;
+const column_key = (col: number): string => `c${col}`;
 
-function workbook(rows: number, columnCount: number): WorkbookShape {
+function workbook(rows: number, column_count: number): WorkbookShape {
   return {
     activeSheet: SHEET,
     sheets: [
@@ -201,8 +205,8 @@ function workbook(rows: number, columnCount: number): WorkbookShape {
         id: SHEET,
         name: "Data",
         rowCount: rows,
-        columns: Array.from({ length: columnCount }, (_, col) => ({
-          key: columnKey(col),
+        columns: Array.from({ length: column_count }, (_, col) => ({
+          key: column_key(col),
           header: String.fromCharCode(65 + col),
           type: "number",
           width: 80,
@@ -213,20 +217,20 @@ function workbook(rows: number, columnCount: number): WorkbookShape {
 }
 
 /** Column A holds row + 1; the other columns start empty. */
-function numberData(rows: number, columnCount: number): ColumnarShape {
+function number_data(rows: number, column_count: number): ColumnarShape {
   const columns: Record<string, Float64Array> = {};
-  for (let col = 0; col < columnCount; col++) columns[columnKey(col)] = new Float64Array(rows);
-  const first = columns[columnKey(0)];
+  for (let col = 0; col < column_count; col++) columns[column_key(col)] = new Float64Array(rows);
+  const first = columns[column_key(0)];
   if (first === undefined) throw new Error("Fixture needs at least one column");
   for (let row = 0; row < rows; row++) first[row] = row + 1;
   return { rowCount: rows, columns };
 }
 
-function formulaPatch(row: number, col: number, src: string): SetPatch {
+function formula_patch(row: number, col: number, src: string): SetPatch {
   return { op: "set", addr: address(row, col), value: { kind: "formula", src } };
 }
 
-function applyAll(store: StoreShape, patches: readonly SetPatch[]): void {
+function apply_all(store: StoreShape, patches: readonly SetPatch[]): void {
   for (let start = 0; start < patches.length; start += PATCHES_PER_TRANSACTION) {
     const result = store.applyTransaction({
       patches: patches.slice(start, start + PATCHES_PER_TRANSACTION),
@@ -245,7 +249,7 @@ interface RecalcRow {
   expected(value: number): { address: CellAddress; value: number };
 }
 
-const sumOfRowsTwoTo = (last: number): number => (last * (last + 1)) / 2 - 1;
+const sum_of_rows_two_to = (last: number): number => (last * (last + 1)) / 2 - 1;
 
 /** Rows from the formula benchmark's topologies; every timed edit writes A1. */
 const RECALC_ROWS: readonly RecalcRow[] = [
@@ -255,7 +259,7 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     rows: 100_000,
     columns: 2,
     formulas: () =>
-      Array.from({ length: 100_000 }, (_, row) => formulaPatch(row, 1, `=$A$1+${row + 1}`)),
+      Array.from({ length: 100_000 }, (_, row) => formula_patch(row, 1, `=$A$1+${row + 1}`)),
     expected: (value) => ({ address: address(99_999, 1), value: value + 100_000 }),
   },
   {
@@ -265,7 +269,7 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     rows: 64,
     columns: 1,
     formulas: () =>
-      Array.from({ length: 63 }, (_, index) => formulaPatch(index + 1, 0, `=A${index + 1}+1`)),
+      Array.from({ length: 63 }, (_, index) => formula_patch(index + 1, 0, `=A${index + 1}+1`)),
     expected: (value) => ({ address: address(63, 0), value: value + 63 }),
   },
   {
@@ -278,9 +282,9 @@ const RECALC_ROWS: readonly RecalcRow[] = [
       Array.from({ length: 32 }, (_, row) => {
         const source = row === 0 ? "$A$1" : `$D$${row}`;
         return [
-          formulaPatch(row, 1, `=${source}+1`),
-          formulaPatch(row, 2, `=${source}+2`),
-          formulaPatch(row, 3, `=B${row + 1}+C${row + 1}`),
+          formula_patch(row, 1, `=${source}+1`),
+          formula_patch(row, 2, `=${source}+2`),
+          formula_patch(row, 3, `=B${row + 1}+C${row + 1}`),
         ];
       }).flat(),
     // D(k) = 2 D(k-1) + 3 with D(1) = 2 A1 + 3, so D(32) = (A1 + 3) 2^32 - 3.
@@ -292,8 +296,8 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     rows: 10_000,
     columns: 2,
     formulas: () =>
-      Array.from({ length: 10_000 }, (_, row) => formulaPatch(row, 1, "=SUM($A$1:$A$100)")),
-    expected: (value) => ({ address: address(9_999, 1), value: value + sumOfRowsTwoTo(100) }),
+      Array.from({ length: 10_000 }, (_, row) => formula_patch(row, 1, "=SUM($A$1:$A$100)")),
+    expected: (value) => ({ address: address(9_999, 1), value: value + sum_of_rows_two_to(100) }),
   },
   {
     id: "distinct-range-10k",
@@ -303,9 +307,9 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     formulas: () =>
       Array.from({ length: 10_000 }, (_, row) => {
         const start = row * 10 + 1;
-        return formulaPatch(row, 1, `=SUM(A${start}:A${start + 9})`);
+        return formula_patch(row, 1, `=SUM(A${start}:A${start + 9})`);
       }),
-    expected: (value) => ({ address: address(0, 1), value: value + sumOfRowsTwoTo(10) }),
+    expected: (value) => ({ address: address(0, 1), value: value + sum_of_rows_two_to(10) }),
   },
   {
     id: "closure-100k",
@@ -314,8 +318,8 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     columns: 3,
     formulas: () =>
       Array.from({ length: 100_000 }, (_, row) => [
-        formulaPatch(row, 1, `=A${row + 1}+1`),
-        formulaPatch(row, 2, `=B${row + 1}+1`),
+        formula_patch(row, 1, `=A${row + 1}+1`),
+        formula_patch(row, 2, `=B${row + 1}+1`),
       ]).flat(),
     expected: (value) => ({ address: address(0, 2), value: value + 2 }),
   },
@@ -324,26 +328,26 @@ const RECALC_ROWS: readonly RecalcRow[] = [
     description: "one =SUM(A1:A100000)",
     rows: 100_000,
     columns: 2,
-    formulas: () => [formulaPatch(0, 1, "=SUM(A1:A100000)")],
-    expected: (value) => ({ address: address(0, 1), value: value + sumOfRowsTwoTo(100_000) }),
+    formulas: () => [formula_patch(0, 1, "=SUM(A1:A100000)")],
+    expected: (value) => ({ address: address(0, 1), value: value + sum_of_rows_two_to(100_000) }),
   },
 ];
 
-function xlsxWorkbook(): { workbook: WorkbookShape; data: ColumnarShape; formulas: SetPatch[] } {
+function xlsx_workbook(): { workbook: WorkbookShape; data: ColumnarShape; formulas: SetPatch[] } {
   const ids = new Float64Array(XLSX_ROWS);
   const amounts = new Float64Array(XLSX_ROWS);
   const names: string[] = new Array(XLSX_ROWS);
   const regions: string[] = new Array(XLSX_ROWS);
-  const regionNames = ["North", "South", "East", "West"];
+  const region_names = ["North", "South", "East", "West"];
   const formulas: SetPatch[] = [];
   for (let row = 0; row < XLSX_ROWS; row++) {
     ids[row] = row + 1;
-    amounts[row] = xlsxAmount(row);
+    amounts[row] = xlsx_amount(row);
     names[row] = `Customer ${row % 997}`;
-    regions[row] = regionNames[row % regionNames.length] ?? "North";
+    regions[row] = region_names[row % region_names.length] ?? "North";
     formulas.push(
-      formulaPatch(row, 4, `=C${row + 1}*2`),
-      formulaPatch(row, 5, `=IF(C${row + 1}>500,"high","low")`),
+      formula_patch(row, 4, `=C${row + 1}*2`),
+      formula_patch(row, 5, `=IF(C${row + 1}>500,"high","low")`),
     );
   }
   const columns: ColumnShape[] = [
@@ -368,7 +372,7 @@ function xlsxWorkbook(): { workbook: WorkbookShape; data: ColumnarShape; formula
 }
 
 /** Deterministic amounts in [0.25, 999.25]; about half are above 500. */
-function xlsxAmount(row: number): number {
+function xlsx_amount(row: number): number {
   return ((row * 37) % 1000) + 0.25;
 }
 
@@ -377,7 +381,7 @@ const XLSX_CHECK_ROW = 1;
 // ---------------------------------------------------------------------------
 // Child parts: each runs in a fresh process.
 
-async function collectGarbage(): Promise<void> {
+async function collect_garbage(): Promise<void> {
   for (let turn = 0; turn < GC_TURNS; turn++) {
     await new Promise<void>((done) => setImmediate(done));
     Bun.gc(true);
@@ -397,7 +401,7 @@ function geomean(values: readonly number[]): number {
   return Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length);
 }
 
-function assertValue(
+function assert_value(
   store: StoreShape,
   expected: { address: CellAddress; value: number },
   label: string,
@@ -408,25 +412,27 @@ function assertValue(
   }
 }
 
-function measureRecalcRow(core: CoreModule, row: RecalcRow): number[] {
+function measure_recalc_row(core: CoreModule, row: RecalcRow): number[] {
   const store = new core.SheetwriteStore(
     workbook(row.rows, row.columns),
-    numberData(row.rows, row.columns),
+    number_data(row.rows, row.columns),
   );
   try {
-    applyAll(store, row.formulas());
-    let nextValue = 1_000;
+    apply_all(store, row.formulas());
+    let next_value = 1_000;
     const edit = (): void => {
-      nextValue += 1;
+      next_value += 1;
       const result = store.applyTransaction({
-        patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: nextValue } }],
+        patches: [
+          { op: "set", addr: address(0, 0), value: { kind: "literal", value: next_value } },
+        ],
       });
       if (result.status !== "applied") throw new Error(`${row.id} edit was ${result.status}`);
     };
     for (let warmup = 0; warmup < WARMUP_EDITS; warmup++) edit();
-    assertValue(store, row.expected(nextValue), row.id);
+    assert_value(store, row.expected(next_value), row.id);
 
-    const perEditMs: number[] = [];
+    const per_edit_ms: number[] = [];
     for (let sample = 0; sample < RECALC_SAMPLES_PER_PROCESS; sample++) {
       let edits = 0;
       const started = performance.now();
@@ -436,55 +442,55 @@ function measureRecalcRow(core: CoreModule, row: RecalcRow): number[] {
         edits += 1;
         elapsed = performance.now() - started;
       }
-      perEditMs.push(elapsed / edits);
-      assertValue(store, row.expected(nextValue), row.id);
+      per_edit_ms.push(elapsed / edits);
+      assert_value(store, row.expected(next_value), row.id);
     }
-    return perEditMs;
+    return per_edit_ms;
   } finally {
     store.dispose();
   }
 }
 
-async function measureXlsx(core: CoreModule, importFile: string) {
-  const fixture = xlsxWorkbook();
+async function measure_xlsx(core: CoreModule, import_file: string) {
+  const fixture = xlsx_workbook();
   const store = new core.SheetwriteStore(fixture.workbook, fixture.data);
-  const exportMs: number[] = [];
+  const export_ms: number[] = [];
   try {
-    applyAll(store, fixture.formulas);
+    apply_all(store, fixture.formulas);
     for (let sample = -1; sample < XLSX_SAMPLES_PER_PROCESS; sample++) {
       const started = performance.now();
       const bytes = await core.toXlsxWorkbook(store.exportSnapshot());
       const elapsed = performance.now() - started;
       if (bytes.byteLength === 0) throw new Error("Export wrote no bytes");
-      if (sample >= 0) exportMs.push(elapsed);
+      if (sample >= 0) export_ms.push(elapsed);
     }
   } finally {
     store.dispose();
   }
 
-  const input = new Uint8Array(readFileSync(importFile));
-  const expectedTotal = {
+  const input = new Uint8Array(readFileSync(import_file));
+  const expected_total = {
     address: address(XLSX_CHECK_ROW, 4),
-    value: xlsxAmount(XLSX_CHECK_ROW) * 2,
+    value: xlsx_amount(XLSX_CHECK_ROW) * 2,
   };
-  const importMs: number[] = [];
+  const import_ms: number[] = [];
   for (let sample = -1; sample < XLSX_SAMPLES_PER_PROCESS; sample++) {
     const started = performance.now();
     const snapshot = await core.fromXlsxWorkbook(input.slice());
     const imported = core.SheetwriteStore.fromSnapshot(snapshot);
     const elapsed = performance.now() - started;
     try {
-      assertValue(imported, expectedTotal, "xlsx import");
+      assert_value(imported, expected_total, "xlsx import");
     } finally {
       imported.dispose();
     }
-    if (sample >= 0) importMs.push(elapsed);
+    if (sample >= 0) import_ms.push(elapsed);
   }
-  return { exportMs, importMs };
+  return { exportMs: export_ms, importMs: import_ms };
 }
 
 /** Process RSS in bytes; `maxRSS` is reported in KiB on both Linux and macOS. */
-function rssBytes(): { rss: number; maxRss: number } {
+function rss_bytes(): { rss: number; maxRss: number } {
   return { rss: process.memoryUsage().rss, maxRss: process.resourceUsage().maxRSS * BYTES_PER_KIB };
 }
 
@@ -522,9 +528,9 @@ interface RssSampler {
   terminate(): void;
 }
 
-async function startRssSampler(): Promise<RssSampler> {
+async function start_rss_sampler(): Promise<RssSampler> {
   const worker = new Worker(URL.createObjectURL(new Blob([RSS_SAMPLER_SOURCE])));
-  const nextMessage = () =>
+  const next_message = () =>
     new Promise<unknown>((done, fail) => {
       worker.addEventListener("message", (event) => done(event.data), { once: true });
       worker.addEventListener(
@@ -535,15 +541,15 @@ async function startRssSampler(): Promise<RssSampler> {
         },
       );
     });
-  if ((await nextMessage()) !== "ready") throw new Error("RSS sampler did not start");
+  if ((await next_message()) !== "ready") throw new Error("RSS sampler did not start");
   return {
     async reset() {
-      const reply = nextMessage();
+      const reply = next_message();
       worker.postMessage("reset");
       if ((await reply) !== "reset") throw new Error("RSS sampler did not reset");
     },
     async stop() {
-      const reply = nextMessage();
+      const reply = next_message();
       worker.postMessage("stop");
       const peak = await reply;
       if (typeof peak !== "number") throw new Error("RSS sampler returned no peak");
@@ -555,41 +561,42 @@ async function startRssSampler(): Promise<RssSampler> {
   };
 }
 
-async function measureMemory(core: CoreModule) {
+async function measure_memory(core: CoreModule) {
   const columns = 2;
   const store = new core.SheetwriteStore(
     workbook(MEMORY_FORMULAS, columns),
-    numberData(MEMORY_FORMULAS, columns),
+    number_data(MEMORY_FORMULAS, columns),
   );
-  const sampler = await startRssSampler();
+  const sampler = await start_rss_sampler();
   try {
     const formulas = Array.from({ length: MEMORY_FORMULAS }, (_, row) =>
-      formulaPatch(row, 1, `=A${row + 1}+1`),
+      formula_patch(row, 1, `=A${row + 1}+1`),
     );
-    await collectGarbage();
-    const before = rssBytes();
+    await collect_garbage();
+    const before = rss_bytes();
     await sampler.reset();
-    applyAll(store, formulas);
-    assertValue(
+    apply_all(store, formulas);
+    assert_value(
       store,
       { address: address(MEMORY_FORMULAS - 1, 1), value: MEMORY_FORMULAS + 1 },
       "memory fixture",
     );
-    await collectGarbage();
-    const after = rssBytes();
-    const sampledPeak = await sampler.stop();
+    await collect_garbage();
+    const after = rss_bytes();
+    const sampled_peak = await sampler.stop();
     // The kernel max counts only when the load raised it; an earlier, higher
     // peak of the same process says nothing about this load.
-    const buildSetNewPeak = after.maxRss > before.maxRss;
+    const build_set_new_peak = after.maxRss > before.maxRss;
     return {
       rssBeforeBytes: before.rss,
       rssAfterBytes: after.rss,
       maxRssBeforeBytes: before.maxRss,
       maxRssBytes: after.maxRss,
-      sampledPeakRssBytes: sampledPeak,
-      buildSetNewPeak,
+      sampledPeakRssBytes: sampled_peak,
+      buildSetNewPeak: build_set_new_peak,
       retainedBytes: after.rss - before.rss,
-      peakBytes: Math.max(sampledPeak, buildSetNewPeak ? after.maxRss : 0, after.rss) - before.rss,
+      peakBytes:
+        Math.max(sampled_peak, build_set_new_peak ? after.maxRss : 0, after.rss) - before.rss,
     };
   } finally {
     sampler.terminate();
@@ -599,9 +606,9 @@ async function measureMemory(core: CoreModule) {
 
 type ChildPart = "timing" | "memory" | "prepare-import";
 
-async function child(dir: string, engine: EngineName, part: ChildPart, importFile: string) {
-  const loaded = await loadVersion(dir, engine);
-  assertEngine(loaded.core, engine);
+async function child(dir: string, engine: EngineName, part: ChildPart, import_file: string) {
+  const loaded = await load_version(dir, engine);
+  assert_engine(loaded.core, engine);
   const identity = {
     packageVersions: loaded.packageVersions,
     setupCall: loaded.setupCall,
@@ -609,19 +616,23 @@ async function child(dir: string, engine: EngineName, part: ChildPart, importFil
   };
   switch (part) {
     case "timing": {
-      const recalcMs: Record<string, number[]> = {};
-      for (const row of RECALC_ROWS) recalcMs[row.id] = measureRecalcRow(loaded.core, row);
-      return { ...identity, recalcMs, ...(await measureXlsx(loaded.core, importFile)) };
+      const recalc_ms: Record<string, number[]> = {};
+      for (const row of RECALC_ROWS) recalc_ms[row.id] = measure_recalc_row(loaded.core, row);
+      return {
+        ...identity,
+        recalcMs: recalc_ms,
+        ...(await measure_xlsx(loaded.core, import_file)),
+      };
     }
     case "memory":
-      return { ...identity, memory: await measureMemory(loaded.core) };
+      return { ...identity, memory: await measure_memory(loaded.core) };
     case "prepare-import": {
-      const fixture = xlsxWorkbook();
+      const fixture = xlsx_workbook();
       const store = new loaded.core.SheetwriteStore(fixture.workbook, fixture.data);
       try {
-        applyAll(store, fixture.formulas);
+        apply_all(store, fixture.formulas);
         const bytes = await loaded.core.toXlsxWorkbook(store.exportSnapshot());
-        writeFileSync(importFile, bytes);
+        writeFileSync(import_file, bytes);
         return { ...identity, importFileSha256: sha256(bytes), importFileBytes: bytes.byteLength };
       } finally {
         store.dispose();
@@ -635,7 +646,7 @@ async function child(dir: string, engine: EngineName, part: ChildPart, importFil
 
 const RELATIVE_IMPORT = /(?:from\s*|import\s*\(\s*|import\s+)["'](\.{1,2}\/[^"']+)["']/g;
 
-function browserEntry(root: string): string {
+function browser_entry(root: string): string {
   const manifest: { exports?: { ".": { browser?: string } } } = JSON.parse(
     readFileSync(join(root, "package.json"), "utf8"),
   );
@@ -645,7 +656,7 @@ function browserEntry(root: string): string {
 }
 
 /** The browser entry and every file it reaches through relative imports. */
-function jsClosure(entry: string): string[] {
+function js_closure(entry: string): string[] {
   const seen = new Set<string>();
   const pending = [entry];
   for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
@@ -660,7 +671,7 @@ function jsClosure(entry: string): string[] {
   return [...seen].sort();
 }
 
-function brotliBytes(bytes: Uint8Array): number {
+function brotli_bytes(bytes: Uint8Array): number {
   return brotliCompressSync(bytes, {
     params: {
       [zlibConstants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY,
@@ -669,28 +680,28 @@ function brotliBytes(bytes: Uint8Array): number {
   }).byteLength;
 }
 
-function engineSizes(dir: string) {
+function engine_sizes(dir: string) {
   return Object.fromEntries(
     ENGINES.map((engine) => {
-      const root = packageRoot(dir, ENGINE_PACKAGE[engine]);
+      const root = package_root(dir, ENGINE_PACKAGE[engine]);
       const wasm = readFileSync(join(root, "pkg", "sheetwrite_wasm_bg.wasm"));
-      const jsFiles = jsClosure(browserEntry(root)).map((file) => ({
+      const js_files = js_closure(browser_entry(root)).map((file) => ({
         file: file.slice(root.length + 1),
         bytes: readFileSync(file),
       }));
       const js = {
-        files: jsFiles.map(({ file }) => file),
-        rawBytes: jsFiles.reduce((sum, { bytes }) => sum + bytes.byteLength, 0),
-        brotliBytes: jsFiles.reduce((sum, { bytes }) => sum + brotliBytes(bytes), 0),
+        files: js_files.map(({ file }) => file),
+        rawBytes: js_files.reduce((sum, { bytes }) => sum + bytes.byteLength, 0),
+        brotliBytes: js_files.reduce((sum, { bytes }) => sum + brotli_bytes(bytes), 0),
       };
-      const wasmSizes = {
+      const wasm_sizes = {
         rawBytes: wasm.byteLength,
-        brotliBytes: brotliBytes(wasm),
+        brotliBytes: brotli_bytes(wasm),
         sha256: sha256(wasm),
       };
       return [
         engine,
-        { wasm: wasmSizes, js, totalBrotliBytes: wasmSizes.brotliBytes + js.brotliBytes },
+        { wasm: wasm_sizes, js, totalBrotliBytes: wasm_sizes.brotliBytes + js.brotliBytes },
       ];
     }),
   );
@@ -704,17 +715,17 @@ interface VersionInput {
   dir: string;
 }
 
-function parseVersion(value: string): VersionInput {
+function parse_version(value: string): VersionInput {
   const separator = value.indexOf("=");
   if (separator <= 0) throw new Error(`--version expects label=dir, got ${value}`);
   return { label: value.slice(0, separator), dir: resolve(value.slice(separator + 1)) };
 }
 
-function runChild(
+function run_child(
   input: VersionInput,
   engine: EngineName,
   part: ChildPart,
-  importFile: string,
+  import_file: string,
 ): Record<string, unknown> {
   const result = Bun.spawnSync(
     [
@@ -728,7 +739,7 @@ function runChild(
       "--part",
       part,
       "--import-file",
-      importFile,
+      import_file,
     ],
     { stdout: "pipe", stderr: "pipe" },
   );
@@ -741,19 +752,19 @@ function runChild(
   return JSON.parse(lines[lines.length - 1] ?? "");
 }
 
-function machineDescription() {
-  const cpuList = cpus();
+function machine_description() {
+  const cpu_list = cpus();
   return {
     platform: platform(),
     release: release(),
-    cpuModel: cpuList[0]?.model ?? "unknown",
-    logicalCpus: cpuList.length,
+    cpuModel: cpu_list[0]?.model ?? "unknown",
+    logicalCpus: cpu_list.length,
     bun: Bun.version,
-    affinity: platform() === "linux" ? readAffinity() : null,
+    affinity: platform() === "linux" ? read_affinity() : null,
   };
 }
 
-function readAffinity(): string | null {
+function read_affinity(): string | null {
   const status = readFileSync("/proc/self/status", "utf8");
   return /Cpus_allowed_list:\s*(\S+)/.exec(status)?.[1] ?? null;
 }
@@ -776,7 +787,7 @@ async function run(options: {
 }) {
   const [oldest] = options.versions;
   if (oldest === undefined) throw new Error("Pass at least one --version label=dir");
-  const importFile = join(tmpdir(), `sheetwrite-version-comparison-${process.pid}.xlsx`);
+  const import_file = join(tmpdir(), `sheetwrite-version-comparison-${process.pid}.xlsx`);
   const samples: {
     round: number;
     order: number;
@@ -787,13 +798,13 @@ async function run(options: {
   }[] = [];
   let prepared: Record<string, unknown>;
   try {
-    prepared = runChild(oldest, "default", "prepare-import", importFile);
+    prepared = run_child(oldest, "default", "prepare-import", import_file);
     for (let round = 0; round < options.rounds; round++) {
-      const versionOrder = round % 2 === 0 ? options.versions : [...options.versions].reverse();
-      const engineOrder = round % 2 === 0 ? ENGINES : [...ENGINES].reverse();
+      const version_order = round % 2 === 0 ? options.versions : [...options.versions].reverse();
+      const engine_order = round % 2 === 0 ? ENGINES : [...ENGINES].reverse();
       let order = 0;
-      for (const version of versionOrder) {
-        for (const engine of engineOrder) {
+      for (const version of version_order) {
+        for (const engine of engine_order) {
           for (const part of ["timing", "memory"] as const) {
             process.stderr.write(
               `round ${round + 1}/${options.rounds}: ${version.label} ${engine} ${part}\n`,
@@ -804,18 +815,18 @@ async function run(options: {
               version: version.label,
               engine,
               part,
-              result: runChild(version, engine, part, importFile),
+              result: run_child(version, engine, part, import_file),
             });
           }
         }
       }
     }
   } finally {
-    rmSync(importFile, { force: true });
+    rmSync(import_file, { force: true });
   }
 
   const summary: Record<string, Record<string, unknown>> = {};
-  const aaRatios = {
+  const aa_ratios = {
     recalcGeomean: [] as number[],
     retained: [] as number[],
     peak: [] as number[],
@@ -823,8 +834,8 @@ async function run(options: {
     export: [] as number[],
   };
   for (const version of options.versions) {
-    const versionSummary: Record<string, unknown> = {};
-    summary[version.label] = versionSummary;
+    const version_summary: Record<string, unknown> = {};
+    summary[version.label] = version_summary;
     for (const engine of ENGINES) {
       const pick = (part: string, parity?: number) =>
         samples.filter(
@@ -841,15 +852,15 @@ async function run(options: {
         const memory = pick("memory", parity).map(
           (sample) => sample.result as unknown as MemorySample,
         );
-        const rowMedians = Object.fromEntries(
+        const row_medians = Object.fromEntries(
           RECALC_ROWS.map((row) => [
             row.id,
             median(timing.map((sample) => median(sample.recalcMs[row.id] ?? []))),
           ]),
         );
         return {
-          recalcRowMedianMs: rowMedians,
-          recalcGeomeanMs: geomean(Object.values(rowMedians)),
+          recalcRowMedianMs: row_medians,
+          recalcGeomeanMs: geomean(Object.values(row_medians)),
           retainedMiB: median(memory.map((sample) => sample.memory.retainedBytes)) / BYTES_PER_MIB,
           peakMiB: median(memory.map((sample) => sample.memory.peakBytes)) / BYTES_PER_MIB,
           importMs: median(timing.map((sample) => median(sample.importMs))),
@@ -859,16 +870,16 @@ async function run(options: {
       const all = metrics();
       const forward = metrics(0);
       const backward = metrics(1);
-      aaRatios.recalcGeomean.push(forward.recalcGeomeanMs / backward.recalcGeomeanMs);
-      aaRatios.retained.push(forward.retainedMiB / backward.retainedMiB);
-      aaRatios.peak.push(forward.peakMiB / backward.peakMiB);
-      aaRatios.import.push(forward.importMs / backward.importMs);
-      aaRatios.export.push(forward.exportMs / backward.exportMs);
-      versionSummary[engine] = all;
+      aa_ratios.recalcGeomean.push(forward.recalcGeomeanMs / backward.recalcGeomeanMs);
+      aa_ratios.retained.push(forward.retainedMiB / backward.retainedMiB);
+      aa_ratios.peak.push(forward.peakMiB / backward.peakMiB);
+      aa_ratios.import.push(forward.importMs / backward.importMs);
+      aa_ratios.export.push(forward.exportMs / backward.exportMs);
+      version_summary[engine] = all;
     }
   }
-  const aaSpreadPercent = Object.fromEntries(
-    Object.entries(aaRatios).map(([metric, ratios]) => [
+  const aa_spread_percent = Object.fromEntries(
+    Object.entries(aa_ratios).map(([metric, ratios]) => [
       metric,
       Math.max(...ratios.map((ratio) => Math.abs(ratio - 1))) * 100,
     ]),
@@ -878,7 +889,7 @@ async function run(options: {
     protocol: "sheetwrite-version-comparison-v1",
     machine: options.machine,
     measuredAt: new Date().toISOString(),
-    host: machineDescription(),
+    host: machine_description(),
     rounds: options.rounds,
     order:
       "versions ABC in even rounds and CBA in odd rounds, engines default/full then full/default; one fresh process per version, engine and part",
@@ -901,13 +912,13 @@ async function run(options: {
           {
             packageVersions: first.packageVersions,
             setupCall: first.setupCall,
-            sizes: engineSizes(version.dir),
+            sizes: engine_sizes(version.dir),
           },
         ];
       }),
     ),
     summary,
-    aaSpreadPercent,
+    aaSpreadPercent: aa_spread_percent,
     samples,
   };
   writeFileSync(options.output, `${JSON.stringify(artifact, null, 2)}\n`);
@@ -952,7 +963,7 @@ interface MachineArtifact {
   >;
 }
 
-const formatNumber = (value: number, digits: number): string =>
+const format_number = (value: number, digits: number): string =>
   value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 function report(inputs: string[], output: string) {
@@ -967,28 +978,28 @@ function report(inputs: string[], output: string) {
   }[] = [
     {
       name: "Formula recalculation, geomean time of the shared benchmark rows",
-      cell: (a, l, e) => `${formatNumber(a.summary[l]?.[e].recalcGeomeanMs ?? Number.NaN, 3)} ms`,
+      cell: (a, l, e) => `${format_number(a.summary[l]?.[e].recalcGeomeanMs ?? Number.NaN, 3)} ms`,
     },
     {
       name: "Retained memory, 100k formulas",
-      cell: (a, l, e) => `${formatNumber(a.summary[l]?.[e].retainedMiB ?? Number.NaN, 1)} MiB`,
+      cell: (a, l, e) => `${format_number(a.summary[l]?.[e].retainedMiB ?? Number.NaN, 1)} MiB`,
     },
     {
       name: "Peak memory, 100k formulas",
-      cell: (a, l, e) => `${formatNumber(a.summary[l]?.[e].peakMiB ?? Number.NaN, 1)} MiB`,
+      cell: (a, l, e) => `${format_number(a.summary[l]?.[e].peakMiB ?? Number.NaN, 1)} MiB`,
     },
     {
       name: "Engine download, Brotli",
       cell: (a, l, e) =>
-        `${formatNumber((a.versions[l]?.sizes[e].totalBrotliBytes ?? Number.NaN) / BYTES_PER_KIB, 0)} KiB`,
+        `${format_number((a.versions[l]?.sizes[e].totalBrotliBytes ?? Number.NaN) / BYTES_PER_KIB, 0)} KiB`,
     },
     {
       name: "XLSX import",
-      cell: (a, l, e) => `${formatNumber(a.summary[l]?.[e].importMs ?? Number.NaN, 0)} ms`,
+      cell: (a, l, e) => `${format_number(a.summary[l]?.[e].importMs ?? Number.NaN, 0)} ms`,
     },
     {
       name: "XLSX export",
-      cell: (a, l, e) => `${formatNumber(a.summary[l]?.[e].exportMs ?? Number.NaN, 0)} ms`,
+      cell: (a, l, e) => `${format_number(a.summary[l]?.[e].exportMs ?? Number.NaN, 0)} ms`,
     },
   ];
   const lines = [
@@ -1046,7 +1057,7 @@ if (command === "child") {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 } else if (command === "run") {
   await run({
-    versions: (values.version ?? []).map(parseVersion),
+    versions: (values.version ?? []).map(parse_version),
     rounds: values.rounds === undefined ? DEFAULT_ROUNDS : Number(values.rounds),
     machine: required("machine"),
     output: resolve(required("output")),
@@ -1055,7 +1066,7 @@ if (command === "child") {
     ),
   });
 } else if (command === "sizes") {
-  process.stdout.write(`${JSON.stringify(engineSizes(resolve(required("dir"))), null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(engine_sizes(resolve(required("dir"))), null, 2)}\n`);
 } else if (command === "report") {
   report(values.input ?? [], resolve(required("output")));
 } else {

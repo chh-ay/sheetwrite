@@ -8,29 +8,29 @@ import { dirname, join, resolve } from "node:path";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const packageVersions = new Map<string, string>(
+const repository_root = resolve(import.meta.dir, "..");
+const package_versions = new Map<string, string>(
   PUBLISHABLE_PACKAGE_ORDER.map((name) => {
     const directory = name.slice("@sheetwrite/".length);
     const { version } = JSON.parse(
-      readFileSync(resolve(repositoryRoot, "packages", directory, "package.json"), "utf8"),
+      readFileSync(resolve(repository_root, "packages", directory, "package.json"), "utf8"),
     ) as { version: string };
     return [name, version];
   }),
 );
 /** The canonical tarball reference for one workspace package at its own version. */
-function isCanonicalTarball(name: string, reference: string | undefined): boolean {
-  const version = packageVersions.get(name);
+function is_canonical_tarball(name: string, reference: string | undefined): boolean {
+  const version = package_versions.get(name);
   if (version === undefined || reference === undefined) return false;
   const file = `sheetwrite-${name.slice("@sheetwrite/".length)}-${version}.tgz`;
   return reference === `file:artifacts/${file}` || reference === `file:../.packed/${file}`;
 }
-const registryVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
-const fixtureDirectories = [
+const registry_version = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const fixture_directories = [
   "test/consumer/package-lock.json",
   "test/release-locks/*/package-lock.json",
   "test/bundler-fixtures/*/package-lock.json",
-].flatMap((pattern) => [...new Bun.Glob(pattern).scanSync(repositoryRoot)].map(dirname));
+].flatMap((pattern) => [...new Bun.Glob(pattern).scanSync(repository_root)].map(dirname));
 
 interface FixtureManifest {
   readonly scripts?: Readonly<Record<string, string>>;
@@ -52,7 +52,7 @@ interface FixtureLock {
 }
 
 function json<T>(path: string): T {
-  return JSON.parse(readFileSync(resolve(repositoryRoot, path), "utf8")) as T;
+  return JSON.parse(readFileSync(resolve(repository_root, path), "utf8")) as T;
 }
 
 function dependencies(manifest: FixtureManifest): Readonly<Record<string, string>> {
@@ -61,8 +61,8 @@ function dependencies(manifest: FixtureManifest): Readonly<Record<string, string
 
 describe("immutable release consumer locks", () => {
   it("commits a lockfile matching every release consumer manifest", () => {
-    expect(fixtureDirectories.length).toBeGreaterThan(0);
-    for (const directory of fixtureDirectories) {
+    expect(fixture_directories.length).toBeGreaterThan(0);
+    for (const directory of fixture_directories) {
       const manifest = json<FixtureManifest>(`${directory}/package.json`);
       const lock = json<FixtureLock>(`${directory}/package-lock.json`);
       expect(lock.lockfileVersion).toBe(3);
@@ -70,17 +70,17 @@ describe("immutable release consumer locks", () => {
       expect(lock.packages?.[""]?.devDependencies ?? {}).toEqual(manifest.devDependencies ?? {});
       for (const [name, range] of Object.entries(dependencies(manifest))) {
         if (name.startsWith("@sheetwrite/")) {
-          expect(isCanonicalTarball(name, range), `${directory} ${name}`).toBe(true);
+          expect(is_canonical_tarball(name, range), `${directory} ${name}`).toBe(true);
         } else {
-          expect(range, `${directory} ${name}`).toMatch(registryVersion);
+          expect(range, `${directory} ${name}`).toMatch(registry_version);
         }
       }
     }
   });
 
   it("locks registry and canonical tarball bytes with integrity hashes", () => {
-    const internalIntegrities = new Map<string, string>();
-    for (const directory of fixtureDirectories) {
+    const internal_integrities = new Map<string, string>();
+    for (const directory of fixture_directories) {
       const manifest = json<FixtureManifest>(`${directory}/package.json`);
       const lock = json<FixtureLock>(`${directory}/package-lock.json`);
       for (const name of Object.keys(dependencies(manifest))) {
@@ -90,37 +90,39 @@ describe("immutable release consumer locks", () => {
       }
       for (const [path, entry] of Object.entries(lock.packages ?? {})) {
         if (path === "") continue;
-        expect(entry.version).toMatch(registryVersion);
+        expect(entry.version).toMatch(registry_version);
         if (entry.resolved?.startsWith("https://")) expect(entry.integrity).toMatch(/^sha512-/);
         if (!path.startsWith("node_modules/@sheetwrite/")) continue;
-        const packageName = path.slice("node_modules/".length);
-        expect(isCanonicalTarball(packageName, entry.resolved), `${directory} ${path}`).toBe(true);
+        const package_name = path.slice("node_modules/".length);
+        expect(is_canonical_tarball(package_name, entry.resolved), `${directory} ${path}`).toBe(
+          true,
+        );
         expect(entry.integrity).toMatch(/^sha512-/);
-        const existing = internalIntegrities.get(packageName);
-        if (existing === undefined) internalIntegrities.set(packageName, entry.integrity!);
+        const existing = internal_integrities.get(package_name);
+        if (existing === undefined) internal_integrities.set(package_name, entry.integrity!);
         else expect(entry.integrity, `${directory} ${path}`).toBe(existing);
       }
     }
     // Every published package is installed from its canonical tarball by some consumer.
-    expect([...internalIntegrities.keys()].sort()).toEqual([...PUBLISHABLE_PACKAGE_ORDER].sort());
+    expect([...internal_integrities.keys()].sort()).toEqual([...PUBLISHABLE_PACKAGE_ORDER].sort());
   });
 
   it("rebinds copied canonical tarballs without changing registry entries", async () => {
     const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-lock-"));
     try {
-      const registryEntry = {
+      const registry_entry = {
         version: "19.1.0",
         resolved: "https://registry.npmjs.org/react/-/react-19.1.0.tgz",
         integrity: "sha512-registry",
       };
-      const lockPath = join(root, "package-lock.json");
-      const tarballPath = join(root, "sheetwrite-core-0.2.0.tgz");
+      const lock_path = join(root, "package-lock.json");
+      const tarball_path = join(root, "sheetwrite-core-0.2.0.tgz");
       const copied = "file:artifacts/sheetwrite-core-0.1.0.tgz";
       const dependencies = { "@sheetwrite/core": copied, react: "19.1.0" };
-      await writeFile(tarballPath, "canonical bytes");
+      await writeFile(tarball_path, "canonical bytes");
       await writeFile(join(root, "package.json"), `${JSON.stringify({ dependencies })}\n`);
       await writeFile(
-        lockPath,
+        lock_path,
         `${JSON.stringify({
           lockfileVersion: 3,
           packages: {
@@ -130,28 +132,31 @@ describe("immutable release consumer locks", () => {
               resolved: copied,
               integrity: "sha512-stale",
             },
-            "node_modules/react": registryEntry,
+            "node_modules/react": registry_entry,
           },
         })}\n`,
       );
-      await bindCanonicalTarballIntegrities(lockPath, new Map([["@sheetwrite/core", tarballPath]]));
-      const rebound = JSON.parse(await readFile(lockPath, "utf8")) as FixtureLock;
-      const reboundManifest = JSON.parse(
+      await bindCanonicalTarballIntegrities(
+        lock_path,
+        new Map([["@sheetwrite/core", tarball_path]]),
+      );
+      const rebound = JSON.parse(await readFile(lock_path, "utf8")) as FixtureLock;
+      const rebound_manifest = JSON.parse(
         await readFile(join(root, "package.json"), "utf8"),
       ) as FixtureManifest;
-      const reboundCore = rebound.packages?.["node_modules/@sheetwrite/core"];
+      const rebound_core = rebound.packages?.["node_modules/@sheetwrite/core"];
       for (const reference of [
-        reboundManifest.dependencies?.["@sheetwrite/core"],
+        rebound_manifest.dependencies?.["@sheetwrite/core"],
         rebound.packages?.[""]?.dependencies?.["@sheetwrite/core"],
-        reboundCore?.resolved,
+        rebound_core?.resolved,
       ]) {
         expect(reference).toEndWith("sheetwrite-core-0.2.0.tgz");
       }
-      expect(reboundCore).toMatchObject({
+      expect(rebound_core).toMatchObject({
         version: "0.2.0",
         integrity: `sha512-${createHash("sha512").update("canonical bytes").digest("base64")}`,
       });
-      expect(rebound.packages?.["node_modules/react"]).toEqual(registryEntry);
+      expect(rebound.packages?.["node_modules/react"]).toEqual(registry_entry);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

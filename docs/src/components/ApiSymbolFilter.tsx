@@ -31,7 +31,7 @@ interface SymbolGroup {
 /** Below this many cards a filter costs more clicks than it saves. */
 export const MINIMUM_FILTERABLE_CARDS = 12;
 
-function collectGroups(): readonly SymbolGroup[] {
+function collect_groups(): readonly SymbolGroup[] {
   if (isServer) return [];
   const article = document.querySelector<HTMLElement>("#main-content article.sw-prose");
   const groups: SymbolGroup[] = [];
@@ -51,7 +51,7 @@ function collectGroups(): readonly SymbolGroup[] {
   return groups;
 }
 
-function statusFor(query: string, matches: number, total: number): string {
+function status_for(query: string, matches: number, total: number): string {
   if (query.length === 0) return `${total} exported symbols.`;
   if (matches === 0) return `No exported symbol matches "${query}".`;
   return `${matches} of ${total} exported symbols match "${query}".`;
@@ -61,63 +61,63 @@ export function ApiSymbolFilter(props: {
   /** The page's exported symbol count from its frontmatter, so the server renders the filter. */
   readonly symbolCount: number;
 }) {
-  const inputId = createUniqueId();
-  const statusId = createUniqueId();
+  const input_id = createUniqueId();
+  const status_id = createUniqueId();
   // The page is static, so its cards are all there when the island hydrates.
-  const groups = collectGroups();
+  const groups = collect_groups();
   // The reader may have typed into the server-rendered field before it hydrated.
   const typed = isServer
     ? ""
-    : ((document.getElementById(inputId) as HTMLInputElement | null)?.value ?? "");
-  const [query, setQuery] = createSignal(typed);
-  const [matchCount, setMatchCount] = createSignal(props.symbolCount);
+    : ((document.getElementById(input_id) as HTMLInputElement | null)?.value ?? "");
+  const [query, set_query] = createSignal(typed);
+  const [match_count, set_match_count] = createSignal(props.symbolCount);
   const trimmed = () => query().trim();
 
   createEffect(() => {
     const needle = trimmed().toLowerCase();
     let matches = 0;
     for (const group of groups) {
-      let groupMatches = 0;
+      let group_matches = 0;
       for (const card of group.cards) {
         const visible = needle.length === 0 || card.text.includes(needle);
         card.element.hidden = !visible;
-        if (visible) groupMatches += 1;
+        if (visible) group_matches += 1;
       }
-      matches += groupMatches;
-      group.grid.hidden = groupMatches === 0;
-      group.heading?.toggleAttribute("hidden", groupMatches === 0);
+      matches += group_matches;
+      group.grid.hidden = group_matches === 0;
+      group.heading?.toggleAttribute("hidden", group_matches === 0);
     }
-    if (groups.length > 0) setMatchCount(matches);
+    if (groups.length > 0) set_match_count(matches);
   });
 
   return (
     <search aria-label="Filter exported symbols" class="sw-symbol-filter">
       {/* oxlint-disable-next-line jsx-a11y/label-has-associated-control -- `for` names the input; the rule knows only React's `htmlFor`. */}
-      <label class="sw-symbol-filter__label" for={inputId}>
+      <label class="sw-symbol-filter__label" for={input_id}>
         Filter exported symbols
       </label>
       <div class="sw-symbol-filter__field">
         <Icon name="search" />
         <input
-          aria-describedby={statusId}
+          aria-describedby={status_id}
           autocomplete="off"
-          id={inputId}
-          onInput={(event) => setQuery(event.currentTarget.value)}
+          id={input_id}
+          onInput={(event) => set_query(event.currentTarget.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") setQuery("");
+            if (event.key === "Escape") set_query("");
           }}
           placeholder="incremental, camelCase, or a word from the summary"
           type="search"
           value={query()}
         />
         <Show when={query().length > 0}>
-          <button class="sw-symbol-filter__clear" onClick={() => setQuery("")} type="button">
+          <button class="sw-symbol-filter__clear" onClick={() => set_query("")} type="button">
             Clear
           </button>
         </Show>
       </div>
-      <p aria-live="polite" class="sw-symbol-filter__status" id={statusId}>
-        {statusFor(trimmed(), matchCount(), props.symbolCount)}
+      <p aria-live="polite" class="sw-symbol-filter__status" id={status_id}>
+        {status_for(trimmed(), match_count(), props.symbolCount)}
       </p>
     </search>
   );

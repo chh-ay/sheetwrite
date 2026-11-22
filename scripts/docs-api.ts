@@ -37,13 +37,13 @@ import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
-function packageSourcePath(packageName: string, source: string): string {
+function package_source_path(package_name: string, source: string): string {
   const separator = source.indexOf("#");
   const file = separator === -1 ? source : source.slice(0, separator);
   const fragment = separator === -1 ? undefined : source.slice(separator + 1);
-  const packageDirectory = PACKAGE_DIRECTORIES[packageName];
-  if (packageDirectory === undefined) return source;
-  const normalized = posix(normalize(join(packageDirectory, file)));
+  const package_directory = PACKAGE_DIRECTORIES[package_name];
+  if (package_directory === undefined) return source;
+  const normalized = posix(normalize(join(package_directory, file)));
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
 }
 
@@ -57,21 +57,21 @@ const BUILD_OUTPUT = /^packages\/[^/]+\/(?:dist|pkg|pkg-history)\//;
  * declares `name`. Files that only the build writes, such as wasm-bindgen's
  * `pkg/*.d.ts`, have no repository copy and stay as they are.
  */
-function repositorySourcePath(source: string, name: string): string {
+function repository_source_path(source: string, name: string): string {
   const file = source.split("#")[0] ?? source;
   const built = /^(packages\/[^/]+)\/dist\/(.+)\.d\.[cm]?ts$/.exec(file);
   if (built === null) return source;
-  const sourceFile = [".ts", ".tsx"]
+  const source_file = [".ts", ".tsx"]
     .map((extension) => `${built[1]}/src/${built[2]}${extension}`)
     .find((candidate) => existsSync(join(repositoryRoot, candidate)));
-  if (sourceFile === undefined) return source;
+  if (source_file === undefined) return source;
   const declaration = new RegExp(
     `^export\\s+(?:declare\\s+)?(?:abstract\\s+)?(?:interface|type|class|function|const|let|enum)\\s+${name}\\b`,
   );
-  const line = readFileSync(join(repositoryRoot, sourceFile), "utf8")
+  const line = readFileSync(join(repositoryRoot, source_file), "utf8")
     .split("\n")
     .findIndex((text) => declaration.test(text));
-  return line < 0 ? sourceFile : `${sourceFile}#L${line + 1}`;
+  return line < 0 ? source_file : `${source_file}#L${line + 1}`;
 }
 
 interface DeclarationMember {
@@ -93,8 +93,8 @@ interface DeclarationShape {
 const OPAQUE_EXPORTS: ReadonlySet<string> = new Set(["InitOutput"]);
 
 /** The members an export's reference page lists. */
-function renderedMembers(item: Pick<ApiExport, "name" | "signature">): DeclarationMember[] {
-  return OPAQUE_EXPORTS.has(item.name) ? [] : declarationShape(parseableDeclaration(item)).members;
+function rendered_members(item: Pick<ApiExport, "name" | "signature">): DeclarationMember[] {
+  return OPAQUE_EXPORTS.has(item.name) ? [] : declaration_shape(parseableDeclaration(item)).members;
 }
 
 /**
@@ -105,7 +105,7 @@ const WASM_BINDGEN_FREE =
   "Releases the object's WASM memory now instead of at garbage collection; the object can't be used afterwards.";
 
 /** An export's member doc comments, with wasm-bindgen's `free()` described for generated classes. */
-function renderedMemberDocs(item: ApiExport): ApiExport["memberDocs"] {
+function rendered_member_docs(item: ApiExport): ApiExport["memberDocs"] {
   const generated =
     item.kind === "class" &&
     /^pkg[^/]*\//.test(item.source) &&
@@ -133,7 +133,7 @@ export function documentationLinkRoutes(manifest: PublicApiManifest): Documentat
         candidates.push({
           packageName: pkg.name,
           entry,
-          route: symbolRoute(pkg, entry, item),
+          route: symbol_route(pkg, entry, item),
           item,
         });
         routes.set(item.name, candidates);
@@ -143,14 +143,16 @@ export function documentationLinkRoutes(manifest: PublicApiManifest): Documentat
   return routes;
 }
 
-function uniqueDocumentationCandidate(
+function unique_documentation_candidate(
   routes: DocumentationLinkRoutes,
-  packageName: string,
+  package_name: string,
   target: string,
 ): DocumentationLinkCandidate | undefined {
   const candidates = routes.get(target) ?? [];
-  const packageCandidates = candidates.filter((candidate) => candidate.packageName === packageName);
-  if (packageCandidates.length === 1) return packageCandidates[0];
+  const package_candidates = candidates.filter(
+    (candidate) => candidate.packageName === package_name,
+  );
+  if (package_candidates.length === 1) return package_candidates[0];
   return candidates.length === 1 ? candidates[0] : undefined;
 }
 
@@ -158,21 +160,21 @@ function uniqueDocumentationCandidate(
  * The same symbol is re-exported from several entry points, so a reference resolves to
  * the page's own entry first, then its package, then an unambiguous match anywhere.
  */
-function closestCandidate<
+function closest_candidate<
   T extends { readonly packageName: string; readonly entry: ApiEntryPoint },
->(candidates: readonly T[], packageName: string, entry: ApiEntryPoint): T | undefined {
+>(candidates: readonly T[], package_name: string, entry: ApiEntryPoint): T | undefined {
   const local = candidates.filter(
-    (candidate) => candidate.packageName === packageName && candidate.entry === entry,
+    (candidate) => candidate.packageName === package_name && candidate.entry === entry,
   );
-  const samePackage = candidates.filter((candidate) => candidate.packageName === packageName);
-  return [local, samePackage, candidates].find((group) => group.length === 1)?.[0];
+  const same_package = candidates.filter((candidate) => candidate.packageName === package_name);
+  return [local, same_package, candidates].find((group) => group.length === 1)?.[0];
 }
 
-function hasRenderedMember(item: ApiExport, memberName: string): boolean {
-  return renderedMembers(item).some((member) => member.name === memberName);
+function has_rendered_member(item: ApiExport, member_name: string): boolean {
+  return rendered_members(item).some((member) => member.name === member_name);
 }
 
-function documentationLinkRoute(
+function documentation_link_route(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
@@ -180,30 +182,30 @@ function documentationLinkRoute(
   routes: DocumentationLinkRoutes,
 ): string | undefined {
   if (/^(?:https?:\/\/|\/docs\/)/.test(target)) return target;
-  const targetParts = target.split(".");
-  if (targetParts.length > 2) return undefined;
-  const [ownerName, memberName] = targetParts;
-  if (memberName !== undefined) {
-    const localOwner = entry.exports.find((candidate) => candidate.name === ownerName);
+  const target_parts = target.split(".");
+  if (target_parts.length > 2) return undefined;
+  const [owner_name, member_name] = target_parts;
+  if (member_name !== undefined) {
+    const local_owner = entry.exports.find((candidate) => candidate.name === owner_name);
     const owner =
-      localOwner === undefined
-        ? uniqueDocumentationCandidate(routes, pkg.name, ownerName ?? "")
+      local_owner === undefined
+        ? unique_documentation_candidate(routes, pkg.name, owner_name ?? "")
         : {
             packageName: pkg.name,
             entry,
-            route: symbolRoute(pkg, entry, localOwner),
-            item: localOwner,
+            route: symbol_route(pkg, entry, local_owner),
+            item: local_owner,
           };
-    return owner === undefined || !hasRenderedMember(owner.item, memberName)
+    return owner === undefined || !has_rendered_member(owner.item, member_name)
       ? undefined
-      : `${owner.route}#${anchor(ownerName ?? "")}-${anchor(memberName)}`;
+      : `${owner.route}#${anchor(owner_name ?? "")}-${anchor(member_name)}`;
   }
   const local = entry.exports.find((candidate) => candidate.name === target);
-  if (local !== undefined) return symbolRoute(pkg, entry, local);
-  if (hasRenderedMember(item, target)) {
-    return `${symbolRoute(pkg, entry, item)}#${anchor(item.name)}-${anchor(target)}`;
+  if (local !== undefined) return symbol_route(pkg, entry, local);
+  if (has_rendered_member(item, target)) {
+    return `${symbol_route(pkg, entry, item)}#${anchor(item.name)}-${anchor(target)}`;
   }
-  return uniqueDocumentationCandidate(routes, pkg.name, target)?.route;
+  return unique_documentation_candidate(routes, pkg.name, target)?.route;
 }
 
 export function unresolvedDocumentationLinks(manifest: PublicApiManifest): string[] {
@@ -219,7 +221,7 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
         for (const source of documentation) {
           for (const match of source.matchAll(/\{@link\s+([^\s|}]+)/g)) {
             const target = match[1] ?? "";
-            if (documentationLinkRoute(pkg, entry, item, target, routes) === undefined) {
+            if (documentation_link_route(pkg, entry, item, target, routes) === undefined) {
               issues.push(
                 `${pkg.name} ${entry.subpath} ${item.name} has unresolved documentation link ${target}`,
               );
@@ -248,7 +250,7 @@ interface DocumentationParts {
 /** The tags a doc comment is split on; everything else stays in the body. */
 const DOCUMENTATION_TAG = /(?:^|\n)@(example|see|param|returns?|throws)\b\s*/;
 
-function documentationParts(
+function documentation_parts(
   documentation: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
@@ -270,7 +272,7 @@ function documentationParts(
       const link = /^\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}$/.exec(value);
       const target = link?.[1] ?? value;
       const label = link?.[2]?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      const route = documentation_link_route(pkg, entry, item, target, routes);
       related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
     } else if (tag === "param") {
       const parameter = /^([\w$.]+)\s*(?:-\s*)?([\s\S]*)$/.exec(value);
@@ -287,22 +289,22 @@ function documentationParts(
 }
 
 /**
- * JSDoc body, examples and related links. `headingLevel` places the Examples
+ * JSDoc body, examples and related links. `heading_level` places the Examples
  * and See also headings one level below whatever holds the text: 2 for a
  * symbol page's opening summary (under the page title), 4 for a member's
  * documentation (under its group heading in Members), so heading levels never
  * skip.
  */
-function documentationSections(
+function documentation_sections(
   documentation: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
-  headingLevel: 2 | 3 | 4,
+  heading_level: 2 | 3 | 4,
 ): string {
-  const heading = "#".repeat(headingLevel);
-  const { body, examples, related } = documentationParts(documentation, pkg, entry, item, routes);
+  const heading = "#".repeat(heading_level);
+  const { body, examples, related } = documentation_parts(documentation, pkg, entry, item, routes);
   const blocks = [body];
   if (examples.length > 0) blocks.push(`${heading} Examples`, ...examples);
   if (related.length > 0) blocks.push(`${heading} See also`, related.join("\n"));
@@ -310,7 +312,7 @@ function documentationSections(
 }
 
 /** Replaces `{@link …}` with a Markdown link to the target's page, or inline code. */
-function resolveDocumentationLinks(
+function resolve_documentation_links(
   markdown: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
@@ -321,24 +323,24 @@ function resolveDocumentationLinks(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      const route = documentation_link_route(pkg, entry, item, target, routes);
       return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
     },
   );
 }
 
-function documentationMarkdown(
+function documentation_markdown(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
-  headingLevel: 2 | 3 | 4 = 3,
+  heading_level: 2 | 3 | 4 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return resolveDocumentationLinks(
-    documentationSections(documentation, pkg, entry, item, routes, headingLevel),
+  return resolve_documentation_links(
+    documentation_sections(documentation, pkg, entry, item, routes, heading_level),
     pkg,
     entry,
     item,
@@ -346,7 +348,7 @@ function documentationMarkdown(
   );
 }
 
-function memberDocumentationHtml(
+function member_documentation_html(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
@@ -359,7 +361,7 @@ function memberDocumentationHtml(
       /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
       (_match, target: string, label: string | undefined) => {
         const text = label?.trim() || target;
-        const route = documentationLinkRoute(pkg, entry, item, target, routes);
+        const route = documentation_link_route(pkg, entry, item, target, routes);
         return route === undefined
           ? `<code>${text}</code>`
           : `<a href="${route}"><code>${text}</code></a>`;
@@ -371,7 +373,7 @@ function memberDocumentationHtml(
  * A member card's `@param`, `@returns` and `@throws` as labelled lines, so they
  * read as a compact list instead of raw tags inside the description.
  */
-function memberTagsHtml(
+function member_tags_html(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
@@ -379,7 +381,7 @@ function memberTagsHtml(
   routes: DocumentationLinkRoutes,
 ): string | undefined {
   const describe = (text: string): string =>
-    memberDocumentationHtml(pkg, entry, item, text, routes);
+    member_documentation_html(pkg, entry, item, text, routes);
   const rows = [
     ...[...parts.parameters].map(
       ([name, text]) =>
@@ -394,8 +396,8 @@ function memberTagsHtml(
 }
 
 /** One card per `@throws`: the error, then when it is thrown. */
-function throwsCardHtml(descriptionHtml: string): string {
-  return `<div class="api-card api-field"><p class="api-card__doc">${descriptionHtml}</p></div>`;
+function throws_card_html(description_html: string): string {
+  return `<div class="api-card api-field"><p class="api-card__doc">${description_html}</p></div>`;
 }
 
 /**
@@ -403,14 +405,14 @@ function throwsCardHtml(descriptionHtml: string): string {
  * backticks when the summary is rendered as HTML (member rows); search and
  * social descriptions are plain text.
  */
-function compactSummary(markdown: string, keepInlineCode = false): string {
+function compact_summary(markdown: string, keep_inline_code = false): string {
   const plain = markdown
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(keepInlineCode ? /[*_~]/g : /[`*_~]/g, "")
+    .replace(keep_inline_code ? /[*_~]/g : /[`*_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  const firstSentence = /^.{24,240}?[.!?](?=\s|$)/.exec(plain)?.[0];
-  if (firstSentence !== undefined) return firstSentence;
+  const first_sentence = /^.{24,240}?[.!?](?=\s|$)/.exec(plain)?.[0];
+  if (first_sentence !== undefined) return first_sentence;
   if (plain.length <= 220) return plain;
   const clipped = plain.slice(0, 217);
   return `${clipped.slice(0, clipped.lastIndexOf(" "))}…`;
@@ -425,13 +427,13 @@ const SEARCH_DESCRIPTION_MAX = 160;
  * two packages re-export from sharing one description. A long result is
  * clipped on a word; a short one stays short, as its JSDoc is.
  */
-function symbolDescription(
+function symbol_description(
   name: string,
   kind: string,
-  packageLabel: string,
+  package_label: string,
   summary: string,
 ): string {
-  const text = `${name} ${kind} in ${packageLabel}: ${summary}`;
+  const text = `${name} ${kind} in ${package_label}: ${summary}`;
   if (text.length <= SEARCH_DESCRIPTION_MAX) return text;
 
   const clipped = text.slice(0, SEARCH_DESCRIPTION_MAX - 1);
@@ -470,14 +472,16 @@ export function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">
  * belong to a project, so shapes are parsed in batches by {@link prepareDeclarationShapes}
  * and then read synchronously by the link resolution and page renderers.
  */
-const declarationShapes = new Map<string, DeclarationShape>();
+const declaration_shapes = new Map<string, DeclarationShape>();
 
 /**
  * Parse declarations with the TypeScript 7 API: each signature becomes a file in a scratch
  * inferred project, printed by its emitter and read back as `typescript/unstable/ast` nodes.
  */
 export async function prepareDeclarationShapes(signatures: Iterable<string>): Promise<void> {
-  const pending = [...new Set(signatures)].filter((signature) => !declarationShapes.has(signature));
+  const pending = [...new Set(signatures)].filter(
+    (signature) => !declaration_shapes.has(signature),
+  );
   if (pending.length === 0) return;
   const directory = await mkdtemp(join(tmpdir(), "sheetwrite-declarations-"));
   const api = new API({ cwd: directory });
@@ -498,9 +502,9 @@ export async function prepareDeclarationShapes(signatures: Iterable<string>): Pr
         if (project === undefined) {
           throw new Error("TypeScript 7 could not open the scratch declaration project");
         }
-        declarationShapes.set(
+        declaration_shapes.set(
           declaration.signature,
-          await readDeclarationShape(project, declaration.path, declaration.signature),
+          await read_declaration_shape(project, declaration.path, declaration.signature),
         );
       }
     } finally {
@@ -512,19 +516,19 @@ export async function prepareDeclarationShapes(signatures: Iterable<string>): Pr
   }
 }
 
-async function readDeclarationShape(
+async function read_declaration_shape(
   project: Project,
   path: string,
   signature: string,
 ): Promise<DeclarationShape> {
-  const sourceFile = await project.program.getSourceFile(path);
-  const declaration = sourceFile?.statements[0];
+  const source_file = await project.program.getSourceFile(path);
+  const declaration = source_file?.statements[0];
 
-  if (sourceFile === undefined || declaration === undefined) {
+  if (source_file === undefined || declaration === undefined) {
     return { formatted: signature, members: [], variants: [] };
   }
 
-  const memberNodes: readonly Node[] =
+  const member_nodes: readonly Node[] =
     isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)
       ? declaration.members
       : isTypeAliasDeclaration(declaration) && isTypeLiteralNode(declaration.type)
@@ -533,23 +537,23 @@ async function readDeclarationShape(
 
   return {
     formatted: await project.emitter.printNode(declaration),
-    members: memberNodes.map((member, index) => ({
-      name: declarationMemberName(member, index, sourceFile),
-      signature: member.getText(sourceFile).replace(/\s+/g, " ").trim(),
+    members: member_nodes.map((member, index) => ({
+      name: declaration_member_name(member, index, source_file),
+      signature: member.getText(source_file).replace(/\s+/g, " ").trim(),
     })),
     variants:
       isTypeAliasDeclaration(declaration) && isUnionTypeNode(declaration.type)
         ? declaration.type.types.map((variant) =>
-            variant.getText(sourceFile).replace(/\s+/g, " ").trim(),
+            variant.getText(source_file).replace(/\s+/g, " ").trim(),
           )
         : [],
   };
 }
 
-function declarationMemberName(member: Node, index: number, sourceFile: SourceFile): string {
+function declaration_member_name(member: Node, index: number, source_file: SourceFile): string {
   const named = member as Node & { name?: Node };
   if (named.name !== undefined) {
-    return named.name.getText(sourceFile).replace(/^["']|["']$/g, "");
+    return named.name.getText(source_file).replace(/^["']|["']$/g, "");
   }
   if (isConstructorDeclaration(member)) return "constructor";
   if (isCallSignatureDeclaration(member)) return "call";
@@ -558,15 +562,15 @@ function declarationMemberName(member: Node, index: number, sourceFile: SourceFi
   return `member-${index + 1}`;
 }
 
-function declarationShape(signature: string): DeclarationShape {
-  return declarationShapes.get(signature) ?? { formatted: signature, members: [], variants: [] };
+function declaration_shape(signature: string): DeclarationShape {
+  return declaration_shapes.get(signature) ?? { formatted: signature, members: [], variants: [] };
 }
 
 /**
  * Split `text` on `separator` where it is not nested in brackets and not inside a
  * string literal. Member signatures are one-liners, so a single scan is enough.
  */
-function splitTopLevel(text: string, separator: string): string[] {
+function split_top_level(text: string, separator: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let quote: string | undefined;
@@ -604,8 +608,8 @@ interface MemberTypeParts {
  * The declared type of a member row. Only a colon outside brackets and string
  * literals separates the member prefix from its type.
  */
-function memberTypeParts(signature: string): MemberTypeParts | undefined {
-  const parts = splitTopLevel(signature, ":");
+function member_type_parts(signature: string): MemberTypeParts | undefined {
+  const parts = split_top_level(signature, ":");
   if (parts.length < 2) return undefined;
   const rest = parts.slice(1).join(":").trim();
   const terminated = rest.endsWith(";");
@@ -617,12 +621,12 @@ function memberTypeParts(signature: string): MemberTypeParts | undefined {
 }
 
 /** Order- and duplicate-insensitive identity of a string-literal union. */
-function literalUnionKey(literals: readonly string[]): string {
+function literal_union_key(literals: readonly string[]): string {
   return [...new Set(literals)].sort().join("\u0000");
 }
 
-function stringLiteralUnionVariants(type: string): string[] | undefined {
-  const variants = splitTopLevel(type, "|").map((variant) => variant.trim());
+function string_literal_union_variants(type: string): string[] | undefined {
+  const variants = split_top_level(type, "|").map((variant) => variant.trim());
   if (variants.length < 2) return undefined;
   if (!variants.every((variant) => /^"(?:[^"\\]|\\.)*"$/.test(variant))) return undefined;
   return variants.map((variant) => variant.slice(1, -1));
@@ -639,7 +643,7 @@ interface UnionAlias {
  * it: an alias qualifies when its declaration is a string-literal union, or the
  * `(typeof SOME_EXPORTED_ARRAY)[number]` form whose array holds the same literals.
  */
-async function unionAliasIndex(
+async function union_alias_index(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   routes: DocumentationLinkRoutes,
@@ -647,15 +651,15 @@ async function unionAliasIndex(
   const candidates = [...routes.values()].flat().filter(({ item }) => item.kind === "type");
   if (candidates.length === 0) return new Map();
   await prepareDeclarationShapes(candidates.map(({ item }) => parseableDeclaration(item)));
-  const byLiteralSet = new Map<
+  const by_literal_set = new Map<
     string,
     Array<UnionAlias & { entry: ApiEntryPoint; packageName: string }>
   >();
   for (const candidate of candidates) {
-    const shape = declarationShape(parseableDeclaration(candidate.item));
+    const shape = declaration_shape(parseableDeclaration(candidate.item));
     let literals: string[] | undefined;
     if (shape.variants.length > 0) {
-      literals = stringLiteralUnionVariants(shape.variants.join(" | "));
+      literals = string_literal_union_variants(shape.variants.join(" | "));
     } else {
       const indirect = /^\(typeof\s+([A-Za-z0-9_$]+)\)\[\s*number\s*\]$/.exec(
         candidate.item.signature
@@ -666,7 +670,7 @@ async function unionAliasIndex(
       const source =
         indirect === null
           ? undefined
-          : closestCandidate(
+          : closest_candidate(
               routes.get(indirect[1] ?? "") ?? [],
               candidate.packageName,
               candidate.entry,
@@ -679,19 +683,19 @@ async function unionAliasIndex(
             );
     }
     if (literals === undefined || literals.length < 2) continue;
-    const key = literalUnionKey(literals);
-    const resolved = byLiteralSet.get(key) ?? [];
+    const key = literal_union_key(literals);
+    const resolved = by_literal_set.get(key) ?? [];
     resolved.push({
       name: candidate.item.name,
       route: candidate.route,
       entry: candidate.entry,
       packageName: candidate.packageName,
     });
-    byLiteralSet.set(key, resolved);
+    by_literal_set.set(key, resolved);
   }
   const aliases = new Map<string, UnionAlias>();
-  for (const [key, resolved] of byLiteralSet) {
-    const chosen = closestCandidate(resolved, pkg.name, entry);
+  for (const [key, resolved] of by_literal_set) {
+    const chosen = closest_candidate(resolved, pkg.name, entry);
     if (chosen !== undefined) aliases.set(key, { name: chosen.name, route: chosen.route });
   }
   return aliases;
@@ -726,7 +730,7 @@ export function consumerIndex(manifest: PublicApiManifest): ConsumerIndex {
           named.add(name);
           references.set(name, [
             ...(references.get(name) ?? []),
-            { packageName: pkg.name, name: item.name, route: symbolRoute(pkg, entry, item) },
+            { packageName: pkg.name, name: item.name, route: symbol_route(pkg, entry, item) },
           ]);
         }
       }
@@ -740,7 +744,7 @@ export function consumerIndex(manifest: PublicApiManifest): ConsumerIndex {
  * section is left out when there are none. Every page of a package would list
  * the same dependent packages, so they are not shown.
  */
-function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
+function render_referenced_by(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
   const references = (consumers.references.get(item.name) ?? []).filter(
     (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
   );
@@ -785,7 +789,7 @@ interface FunctionFields {
  * Splits `text` on top-level commas: not inside brackets, braces, parentheses,
  * type arguments or string literals. An arrow's `=>` is not a closing bracket.
  */
-function splitTopLevelCommas(text: string): string[] {
+function split_top_level_commas(text: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let quote: string | undefined;
@@ -810,7 +814,7 @@ function splitTopLevelCommas(text: string): string[] {
 }
 
 /** The index of the bracket that closes the one at `open`. */
-function closingIndex(text: string, open: number): number {
+function closing_index(text: string, open: number): number {
   const pairs: Record<string, string> = { "(": ")", "<": ">" };
   const opener = text[open] ?? "";
   const closer = pairs[opener];
@@ -834,11 +838,11 @@ function closingIndex(text: string, open: number): number {
 export function functionFields(signature: string, name: string): FunctionFields | undefined {
   const declared = signature.indexOf(`function ${name}`);
   let open = declared === -1 ? 0 : declared + `function ${name}`.length;
-  if (signature[open] === "<") open = closingIndex(signature, open) + 1;
+  if (signature[open] === "<") open = closing_index(signature, open) + 1;
   if (signature[open] !== "(") return undefined;
-  const close = closingIndex(signature, open);
+  const close = closing_index(signature, open);
   if (close === -1) return undefined;
-  const parameters = splitTopLevelCommas(signature.slice(open + 1, close)).map((parameter) => {
+  const parameters = split_top_level_commas(signature.slice(open + 1, close)).map((parameter) => {
     const colon = parameter.indexOf(":");
     const head = (colon === -1 ? parameter : parameter.slice(0, colon)).trim();
     const optional = head.endsWith("?");
@@ -854,7 +858,7 @@ export function functionFields(signature: string, name: string): FunctionFields 
 }
 
 /** A type in a field, with each documented type name linked to its page. */
-function linkedTypeHtml(
+function linked_type_html(
   type: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
@@ -862,7 +866,7 @@ function linkedTypeHtml(
   routes: DocumentationLinkRoutes,
 ): string {
   return html(type).replace(/\b[A-Z][A-Za-z0-9_]*\b/g, (name) => {
-    const route = documentationLinkRoute(pkg, entry, item, name, routes);
+    const route = documentation_link_route(pkg, entry, item, name, routes);
     return route === undefined ? name : `<a href="${route}">${name}</a>`;
   });
 }
@@ -871,12 +875,12 @@ function linkedTypeHtml(
  * One field card: its signature line (name, type and a required or optional
  * marker; no name for a return value) over its description.
  */
-function fieldHtml(
+function field_html(
   id: string,
   name: string | undefined,
-  typeHtml: string,
+  type_html: string,
   marker: "required" | "optional" | undefined,
-  descriptionHtml: string | undefined,
+  description_html: string | undefined,
 ): string {
   const label =
     name === undefined
@@ -885,12 +889,12 @@ function fieldHtml(
   return [
     `<div class="api-card api-field" id="${id}">`,
     '<div class="api-card__head">',
-    `<code class="api-sig">${label}<span class="api-sig__type">${typeHtml}</span></code>`,
+    `<code class="api-sig">${label}<span class="api-sig__type">${type_html}</span></code>`,
     marker === undefined ? "" : `<span class="api-card__flags"><span>${marker}</span></span>`,
     "</div>",
-    descriptionHtml === undefined || descriptionHtml === ""
+    description_html === undefined || description_html === ""
       ? ""
-      : `<p class="api-card__doc">${descriptionHtml}</p>`,
+      : `<p class="api-card__doc">${description_html}</p>`,
     "</div>",
   ]
     .filter((line) => line !== "")
@@ -901,25 +905,25 @@ function fieldHtml(
  * Without its own description, a field named by one documented type reads
  * that type's summary.
  */
-function fieldTypeSummary(
+function field_type_summary(
   type: string,
   pkg: ApiPackage,
   routes: DocumentationLinkRoutes,
 ): string | undefined {
   if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
-  const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+  const target = unique_documentation_candidate(routes, pkg.name, type)?.item.documentation;
   return target === undefined || target.trim() === ""
     ? undefined
-    : compactSummary(target.split(/\n@/)[0] ?? "", true);
+    : compact_summary(target.split(/\n@/)[0] ?? "", true);
 }
 
 /** `void` and `Promise<void>`: a return value with nothing to describe. */
-function returnsNothing(type: string): boolean {
+function returns_nothing(type: string): boolean {
   return /^(?:void|Promise<void>)$/.test(type.replace(/\s+/g, ""));
 }
 
 /** A function's Parameters and Returns sections as fields; no Returns for `void`. */
-function renderFunctionFields(
+function render_function_fields(
   fields: FunctionFields,
   parts: DocumentationParts,
   pkg: ApiPackage,
@@ -928,8 +932,8 @@ function renderFunctionFields(
   routes: DocumentationLinkRoutes,
 ): string {
   const describe = (text: string | undefined): string | undefined =>
-    text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
-  const typeSummary = (type: string): string | undefined => fieldTypeSummary(type, pkg, routes);
+    text === undefined ? undefined : member_documentation_html(pkg, entry, item, text, routes);
+  const type_summary = (type: string): string | undefined => field_type_summary(type, pkg, routes);
   const blocks: string[] = [];
   if (fields.parameters.length > 0) {
     blocks.push(
@@ -937,14 +941,14 @@ function renderFunctionFields(
       "",
       '<div class="api-cards">',
       ...fields.parameters.map((parameter) =>
-        fieldHtml(
+        field_html(
           `parameter-${anchor(parameter.name.replace(/^\.\.\./, ""))}`,
           parameter.name,
-          linkedTypeHtml(parameter.type, pkg, entry, item, routes),
+          linked_type_html(parameter.type, pkg, entry, item, routes),
           parameter.optional ? "optional" : "required",
           describe(
             parts.parameters.get(parameter.name.replace(/^\.\.\./, "")) ??
-              typeSummary(parameter.type),
+              type_summary(parameter.type),
           ),
         ),
       ),
@@ -953,17 +957,17 @@ function renderFunctionFields(
     );
   }
   // A function that returns nothing has no Returns card.
-  if (!returnsNothing(fields.returns)) {
+  if (!returns_nothing(fields.returns)) {
     blocks.push(
       "## Returns",
       "",
       '<div class="api-cards">',
-      fieldHtml(
+      field_html(
         "returns",
         undefined,
-        linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+        linked_type_html(fields.returns, pkg, entry, item, routes),
         undefined,
-        describe(parts.returns ?? typeSummary(fields.returns)),
+        describe(parts.returns ?? type_summary(fields.returns)),
       ),
       "</div>",
       "",
@@ -974,7 +978,7 @@ function renderFunctionFields(
       "## Throws",
       "",
       '<div class="api-cards">',
-      ...parts.throws.map((text) => throwsCardHtml(describe(text) ?? "")),
+      ...parts.throws.map((text) => throws_card_html(describe(text) ?? "")),
       "</div>",
       "",
     );
@@ -982,7 +986,7 @@ function renderFunctionFields(
   return blocks.join("\n");
 }
 
-async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
+async function render_declaration(signature: string, expanded: boolean): Promise<string> {
   // Pretty-printed so long unions wrap per variant instead of scrolling; no
   // fence title - the surrounding "Declaration" heading already names it.
   const formatted = await formatDeclaration(signature);
@@ -1017,7 +1021,7 @@ const MEMBER_MODIFIER =
   /^(?:readonly|static|abstract|public|protected|private|declare|get|set|async)\s+/;
 
 /** A member's declaration without its leading modifiers (`readonly`, `static`, …). */
-function memberHead(signature: string): string {
+function member_head(signature: string): string {
   let head = signature.trimStart();
   while (MEMBER_MODIFIER.test(head)) head = head.replace(MEMBER_MODIFIER, "");
   return head;
@@ -1027,14 +1031,14 @@ function memberHead(signature: string): string {
  * Callbacks named `on…` are events. Methods are members declared with a call
  * signature, or as a property whose type is a function (`run: () => void`).
  */
-function memberGroup(member: DeclarationMember): MemberGroup {
+function member_group(member: DeclarationMember): MemberGroup {
   if (/^on[A-Z]/.test(member.name)) return "Events";
-  const head = memberHead(member.signature);
+  const head = member_head(member.signature);
   if (head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))) {
     return "Methods";
   }
-  const type = memberTypeParts(head)?.type ?? "";
-  return /^(?:<[^>]*>\s*)?\([^]*\)\s*=>/.test(type) && splitTopLevel(type, "|").length === 1
+  const type = member_type_parts(head)?.type ?? "";
+  return /^(?:<[^>]*>\s*)?\([^]*\)\s*=>/.test(type) && split_top_level(type, "|").length === 1
     ? "Methods"
     : "Properties";
 }
@@ -1045,7 +1049,7 @@ function memberGroup(member: DeclarationMember): MemberGroup {
  * card's header is the member's highlighted declaration; its documentation
  * follows, always visible.
  */
-function renderMembers(
+function render_members(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
@@ -1053,7 +1057,7 @@ function renderMembers(
   routes: DocumentationLinkRoutes,
   aliases: ReadonlyMap<string, UnionAlias>,
 ): string {
-  const searchTargets = new Set<string>(
+  const search_targets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
         target.packageName === pkg.name &&
@@ -1061,39 +1065,39 @@ function renderMembers(
         target.owner === item.name,
     ).map(({ term }) => term),
   );
-  const memberDocs = new Map(
-    renderedMemberDocs(item).map((member) => [member.name, member.documentation]),
+  const member_docs = new Map(
+    rendered_member_docs(item).map((member) => [member.name, member.documentation]),
   );
   const documented = new Set<string>();
-  const indexLinks: string[] = [];
-  const usedIds = new Set<string>();
+  const index_links: string[] = [];
+  const used_ids = new Set<string>();
   const cards = members.map((member, index) => {
     // Overload rows repeat a member name. The first row keeps the member ID
     // that the index and other pages link to; each later row gets a suffix,
     // so no two elements share an ID.
-    const memberId = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
-    const firstRow = !usedIds.has(memberId);
-    let id = memberId;
-    for (let overload = 2; usedIds.has(id); overload += 1) id = `${memberId}-${overload}`;
-    usedIds.add(id);
-    if (firstRow) indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
-    const searchAnchor =
-      firstRow && searchTargets.has(member.name)
+    const member_id = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
+    const first_row = !used_ids.has(member_id);
+    let id = member_id;
+    for (let overload = 2; used_ids.has(id); overload += 1) id = `${member_id}-${overload}`;
+    used_ids.add(id);
+    if (first_row) index_links.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
+    const search_anchor =
+      first_row && search_targets.has(member.name)
         ? `<h4 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h4>`
         : "";
     // Overload rows repeat a member name; the merged documentation renders once,
     // on the first row.
-    const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
+    const documentation = documented.has(member.name) ? undefined : member_docs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
-    const parts = memberTypeParts(member.signature);
-    const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
-    const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
+    const parts = member_type_parts(member.signature);
+    const variants = parts === undefined ? undefined : string_literal_union_variants(parts.type);
+    const alias = variants === undefined ? undefined : aliases.get(literal_union_key(variants));
     // The alias names the type; its expansion stays in the Declaration section.
     const signature =
       alias === undefined || parts === undefined
         ? member.signature
         : `${parts.prefix} ${alias.name}${parts.terminated ? ";" : ""}`;
-    const head = memberHead(member.signature);
+    const head = member_head(member.signature);
     const flags = [
       /^\s*readonly\s/.test(member.signature) ? "<span>read-only</span>" : "",
       head.startsWith(`${member.name}?`) ? "<span>optional</span>" : "",
@@ -1101,26 +1105,26 @@ function renderMembers(
         ? ""
         : `<span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`,
     ].join("");
-    const docParts =
+    const doc_parts =
       documentation === undefined
         ? undefined
-        : documentationParts(documentation, pkg, entry, item, routes);
+        : documentation_parts(documentation, pkg, entry, item, routes);
     const tags =
-      docParts === undefined ? undefined : memberTagsHtml(pkg, entry, item, docParts, routes);
+      doc_parts === undefined ? undefined : member_tags_html(pkg, entry, item, doc_parts, routes);
     const body =
-      documentation === undefined || docParts === undefined
+      documentation === undefined || doc_parts === undefined
         ? []
         : [
             /(?:^|\n)@(example|see)\b/.test(documentation)
-              ? `${documentationMarkdown(pkg, entry, item, routes, documentation, 4)}\n`
-              : docParts.body === ""
+              ? `${documentation_markdown(pkg, entry, item, routes, documentation, 4)}\n`
+              : doc_parts.body === ""
                 ? ""
-                : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, docParts.body, routes)}</p>`,
+                : `<p class="api-card__doc">${member_documentation_html(pkg, entry, item, doc_parts.body, routes)}</p>`,
             ...(tags === undefined ? [] : [tags]),
           ].filter((block) => block !== "");
     const card = [
-      searchAnchor,
-      `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
+      search_anchor,
+      `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${search_targets.has(member.name) ? "10" : "1"}">`,
       '<div class="api-card__head">',
       "",
       // A fenced block so member signatures get real syntax highlighting; the
@@ -1135,15 +1139,15 @@ function renderMembers(
       ...body,
       "</article>",
     ].join("\n");
-    return { group: memberGroup(member), card };
+    return { group: member_group(member), card };
   });
   // Overloads share one entry in the index.
-  const memberCount = new Set(members.map((member) => member.name)).size;
+  const member_count = new Set(members.map((member) => member.name)).size;
   const index =
-    memberCount <= MEMBER_INDEX_MINIMUM
+    member_count <= MEMBER_INDEX_MINIMUM
       ? []
       : [
-          `<nav class="api-member-index" aria-label="Members" data-pagefind-ignore>${indexLinks.join("")}</nav>`,
+          `<nav class="api-member-index" aria-label="Members" data-pagefind-ignore>${index_links.join("")}</nav>`,
           "",
         ];
   const groups = MEMBER_GROUPS.flatMap((group) => {
@@ -1163,7 +1167,7 @@ function renderMembers(
 }
 
 /** Page slugs by entry point, worked out once per entry: a slug depends on its neighbours' names. */
-const entryPageSlugs = new WeakMap<ApiEntryPoint, ReadonlyMap<string, string>>();
+const entry_page_slugs = new WeakMap<ApiEntryPoint, ReadonlyMap<string, string>>();
 
 /**
  * Where an export's page lives under the docs content root, without the
@@ -1171,10 +1175,10 @@ const entryPageSlugs = new WeakMap<ApiEntryPoint, ReadonlyMap<string, string>>()
  * suffix (api-page-slugs.ts).
  */
 export function symbolPagePath(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
-  let slugs = entryPageSlugs.get(entry);
+  let slugs = entry_page_slugs.get(entry);
   if (slugs === undefined) {
     slugs = apiPageSlugs(entry.exports);
-    entryPageSlugs.set(entry, slugs);
+    entry_page_slugs.set(entry, slugs);
   }
   const slug = slugs.get(item.name);
   if (slug === undefined) {
@@ -1183,7 +1187,7 @@ export function symbolPagePath(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiE
   return `api/${entrySlug(pkg.name, entry.subpath)}/${slug}`;
 }
 
-function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
+function symbol_route(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
   return `/docs/${symbolPagePath(pkg, entry, item)}/`;
 }
 
@@ -1195,25 +1199,25 @@ export async function renderSymbolPage(
   consumers: ConsumerIndex = EMPTY_CONSUMER_INDEX,
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
-  const source = repositorySourcePath(packageSourcePath(pkg.name, item.source), item.name);
-  const parts = documentationParts(
+  const source = repository_source_path(package_source_path(pkg.name, item.source), item.name);
+  const parts = documentation_parts(
     item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.",
     pkg,
     entry,
     item,
     routes,
   );
-  const summary = resolveDocumentationLinks(parts.body, pkg, entry, item, routes);
+  const summary = resolve_documentation_links(parts.body, pkg, entry, item, routes);
   const declaration = parseableDeclaration(item);
   await prepareDeclarationShapes([declaration]);
-  const shape = declarationShape(declaration);
-  const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
-  const aliases = await unionAliasIndex(pkg, entry, routes);
+  const shape = declaration_shape(declaration);
+  const description = symbol_description(item.name, item.kind, label, compact_summary(summary));
+  const aliases = await union_alias_index(pkg, entry, routes);
   const fields = item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
   // A variants section earns its space only for structured unions; scalar
   // unions read best inline in the (expanded) declaration, where identifiers
   // are highlighted, hoverable, and linked.
-  const structuredVariants = shape.variants.some((variant) => variant.includes("{"))
+  const structured_variants = shape.variants.some((variant) => variant.includes("{"))
     ? shape.variants
     : [];
   // One consistent model: the code section is always "Declaration", always
@@ -1221,35 +1225,35 @@ export async function renderSymbolPage(
   // the page's primary content: it opens right under the summary, so the
   // signature comes before the examples and fields. Otherwise it closes the
   // page, collapsed.
-  const isDeclarationPrimary = shape.members.length === 0 && structuredVariants.length === 0;
-  const declarationSection = [
+  const is_declaration_primary = shape.members.length === 0 && structured_variants.length === 0;
+  const declaration_section = [
     "## Declaration",
     "",
-    await renderDeclaration(
+    await render_declaration(
       // `declare` is parser scaffolding, not information a reader needs.
       shape.formatted.replace(/^declare /, ""),
-      isDeclarationPrimary,
+      is_declaration_primary,
     ),
     "",
   ];
 
   // The examples follow the summary; at desktop width they sit in an aside
   // beside the summary and the rest of the reference.
-  const hasAside = parts.examples.length > 0;
+  const has_aside = parts.examples.length > 0;
   const body = [
     frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
     "",
-    ...(hasAside ? ['<div class="api-layout">', "", '<div class="api-layout__summary">', ""] : []),
+    ...(has_aside ? ['<div class="api-layout">', "", '<div class="api-layout__summary">', ""] : []),
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    sourceRow(source),
+    source_row(source),
     "</dl>",
     "",
-    ...(isDeclarationPrimary ? declarationSection : []),
+    ...(is_declaration_primary ? declaration_section : []),
   ];
-  if (hasAside) {
+  if (has_aside) {
     body.push(
       "</div>",
       "",
@@ -1258,7 +1262,7 @@ export async function renderSymbolPage(
       "## Examples",
       "",
       ...parts.examples.map((example) =>
-        resolveDocumentationLinks(example, pkg, entry, item, routes),
+        resolve_documentation_links(example, pkg, entry, item, routes),
       ),
       "",
       "</aside>",
@@ -1268,28 +1272,28 @@ export async function renderSymbolPage(
     );
   }
   if (fields !== undefined) {
-    body.push(renderFunctionFields(fields, parts, pkg, entry, item, routes));
+    body.push(render_function_fields(fields, parts, pkg, entry, item, routes));
   }
   if (parts.related.length > 0) {
     body.push(
       "## See also",
       "",
-      resolveDocumentationLinks(parts.related.join("\n"), pkg, entry, item, routes),
+      resolve_documentation_links(parts.related.join("\n"), pkg, entry, item, routes),
       "",
     );
   }
-  const members = renderedMembers(item);
+  const members = rendered_members(item);
   if (members.length > 0) {
-    body.push(renderMembers(pkg, entry, item, members, routes, aliases), "");
+    body.push(render_members(pkg, entry, item, members, routes, aliases), "");
   }
 
-  if (structuredVariants.length > 0) {
+  if (structured_variants.length > 0) {
     body.push(
-      `## Variants <span class="api-count" data-pagefind-ignore>${structuredVariants.length}</span>`,
+      `## Variants <span class="api-count" data-pagefind-ignore>${structured_variants.length}</span>`,
       "",
       '<div class="api-variant-list" data-pagefind-ignore>',
     );
-    for (const variant of structuredVariants) {
+    for (const variant of structured_variants) {
       const formatted = await formatTypeExpression(variant);
       body.push('<div class="api-variant">', "", "```ts generated", formatted, "```", "", "</div>");
     }
@@ -1297,15 +1301,15 @@ export async function renderSymbolPage(
   }
 
   body.push(
-    ...(isDeclarationPrimary ? [] : declarationSection),
-    renderReferencedBy(pkg, item, consumers),
+    ...(is_declaration_primary ? [] : declaration_section),
+    render_referenced_by(pkg, item, consumers),
   );
-  if (hasAside) body.push("</div>", "", "</div>");
+  if (has_aside) body.push("</div>", "", "</div>");
   return `${body.join("\n").trimEnd()}\n`;
 }
 
 /** The metadata row linking a page's source file in the repository; build output has no link. */
-function sourceRow(source: string): string {
+function source_row(source: string): string {
   if (BUILD_OUTPUT.test(source)) {
     return `<div><dt>Source</dt><dd><code>${html(source)}</code> (generated at build time)</dd></div>`;
   }
@@ -1318,7 +1322,7 @@ const EXPORT_COUNT_LIST = new Intl.ListFormat("en", { type: "conjunction" });
  * An entry page's lead: what the entry point holds, by kind, so it says more
  * than the title.
  */
-function entryLead(label: string, entry: ApiEntryPoint): string {
+function entry_lead(label: string, entry: ApiEntryPoint): string {
   if (entry.kind === "asset") return `${label} is a CSS or binary asset entry point.`;
   if (entry.exports.length === 0) return `${label} exports no named symbols.`;
   const counts = [...Map.groupBy(entry.exports, (item) => item.kind)]
@@ -1347,7 +1351,7 @@ export function renderEntryPage(
   const body = [
     frontmatter(
       label,
-      entryLead(label, entry),
+      entry_lead(label, entry),
       undefined,
       entry.kind === "asset" ? undefined : entry.exports.length,
     ).trimEnd(),
@@ -1358,7 +1362,9 @@ export function renderEntryPage(
     '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Declaration target</dt><dd><code>${html(entry.target)}</code></dd></div>`,
     `<div><dt>Exports</dt><dd>${entry.exports.length}</dd></div>`,
-    ...(entry.source === undefined ? [] : [sourceRow(packageSourcePath(pkg.name, entry.source))]),
+    ...(entry.source === undefined
+      ? []
+      : [source_row(package_source_path(pkg.name, entry.source))]),
     "</dl>",
     "",
   ];
@@ -1378,9 +1384,9 @@ export function renderEntryPage(
         "",
         '<div class="api-symbol-grid">',
         ...items.map((item) => {
-          const summary = compactSummary(documentationMarkdown(pkg, entry, item, routes));
+          const summary = compact_summary(documentation_markdown(pkg, entry, item, routes));
           return [
-            `<a class="api-symbol-card" href="${symbolRoute(pkg, entry, item)}">`,
+            `<a class="api-symbol-card" href="${symbol_route(pkg, entry, item)}">`,
             `<span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="${item.kind}" aria-hidden="true">${item.kind.charAt(0).toUpperCase()}</span><code>${html(item.name)}</code></span>`,
             `<span class="api-symbol-card__desc">${html(summary)}</span>`,
             "</a>",
@@ -1479,7 +1485,7 @@ export function renderMovedGuides(): string {
     "| Old address | New address |",
     "| --- | --- |",
     ...Object.entries(MOVED_PAGES).map(
-      ([oldRoute, page]) => `| \`${oldRoute}\` | [${page.to}](${page.to}) |`,
+      ([old_route, page]) => `| \`${old_route}\` | [${page.to}](${page.to}) |`,
     ),
     "",
     "## Former repository guides",
@@ -1489,13 +1495,13 @@ export function renderMovedGuides(): string {
     '<div class="sw-card-group sw-moved-guides" data-cols="2">',
   ];
   const guides = new Map<string, string[]>();
-  for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
-    guides.set(route, [...(guides.get(route) ?? []), oldPath]);
+  for (const [old_path, route] of Object.entries(MIGRATION_ROUTES)) {
+    guides.set(route, [...(guides.get(route) ?? []), old_path]);
   }
-  for (const [route, oldPaths] of guides) {
+  for (const [route, old_paths] of guides) {
     const title = readableId(route.split("/").filter(Boolean).at(-1) ?? route);
     lines.push(
-      `<a class="sw-doc-card" href="${html(route)}"><span class="sw-card__title">${html(title)}</span><span class="sw-card__body">${oldPaths.map((path) => `<code>${html(path)}</code>`).join(" ")}</span></a>`,
+      `<a class="sw-doc-card" href="${html(route)}"><span class="sw-card__title">${html(title)}</span><span class="sw-card__body">${old_paths.map((path) => `<code>${html(path)}</code>`).join(" ")}</span></a>`,
     );
   }
   lines.push("</div>");
@@ -1512,33 +1518,33 @@ export function movedPageIssues(
   movedHeadings: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
 ): string[] {
   const failures: string[] = [];
-  const anchorsOf = (route: string): Set<string> | undefined => {
+  const anchors_of = (route: string): Set<string> | undefined => {
     const path = contentPathForRoute(route, documents);
     const document = documents.find((item) => item.path === path);
     return document === undefined ? undefined : headingAnchors(document.content);
   };
   const resolves = (link: string): boolean => {
     const [route = "", fragment] = link.split("#", 2);
-    const anchors = anchorsOf(route);
+    const anchors = anchors_of(route);
     if (anchors === undefined) return false;
     return fragment === undefined || anchors.has(fragment);
   };
-  for (const [oldRoute, page] of Object.entries(movedPages)) {
-    if (contentPathForRoute(oldRoute, documents) !== undefined) {
-      failures.push(`moved page still has content: ${oldRoute}`);
+  for (const [old_route, page] of Object.entries(movedPages)) {
+    if (contentPathForRoute(old_route, documents) !== undefined) {
+      failures.push(`moved page still has content: ${old_route}`);
     }
     if (!resolves(page.to))
-      failures.push(`moved page ${oldRoute} forwards to a missing page: ${page.to}`);
+      failures.push(`moved page ${old_route} forwards to a missing page: ${page.to}`);
     for (const [anchor, target] of Object.entries(page.anchors)) {
       if (!resolves(target)) {
-        failures.push(`moved page ${oldRoute}#${anchor} forwards to a missing target: ${target}`);
+        failures.push(`moved page ${old_route}#${anchor} forwards to a missing target: ${target}`);
       }
     }
   }
   // A heading that left a page which kept its address: the heading must be
   // gone from that page, or forwarding would take readers away from it.
   for (const [route, headings] of Object.entries(movedHeadings)) {
-    const kept = anchorsOf(route);
+    const kept = anchors_of(route);
     if (kept === undefined) {
       failures.push(`moved headings name a missing page: ${route}`);
       continue;
@@ -1587,28 +1593,28 @@ export function undocumentedApi(
     const returns = new Set<string>();
     for (const entry of pkg.entryPoints) {
       for (const item of entry.exports) {
-        const memberDocs = new Set(
-          renderedMemberDocs(item)
+        const member_docs = new Set(
+          rendered_member_docs(item)
             .filter((member) => member.documentation.trim() !== "")
             .map((member) => member.name),
         );
-        for (const member of renderedMembers(item)) {
-          if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
+        for (const member of rendered_members(item)) {
+          if (!member_docs.has(member.name)) members.add(`${item.name}.${member.name}`);
         }
         const fields =
           item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
         if (fields === undefined) continue;
-        const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        const parts = documentation_parts(item.documentation, pkg, entry, item, routes);
         const tagged = parts.parameters.size > 0;
         for (const parameter of fields.parameters) {
           const name = parameter.name.replace(/^\.\.\./, "");
           const described = tagged
             ? parts.parameters.get(name)
-            : fieldTypeSummary(parameter.type, pkg, routes);
+            : field_type_summary(parameter.type, pkg, routes);
           if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
         }
-        if (returnsNothing(fields.returns)) continue;
-        const described = parts.returns ?? fieldTypeSummary(fields.returns, pkg, routes);
+        if (returns_nothing(fields.returns)) continue;
+        const described = parts.returns ?? field_type_summary(fields.returns, pkg, routes);
         if (described === undefined || described === "") returns.add(item.name);
       }
     }

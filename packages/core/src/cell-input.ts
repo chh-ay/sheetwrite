@@ -53,7 +53,7 @@ export function cellEditText(
   numberFormat?: string,
   locale?: string,
 ): string {
-  if (type === "general") return generalEditText(value, numberFormat, locale);
+  if (type === "general") return general_edit_text(value, numberFormat, locale);
   if (type !== "date" || typeof value !== "number") return cellScalarToText(value);
 
   for (const code of DATE_EDIT_CODES) {
@@ -65,9 +65,9 @@ export function cellEditText(
 }
 
 /** {@link cellEditText} in a `general` column: text that reads back as the same value. */
-function generalEditText(
+function general_edit_text(
   value: CellScalar,
-  numberFormat: string | undefined,
+  number_format: string | undefined,
   locale: string | undefined,
 ): string {
   if (typeof value === "string") {
@@ -75,7 +75,7 @@ function generalEditText(
     return reread.kind === "literal" && reread.value === value ? value : `'${value}`;
   }
   if (typeof value !== "number") return cellScalarToText(value);
-  const text = formulaBarText(value, numberFormat, locale);
+  const text = formulaBarText(value, number_format, locale);
   if (text === null) return cellScalarToText(value);
   const reread = parseCellEntry(text, "general", undefined, locale).value;
   return reread.kind === "literal" && reread.value === value ? text : cellScalarToText(value);
@@ -83,33 +83,33 @@ function generalEditText(
 
 /** Each format code's date kind; a workbook uses few codes, and Find asks once per cell. */
 const DATE_KIND_LIMIT = 256;
-const dateKinds = new Map<string, "date" | "time" | null>();
+const date_kinds = new Map<string, "date" | "time" | null>();
 
-function dateKindOf(format: string | undefined): "date" | "time" | null {
+function date_kind_of(format: string | undefined): "date" | "time" | null {
   if (format === undefined) return null;
-  let kind = dateKinds.get(format);
+  let kind = date_kinds.get(format);
   if (kind === undefined) {
     kind = numberFormatDateKind(format);
-    if (dateKinds.size >= DATE_KIND_LIMIT) dateKinds.clear();
-    dateKinds.set(format, kind);
+    if (date_kinds.size >= DATE_KIND_LIMIT) date_kinds.clear();
+    date_kinds.set(format, kind);
   }
   return kind;
 }
 
 /** Whether each locale writes a time on the 12-hour clock; a workbook uses few locales. */
-const twelveHourLocales = new Map<string, boolean>();
+const twelve_hour_locales = new Map<string, boolean>();
 
 /**
  * Whether `locale` writes a time on the 12-hour clock, as `Intl` resolves its
  * hour cycle: `en-US` does, `de-DE` and `en-GB` do not. US English when unset.
  */
-function twelveHourClock(locale: string | undefined): boolean {
+function twelve_hour_clock(locale: string | undefined): boolean {
   if (locale === undefined || locale === "en-US") return true;
-  let twelve = twelveHourLocales.get(locale);
+  let twelve = twelve_hour_locales.get(locale);
   if (twelve === undefined) {
     const cycle = new Intl.DateTimeFormat(locale, { hour: "numeric" }).resolvedOptions().hourCycle;
     twelve = cycle === "h11" || cycle === "h12";
-    twelveHourLocales.set(locale, twelve);
+    twelve_hour_locales.set(locale, twelve);
   }
   return twelve;
 }
@@ -126,11 +126,11 @@ export function formulaBarText(
   numberFormat: string | undefined,
   locale?: string,
 ): string | null {
-  const kind = dateKindOf(numberFormat);
+  const kind = date_kind_of(numberFormat);
   if (kind === null) {
     return numberFormat?.endsWith("%") ? `${Number((value * 100).toPrecision(15))}%` : null;
   }
-  const time = twelveHourClock(locale) ? "h:mm:ss AM/PM" : "h:mm:ss";
+  const time = twelve_hour_clock(locale) ? "h:mm:ss AM/PM" : "h:mm:ss";
   if (kind === "date" || (kind === "time" && value >= 1)) {
     const date = shortDateOf(locale).code;
     return formatNumber(value, Number.isInteger(value) ? date : `${date} ${time}`);
@@ -347,28 +347,28 @@ export function parsePlainDecimal(
   const negative = sign === MINUS_CODE_UNIT;
   if (negative || sign === PLUS_CODE_UNIT) index += 1;
   let mantissa = 0;
-  let significantDigits = 0;
+  let significant_digits = 0;
   let decimals = 0;
-  let hasDigit = false;
-  let hasPoint = false;
+  let has_digit = false;
+  let has_point = false;
   for (; index < end; index += 1) {
     const code = text.charCodeAt(index);
     if (code >= ZERO_CODE_UNIT && code <= NINE_CODE_UNIT) {
-      hasDigit = true;
-      if (hasPoint) decimals += 1;
+      has_digit = true;
+      if (has_point) decimals += 1;
       // Leading zeros are not significant.
       if (mantissa === 0 && code === ZERO_CODE_UNIT) continue;
-      significantDigits += 1;
-      if (significantDigits > MAX_EXACT_DIGITS) return undefined;
+      significant_digits += 1;
+      if (significant_digits > MAX_EXACT_DIGITS) return undefined;
       mantissa = mantissa * 10 + (code - ZERO_CODE_UNIT);
-    } else if (code === DOT_CODE_UNIT && !hasPoint) {
-      hasPoint = true;
+    } else if (code === DOT_CODE_UNIT && !has_point) {
+      has_point = true;
     } else {
       return undefined;
     }
   }
   const scale = EXACT_POWERS_OF_TEN[decimals + shift];
-  if (!hasDigit || scale === undefined) return undefined;
+  if (!has_digit || scale === undefined) return undefined;
   const magnitude = mantissa / scale;
   return negative ? -magnitude : magnitude;
 }

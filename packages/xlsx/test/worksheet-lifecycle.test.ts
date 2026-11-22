@@ -8,7 +8,7 @@ import { book, collectWarnings, editParts, partText, sheet, sheetAt } from "./wo
 
 const named = (id: string, name: string, visibility?: SheetVisibility) =>
   sheet(id, name, [], visibility ? { visibility } : {});
-const rawNamed = (...names: string[]) =>
+const raw_named = (...names: string[]) =>
   rawXlsx({ sheets: names.map((name) => ({ name, xml: worksheet("<sheetData/>") })) });
 
 describe("XLSX worksheet lifecycle fidelity", () => {
@@ -23,27 +23,27 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       [`${"😀".repeat(15)}AB`],
     ];
     for (const names of invalid) {
-      await expect(backend.fromXlsxWorkbook(rawNamed(...names)), names.join()).rejects.toThrow();
+      await expect(backend.fromXlsxWorkbook(raw_named(...names)), names.join()).rejects.toThrow();
       await expect(
         backend.toXlsxWorkbook(book(names.map((name, index) => named(`s${index}`, name)))),
         names.join(),
       ).rejects.toThrow();
     }
     // The 31-character limit counts UTF-16 code units.
-    const boundaryName = `${"😀".repeat(15)}A`;
-    const imported = await backend.fromXlsxWorkbook(rawNamed(boundaryName));
-    expect(imported.sheets[0]?.name).toBe(boundaryName);
+    const boundary_name = `${"😀".repeat(15)}A`;
+    const imported = await backend.fromXlsxWorkbook(raw_named(boundary_name));
+    expect(imported.sheets[0]?.name).toBe(boundary_name);
     await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
   });
 
   it("opens and saves a sheet named History, which only a rename refuses", async () => {
-    const imported = await backend.fromXlsxWorkbook(rawNamed("History"));
+    const imported = await backend.fromXlsxWorkbook(raw_named("History"));
     expect(imported.sheets[0]?.name).toBe("History");
     await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
   });
 
   it("round-trips visible, hidden, and veryHidden states with a visible activeTab fallback", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const bytes = await backend.toXlsxWorkbook(
       book(
         [
@@ -55,7 +55,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
           activeSheet: "hidden",
         },
       ),
-      { onWarning },
+      { onWarning: on_warning },
     );
     const xml = partText(bytes, "xl/workbook.xml");
     expect(xml).toContain('<workbookView activeTab="1"/>');
@@ -74,7 +74,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       ["very-hidden", "veryHidden"],
     ]);
 
-    const hiddenActive = await backend.fromXlsxWorkbook(
+    const hidden_active = await backend.fromXlsxWorkbook(
       rawXlsx({
         sheets: [
           { name: "Hidden", state: "hidden", xml: worksheet("<sheetData/>") },
@@ -83,7 +83,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
         workbookExtra: '<bookViews><workbookView activeTab="0"/></bookViews>',
       }),
     );
-    expect(hiddenActive.workbook.activeSheet).toBe(sheetAt(hiddenActive, 1).id);
+    expect(hidden_active.workbook.activeSheet).toBe(sheetAt(hidden_active, 1).id);
   });
 
   it("reads and writes Excel's tab colors", async () => {

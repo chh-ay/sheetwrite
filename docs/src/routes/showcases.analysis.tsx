@@ -40,7 +40,7 @@ export const Route = createFileRoute("/showcases/analysis")({
 });
 
 /** `2026-03` as "March 2026", for the story text. */
-function monthName(month: string): string {
+function month_name(month: string): string {
   const [year, index] = month.split("-").map(Number);
   return new Date(Date.UTC(year ?? 0, (index ?? 1) - 1)).toLocaleString("en", {
     month: "long",
@@ -89,10 +89,10 @@ function AnalysisShowcase() {
             props={{
               workbookTitle: ANALYSIS_WORKBOOK_TITLE,
               dipRegion: DIP_REGION,
-              priceChangeMonth: monthName(PRICE_CHANGE_MONTH),
+              priceChangeMonth: month_name(PRICE_CHANGE_MONTH),
               priceChangePercent: Math.round(PRICE_CHANGE_RATE * 100),
               launchProduct: LAUNCH_PRODUCT,
-              launchMonth: monthName(LAUNCH_MONTH),
+              launchMonth: month_name(LAUNCH_MONTH),
             }}
           />
         }

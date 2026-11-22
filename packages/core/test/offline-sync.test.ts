@@ -31,14 +31,14 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 const teardown: Array<{ destroy(): void }> = [];
 afterEach(() => {
   for (const owner of teardown.splice(0)) owner.destroy();
-  restoreStubs();
+  restore_stubs();
 });
 
 class FakePendingStorage implements PendingCommitStorage {
@@ -153,7 +153,7 @@ class ControlledAdapter implements PersistenceAdapter {
   }
 }
 
-function snapshot(version = 4, rowCount = 2): WorkbookSnapshot {
+function snapshot(version = 4, row_count = 2): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: "offline-doc",
@@ -164,7 +164,7 @@ function snapshot(version = 4, rowCount = 2): WorkbookSnapshot {
         id: "s1",
         name: "Sheet 1",
         order: 0,
-        rowCount,
+        rowCount: row_count,
         columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
         cells: [],
       },
@@ -172,7 +172,7 @@ function snapshot(version = 4, rowCount = 2): WorkbookSnapshot {
   };
 }
 
-function setValue(value: number) {
+function set_value(value: number) {
   return {
     op: "set" as const,
     addr: { sheet: "s1", row: 0, col: 0 },
@@ -180,10 +180,10 @@ function setValue(value: number) {
   };
 }
 
-function mountGrid(version = 4, rowCount = 2, paged = false) {
+function mount_grid(version = 4, row_count = 2, paged = false) {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const grid = createGridFromSnapshot(host, snapshot(version, rowCount), {
+  const grid = createGridFromSnapshot(host, snapshot(version, row_count), {
     ...(paged
       ? { datasourceStorage: { mode: "paged" as const, chunkRows: 4, cacheBytes: 104 } }
       : {}),
@@ -197,7 +197,7 @@ function offline() {
   return {
     storage: new FakePendingStorage(),
     adapter: new ControlledAdapter(snapshot()),
-    grid: mountGrid(),
+    grid: mount_grid(),
   };
 }
 
@@ -224,23 +224,23 @@ describe("durable offline sync", () => {
         documentId: "offline-doc",
         baseVersion: 4 + index,
         clientMutationId: `restore-${index}`,
-        operations: [{ ...setValue(value), addr: { sheet: "s1", row: index, col: 0 } }],
+        operations: [{ ...set_value(value), addr: { sheet: "s1", row: index, col: 0 } }],
       });
     }
 
-    const grid = mountGrid(4, 3);
+    const grid = mount_grid(4, 3);
     const store = grid.store;
-    const applyTransaction = store.applyTransaction.bind(store);
-    const restoreError = new SheetwriteError("transaction", "store", "restore failed");
-    const rollbackError = new Error("second rollback failed");
+    const apply_transaction = store.applyTransaction.bind(store);
+    const restore_error = new SheetwriteError("transaction", "store", "restore failed");
+    const rollback_error = new Error("second rollback failed");
     store.applyTransaction = (transaction, options) => {
       const [operation] = transaction.patches;
       if (operation?.op === "set" && operation.value.kind === "literal") {
-        if (operation.addr.row === 2 && operation.value.value === 7) throw restoreError;
-        if (operation.addr.row === 1 && operation.value.value === null) throw rollbackError;
+        if (operation.addr.row === 2 && operation.value.value === 7) throw restore_error;
+        if (operation.addr.row === 1 && operation.value.value === null) throw rollback_error;
       }
 
-      return applyTransaction(transaction, options);
+      return apply_transaction(transaction, options);
     };
 
     const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot(4, 3)), {
@@ -254,15 +254,15 @@ describe("durable offline sync", () => {
         () => undefined,
         (error: unknown) => error,
       );
-      expect(failure).toBe(restoreError);
+      expect(failure).toBe(restore_error);
       expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBeNull();
       expect(coordinator.pendingCommits()).toEqual([]);
-      expect(restoreError.cause).toBeInstanceOf(AggregateError);
-      if (!(restoreError.cause instanceof AggregateError)) {
+      expect(restore_error.cause).toBeInstanceOf(AggregateError);
+      if (!(restore_error.cause instanceof AggregateError)) {
         throw new Error("Expected the rollback failure as the restore error cause");
       }
 
-      expect(restoreError.cause.errors).toEqual([rollbackError]);
+      expect(restore_error.cause.errors).toEqual([rollback_error]);
     } finally {
       coordinator.destroy();
       grid.destroy();
@@ -271,18 +271,18 @@ describe("durable offline sync", () => {
 
   it("does not write to the grid when it is destroyed during pending restore", async () => {
     const storage = new FakePendingStorage();
-    storage.seed("restore-first", 4, [setValue(9)]);
-    const grid = mountGrid();
-    const applyTransaction = grid.store.applyTransaction.bind(grid.store);
+    storage.seed("restore-first", 4, [set_value(9)]);
+    const grid = mount_grid();
+    const apply_transaction = grid.store.applyTransaction.bind(grid.store);
     let destroyed = false;
-    let writesAfterDestroy = 0;
+    let writes_after_destroy = 0;
     grid.store.applyTransaction = (transaction, options) => {
       if (destroyed) {
-        writesAfterDestroy += 1;
+        writes_after_destroy += 1;
         throw new Error("Store used after grid destruction");
       }
 
-      return applyTransaction(transaction, options);
+      return apply_transaction(transaction, options);
     };
 
     const coordinator = sync(grid, new ControlledAdapter(snapshot()), {
@@ -298,20 +298,20 @@ describe("durable offline sync", () => {
     await coordinator.ready();
     expect(coordinator.state.connection).toBe("destroyed");
     expect(coordinator.pendingCount).toBe(0);
-    expect(writesAfterDestroy).toBe(0);
+    expect(writes_after_destroy).toBe(0);
   });
 
   for (const paged of [false, true]) {
     it(`rolls back earlier stored records when a later restore fails (${paged ? "paged" : "dense"})`, async () => {
       const storage = new FakePendingStorage();
-      const grid = mountGrid(4, 2, paged);
-      grid.applyTransaction({ patches: [setValue(7)] });
-      grid.applyTransaction({ patches: [setValue(42)] });
+      const grid = mount_grid(4, 2, paged);
+      grid.applyTransaction({ patches: [set_value(7)] });
+      grid.applyTransaction({ patches: [set_value(42)] });
       const before = grid.exportSnapshot();
       storage.seed("restore-first", 4, [{ op: "removeRows", sheet: "s1", at: 0, count: 1 }]);
       // This address is valid before the first record removes a row.
       storage.seed("restore-second", 5, [
-        { ...setValue(9), addr: { sheet: "s1", row: 1, col: 0 } },
+        { ...set_value(9), addr: { sheet: "s1", row: 1, col: 0 } },
       ]);
       const adapter = new ControlledAdapter(snapshot());
       const coordinator = sync(grid, adapter, {
@@ -338,13 +338,13 @@ describe("durable offline sync", () => {
 
   it("rejects a stored batch whose version counts have holes", async () => {
     const storage = new FakePendingStorage();
-    const sparseCounts = new Array<number>(3);
-    sparseCounts[0] = 1;
-    sparseCounts[2] = 1;
-    storage.seed("sparse-batch", 4, [setValue(9), setValue(8)], {
-      versionOperationCounts: sparseCounts,
+    const sparse_counts = new Array<number>(3);
+    sparse_counts[0] = 1;
+    sparse_counts[2] = 1;
+    storage.seed("sparse-batch", 4, [set_value(9), set_value(8)], {
+      versionOperationCounts: sparse_counts,
     });
-    const grid = mountGrid();
+    const grid = mount_grid();
     const coordinator = sync(grid, new ControlledAdapter(snapshot()), {
       pendingStorage: storage,
       initialConnection: "offline",
@@ -356,11 +356,11 @@ describe("durable offline sync", () => {
     const loading = Promise.withResolvers<readonly PendingCommit[]>();
     const started = Promise.withResolvers<AbortSignal | undefined>();
     const storage = new FakePendingStorage();
-    storage.load = (_documentId, options) => {
+    storage.load = (_document_id, options) => {
       started.resolve(options.signal);
       return loading.promise;
     };
-    const grid = mountGrid();
+    const grid = mount_grid();
     const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
       documentId: "doc-1",
       serverVersion: 4,
@@ -377,16 +377,16 @@ describe("durable offline sync", () => {
   });
 
   it("reopens and rebases a compact atomic batch through IndexedDB before acknowledging every version", async () => {
-    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
-    const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
+    const indexed_db_descriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+    const key_range_descriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
     Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: new IDBFactory() });
     Object.defineProperty(globalThis, "IDBKeyRange", { configurable: true, value: IDBKeyRange });
-    const databaseName = "compact-offline-batch";
-    const storage = new IndexedDbPendingCommitStorage({ databaseName });
-    const reopenedStorage = new IndexedDbPendingCommitStorage({ databaseName });
-    const grid = mountGrid(5, 3);
+    const database_name = "compact-offline-batch";
+    const storage = new IndexedDbPendingCommitStorage({ databaseName: database_name });
+    const reopened_storage = new IndexedDbPendingCommitStorage({ databaseName: database_name });
+    const grid = mount_grid(5, 3);
     const adapter = new MemoryPersistenceAdapter(snapshot(5, 3));
-    const loadOptions = { maxRecords: 10, maxOperations: 10, maxBytes: 4096 };
+    const load_options = { maxRecords: 10, maxOperations: 10, maxBytes: 4096 };
     try {
       const restore = encodeRestoreBlock(
         { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
@@ -396,26 +396,26 @@ describe("durable offline sync", () => {
         documentId: "offline-doc",
         baseVersion: 4,
         clientMutationId: "compact-batch",
-        operations: [setValue(9), restore],
+        operations: [set_value(9), restore],
         versionOperationCounts: [1, 1],
       };
       await storage.put(pending);
       storage.close();
-      const loaded = await reopenedStorage.load("offline-doc", loadOptions);
+      const loaded = await reopened_storage.load("offline-doc", load_options);
       expect(loaded).toEqual([pending]);
       const rebased = rebaseDocumentOperations(pending.operations, [
         { op: "addRows", sheet: "s1", at: 0, count: 1 },
       ]);
       if (rebased.status !== "rebased") throw new Error("Expected non-overlapping batch rebase");
-      await reopenedStorage.replace(
+      await reopened_storage.replace(
         "offline-doc",
         ["compact-batch"],
         [{ ...pending, baseVersion: 5, operations: rebased.operations }],
       );
-      reopenedStorage.close();
+      reopened_storage.close();
       const coordinator = sync(grid, adapter, {
         serverVersion: 5,
-        pendingStorage: reopenedStorage,
+        pendingStorage: reopened_storage,
         initialConnection: "offline",
       });
       await coordinator.ready();
@@ -425,31 +425,33 @@ describe("durable offline sync", () => {
       await coordinator.flush();
       expect(coordinator.serverVersion).toBe(7);
       expect(coordinator.pendingCount).toBe(0);
-      expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
+      expect(await reopened_storage.load("offline-doc", load_options)).toEqual([]);
       await expect(
-        reopenedStorage.put({ ...pending, versionOperationCounts: [1, 2] }),
+        reopened_storage.put({ ...pending, versionOperationCounts: [1, 2] }),
       ).rejects.toMatchObject({ code: "transaction" });
-      const sparseCounts = new Array<number>(3);
-      sparseCounts[0] = 1;
-      sparseCounts[2] = 1;
+      const sparse_counts = new Array<number>(3);
+      sparse_counts[0] = 1;
+      sparse_counts[2] = 1;
       await expect(
-        reopenedStorage.put({ ...pending, versionOperationCounts: sparseCounts }),
+        reopened_storage.put({ ...pending, versionOperationCounts: sparse_counts }),
       ).rejects.toMatchObject({ code: "transaction" });
-      const tooManyVersions = MAX_ATOMIC_BATCH_VERSIONS + 1;
+      const too_many_versions = MAX_ATOMIC_BATCH_VERSIONS + 1;
       await expect(
-        reopenedStorage.put({
+        reopened_storage.put({
           ...pending,
-          operations: Array.from({ length: tooManyVersions }, () => setValue(9)),
-          versionOperationCounts: Array.from({ length: tooManyVersions }, () => 1),
+          operations: Array.from({ length: too_many_versions }, () => set_value(9)),
+          versionOperationCounts: Array.from({ length: too_many_versions }, () => 1),
         }),
       ).rejects.toMatchObject({ code: "transaction" });
-      expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
+      expect(await reopened_storage.load("offline-doc", load_options)).toEqual([]);
     } finally {
       storage.close();
-      reopenedStorage.close();
-      if (indexedDbDescriptor) Object.defineProperty(globalThis, "indexedDB", indexedDbDescriptor);
+      reopened_storage.close();
+      if (indexed_db_descriptor)
+        Object.defineProperty(globalThis, "indexedDB", indexed_db_descriptor);
       else Reflect.deleteProperty(globalThis, "indexedDB");
-      if (keyRangeDescriptor) Object.defineProperty(globalThis, "IDBKeyRange", keyRangeDescriptor);
+      if (key_range_descriptor)
+        Object.defineProperty(globalThis, "IDBKeyRange", key_range_descriptor);
       else Reflect.deleteProperty(globalThis, "IDBKeyRange");
     }
   });
@@ -459,10 +461,10 @@ describe("durable offline sync", () => {
     storage.seed(
       "restored-batch",
       4,
-      [setValue(9), { ...setValue(8), addr: { sheet: "s1", row: 1, col: 0 } }],
+      [set_value(9), { ...set_value(8), addr: { sheet: "s1", row: 1, col: 0 } }],
       { versionOperationCounts: [1, 1] },
     );
-    const grid = mountGrid();
+    const grid = mount_grid();
     const ids = ["local-m1", "local-m2"];
     const coordinator = sync(grid, new ControlledAdapter(snapshot()), {
       pendingStorage: storage,
@@ -471,7 +473,7 @@ describe("durable offline sync", () => {
     });
     await coordinator.ready();
 
-    grid.applyTransaction({ patches: [setValue(3)] });
+    grid.applyTransaction({ patches: [set_value(3)] });
     expect(coordinator.state.activity).toBe("persisting");
     await coordinator.ready();
     expect(coordinator.state.activity).toBe("pending");
@@ -480,14 +482,16 @@ describe("durable offline sync", () => {
       version: 6,
       clientMutationId: "restored-batch",
     });
-    grid.applyTransaction({ patches: [setValue(4)] });
+    grid.applyTransaction({ patches: [set_value(4)] });
     await coordinator.ready();
 
     expect(
-      coordinator.pendingCommits().map(({ clientMutationId, baseVersion }) => ({
-        clientMutationId,
-        baseVersion,
-      })),
+      coordinator
+        .pendingCommits()
+        .map(({ clientMutationId: client_mutation_id, baseVersion: base_version }) => ({
+          clientMutationId: client_mutation_id,
+          baseVersion: base_version,
+        })),
     ).toEqual([
       { clientMutationId: "local-m1", baseVersion: 6 },
       { clientMutationId: "local-m2", baseVersion: 7 },
@@ -501,7 +505,7 @@ describe("durable offline sync", () => {
       createMutationId: () => "disconnect-m1",
     });
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(3)] });
+    grid.applyTransaction({ patches: [set_value(3)] });
     await coordinator.ready();
 
     adapter.responders.push(
@@ -512,9 +516,9 @@ describe("durable offline sync", () => {
           });
         }),
     );
-    const errorEvents: unknown[] = [];
+    const error_events: unknown[] = [];
     coordinator.on((event) => {
-      if (event.type === "error") errorEvents.push(event.error);
+      if (event.type === "error") error_events.push(event.error);
     });
     const sending = coordinator.sendNext().catch((error: unknown) => error);
     const signal = adapter.requests[0]?.signal;
@@ -522,7 +526,7 @@ describe("durable offline sync", () => {
     coordinator.setOnline(false);
     expect(await sending).toBe(signal?.reason);
     expect(signal?.reason).toMatchObject({ name: "AbortError" });
-    expect(errorEvents).toHaveLength(0);
+    expect(error_events).toHaveLength(0);
     expect(coordinator.pendingCommits()[0]).toMatchObject({
       clientMutationId: "disconnect-m1",
       status: "pending",
@@ -544,7 +548,7 @@ describe("durable offline sync", () => {
       createMutationId: () => "conflict-m1",
     });
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(5)] });
+    grid.applyTransaction({ patches: [set_value(5)] });
     await coordinator.ready();
     adapter.responders.push(async () => ({ status: "conflict", currentVersion: 6 }));
 
@@ -568,7 +572,7 @@ describe("durable offline sync", () => {
     });
     await coordinator.ready();
 
-    grid.applyTransaction({ patches: [setValue(7)] });
+    grid.applyTransaction({ patches: [set_value(7)] });
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(7);
     await expect(coordinator.ready()).rejects.toThrow("quota exceeded");
     expect(coordinator.pendingCommits()[0]?.status).toBe("storage-error");
@@ -596,7 +600,7 @@ describe("durable offline sync", () => {
     const events: string[] = [];
     coordinator.on((event) => events.push(event.type));
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(8)] });
+    grid.applyTransaction({ patches: [set_value(8)] });
     await coordinator.ready();
     storage.failNextRemove = new Error("remove failed");
     adapter.answer("applied", 5);
@@ -623,7 +627,7 @@ describe("durable offline sync", () => {
     const events: string[] = [];
     coordinator.on((event) => events.push(event.type));
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(6)] });
+    grid.applyTransaction({ patches: [set_value(6)] });
     await coordinator.ready();
     adapter.answer("applied", 5);
 
@@ -642,7 +646,7 @@ describe("durable offline sync", () => {
     const storage = new FakePendingStorage();
     storage.seed("ambiguous-m1", 4, [{ op: "addRows", sheet: "s1", at: 0, count: 1 }]);
     const adapter = new ControlledAdapter(snapshot(5, 3));
-    const grid = mountGrid(5, 3);
+    const grid = mount_grid(5, 3);
     const coordinator = sync(grid, adapter, {
       serverVersion: 5,
       pendingStorage: storage,
@@ -663,7 +667,7 @@ describe("durable offline sync", () => {
     storage.seed("ambiguous-online-m1", 4, [{ op: "addRows", sheet: "s1", at: 0, count: 1 }]);
     const adapter = new ControlledAdapter(snapshot(5));
     adapter.answer("applied", 6);
-    const grid = mountGrid(5);
+    const grid = mount_grid(5);
     const coordinator = sync(grid, adapter, { serverVersion: 5, pendingStorage: storage });
     await coordinator.ready();
     await coordinator.flush();
@@ -684,10 +688,10 @@ describe("durable offline sync", () => {
       createMutationId: () => ids[index++]!,
     });
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(1)] });
-    grid.applyTransaction({ patches: [setValue(2)] });
+    grid.applyTransaction({ patches: [set_value(1)] });
+    grid.applyTransaction({ patches: [set_value(2)] });
     await coordinator.ready();
-    const resourcesBeforeReplacement = {
+    const resources_before_replacement = {
       pendingCount: coordinator.state.pendingCount,
       pendingOperations: coordinator.state.pendingOperations,
       pendingEncodedBytes: coordinator.state.pendingEncodedBytes,
@@ -699,32 +703,32 @@ describe("durable offline sync", () => {
     );
     expect([...storage.records.values()].map((record) => record.baseVersion)).toEqual([4, 5]);
     expect(coordinator.serverVersion).toBe(4);
-    expect(coordinator.state).toMatchObject(resourcesBeforeReplacement);
+    expect(coordinator.state).toMatchObject(resources_before_replacement);
 
     await coordinator.resumeAfterReload(snapshot(10));
     expect([...storage.records.values()].map((record) => record.baseVersion)).toEqual([10, 11]);
     expect(coordinator.pendingCommits().map((record) => record.baseVersion)).toEqual([10, 11]);
-    expect(coordinator.state).toMatchObject(resourcesBeforeReplacement);
+    expect(coordinator.state).toMatchObject(resources_before_replacement);
   });
 
   it("applies asynchronous intake in order behind durable echo removal", async () => {
     const storage = new FakePendingStorage();
     storage.removeGate = Promise.withResolvers<void>();
     const adapter = new ControlledAdapter(snapshot());
-    const sendGate = Promise.withResolvers<PersistenceCommitResponse>();
-    adapter.responders.push(() => sendGate.promise);
-    const grid = mountGrid();
+    const send_gate = Promise.withResolvers<PersistenceCommitResponse>();
+    adapter.responders.push(() => send_gate.promise);
+    const grid = mount_grid();
     const coordinator = sync(grid, adapter, {
       pendingStorage: storage,
       createMutationId: () => "echo-m1",
     });
     await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(3)] });
+    grid.applyTransaction({ patches: [set_value(3)] });
     await coordinator.ready();
 
     const operations: VersionedOperation[] = [
-      { version: 5, clientMutationId: "echo-m1", operations: [setValue(99)] },
-      { version: 6, operations: [setValue(4)] },
+      { version: 5, clientMutationId: "echo-m1", operations: [set_value(99)] },
+      { version: 6, operations: [set_value(4)] },
     ];
     coordinator.subscribe({
       [Symbol.asyncIterator]() {
@@ -745,18 +749,18 @@ describe("durable offline sync", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
 
     const applied = Promise.withResolvers<void>();
-    const disposeApplied = coordinator.on((event) => {
+    const dispose_applied = coordinator.on((event) => {
       if (event.type === "remote-applied" && event.operation.version === 6) {
         applied.resolve(undefined);
       }
     });
     storage.removeGate.resolve(undefined);
     await applied.promise;
-    disposeApplied();
+    dispose_applied();
     expect(coordinator.serverVersion).toBe(6);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(4);
 
-    sendGate.resolve({
+    send_gate.resolve({
       status: "duplicate",
       version: 5,
       clientMutationId: "echo-m1",
@@ -771,23 +775,23 @@ describe("durable offline sync", () => {
       (_, index) => `restore-${String(index).padStart(3, "0")}`,
     );
     let index = 0;
-    const firstGrid = mountGrid();
-    const first = sync(firstGrid, adapter, {
+    const first_grid = mount_grid();
+    const first = sync(first_grid, adapter, {
       pendingStorage: storage,
       initialConnection: "offline",
       createMutationId: () => ids[index++]!,
     });
     await first.ready();
     for (let value = 0; value < ids.length; value++) {
-      expect(firstGrid.applyTransaction({ patches: [setValue(value)] }).status).toBe("applied");
+      expect(first_grid.applyTransaction({ patches: [set_value(value)] }).status).toBe("applied");
     }
     await first.ready();
     expect([...storage.records.keys()]).toEqual(ids);
     first.destroy();
-    firstGrid.destroy();
+    first_grid.destroy();
 
-    const reopenedGrid = mountGrid();
-    const reopened = sync(reopenedGrid, adapter, {
+    const reopened_grid = mount_grid();
+    const reopened = sync(reopened_grid, adapter, {
       pendingStorage: storage,
       initialConnection: "offline",
     });
@@ -795,25 +799,25 @@ describe("durable offline sync", () => {
 
     expect(reopened.pendingCommits().map((record) => record.clientMutationId)).toEqual(ids);
     expect(reopened.pendingCommits().map((record) => record.baseVersion)).toEqual(
-      ids.map((_, recordIndex) => 4 + recordIndex),
+      ids.map((_, record_index) => 4 + record_index),
     );
     expect(reopened.state).toMatchObject({
       pendingCount: 300,
       pendingOperations: 300,
       pendingCapacity: "available",
     });
-    expect(reopenedGrid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(299);
+    expect(reopened_grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(299);
     expect(storage.records.size).toBe(300);
   });
 
   it("restores durable paged edits as dirty until their exact mutation is acknowledged", async () => {
     const storage = new FakePendingStorage();
-    storage.seed("paged-m1", 4, [setValue(9)]);
-    storage.seed("paged-m2", 5, [setValue(8)]);
+    storage.seed("paged-m1", 4, [set_value(9)]);
+    storage.seed("paged-m2", 5, [set_value(8)]);
     const adapter = new ControlledAdapter(snapshot(4, 100));
     adapter.answer("applied", 5);
     adapter.answer("applied", 6);
-    const grid = mountGrid(4, 100, true);
+    const grid = mount_grid(4, 100, true);
     const coordinator = sync(grid, adapter, { pendingStorage: storage });
 
     await coordinator.ready();
@@ -856,21 +860,21 @@ describe("durable offline sync", () => {
       },
     ] as const;
 
-    for (const testCase of cases) {
+    for (const test_case of cases) {
       const storage = new FakePendingStorage();
-      storage.seed("restore-m1", 4, [setValue(1)]);
-      storage.seed("restore-m2", 5, [setValue(2)]);
+      storage.seed("restore-m1", 4, [set_value(1)]);
+      storage.seed("restore-m2", 5, [set_value(2)]);
       const adapter = new ControlledAdapter(snapshot());
-      const grid = mountGrid();
+      const grid = mount_grid();
       const coordinator = sync(grid, adapter, {
         pendingStorage: storage,
         initialConnection: "offline",
-        limits: testCase.limits,
+        limits: test_case.limits,
       });
 
       const error = await coordinator.ready().catch((cause: unknown) => cause);
       expect(error).toBeInstanceOf(SyncProtocolError);
-      expect(error).toMatchObject({ code: testCase.code });
+      expect(error).toMatchObject({ code: test_case.code });
       expect(coordinator.pendingCount).toBe(0);
       expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBeNull();
       expect([...storage.records.keys()]).toEqual(["restore-m1", "restore-m2"]);

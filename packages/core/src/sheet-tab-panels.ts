@@ -19,8 +19,8 @@ export function openTabPanel(
   if (!sheet) return;
   const panel =
     command === "tabColor"
-      ? createTabColorPalette(grid, tabs, sheet)
-      : createMoveCopyDialog(grid, tabs, sheet);
+      ? create_tab_color_palette(grid, tabs, sheet)
+      : create_move_copy_dialog(grid, tabs, sheet);
   tabs.showPanel(id, panel);
   panel.querySelector<HTMLElement>("select, button")?.focus();
 }
@@ -39,16 +39,16 @@ const TAB_COLORS: ReadonlyArray<readonly [name: string, color: string]> = [
   ["Purple", "#7030A0"],
 ];
 
-function createButton(className: string, text: string): HTMLButtonElement {
+function create_button(class_name: string, text: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = className;
+  button.className = class_name;
   button.textContent = text;
   return button;
 }
 
 /** Excel's Tab Color palette: the standard colors, then No Color. Arrow keys, Home and End move. */
-function createTabColorPalette(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
+function create_tab_color_palette(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
   const palette = document.createElement("div");
   palette.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-colors";
   palette.setAttribute("role", "menu");
@@ -63,7 +63,7 @@ function createTabColorPalette(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLE
   const current = sheet.tabColor?.toUpperCase() ?? null;
   const swatches: HTMLButtonElement[] = [];
   for (const [name, color] of choices) {
-    const swatch = createButton(
+    const swatch = create_button(
       color === null ? "sheetwrite-tab-swatch sheetwrite-tab-swatch-none" : "sheetwrite-tab-swatch",
       color === null ? name : "",
     );
@@ -99,7 +99,7 @@ function createTabColorPalette(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLE
   return palette;
 }
 
-function createOption(text: string, value: number): HTMLOptionElement {
+function create_option(text: string, value: number): HTMLOptionElement {
   const option = document.createElement("option");
   option.textContent = text;
   option.value = String(value);
@@ -111,7 +111,7 @@ function createOption(text: string, value: number): HTMLOptionElement {
  * and whether to create a copy instead of moving the sheet. The copy is
  * activated.
  */
-function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
+function create_move_copy_dialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
   const sheets = grid.store.getWorkbook().sheets;
   const dialog = document.createElement("div");
   dialog.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-dialog";
@@ -125,27 +125,27 @@ function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLEl
     }
   });
 
-  const listLabel = document.createElement("span");
-  listLabel.className = "sheetwrite-tab-dialog-label";
-  listLabel.textContent = "Before sheet:";
-  listLabel.setAttribute("aria-hidden", "true");
+  const list_label = document.createElement("span");
+  list_label.className = "sheetwrite-tab-dialog-label";
+  list_label.textContent = "Before sheet:";
+  list_label.setAttribute("aria-hidden", "true");
   const list = document.createElement("select");
   list.size = 6;
   list.setAttribute("aria-label", "Before sheet");
   sheets.forEach((candidate, index) => {
     if ((candidate.visibility ?? "visible") === "visible") {
-      list.appendChild(createOption(candidate.name, index));
+      list.appendChild(create_option(candidate.name, index));
     }
   });
-  list.appendChild(createOption("(move to end)", sheets.length));
+  list.appendChild(create_option("(move to end)", sheets.length));
   list.selectedIndex = 0;
 
-  const copyLabel = document.createElement("label");
-  copyLabel.className = "sheetwrite-tab-dialog-check";
+  const copy_label = document.createElement("label");
+  copy_label.className = "sheetwrite-tab-dialog-check";
   const copy = document.createElement("input");
   copy.type = "checkbox";
   copy.setAttribute("aria-label", "Create a copy");
-  copyLabel.append(copy, " Create a copy");
+  copy_label.append(copy, " Create a copy");
 
   const ok = (): void => {
     const before = Number(list.value);
@@ -160,13 +160,13 @@ function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLEl
     if (to === from) tabs.closeMenu(true);
     else tabs.performLifecycle(sheet.id, () => grid.moveSheet(sheet.id, to), true);
   };
-  const okButton = createButton("sheetwrite-tab-dialog-button", "OK");
-  okButton.addEventListener("click", ok);
-  const cancel = createButton("sheetwrite-tab-dialog-button", "Cancel");
+  const ok_button = create_button("sheetwrite-tab-dialog-button", "OK");
+  ok_button.addEventListener("click", ok);
+  const cancel = create_button("sheetwrite-tab-dialog-button", "Cancel");
   cancel.addEventListener("click", () => tabs.closeMenu(true));
   const buttons = document.createElement("div");
   buttons.className = "sheetwrite-tab-dialog-buttons";
-  buttons.append(okButton, cancel);
+  buttons.append(ok_button, cancel);
 
   list.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
@@ -174,6 +174,6 @@ function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLEl
     event.stopPropagation();
     ok();
   });
-  dialog.append(listLabel, list, copyLabel, buttons);
+  dialog.append(list_label, list, copy_label, buttons);
   return dialog;
 }

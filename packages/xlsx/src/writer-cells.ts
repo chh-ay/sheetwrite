@@ -13,7 +13,7 @@ export function quotedSheet(name: string): string {
   return `'${name.replaceAll("'", "''")}'`;
 }
 
-function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
+function formula_for_reference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
   if (source.kind !== "ref") throw new TypeError("Sheetwrite: expected reference cell");
   const target = snapshot.sheets.find((sheet) => sheet.id === source.target.sheet);
   if (!target) return "#REF!";
@@ -47,7 +47,7 @@ export interface SheetDynamicArrays {
 }
 
 /** The `t` attribute and `<v>` element of a formula's cached value, as Excel writes them. */
-function cachedValue(value: CellScalar | undefined): { type: string; element: string } {
+function cached_value(value: CellScalar | undefined): { type: string; element: string } {
   if (value === undefined || value === null) return { type: "", element: "" };
   if (typeof value === "number") return { type: "", element: `<v>${value}</v>` };
   if (typeof value === "boolean") return { type: ' t="b"', element: `<v>${value ? 1 : 0}</v>` };
@@ -56,11 +56,11 @@ function cachedValue(value: CellScalar | undefined): { type: string; element: st
 }
 
 /** Column letters by column index, filled as cells are written. */
-const columnLetters: string[] = [];
+const column_letters: string[] = [];
 
 /** `cellA1` with each column's letters computed once. */
-function cellReference(row: number, col: number): string {
-  return `${(columnLetters[col] ??= colToA1(col))}${row + 1}`;
+function cell_reference(row: number, col: number): string {
+  return `${(column_letters[col] ??= colToA1(col))}${row + 1}`;
 }
 
 /**
@@ -79,9 +79,9 @@ export function cellXml(
 ): string {
   const column = sheet.columns[cell.col];
   if (!column) throw new RangeError(`Sheetwrite: XLSX cell column ${cell.col} is out of range`);
-  const styleId = styles.cellStyleId(column, cell.source.style);
-  const reference = cellReference(cell.row, cell.col);
-  const styleAttribute = styleId ? ` s="${styleId}"` : "";
+  const style_id = styles.cellStyleId(column, cell.source.style);
+  const reference = cell_reference(cell.row, cell.col);
+  const style_attribute = style_id ? ` s="${style_id}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {
     let formula =
@@ -89,7 +89,7 @@ export function cellXml(
         ? value.src.startsWith("=")
           ? value.src.slice(1)
           : value.src
-        : formulaForReference(snapshot, value);
+        : formula_for_reference(snapshot, value);
     if (formulaCallsExternalData(formula)) {
       emitWarning(context, {
         code: "external-formula",
@@ -97,7 +97,7 @@ export function cellXml(
         sheet: sheet.name,
         cell: reference,
       });
-      return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
+      return `<c r="${reference}"${style_attribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
     }
     if (value.kind === "formula") {
       const converted = context.formulas?.get(value.src);
@@ -112,27 +112,27 @@ export function cellXml(
       spill === undefined &&
       (value.kind !== "formula" || context.arrayFormulas?.has(value.src) !== true)
     ) {
-      return `<c r="${reference}"${styleAttribute}><f>${text}</f></c>`;
+      return `<c r="${reference}"${style_attribute}><f>${text}</f></c>`;
     }
     arrays.written = true;
     const area =
       spill && (spill.rows > 1 || spill.cols > 1)
         ? `${reference}:${cellA1(spill.row + spill.rows - 1, spill.col + spill.cols - 1)}`
         : reference;
-    const cached = cachedValue(spill?.values[0]);
-    return `<c r="${reference}"${styleAttribute}${cached.type} cm="${DYNAMIC_ARRAY_CELL_METADATA}"><f t="array" ref="${area}">${text}</f>${cached.element}</c>`;
+    const cached = cached_value(spill?.values[0]);
+    return `<c r="${reference}"${style_attribute}${cached.type} cm="${DYNAMIC_ARRAY_CELL_METADATA}"><f t="array" ref="${area}">${text}</f>${cached.element}</c>`;
   }
-  if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
+  if (value.value === null) return `<c r="${reference}"${style_attribute}/>`;
   if (typeof value.value === "string") {
-    return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(value.value))}</t></is></c>`;
+    return `<c r="${reference}"${style_attribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(value.value))}</t></is></c>`;
   }
   if (typeof value.value === "boolean") {
-    return `<c r="${reference}"${styleAttribute} t="b"><v>${value.value ? 1 : 0}</v></c>`;
+    return `<c r="${reference}"${style_attribute} t="b"><v>${value.value ? 1 : 0}</v></c>`;
   }
-  return `<c r="${reference}"${styleAttribute}><v>${value.value}</v></c>`;
+  return `<c r="${reference}"${style_attribute}><v>${value.value}</v></c>`;
 }
 
-function hyperlinkRowStyles(
+function hyperlink_row_styles(
   sheet: SheetSnapshot,
 ): (row: number, cells: readonly AbsoluteCell[]) => readonly AbsoluteCell[] {
   const pending = (sheet.hyperlinks ?? [])
@@ -194,6 +194,6 @@ export function* hyperlinkStyledRows(
   sheet: SheetSnapshot,
   rows: Iterable<{ row: number; cells: readonly AbsoluteCell[] }>,
 ): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
-  const applyStyles = hyperlinkRowStyles(sheet);
-  for (const { row, cells } of rows) yield { row, cells: applyStyles(row, cells) };
+  const apply_styles = hyperlink_row_styles(sheet);
+  for (const { row, cells } of rows) yield { row, cells: apply_styles(row, cells) };
 }

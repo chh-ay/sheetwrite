@@ -43,9 +43,9 @@ interface PackageSpec {
   forbiddenFiles?: string[];
 }
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const fixtureRoot = join(repositoryRoot, "test/consumer");
-const mitCompatibleLicenses: Record<string, true> = {
+const repository_root = resolve(import.meta.dir, "..");
+const fixture_root = join(repository_root, "test/consumer");
+const mit_compatible_licenses: Record<string, true> = {
   "0BSD": true,
   "Apache-2.0": true,
   "BSD-2-Clause": true,
@@ -60,7 +60,7 @@ const mitCompatibleLicenses: Record<string, true> = {
 };
 // The 0.1.1 tarball predates its package.json license field. Debian records the
 // upstream MIT grant and source commit: https://sources.debian.org/copyright/license/node-buffers/0.1.1-2/
-const auditedLicenseOverrides: Record<string, string> = {
+const audited_license_overrides: Record<string, string> = {
   "buffers@0.1.1": "MIT",
 };
 /** Optional packages that core and the framework adapters must install and run without. */
@@ -77,7 +77,7 @@ const DIST_ONLY_PACKAGES: Readonly<Record<string, true>> = {
   "@sheetwrite/formula-assist": true,
   "@sheetwrite/queries": true,
 };
-const packageSpecs: PackageSpec[] = [
+const package_specs: PackageSpec[] = [
   {
     directory: "packages/core",
     extraFiles: [
@@ -156,11 +156,14 @@ async function run(command: string[], cwd: string): Promise<string> {
   });
 }
 
-async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest): Promise<void> {
+async function assert_worker_bundle(
+  package_root: string,
+  manifest: PackageManifest,
+): Promise<void> {
   if (manifest.name !== "@sheetwrite/core") return;
 
   const result = await Bun.build({
-    entrypoints: [join(packageRoot, "dist/worker.js")],
+    entrypoints: [join(package_root, "dist/worker.js")],
     format: "esm",
     target: "browser",
   });
@@ -172,34 +175,34 @@ async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest
   }
 }
 
-async function assertTarball(
+async function assert_tarball(
   spec: PackageSpec,
   manifest: PackageManifest,
   result: PackResult,
-  tarballPath: string,
-  extractRoot: string,
+  tarball_path: string,
+  extract_root: string,
 ): Promise<void> {
-  const packedFiles = new Set(result.files.map((file) => file.path));
-  assertPublishedFilePolicy(manifest.name, [...packedFiles]);
-  const requiredFiles = [
+  const packed_files = new Set(result.files.map((file) => file.path));
+  assertPublishedFilePolicy(manifest.name, [...packed_files]);
+  const required_files = [
     ...(REQUIRED_PACKAGE_FILES[manifest.name] ?? []),
     ...(spec.extraFiles ?? []),
   ];
-  for (const requiredFile of requiredFiles) {
-    if (!packedFiles.has(requiredFile)) {
-      throw new Error(`${manifest.name} tarball is missing ${requiredFile}`);
+  for (const required_file of required_files) {
+    if (!packed_files.has(required_file)) {
+      throw new Error(`${manifest.name} tarball is missing ${required_file}`);
     }
   }
-  for (const forbiddenFile of spec.forbiddenFiles ?? []) {
-    if (packedFiles.has(forbiddenFile)) {
+  for (const forbidden_file of spec.forbiddenFiles ?? []) {
+    if (packed_files.has(forbidden_file)) {
       throw new Error(
-        `${manifest.name} tarball contains unreachable runtime type module ${forbiddenFile}`,
+        `${manifest.name} tarball contains unreachable runtime type module ${forbidden_file}`,
       );
     }
   }
 
   if (Object.hasOwn(DIST_ONLY_PACKAGES, manifest.name)) {
-    for (const path of packedFiles) {
+    for (const path of packed_files) {
       if (path.startsWith("src/") || path.startsWith("test/") || path.startsWith("node_modules/")) {
         throw new Error(`${manifest.name} tarball contains forbidden path ${path}`);
       }
@@ -207,26 +210,26 @@ async function assertTarball(
   }
   if (
     manifest.name === "@sheetwrite/core" &&
-    [...packedFiles].some((path) => path.includes("xlsx-backend"))
+    [...packed_files].some((path) => path.includes("xlsx-backend"))
   ) {
     throw new Error("@sheetwrite/core tarball still contains the removed XLSX backend");
   }
 
-  await mkdir(extractRoot, { recursive: true });
-  await run(["tar", "-xzf", tarballPath, "-C", extractRoot], repositoryRoot);
-  const packageRoot = join(extractRoot, "package");
-  const packedManifest = await readJson<PackageManifest>(join(packageRoot, "package.json"));
-  const metadata = JSON.stringify(packedManifest);
+  await mkdir(extract_root, { recursive: true });
+  await run(["tar", "-xzf", tarball_path, "-C", extract_root], repository_root);
+  const package_root = join(extract_root, "package");
+  const packed_manifest = await readJson<PackageManifest>(join(package_root, "package.json"));
+  const metadata = JSON.stringify(packed_manifest);
   if (metadata.includes("workspace:")) {
     throw new Error(`${manifest.name} contains an unpublished workspace dependency range`);
   }
 
-  for (const target of packageTargets(packedManifest)) {
-    await access(join(packageRoot, target));
+  for (const target of packageTargets(packed_manifest)) {
+    await access(join(package_root, target));
   }
-  await assertPublishedDeclarations(packageRoot, [...packedFiles]);
+  await assertPublishedDeclarations(package_root, [...packed_files]);
 
-  await assertWorkerBundle(packageRoot, packedManifest);
+  await assert_worker_bundle(package_root, packed_manifest);
   if (manifest.name === "@sheetwrite/formulas") {
     await run(
       [
@@ -234,7 +237,7 @@ async function assertTarball(
         "--input-type=module",
         "-e",
         `import { strict as assert } from "node:assert";
-         const engine = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "loader-node.mjs")).href)});
+         const engine = await import(${JSON.stringify(pathToFileURL(join(package_root, "loader-node.mjs")).href)});
          await engine.load();
          assert.equal(engine.isLoaded(), true);
          const store = new engine.CellStore();
@@ -247,12 +250,12 @@ async function assertTarball(
            finally { cell.free(); }
          } finally { store.free(); }`,
       ],
-      packageRoot,
+      package_root,
     );
   }
 }
 
-async function pathExists(path: string): Promise<boolean> {
+async function path_exists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
@@ -261,45 +264,45 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function verifyNoOptionalPackageClosure(
+async function verify_no_optional_package_closure(
   name: string,
-  packageName: string,
+  package_name: string,
   tarballs: ReadonlyMap<string, string>,
-  temporaryRoot: string,
+  temporary_root: string,
 ): Promise<void> {
-  const root = join(temporaryRoot, `without-optional-${name}`);
-  await cp(join(repositoryRoot, "test/release-locks", name), root, { recursive: true });
-  const artifactRoot = join(root, "artifacts");
-  await mkdir(artifactRoot, { recursive: true });
-  const localTarballs = new Map<string, string>();
-  for (const localPackage of new Set([packageName, "@sheetwrite/core", "@sheetwrite/wasm"])) {
-    const tarball = tarballs.get(localPackage);
-    if (tarball === undefined) throw new Error(`Missing tarball for ${localPackage}`);
-    localTarballs.set(localPackage, tarball);
-    await cp(tarball, join(artifactRoot, basename(tarball)));
+  const root = join(temporary_root, `without-optional-${name}`);
+  await cp(join(repository_root, "test/release-locks", name), root, { recursive: true });
+  const artifact_root = join(root, "artifacts");
+  await mkdir(artifact_root, { recursive: true });
+  const local_tarballs = new Map<string, string>();
+  for (const local_package of new Set([package_name, "@sheetwrite/core", "@sheetwrite/wasm"])) {
+    const tarball = tarballs.get(local_package);
+    if (tarball === undefined) throw new Error(`Missing tarball for ${local_package}`);
+    local_tarballs.set(local_package, tarball);
+    await cp(tarball, join(artifact_root, basename(tarball)));
   }
-  await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
+  await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), local_tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
   // Core and the adapters must install and run without the optional packages.
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  for (const optionalPackage of OPTIONAL_PACKAGES) {
-    if (lock.includes(`node_modules/${optionalPackage}`)) {
-      throw new Error(`${packageName} package-lock unexpectedly contains ${optionalPackage}`);
+  for (const optional_package of OPTIONAL_PACKAGES) {
+    if (lock.includes(`node_modules/${optional_package}`)) {
+      throw new Error(`${package_name} package-lock unexpectedly contains ${optional_package}`);
     }
-    if (await pathExists(join(root, "node_modules", ...optionalPackage.split("/")))) {
-      throw new Error(`${packageName} node_modules unexpectedly contains ${optionalPackage}`);
+    if (await path_exists(join(root, "node_modules", ...optional_package.split("/")))) {
+      throw new Error(`${package_name} node_modules unexpectedly contains ${optional_package}`);
     }
   }
 
-  const adapterProbe =
-    packageName === "@sheetwrite/svelte"
+  const adapter_probe =
+    package_name === "@sheetwrite/svelte"
       ? "const Entry = Core;"
       : `// Dynamic import intentionally checks the selected packed adapter entry.
-         const Entry = await import(${JSON.stringify(packageName)});`;
+         const Entry = await import(${JSON.stringify(package_name)});`;
   const runtime = `
     import * as Core from "@sheetwrite/core";
-    ${adapterProbe}
+    ${adapter_probe}
     if (typeof Core.createGrid !== "function" || Object.keys(Entry).length === 0) {
       throw new Error("packed core or adapter entry failed to load");
     }
@@ -307,7 +310,7 @@ async function verifyNoOptionalPackageClosure(
   await run(["node", "--input-type=module", "--eval", runtime], root);
 }
 
-async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
+async function verify_adapter_stylesheets(consumer_root: string): Promise<void> {
   // Each stylesheet is the only import in its bundle. A combined framework
   // bundle could hide a dropped adapter import behind another copy of core CSS.
   await run(
@@ -339,35 +342,35 @@ async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
          }
        }`,
     ],
-    consumerRoot,
+    consumer_root,
   );
 }
 
-async function resolveRuntimeDependency(
+async function resolve_runtime_dependency(
   name: string,
-  packageRoot: string,
-  consumerRoot: string,
+  package_root: string,
+  consumer_root: string,
 ): Promise<string> {
-  let current = packageRoot;
-  while (current.startsWith(consumerRoot)) {
+  let current = package_root;
+  while (current.startsWith(consumer_root)) {
     const candidate = join(current, "node_modules", ...name.split("/"));
-    if (await pathExists(join(candidate, "package.json"))) return candidate;
+    if (await path_exists(join(candidate, "package.json"))) return candidate;
     const parent = dirname(current);
     if (parent === current) break;
     current = parent;
   }
-  throw new Error(`Unable to resolve runtime dependency ${name} from ${packageRoot}`);
+  throw new Error(`Unable to resolve runtime dependency ${name} from ${package_root}`);
 }
 
-async function auditRuntimeLicenses(consumerRoot: string): Promise<number> {
-  const queue = [join(consumerRoot, "node_modules", "@sheetwrite", "xlsx")];
+async function audit_runtime_licenses(consumer_root: string): Promise<number> {
+  const queue = [join(consumer_root, "node_modules", "@sheetwrite", "xlsx")];
   const visited = new Set<string>();
   while (queue.length > 0) {
-    const packageRoot = queue.pop()!;
-    if (visited.has(packageRoot)) continue;
-    visited.add(packageRoot);
-    const manifest = await readJson<PackageManifest>(join(packageRoot, "package.json"));
-    const declaredLicense =
+    const package_root = queue.pop()!;
+    if (visited.has(package_root)) continue;
+    visited.add(package_root);
+    const manifest = await readJson<PackageManifest>(join(package_root, "package.json"));
+    const declared_license =
       typeof manifest.license === "string"
         ? manifest.license
         : manifest.license &&
@@ -376,35 +379,35 @@ async function auditRuntimeLicenses(consumerRoot: string): Promise<number> {
             typeof manifest.license.type === "string"
           ? manifest.license.type
           : "";
-    const rawLicense =
-      declaredLicense || auditedLicenseOverrides[`${manifest.name}@${manifest.version}`] || "";
-    const alternatives = rawLicense.replace(/[()]/g, "").split(/\s+OR\s+/);
+    const raw_license =
+      declared_license || audited_license_overrides[`${manifest.name}@${manifest.version}`] || "";
+    const alternatives = raw_license.replace(/[()]/g, "").split(/\s+OR\s+/);
     const compatible = alternatives.some((alternative) =>
       alternative
         .split(/\s+AND\s+/)
-        .every((license) => mitCompatibleLicenses[license.trim()] === true),
+        .every((license) => mit_compatible_licenses[license.trim()] === true),
     );
     if (!compatible) {
       throw new Error(
-        `${manifest.name} has unresolved or incompatible license ${rawLicense || "<missing>"}`,
+        `${manifest.name} has unresolved or incompatible license ${raw_license || "<missing>"}`,
       );
     }
     for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      queue.push(await resolveRuntimeDependency(dependency, packageRoot, consumerRoot));
+      queue.push(await resolve_runtime_dependency(dependency, package_root, consumer_root));
     }
   }
   return visited.size;
 }
 
-async function verifyMountedFrameworkConsumers(consumerRoot: string): Promise<void> {
-  const requireFromConsumer = createRequire(join(consumerRoot, "package.json"));
-  const viteEntry = requireFromConsumer.resolve("vite");
+async function verify_mounted_framework_consumers(consumer_root: string): Promise<void> {
+  const require_from_consumer = createRequire(join(consumer_root, "package.json"));
+  const vite_entry = require_from_consumer.resolve("vite");
   // Vite is intentionally resolved from the freshly installed tarball consumer,
   // not the repository dependency graph, so this module path is runtime-selected.
-  const { preview } = await import(pathToFileURL(viteEntry).href);
+  const { preview } = await import(pathToFileURL(vite_entry).href);
   const server = await preview({
-    root: consumerRoot,
-    configFile: join(consumerRoot, "vite.config.ts"),
+    root: consumer_root,
+    configFile: join(consumer_root, "vite.config.ts"),
     preview: { host: "127.0.0.1", port: 0, strictPort: false },
   });
   const address = server.httpServer.address();
@@ -459,81 +462,81 @@ if (process.argv.includes("--help")) {
   process.exit(0);
 }
 
-const artifactDirectory = optionValue(process.argv, "--artifacts");
-const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
-if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+const artifact_directory = optionValue(process.argv, "--artifacts");
+const required_artifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifact_directory === undefined) {
   throw new Error("Artifact-only packed verification requires --artifacts");
 }
 if (
-  requiredArtifacts !== undefined &&
-  (artifactDirectory === undefined || resolve(artifactDirectory) !== resolve(requiredArtifacts))
+  required_artifacts !== undefined &&
+  (artifact_directory === undefined || resolve(artifact_directory) !== resolve(required_artifacts))
 ) {
   throw new Error("Packed verification artifact input differs from the canonical artifact set");
 }
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
+const temporary_root = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
 try {
-  const tarballRoot = join(temporaryRoot, "tarballs");
-  const extractRoot = join(temporaryRoot, "extracted");
-  const consumerRoot = join(temporaryRoot, "consumer");
-  await mkdir(extractRoot, { recursive: true });
+  const tarball_root = join(temporary_root, "tarballs");
+  const extract_root = join(temporary_root, "extracted");
+  const consumer_root = join(temporary_root, "consumer");
+  await mkdir(extract_root, { recursive: true });
 
-  const sourceManifests = await Promise.all(
-    packageSpecs.map((spec) =>
-      readJson<PackageManifest>(join(repositoryRoot, spec.directory, "package.json")),
+  const source_manifests = await Promise.all(
+    package_specs.map((spec) =>
+      readJson<PackageManifest>(join(repository_root, spec.directory, "package.json")),
     ),
   );
   const tarballs = new Map<string, string>();
-  const packageSizes = new Map<string, { packed: number; unpacked: number }>();
-  let artifactManifestDigest: string | undefined;
+  const package_sizes = new Map<string, { packed: number; unpacked: number }>();
+  let artifact_manifest_digest: string | undefined;
 
-  if (artifactDirectory === undefined) {
-    const packages = await packBuiltPackages(tarballRoot);
-    const byName = new Map(packages.map((packed) => [packed.artifact.name, packed]));
-    for (const [index, spec] of packageSpecs.entries()) {
-      const manifest = sourceManifests[index];
+  if (artifact_directory === undefined) {
+    const packages = await packBuiltPackages(tarball_root);
+    const by_name = new Map(packages.map((packed) => [packed.artifact.name, packed]));
+    for (const [index, spec] of package_specs.entries()) {
+      const manifest = source_manifests[index];
       if (manifest === undefined) throw new Error(`Missing source manifest for ${spec.directory}`);
-      const packed = byName.get(manifest.name);
+      const packed = by_name.get(manifest.name);
       if (packed === undefined) throw new Error(`Missing packed package ${manifest.name}`);
-      await assertTarball(
+      await assert_tarball(
         spec,
         manifest,
         packed.pack,
         packed.tarballPath,
-        join(extractRoot, basename(spec.directory)),
+        join(extract_root, basename(spec.directory)),
       );
       tarballs.set(manifest.name, packed.tarballPath);
-      packageSizes.set(manifest.name, {
+      package_sizes.set(manifest.name, {
         packed: packed.pack.size,
         unpacked: packed.pack.unpackedSize,
       });
     }
   } else {
-    const release = await verifyReleaseArtifacts(resolve(artifactDirectory));
-    artifactManifestDigest = await readReleaseManifestDigest(resolve(artifactDirectory));
+    const release = await verifyReleaseArtifacts(resolve(artifact_directory));
+    artifact_manifest_digest = await readReleaseManifestDigest(resolve(artifact_directory));
     const artifacts = new Map(release.packages.map((artifact) => [artifact.name, artifact]));
-    for (const [index, spec] of packageSpecs.entries()) {
-      const manifest = sourceManifests[index];
+    for (const [index, spec] of package_specs.entries()) {
+      const manifest = source_manifests[index];
       if (manifest === undefined) throw new Error(`Missing source manifest for ${spec.directory}`);
       const artifact = artifacts.get(manifest.name);
       if (artifact === undefined)
         throw new Error(`Missing canonical artifact for ${manifest.name}`);
-      const tarballPath = join(resolve(artifactDirectory), artifact.path);
+      const tarball_path = join(resolve(artifact_directory), artifact.path);
       const result: PackResult = {
         filename: artifact.path,
         size: artifact.bytes,
         unpackedSize: artifact.unpackedBytes,
         files: artifact.files.map((path) => ({ path })),
       };
-      await assertTarball(
+      await assert_tarball(
         spec,
         manifest,
         result,
-        tarballPath,
-        join(extractRoot, basename(spec.directory)),
+        tarball_path,
+        join(extract_root, basename(spec.directory)),
       );
-      tarballs.set(manifest.name, tarballPath);
-      packageSizes.set(manifest.name, {
+      tarballs.set(manifest.name, tarball_path);
+      package_sizes.set(manifest.name, {
         packed: artifact.bytes,
         unpacked: artifact.unpackedBytes,
       });
@@ -541,20 +544,20 @@ try {
   }
 
   await Promise.all([
-    verifyNoOptionalPackageClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
-    verifyNoOptionalPackageClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
-    verifyNoOptionalPackageClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
-    verifyNoOptionalPackageClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
+    verify_no_optional_package_closure("core", "@sheetwrite/core", tarballs, temporary_root),
+    verify_no_optional_package_closure("react", "@sheetwrite/react", tarballs, temporary_root),
+    verify_no_optional_package_closure("vue", "@sheetwrite/vue", tarballs, temporary_root),
+    verify_no_optional_package_closure("svelte", "@sheetwrite/svelte", tarballs, temporary_root),
   ]);
 
-  await cp(fixtureRoot, consumerRoot, { recursive: true });
-  const consumerArtifacts = join(consumerRoot, "artifacts");
-  await mkdir(consumerArtifacts, { recursive: true });
+  await cp(fixture_root, consumer_root, { recursive: true });
+  const consumer_artifacts = join(consumer_root, "artifacts");
+  await mkdir(consumer_artifacts, { recursive: true });
   for (const tarball of tarballs.values()) {
-    await cp(tarball, join(consumerArtifacts, basename(tarball)));
+    await cp(tarball, join(consumer_artifacts, basename(tarball)));
   }
-  await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), tarballs);
-  await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
+  await bindCanonicalTarballIntegrities(join(consumer_root, "package-lock.json"), tarballs);
+  await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumer_root);
   await run(
     [
       "npm",
@@ -566,40 +569,40 @@ try {
       "svelte",
       "vue",
     ],
-    consumerRoot,
+    consumer_root,
   );
-  const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
-  await run(["npm", "run", "typecheck"], consumerRoot);
-  await verifyAdapterStylesheets(consumerRoot);
-  await run(["npm", "run", "bundle"], consumerRoot);
-  await run(["npm", "run", "bundle:frameworks"], consumerRoot);
-  await verifyMountedFrameworkConsumers(consumerRoot);
-  await run(["npm", "run", "runtime"], consumerRoot);
-  await run(["npm", "run", "runtime:formulas"], consumerRoot);
-  await run(["npm", "run", "runtime:queries"], consumerRoot);
+  const audited_license_count = await audit_runtime_licenses(consumer_root);
+  await run(["npm", "run", "typecheck"], consumer_root);
+  await verify_adapter_stylesheets(consumer_root);
+  await run(["npm", "run", "bundle"], consumer_root);
+  await run(["npm", "run", "bundle:frameworks"], consumer_root);
+  await verify_mounted_framework_consumers(consumer_root);
+  await run(["npm", "run", "runtime"], consumer_root);
+  await run(["npm", "run", "runtime:formulas"], consumer_root);
+  await run(["npm", "run", "runtime:queries"], consumer_root);
 
   // The Vite build must have compiled the packed Svelte adapter and retained
   // its operational-event wiring, in addition to the mounted browser proof.
-  const viteAssets = join(consumerRoot, "dist-vite/assets");
-  const assetFiles = await readdir(viteAssets);
-  let adapterCompiled = false;
-  for (const name of assetFiles) {
+  const vite_assets = join(consumer_root, "dist-vite/assets");
+  const asset_files = await readdir(vite_assets);
+  let adapter_compiled = false;
+  for (const name of asset_files) {
     if (!name.endsWith(".js")) continue;
-    const content = await readFile(join(viteAssets, name), "utf8");
-    if (content.includes("onMutationRejected")) adapterCompiled = true;
+    const content = await readFile(join(vite_assets, name), "utf8");
+    if (content.includes("onMutationRejected")) adapter_compiled = true;
   }
-  if (!adapterCompiled) {
+  if (!adapter_compiled) {
     throw new Error("Vite consumer bundle does not contain packed adapter event wiring");
   }
 
-  for (const [name, size] of packageSizes) {
+  for (const [name, size] of package_sizes) {
     console.log(`${name}: packed=${size.packed}B unpacked=${size.unpacked}B`);
   }
-  console.log(`Audited ${auditedLicenseCount} MIT-compatible XLSX runtime package licenses`);
-  if (artifactManifestDigest !== undefined) {
-    console.log(`Artifact manifest SHA-512: ${artifactManifestDigest}`);
+  console.log(`Audited ${audited_license_count} MIT-compatible XLSX runtime package licenses`);
+  if (artifact_manifest_digest !== undefined) {
+    console.log(`Artifact manifest SHA-512: ${artifact_manifest_digest}`);
   }
   console.log("Packed tarball consumer verification passed");
 } finally {
-  await rm(temporaryRoot, { force: true, recursive: true });
+  await rm(temporary_root, { force: true, recursive: true });
 }

@@ -11,7 +11,7 @@ import type { ShowcaseIsland } from "../showcases/islands.js";
  * read these entries as they read the showcases'.
  */
 
-function withProps<Props extends object>(component: Component<Props>): IslandRender {
+function with_props<Props extends object>(component: Component<Props>): IslandRender {
   // The server wrote these props from the same component's props (islands/Island.tsx).
   return (_island, props) => createComponent(component, props as Props);
 }
@@ -20,41 +20,41 @@ function withProps<Props extends object>(component: Component<Props>): IslandRen
 export const TEST_FIXTURE_ISLANDS = {
   "test-xlsx": {
     source: "src/test-fixtures/xlsx/XlsxFixture.tsx",
-    load: () => import("./xlsx/XlsxFixture.js").then(({ XlsxFixture }) => withProps(XlsxFixture)),
+    load: () => import("./xlsx/XlsxFixture.js").then(({ XlsxFixture }) => with_props(XlsxFixture)),
   },
   "test-formulas-engine": {
     source: "src/test-fixtures/formulas-engine/FormulasEngineFixture.tsx",
     load: () =>
       import("./formulas-engine/FormulasEngineFixture.js").then(({ FormulasEngineFixture }) =>
-        withProps(FormulasEngineFixture),
+        with_props(FormulasEngineFixture),
       ),
   },
   "test-collaboration": {
     source: "src/test-fixtures/collaboration/CollaborationFixture.tsx",
     load: () =>
       import("./collaboration/CollaborationFixture.js").then(({ CollaborationFixture }) =>
-        withProps(CollaborationFixture),
+        with_props(CollaborationFixture),
       ),
   },
   "test-grid-memory": {
     source: "src/test-fixtures/grid-memory/GridMemoryFixture.tsx",
     load: () =>
       import("./grid-memory/GridMemoryFixture.js").then(({ GridMemoryFixture }) =>
-        withProps(GridMemoryFixture),
+        with_props(GridMemoryFixture),
       ),
   },
   "test-prefetch": {
     source: "src/test-fixtures/prefetch/PrefetchFixture.tsx",
     load: () =>
       import("./prefetch/PrefetchFixture.js").then(({ PrefetchFixture }) =>
-        withProps(PrefetchFixture),
+        with_props(PrefetchFixture),
       ),
   },
   "test-framework-lifecycle": {
     source: "src/test-fixtures/framework-lifecycle/FrameworkLifecycleFixture.tsx",
     load: () =>
       import("./framework-lifecycle/FrameworkLifecycleFixture.js").then(
-        ({ FrameworkLifecycleFixture }) => withProps(FrameworkLifecycleFixture),
+        ({ FrameworkLifecycleFixture }) => with_props(FrameworkLifecycleFixture),
       ),
   },
 } as const satisfies Readonly<Record<string, ShowcaseIsland>>;

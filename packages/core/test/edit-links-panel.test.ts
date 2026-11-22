@@ -34,9 +34,9 @@ const budget: ExternalLink = {
 };
 const A1 = { sheet: "s1", row: 0, col: 0 };
 
-async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResolver) {
+async function setup(external_links?: ExternalLink[], resolve?: ExternalLinkResolver) {
   const workbook: Workbook = {
-    ...(externalLinks === undefined ? {} : { externalLinks }),
+    ...(external_links === undefined ? {} : { externalLinks: external_links }),
     activeSheet: "s1",
     sheets: [
       {
@@ -67,7 +67,7 @@ async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResol
     patches: [{ op: "set", addr: A1, value: { kind: "formula", src: "=[Budget.xlsx]Annual!A1" } }],
   });
 
-  const commandButton = (id: string): HTMLButtonElement | null => {
+  const command_button = (id: string): HTMLButtonElement | null => {
     const button = host.querySelector<HTMLButtonElement>(
       `.sheetwrite-ribbon [data-command="${id}"]`,
     );
@@ -76,16 +76,16 @@ async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResol
     }
     return button;
   };
-  const openTab = (name: string): void => {
+  const open_tab = (name: string): void => {
     const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
       (candidate) => candidate.textContent === name,
     );
     if (tab === undefined) throw new Error(`no ribbon tab "${name}"`);
     tab.click();
   };
-  const openPanel = async (): Promise<void> => {
-    openTab("Data");
-    const command = commandButton("editLinks");
+  const open_panel = async (): Promise<void> => {
+    open_tab("Data");
+    const command = command_button("editLinks");
     if (command === null) throw new Error("Edit Links is not shown");
     command.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
     await loadPanels(grid);
@@ -98,24 +98,36 @@ async function setup(externalLinks?: ExternalLink[], resolve?: ExternalLinkResol
     if (element === null) throw new Error(`no panel control ${key}`);
     return element;
   };
-  const panelText = (): string => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
-  return { grid, commandButton, openTab, openPanel, control, panelText };
+  const panel_text = (): string => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+  return {
+    grid,
+    commandButton: command_button,
+    openTab: open_tab,
+    openPanel: open_panel,
+    control,
+    panelText: panel_text,
+  };
 }
 
 it("lists the links and updates their values through the grid's resolver", async () => {
-  const withoutResolver = await setup([budget]);
-  await withoutResolver.openPanel();
-  expect(withoutResolver.panelText()).toContain("Budget.xlsx");
-  expect(withoutResolver.panelText()).toContain("Location: https://files.example/Budget.xlsx");
-  expect(withoutResolver.panelText()).toContain("Status: Saved values");
-  expect(withoutResolver.control<HTMLButtonElement>("update-all").disabled).toBe(true);
+  const without_resolver = await setup([budget]);
+  await without_resolver.openPanel();
+  expect(without_resolver.panelText()).toContain("Budget.xlsx");
+  expect(without_resolver.panelText()).toContain("Location: https://files.example/Budget.xlsx");
+  expect(without_resolver.panelText()).toContain("Status: Saved values");
+  expect(without_resolver.control<HTMLButtonElement>("update-all").disabled).toBe(true);
 
   const requests: string[] = [];
-  const { grid, openPanel, control, panelText } = await setup([budget], async ({ book }) => {
+  const {
+    grid,
+    openPanel: open_panel,
+    control,
+    panelText: panel_text,
+  } = await setup([budget], async ({ book }) => {
     requests.push(book);
     return [{ name: "Annual", cells: [{ row: 0, col: 0, value: 9 }] }];
   });
-  await openPanel();
+  await open_panel();
   const saved = Promise.withResolvers<void>();
   const stop = grid.on("change", () => saved.resolve());
   control<HTMLButtonElement>("update-budget.xlsx").click();
@@ -126,12 +138,12 @@ it("lists the links and updates their values through the grid's resolver", async
 
   expect(requests).toEqual(["Budget.xlsx"]);
   expect(grid.store.getCell(A1).resolved).toBe(9);
-  expect(panelText()).toContain("Status: Updated");
+  expect(panel_text()).toContain("Status: Updated");
 });
 
 it("changes the source and breaks the link from the panel", async () => {
-  const { grid, openPanel, control } = await setup([budget]);
-  await openPanel();
+  const { grid, openPanel: open_panel, control } = await setup([budget]);
+  await open_panel();
 
   control<HTMLButtonElement>("source-budget.xlsx").click();
   control<HTMLInputElement>("source-book-budget.xlsx").value = "Plan.xlsx";

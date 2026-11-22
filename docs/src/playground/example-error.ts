@@ -32,31 +32,31 @@ const SOURCE_LOCATION = /example\.ts:(\d+):\d+/;
 export const WRAPPER_LINES = 3;
 
 /** An example line from a line of the function that runs it, if it is one. */
-function fromFunctionLine(line: number): number | undefined {
-  const exampleLine = line - WRAPPER_LINES;
-  return exampleLine >= 1 ? exampleLine : undefined;
+function from_function_line(line: number): number | undefined {
+  const example_line = line - WRAPPER_LINES;
+  return example_line >= 1 ? example_line : undefined;
 }
 
 /** The example line an error points at, from its stack or from the engine's own fields. */
-function errorLine(reason: object): number | undefined {
+function error_line(reason: object): number | undefined {
   const stack = Reflect.get(reason, "stack");
   const frame = SOURCE_LOCATION.exec(typeof stack === "string" ? stack : "")?.[1];
-  if (frame !== undefined) return fromFunctionLine(Number.parseInt(frame, 10));
+  if (frame !== undefined) return from_function_line(Number.parseInt(frame, 10));
 
-  // JavaScriptCore: `line` is the throwing line; a `sourceURL` means it was in another file.
+  // JavaScriptCore: `line` is the throwing line; a `source_url` means it was in another file.
   const line = Reflect.get(reason, "line");
-  const sourceURL = Reflect.get(reason, "sourceURL");
-  if (typeof line !== "number" || !Number.isInteger(line) || sourceURL !== undefined) {
+  const source_url = Reflect.get(reason, "sourceURL");
+  if (typeof line !== "number" || !Number.isInteger(line) || source_url !== undefined) {
     return undefined;
   }
-  return fromFunctionLine(line);
+  return from_function_line(line);
 }
 
 /** An error the example threw or rejected with, as the playground shows it. */
 export function exampleError(reason: unknown): ExampleError {
   if (typeof reason === "object" && reason !== null && "message" in reason) {
     const name = "name" in reason && typeof reason.name === "string" ? reason.name : "Error";
-    return { name, message: String(reason.message), line: errorLine(reason) };
+    return { name, message: String(reason.message), line: error_line(reason) };
   }
   return { name: "Error", message: String(reason), line: undefined };
 }

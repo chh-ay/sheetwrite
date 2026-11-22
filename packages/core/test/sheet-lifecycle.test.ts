@@ -15,31 +15,31 @@ function workbook(
     name: string;
     visibility?: "visible" | "hidden" | "veryHidden";
   }>,
-  activeSheet = sheets[0]!.id,
+  active_sheet = sheets[0]!.id,
 ): Workbook {
   return {
-    activeSheet,
+    activeSheet: active_sheet,
     sheets: sheets.map((sheet) => ({ ...sheet, rowCount: 2, columns: [{ ...column }] })),
   };
 }
 
-function lifecycleCode(result: SheetLifecycleResult): string | undefined {
+function lifecycle_code(result: SheetLifecycleResult): string | undefined {
   if (result.status !== "rejected") return undefined;
   return result.issues.find((issue) => issue.kind === "sheet-lifecycle")?.code;
 }
 
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
 });
 
 afterEach(() => {
-  restoreCanvas();
+  restore_canvas();
   document.body.replaceChildren();
 });
 
@@ -58,7 +58,7 @@ describe("Grid worksheet lifecycle", () => {
     const anchor = { sheet: "one", row: 0, col: 0 };
     const outgoing = { sheet: "one", row: 3, col: 1 };
     const target = { sheet: "two", row: 0, col: 0 };
-    const externalFormula = { ...target, col: 1 };
+    const external_formula = { ...target, col: 1 };
     const incoming = { ...target, row: 1, col: 1 };
     grid.applyTransaction({
       patches: [
@@ -75,7 +75,7 @@ describe("Grid worksheet lifecycle", () => {
           style: { italic: true },
         },
         { op: "set", addr: outgoing, value: { kind: "ref", target }, style: { italic: true } },
-        { op: "set", addr: externalFormula, value: { kind: "formula", src: "='One'!A2+1" } },
+        { op: "set", addr: external_formula, value: { kind: "formula", src: "='One'!A2+1" } },
         {
           op: "set",
           addr: incoming,
@@ -98,8 +98,8 @@ describe("Grid worksheet lifecycle", () => {
     });
     expect(grid.store.getRefTarget(outgoing)).toEqual(target);
     expect(grid.store.getRefTarget(incoming)).toEqual({ ...anchor, row: 2 });
-    expect(grid.store.getFormula(externalFormula)).toBe("='One'!A2+1");
-    expect(grid.store.getCell(externalFormula).resolved).toBe(3);
+    expect(grid.store.getFormula(external_formula)).toBe("='One'!A2+1");
+    expect(grid.store.getCell(external_formula).resolved).toBe(3);
     expect(grid.store.getCell(incoming)).toMatchObject({ resolved: 3, style: { underline: true } });
 
     grid.actions.redo();
@@ -129,10 +129,10 @@ describe("Grid worksheet lifecycle", () => {
     expect(model.sheets.find((sheet) => sheet.id === "active")!.visibility).toBe("hidden");
 
     expect(grid.setSheetVisibility("left", "veryHidden").status).toBe("applied");
-    const rejectedHide = grid.setSheetVisibility("right", "hidden");
-    expect(lifecycleCode(rejectedHide)).toBe("last-visible-sheet");
+    const rejected_hide = grid.setSheetVisibility("right", "hidden");
+    expect(lifecycle_code(rejected_hide)).toBe("last-visible-sheet");
     expect(model.sheets.find((sheet) => sheet.id === "right")!.visibility).toBeUndefined();
-    expect(lifecycleCode(grid.removeSheet("right"))).toBe("last-visible-sheet");
+    expect(lifecycle_code(grid.removeSheet("right"))).toBe("last-visible-sheet");
 
     expect(grid.setSheetVisibility("hidden", "visible").status).toBe("applied");
     expect(grid.removeSheet("right").status).toBe("applied");
@@ -161,13 +161,13 @@ describe("Grid worksheet lifecycle", () => {
       operations: [{ op: "setSheetVisibility", sheet: "one", visibility: "hidden" }],
     });
 
-    const visibilityConflict = rebaseDocumentOperations(
+    const visibility_conflict = rebaseDocumentOperations(
       [{ op: "setSheetVisibility", sheet: "one", visibility: "visible" }],
       [{ op: "setSheetVisibility", sheet: "one", visibility: "hidden" }],
     );
-    expect(visibilityConflict.status).toBe("conflict");
-    if (visibilityConflict.status === "conflict") {
-      expect(visibilityConflict.conflict.code).toBe("sheet-lifecycle");
+    expect(visibility_conflict.status).toBe("conflict");
+    if (visibility_conflict.status === "conflict") {
+      expect(visibility_conflict.conflict.code).toBe("sheet-lifecycle");
     }
 
     const removed = rebaseDocumentOperations(

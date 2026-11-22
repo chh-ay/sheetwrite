@@ -2,7 +2,7 @@
 // the Sort panel, and runs the Insert › Chart and Insert › PivotTable
 // commands. This module is the panel chunk: panel-loader.ts loads it on first
 // use and attaches it once per grid. The Sort panel is a chunk of its own
-// (`openLazyPanel`). Everything goes through the public Grid API.
+// (`open_lazy_panel`). Everything goes through the public Grid API.
 
 import { MAX_CHART_POINTS } from "../chart-definition.js";
 import { isDashboard } from "../dashboard.js";
@@ -62,7 +62,7 @@ interface PanelState {
 
 const STATES = new WeakMap<Grid, PanelState>();
 
-function stateOf(grid: Grid): PanelState {
+function state_of(grid: Grid): PanelState {
   let state = STATES.get(grid);
   if (state === undefined) {
     state = { icons: undefined, open: null, lazyRequest: null };
@@ -79,113 +79,113 @@ const NO_SELECTION = "Select the source data first.";
 
 /** Show the Chart panel for `ref`. */
 export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "chart", sheet: ref.sheet, id: ref.id };
   const panel = chartPanel(grid, ref, state.icons);
   grid.openPanel({
     title: panel.title,
     focus,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 /** Show the field list of the pivot `id` on `sheet`. */
 export function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "pivot", sheet, id };
   const panel = pivotPanel(grid, sheet, id, focus);
   grid.openPanel({
     ...panel,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 /** Show Formulas › Explain Formula for the focus cell; the panel follows the selection. */
 export function openExplainPanel(grid: Grid): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "explain" };
   const panel = explainPanel(grid);
   grid.openPanel({
     ...panel,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 export function openNamePanel(grid: Grid, define = false): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "names" };
   const panel = namePanel(grid, define);
   grid.openPanel({
     ...panel,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 /** Data › Measures opens the measures panel. */
 export function openMeasurePanel(grid: Grid): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "measures" };
   const panel = measurePanel(grid);
   grid.openPanel({
     ...panel,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 /** Data › Data Model and Data › Relationships open the data model panel. */
 export function openDataModelPanel(grid: Grid): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "dataModel" };
   const panel = relationshipPanel(grid);
   grid.openPanel({
     ...panel,
-    render: (body) => trackOpen(state, open, panel.render(body)),
+    render: (body) => track_open(state, open, panel.render(body)),
   });
 }
 
 /** Insert › Filters › Slicer: the Insert Slicers list for the active dashboard. */
 export function openSlicerPanel(grid: Grid): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "slicer" };
   const panel = slicerPanel(grid, grid.getActiveSheet());
-  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
+  grid.openPanel({ ...panel, render: (body) => track_open(state, open, panel.render(body)) });
 }
 
 /** Insert › Dashboard › KPI Card: the measure picker for the active dashboard. */
 export function openKpiPanel(grid: Grid): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const open: OpenPanel = { kind: "kpi" };
   const panel = kpiPanel(grid, grid.getActiveSheet());
-  grid.openPanel({ ...panel, render: (body) => trackOpen(state, open, panel.render(body)) });
+  grid.openPanel({ ...panel, render: (body) => track_open(state, open, panel.render(body)) });
 }
 
 /** Show the Sort panel for the selection or the current region. */
 export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
   // loads on first open instead of with every grid.
-  openLazyPanel(grid, { kind: "sort" }, async () => (await import("./sort-panel.js")).sortPanel);
+  open_lazy_panel(grid, { kind: "sort" }, async () => (await import("./sort-panel.js")).sortPanel);
 }
 
 /** Data › Queries & Connections, or Get Data with the new-query form open. */
 export function openQueryPanel(grid: Grid, create: boolean): void {
   // Its own chunk, like Sort: only grids with a query session load it.
-  openLazyPanel(grid, { kind: "queries" }, async () => {
-    const { queryPanel } = await import("./query-panel.js");
-    return (target) => queryPanel(target, create);
+  open_lazy_panel(grid, { kind: "queries" }, async () => {
+    const { queryPanel: query_panel } = await import("./query-panel.js");
+    return (target) => query_panel(target, create);
   });
 }
 
 /** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
 export function openEditLinksPanel(grid: Grid): void {
-  openLazyPanel(grid, { kind: "links" }, async () => {
-    const { editLinksPanel } = await import("./edit-links-panel.js");
-    return editLinksPanel;
+  open_lazy_panel(grid, { kind: "links" }, async () => {
+    const { editLinksPanel: edit_links_panel } = await import("./edit-links-panel.js");
+    return edit_links_panel;
   });
 }
 
 /** Open an opted-in history panel in its own lazy chunk. */
 export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) => GridPanel>): void {
-  openLazyPanel(grid, { kind: "history" }, load);
+  open_lazy_panel(grid, { kind: "history" }, load);
 }
 
 /**
@@ -196,12 +196,12 @@ export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) =>
  * the failure stays a rejected promise that the host's unhandled-rejection
  * path observes.
  */
-function openLazyPanel(
+function open_lazy_panel(
   grid: Grid,
   open: OpenPanel,
   load: () => Promise<(grid: Grid) => GridPanel>,
 ): void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   const request = Symbol(open.kind);
   state.lazyRequest = request;
 
@@ -212,13 +212,13 @@ function openLazyPanel(
     const panel = build(grid);
     grid.openPanel({
       ...panel,
-      render: (body) => trackOpen(state, open, panel.render(body)),
+      render: (body) => track_open(state, open, panel.render(body)),
     });
   });
 }
 
 /** Record the open panel until its cleanup runs, whoever closes it. */
-function trackOpen(state: PanelState, open: OpenPanel, cleanup: () => void): () => void {
+function track_open(state: PanelState, open: OpenPanel, cleanup: () => void): () => void {
   state.open = open;
   return () => {
     cleanup();
@@ -235,7 +235,7 @@ export function syncPivotPanel(
   grid: Grid,
   hit: { readonly sheet: SheetId; readonly id: string } | null,
 ): void {
-  const open = stateOf(grid).open;
+  const open = state_of(grid).open;
   if (hit === null) {
     if (open?.kind === "pivot") grid.openPanel(null);
     return;
@@ -247,7 +247,7 @@ export function syncPivotPanel(
 
 /** An open Chart panel follows the selected chart; a selection alone never opens it. */
 export function followChart(grid: Grid, ref: ChartRef | null): void {
-  const open = stateOf(grid).open;
+  const open = state_of(grid).open;
   if (ref === null || open?.kind !== "chart") return;
   if (open.sheet !== ref.sheet || open.id !== ref.id) openChartPanel(grid, ref, false);
 }
@@ -265,7 +265,7 @@ export function insertChart(grid: Grid, kind: ChartKind = "column"): boolean {
 
   const chart = chartFromRange(
     range,
-    chartSourceReader(grid, range),
+    chart_source_reader(grid, range),
     nextChartId(grid.getCharts(range.sheet)),
     owner.columns.length,
     kind,
@@ -290,7 +290,7 @@ const PIVOT_CHART_BOX = { w: 6, h: 8 } as const;
 export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolean {
   const sheet = grid.getActiveSheet();
   const owner = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-  if (!isDashboard(owner)) return insertWorksheetPivotChart(grid, kind);
+  if (!isDashboard(owner)) return insert_worksheet_pivot_chart(grid, kind);
 
   const items = owner?.dashboard?.items ?? [];
   const pivots = items.filter((item) => item.kind === "pivot");
@@ -324,7 +324,7 @@ export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolea
 }
 
 /** Insert › Charts › PivotChart on a worksheet: a chart over the pivot that holds the active cell. */
-function insertWorksheetPivotChart(grid: Grid, kind: ChartKind): boolean {
+function insert_worksheet_pivot_chart(grid: Grid, kind: ChartKind): boolean {
   const hit = selectedPivot(grid);
   const sheet = hit?.range.sheet;
   const owner = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
@@ -359,7 +359,7 @@ function insertWorksheetPivotChart(grid: Grid, kind: ChartKind): boolean {
  * Reader over the cells that chart inference inspects: the first row and the
  * first column up to `MAX_CHART_POINTS` rows below it, each read in bulk.
  */
-function chartSourceReader(grid: Grid, range: Range): (row: number, col: number) => CellScalar {
+function chart_source_reader(grid: Grid, range: Range): (row: number, col: number) => CellScalar {
   const { sheet, start, end } = range;
   const header = readRowValues(grid.store, {
     sheet,
@@ -369,13 +369,13 @@ function chartSourceReader(grid: Grid, range: Range): (row: number, col: number)
   });
 
   const categories: CellScalar[] = [];
-  const categorySpan = {
+  const category_span = {
     sheet,
     col: start.col,
     startRow: start.row + 1,
     endRow: Math.min(end.row, start.row + MAX_CHART_POINTS),
   };
-  scanColumnValues(grid.store, categorySpan, (value) => {
+  scanColumnValues(grid.store, category_span, (value) => {
     categories.push(value);
     return true;
   });
@@ -383,7 +383,7 @@ function chartSourceReader(grid: Grid, range: Range): (row: number, col: number)
   return (row, col) =>
     row === start.row
       ? (header[col - start.col] ?? null)
-      : (categories[row - categorySpan.startRow] ?? null);
+      : (categories[row - category_span.startRow] ?? null);
 }
 
 /** Where Insert › PivotTable puts the new pivot. */
@@ -401,13 +401,13 @@ export type PivotDestination =
  * message for the form, or null.
  */
 export function insertPivot(grid: Grid, destination: PivotDestination): string | null {
-  if (destination.kind === "dashboard") return insertDashboardPivot(grid, destination.table);
+  if (destination.kind === "dashboard") return insert_dashboard_pivot(grid, destination.table);
   const workbook = grid.store.getWorkbook();
   const range = selectionRange(grid.getSelection(), workbook.sheets);
   if (range === null) return NO_SELECTION;
 
   let anchor: CellAddress;
-  let newSheet: SheetSnapshot | null = null;
+  let new_sheet: SheetSnapshot | null = null;
   if (destination.kind === "cell") {
     const parsed = parseRangeText(destination.text, workbook.sheets, grid.getActiveSheet());
     if ("error" in parsed) {
@@ -421,8 +421,8 @@ export function insertPivot(grid: Grid, destination: PivotDestination): string |
     }
     anchor = { sheet: parsed.range.sheet, ...parsed.range.start };
   } else {
-    newSheet = pivotSheet(workbook.sheets);
-    anchor = { sheet: newSheet.id, ...NEW_SHEET_ANCHOR };
+    new_sheet = pivot_sheet(workbook.sheets);
+    anchor = { sheet: new_sheet.id, ...NEW_SHEET_ANCHOR };
   }
 
   const tables = workbook.sheets.flatMap((sheet) => sheet.tables ?? []);
@@ -435,12 +435,12 @@ export function insertPivot(grid: Grid, destination: PivotDestination): string |
     values: [],
   };
   const result =
-    newSheet === null
+    new_sheet === null
       ? grid.setPivot(pivot, anchor.sheet)
       : grid.applyTransaction({
           patches: [
-            { op: "addSheet", sheet: newSheet },
-            { op: "setPivot", sheet: newSheet.id, pivot },
+            { op: "addSheet", sheet: new_sheet },
+            { op: "setPivot", sheet: new_sheet.id, pivot },
           ],
         });
   const message = rejectionMessage(result);
@@ -460,7 +460,7 @@ const NEW_PIVOT_BOX = { w: 6, h: 8 } as const;
  * and an item that shows it in the first free box, in one undo step. The
  * field list opens.
  */
-function insertDashboardPivot(grid: Grid, table: string): string | null {
+function insert_dashboard_pivot(grid: Grid, table: string): string | null {
   const sheet = grid.getActiveSheet();
   const items =
     grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)?.dashboard?.items ??
@@ -493,7 +493,7 @@ function insertDashboardPivot(grid: Grid, table: string): string | null {
 }
 
 /** An empty sheet for a new pivot, with Excel's next free `SheetN` name and a free ID. */
-function pivotSheet(
+function pivot_sheet(
   sheets: readonly { readonly id: SheetId; readonly name: string }[],
 ): SheetSnapshot {
   const ids = new Set(sheets.map((sheet) => sheet.id));
@@ -511,7 +511,7 @@ function pivotSheet(
 
 /** Attach the loaded panels to one grid. Returns the disposer. */
 export function attachPanels(grid: Grid, icons?: IconOverrides): () => void {
-  const state = stateOf(grid);
+  const state = state_of(grid);
   state.icons = icons;
   return () => {
     // A lazy panel whose chunk loads after the grid is destroyed opens nothing.

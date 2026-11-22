@@ -11,10 +11,10 @@ beforeAll(async () => {
 });
 
 const address = (row: number, col = 1) => ({ sheet: "s1", row, col });
-const range = (first: number, last = first, firstCol = 1, lastCol = firstCol): Range => ({
+const range = (first: number, last = first, first_col = 1, last_col = first_col): Range => ({
   sheet: "s1",
-  start: { row: first, col: firstCol },
-  end: { row: last, col: lastCol },
+  start: { row: first, col: first_col },
+  end: { row: last, col: last_col },
 });
 const sequence = "=SEQUENCE(3,2)";
 const original: CellScalar[][] = [
@@ -226,9 +226,9 @@ const cases: EditingCase[] = [
 ];
 
 function projection(store: SheetwriteStore): CellScalar[][] {
-  const columnCount = store.getWorkbook().sheets[0]?.columns.length ?? 0;
+  const column_count = store.getWorkbook().sheets[0]?.columns.length ?? 0;
   return [1, 2, 3, 4].map((row) =>
-    [1, 2].map((col) => (col < columnCount ? store.getCell(address(row, col)).resolved : null)),
+    [1, 2].map((col) => (col < column_count ? store.getCell(address(row, col)).resolved : null)),
   );
 }
 
@@ -393,15 +393,15 @@ describe("FILTER spills", () => {
     expect(Array.from(clipboard.spillDerived)).toEqual([0, 1, 1, 1, 1]);
     expect(clipboard.formulas).toEqual([{ offset: 0, source: "=FILTER(A1:A5,B1:B5)" }]);
     store.setViewSort("s1", [{ col: 0, ascending: false }]);
-    const sortedClipboard = store.getClipboardWindow("s1", { start: 0, end: 12 }, [2]);
-    const spillOffsets = Array.from(sortedClipboard.dataRows, (row, offset) =>
+    const sorted_clipboard = store.getClipboardWindow("s1", { start: 0, end: 12 }, [2]);
+    const spill_offsets = Array.from(sorted_clipboard.dataRows, (row, offset) =>
       row < values.length ? offset : -1,
     ).filter((offset) => offset >= 0);
-    expect(spillOffsets.map((offset) => sortedClipboard.values[offset])).toEqual(
-      spillOffsets.map((offset) => values[sortedClipboard.dataRows[offset]!]!),
+    expect(spill_offsets.map((offset) => sorted_clipboard.values[offset])).toEqual(
+      spill_offsets.map((offset) => values[sorted_clipboard.dataRows[offset]!]!),
     );
-    expect(spillOffsets.map((offset) => sortedClipboard.spillDerived[offset])).toEqual(
-      spillOffsets.map((offset) => (sortedClipboard.dataRows[offset] === 0 ? 0 : 1)),
+    expect(spill_offsets.map((offset) => sorted_clipboard.spillDerived[offset])).toEqual(
+      spill_offsets.map((offset) => (sorted_clipboard.dataRows[offset] === 0 ? 0 : 1)),
     );
 
     const snapshot = store.exportSnapshot();

@@ -29,7 +29,7 @@ function panel(id: string) {
 }
 
 /** Reads `rows` × `cols` resolved values from the Analysis sheet in the live Grid. */
-async function readBlock(page: Page, row: number, col: number, rows: number, cols: number) {
+async function read_block(page: Page, row: number, col: number, rows: number, cols: number) {
   return page.evaluate(
     ({ sheet, row, col, rows, cols }) => {
       const grid = window.__sheetwriteFormulasGrid;
@@ -46,21 +46,21 @@ async function readBlock(page: Page, row: number, col: number, rows: number, col
 }
 
 /** Revenue per region straight from the generated ledger, independent of the engine. */
-function regionRevenue(apacUnitFactor = 1): Map<string, number> {
+function region_revenue(apac_unit_factor = 1): Map<string, number> {
   const ledger = buildOrdersLedger();
   const totals = new Map<string, number>();
   for (let row = 0; row < ORDER_ROWS; row++) {
     const region = ledger.region[row]!;
     const units =
       region === "APAC"
-        ? Math.round((ledger.units[row] ?? 0) * apacUnitFactor)
+        ? Math.round((ledger.units[row] ?? 0) * apac_unit_factor)
         : (ledger.units[row] ?? 0);
     totals.set(region, (totals.get(region) ?? 0) + units * (ledger.price[row] ?? 0));
   }
   return totals;
 }
 
-async function bootFormulas(page: Page): Promise<void> {
+async function boot_formulas(page: Page): Promise<void> {
   await expect(page.getByTestId(`formulas-recipe-${FORMULA_PANELS[0]!.id}`)).toBeEnabled({
     timeout: 30_000,
   });
@@ -71,20 +71,20 @@ test("the full engine computes the dashboard and every panel follows one edit", 
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(ROUTE);
-  await bootFormulas(page);
+  await boot_formulas(page);
 
   // GROUPBY: one row per region (sorted) plus a total, equal to sums over the raw ledger.
   const region = panel("region");
-  const expected = regionRevenue();
-  const block = await readBlock(page, region.row, region.col, REGIONS.length + 1, 2);
-  const byRegion = new Map(block.map(([label, value]) => [String(label), value]));
-  for (const name of REGIONS) expect(byRegion.get(name)).toBe(expected.get(name));
-  expect(byRegion.get("Total")).toBe([...expected.values()].reduce((sum, value) => sum + value));
+  const expected = region_revenue();
+  const block = await read_block(page, region.row, region.col, REGIONS.length + 1, 2);
+  const by_region = new Map(block.map(([label, value]) => [String(label), value]));
+  for (const name of REGIONS) expect(by_region.get(name)).toBe(expected.get(name));
+  expect(by_region.get("Total")).toBe([...expected.values()].reduce((sum, value) => sum + value));
 
   // Every panel shows a result: an error at its anchor means the formula or its data are wrong.
   const failing: string[] = [];
   for (const candidate of FORMULA_PANELS) {
-    const anchor = (await readBlock(page, candidate.row, candidate.col, 1, 1))[0]?.[0];
+    const anchor = (await read_block(page, candidate.row, candidate.col, 1, 1))[0]?.[0];
     if (typeof anchor === "string" && anchor.startsWith("#")) {
       failing.push(`${candidate.id}: ${anchor}`);
     }
@@ -93,30 +93,29 @@ test("the full engine computes the dashboard and every panel follows one edit", 
 
   // The monthly panel shows the story: its best month falls in the Q4 peak.
   const monthly = panel("monthly");
-  const months = await readBlock(page, monthly.row, monthly.col, LEDGER_MONTHS, 2);
-  const [bestMonth] = [...months].sort((a, b) => Number(b[1]) - Number(a[1]));
-  const peakMonths = PEAK_MONTHS_OF_YEAR.map(
+  const months = await read_block(page, monthly.row, monthly.col, LEDGER_MONTHS, 2);
+  const [best_month] = [...months].sort((a, b) => Number(b[1]) - Number(a[1]));
+  const peak_months = PEAK_MONTHS_OF_YEAR.map(
     (month) => `${LEDGER_YEAR}-${String(month + 1).padStart(2, "0")}`,
   );
-  expect(peakMonths).toContain(String(bestMonth?.[0]));
+  expect(peak_months).toContain(String(best_month?.[0]));
 
   // The APAC promotion is one transaction; GROUPBY and the A11# spill reference follow it.
   const top = panel("top");
   const best = panel("best");
   await page.getByTestId("formulas-promotion").click();
   await expect(page.getByTestId("formulas-recalc")).toContainText("APAC promotion");
-  const promoted = regionRevenue(1.2);
+  const promoted = region_revenue(1.2);
   const after = new Map(
-    (await readBlock(page, region.row, region.col, REGIONS.length + 1, 2)).map(([label, value]) => [
-      String(label),
-      value,
-    ]),
+    (await read_block(page, region.row, region.col, REGIONS.length + 1, 2)).map(
+      ([label, value]) => [String(label), value],
+    ),
   );
   expect(after.get("APAC")).toBe(promoted.get("APAC"));
   expect(after.get("EMEA")).toBe(expected.get("EMEA"));
-  const [ranked] = await readBlock(page, top.row, top.col, 1, 2);
-  const [bestRow] = await readBlock(page, best.row, best.col, 1, 2);
-  expect(bestRow).toEqual(ranked);
+  const [ranked] = await read_block(page, top.row, top.col, 1, 2);
+  const [best_row] = await read_block(page, best.row, best.col, 1, 2);
+  expect(best_row).toEqual(ranked);
 
   // A visitor formula evaluates in the playground cell after the promotion.
   const draft = "=ROWS(UNIQUE(Orders!B1:B20000))";
@@ -127,7 +126,7 @@ test("the full engine computes the dashboard and every panel follows one edit", 
   // Undo removes the promotion, not the later playground formula.
   await page.getByTestId("formulas-promotion").click();
   await expect
-    .poll(async () => (await readBlock(page, region.row + 1, region.col + 1, 1, 1))[0]?.[0])
+    .poll(async () => (await read_block(page, region.row + 1, region.col + 1, 1, 1))[0]?.[0])
     .toBe(block[1]?.[1]);
   expect(
     await page.evaluate((addr) => window.__sheetwriteFormulasGrid?.store.getFormula(addr), {
@@ -150,6 +149,6 @@ test("arriving from a default-engine page loads the full engine", async ({ page 
   await expect(page).toHaveURL(/\/showcases\/$/);
   await page.locator('main a[data-owner="formulas"]').click();
   await expect(page).toHaveURL(new RegExp(`${new URL(ROUTE).pathname}$`));
-  await bootFormulas(page);
+  await boot_formulas(page);
   await expect(page.getByTestId("formulas-recalc")).toContainText("First calculation");
 });

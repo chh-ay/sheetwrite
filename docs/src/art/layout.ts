@@ -84,8 +84,8 @@ export function routePoints(
   toSide: BoxSide = opposite(side),
 ): Point[] {
   const vertical = side === "top" || side === "bottom";
-  const entersVertically = toSide === "top" || toSide === "bottom";
-  if (vertical !== entersVertically) {
+  const enters_vertically = toSide === "top" || toSide === "bottom";
+  if (vertical !== enters_vertically) {
     return [from, vertical ? { x: from.x, y: to.y } : { x: to.x, y: from.y }, to];
   }
   if (side === toSide) {
@@ -119,17 +119,17 @@ export function route(
   points.slice(1, -1).forEach((corner, index) => {
     const before = points[index] ?? from;
     const after = points[index + 2] ?? to;
-    const inLength = Math.hypot(corner.x - before.x, corner.y - before.y);
-    const outLength = Math.hypot(after.x - corner.x, after.y - corner.y);
-    const radius = Math.min(BEND, inLength / 2, outLength / 2);
+    const in_length = Math.hypot(corner.x - before.x, corner.y - before.y);
+    const out_length = Math.hypot(after.x - corner.x, after.y - corner.y);
+    const radius = Math.min(BEND, in_length / 2, out_length / 2);
     if (radius < 0.01) return;
     const enter = {
-      x: corner.x - ((corner.x - before.x) / inLength) * radius,
-      y: corner.y - ((corner.y - before.y) / inLength) * radius,
+      x: corner.x - ((corner.x - before.x) / in_length) * radius,
+      y: corner.y - ((corner.y - before.y) / in_length) * radius,
     };
     const leave = {
-      x: corner.x + ((after.x - corner.x) / outLength) * radius,
-      y: corner.y + ((after.y - corner.y) / outLength) * radius,
+      x: corner.x + ((after.x - corner.x) / out_length) * radius,
+      y: corner.y + ((after.y - corner.y) / out_length) * radius,
     };
     d += `L${r(enter.x)} ${r(enter.y)}Q${r(corner.x)} ${r(corner.y)} ${r(leave.x)} ${r(leave.y)}`;
   });

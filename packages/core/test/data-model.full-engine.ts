@@ -127,38 +127,38 @@ it("refuses a relationship in the panel while its lookup keys repeat", async () 
     if (target === null) throw new Error("missing control");
     target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
   };
-  const panelText = () => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
-  const setId = (value: string) =>
+  const panel_text = () => host.querySelector(".sheetwrite-panel")?.textContent ?? "";
+  const set_id = (value: string) =>
     grid.applyTransaction({
       patches: [
         { op: "set", addr: { sheet: "data", row: 3, col: 2 }, value: { kind: "literal", value } },
       ],
     });
   try {
-    expect(setId("c1").status).toBe("applied");
+    expect(set_id("c1").status).toBe("applied");
     (await loadPanels(grid)).openDataModelPanel(grid);
     const save = host.querySelector('[data-focus-key="save-relationship"]');
 
     // Orders is the data table and Customers the lookup table; each has one key column.
-    const [dataTable, , lookupTable] = host.querySelectorAll<HTMLSelectElement>(
+    const [data_table, , lookup_table] = host.querySelectorAll<HTMLSelectElement>(
       ".sheetwrite-panel select",
     );
-    if (dataTable === undefined || lookupTable === undefined) throw new Error("missing pickers");
+    if (data_table === undefined || lookup_table === undefined) throw new Error("missing pickers");
     for (const [picker, value] of [
-      [dataTable, "orders"],
-      [lookupTable, "customers"],
+      [data_table, "orders"],
+      [lookup_table, "customers"],
     ] as const) {
       picker.value = value;
       picker.dispatchEvent(new Event("change", { bubbles: true }));
     }
     press(save);
     expect(grid.store.getWorkbook().dataModel).toBeUndefined();
-    expect(panelText()).toContain("The lookup table repeats a key in rows 1 and 3.");
+    expect(panel_text()).toContain("The lookup table repeats a key in rows 1 and 3.");
 
-    expect(setId("C3").status).toBe("applied");
+    expect(set_id("C3").status).toBe("applied");
     press(save);
     expect(grid.store.getWorkbook().dataModel?.relationships).toHaveLength(1);
-    expect(panelText()).toContain("1 keys match no row and show as blank.");
+    expect(panel_text()).toContain("1 keys match no row and show as blank.");
   } finally {
     grid.destroy();
     host.remove();
@@ -167,7 +167,7 @@ it("refuses a relationship in the panel while its lookup keys repeat", async () 
 });
 
 /** Orders with amounts on Data, a lookup-flattened copy in E:F, and an empty Report sheet. */
-const mountReport = () => {
+const mount_report = () => {
   const restore = installCanvasTestStubs();
   const input = snapshot();
   const data = input.sheets[0];
@@ -211,7 +211,7 @@ const mountReport = () => {
 };
 
 it("keeps model pivot results equal to a flattened range through undo and transfer", async () => {
-  const { grid, destroy } = mountReport();
+  const { grid, destroy } = mount_report();
   const pivot: PivotDefinition = {
     id: "related",
     name: "Related",
@@ -293,14 +293,14 @@ it("keeps model pivot results equal to a flattened range through undo and transf
 });
 
 it("evaluates a measure in each pivot cell like the flattened rows of that cell", async () => {
-  const { grid, destroy } = mountReport();
+  const { grid, destroy } = mount_report();
   const measure = {
     id: "mean",
     name: "Mean Amount",
     table: "orders",
     formula: "=SUM(Orders[Amount])/COUNT(Orders[Amount])",
   };
-  const modelPivot = (values: PivotDefinition["values"]): PivotDefinition => ({
+  const model_pivot = (values: PivotDefinition["values"]): PivotDefinition => ({
     id: "related",
     name: "Related",
     anchor: { row: 0, col: 0 },
@@ -327,10 +327,10 @@ it("evaluates a measure in each pivot cell like the flattened rows of that cell"
     if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
     expect(store.setMeasure(measure).status).toBe("applied");
     expect(store.getMeasureStatus(measure.id)).toEqual({ status: "ok" });
-    expect(grid.setPivot(modelPivot([{ measure: measure.id }])).status).toBe("applied");
+    expect(grid.setPivot(model_pivot([{ measure: measure.id }])).status).toBe("applied");
     expect(
       grid.setPivot({
-        ...modelPivot([{ field: 1, aggregation: "AVERAGE" }]),
+        ...model_pivot([{ field: 1, aggregation: "AVERAGE" }]),
         id: "flat",
         name: "Flat",
         anchor: { row: 15, col: 0 },
@@ -357,7 +357,7 @@ it("evaluates a measure in each pivot cell like the flattened rows of that cell"
     compare();
 
     expect(
-      grid.setPivot({ ...modelPivot([{ measure: measure.id }]), source: { table: "orders" } })
+      grid.setPivot({ ...model_pivot([{ measure: measure.id }]), source: { table: "orders" } })
         .status,
     ).not.toBe("applied");
     await releaseEngineMemory();
@@ -368,7 +368,7 @@ it("evaluates a measure in each pivot cell like the flattened rows of that cell"
 });
 
 it("passes each worksheet pivot's current output, measures included, to the XLSX export", async () => {
-  const { grid, destroy } = mountReport();
+  const { grid, destroy } = mount_report();
   let passed: readonly DashboardExport[] | undefined;
   setXlsxWorkbookBackend({
     name: "capture",

@@ -52,22 +52,27 @@ const PLACEHOLDER_WORKBOOK: Workbook = {
  * shortcuts panel. Marks the document `data-figure-ready` once the first
  * frame is drawn.
  */
-async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<void> {
+async function mount_figure(host: HTMLElement, params: URLSearchParams): Promise<void> {
   document.documentElement.dataset.theme = params.get("theme") === "dark" ? "dark" : "light";
   host.style.width = `${Number(params.get("width") ?? 1200)}px`;
   host.style.height = `${Number(params.get("height") ?? 720)}px`;
 
-  const [formulas, { chartsAddon }, { queriesAddon }, { externalLinksAddon }, history] =
-    await Promise.all([
-      import("@sheetwrite/formulas"),
-      import("@sheetwrite/charts"),
-      import("@sheetwrite/queries"),
-      import("@sheetwrite/core/external-links"),
-      import("@sheetwrite/core/history"),
-    ]);
+  const [
+    formulas,
+    { chartsAddon: charts_addon },
+    { queriesAddon: queries_addon },
+    { externalLinksAddon: external_links_addon },
+    history,
+  ] = await Promise.all([
+    import("@sheetwrite/formulas"),
+    import("@sheetwrite/charts"),
+    import("@sheetwrite/queries"),
+    import("@sheetwrite/core/external-links"),
+    import("@sheetwrite/core/history"),
+  ]);
   await initSheetwrite({
     engine: formulas,
-    addons: [chartsAddon(), queriesAddon(), externalLinksAddon(), history.historyAddon()],
+    addons: [charts_addon(), queries_addon(), external_links_addon(), history.historyAddon()],
   });
   const archive = await history.HistoryArchive.open({
     documentId: HISTORY_DOCUMENT,
@@ -97,11 +102,11 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
     },
   });
   await shell.grid.importWorkbook(
-    figureWorkbook(sheet, dashboardLayout(params.get("layout")), presentation),
+    figureWorkbook(sheet, dashboard_layout(params.get("layout")), presentation),
   );
-  if (params.get("links") === "1") linkBudget(shell.grid);
+  if (params.get("links") === "1") link_budget(shell.grid);
 
-  if (params.get("history") === "1") await saveDraft(archive, figureWorkbook(sheet));
+  if (params.get("history") === "1") await save_draft(archive, figureWorkbook(sheet));
   window.__sheetwriteFigureGrid = shell.grid;
 
   await document.fonts.ready;
@@ -110,7 +115,7 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
 }
 
 /** The dashboard layout a `layout` parameter names; anything else is the full layout. */
-function dashboardLayout(name: string | null): DashboardLayout {
+function dashboard_layout(name: string | null): DashboardLayout {
   return name === "tablet" || name === "phone" ? name : "wide";
 }
 
@@ -121,13 +126,13 @@ const HISTORY_DOCUMENT = "figures";
 const DRAFT_TIME = Date.parse("2026-11-03T16:20:00Z");
 
 /** Start the archive from the open workbook and name its first version. */
-async function saveDraft(archive: HistoryArchive, snapshot: WorkbookSnapshot): Promise<void> {
+async function save_draft(archive: HistoryArchive, snapshot: WorkbookSnapshot): Promise<void> {
   await archive.initialize({ ...snapshot, documentId: HISTORY_DOCUMENT }, DRAFT_TIME);
   await archive.saveVersion("Budget draft", "Lena Fischer", DRAFT_TIME);
 }
 
 /** One linked workbook and a formula on the Regions sheet that reads it. */
-function linkBudget(grid: Grid): void {
+function link_budget(grid: Grid): void {
   const result = grid.applyTransaction({
     patches: [
       {
@@ -160,4 +165,4 @@ function linkBudget(grid: Grid): void {
 
 const stage = document.getElementById("stage");
 if (stage === null) throw new Error("The stage page has no #stage element");
-await mountFigure(stage, new URLSearchParams(location.search));
+await mount_figure(stage, new URLSearchParams(location.search));

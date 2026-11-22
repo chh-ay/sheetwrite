@@ -22,11 +22,11 @@ export class CanvasRenderer implements Renderer {
   private viewport: Viewport = { scrollTop: 0, scrollLeft: 0, width: 0, height: 0 };
   private dpr = 1;
   private renderers: ReadonlyMap<string, CellRenderer> = new Map();
-  private cssWidth = -1;
-  private cssHeight = -1;
-  private lastViewport: Viewport | null = null;
-  private lastDpr = 1;
-  private lastSidewaysSafe = false;
+  private css_width = -1;
+  private css_height = -1;
+  private last_viewport: Viewport | null = null;
+  private last_dpr = 1;
+  private last_sideways_safe = false;
 
   mount(host: HTMLElement, theme: Theme): void {
     this.theme = theme;
@@ -51,17 +51,17 @@ export class CanvasRenderer implements Renderer {
 
   setLayout(layout: RenderLayout): void {
     this.layout = layout;
-    this.lastViewport = null;
+    this.last_viewport = null;
   }
 
   setTheme(theme: Theme): void {
     this.theme = theme;
-    this.lastViewport = null;
+    this.last_viewport = null;
   }
 
   setRenderers(renderers: ReadonlyMap<string, CellRenderer>): void {
     this.renderers = renderers;
-    this.lastViewport = null;
+    this.last_viewport = null;
   }
 
   setViewport(viewport: Viewport): void {
@@ -75,11 +75,11 @@ export class CanvasRenderer implements Renderer {
       canvas.width = w;
       canvas.height = h;
     }
-    if (this.cssWidth !== viewport.width || this.cssHeight !== viewport.height) {
+    if (this.css_width !== viewport.width || this.css_height !== viewport.height) {
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
-      this.cssWidth = viewport.width;
-      this.cssHeight = viewport.height;
+      this.css_width = viewport.width;
+      this.css_height = viewport.height;
     }
   }
 
@@ -88,16 +88,16 @@ export class CanvasRenderer implements Renderer {
     const round = Math.round;
     this.viewport.scrollTop = round(this.viewport.scrollTop * this.dpr) / this.dpr;
     this.viewport.scrollLeft = round(this.viewport.scrollLeft * this.dpr) / this.dpr;
-    const sidewaysSafe = sidewaysBlitSafe(view, this.layout);
+    const sideways_safe = sidewaysBlitSafe(view, this.layout);
     const damage = blitScroll(
       this.ctx,
       this.canvas,
       this.theme,
-      this.lastViewport,
+      this.last_viewport,
       this.viewport,
       this.dpr,
-      this.lastDpr,
-      this.lastSidewaysSafe && sidewaysSafe,
+      this.last_dpr,
+      this.last_sideways_safe && sideways_safe,
     );
     paintFrame(
       this.ctx,
@@ -109,9 +109,9 @@ export class CanvasRenderer implements Renderer {
       this.renderers,
       damage,
     );
-    this.lastViewport = { ...this.viewport };
-    this.lastDpr = this.dpr;
-    this.lastSidewaysSafe = sidewaysSafe;
+    this.last_viewport = { ...this.viewport };
+    this.last_dpr = this.dpr;
+    this.last_sideways_safe = sideways_safe;
   }
 
   paintPanes(panes: readonly PanePaint[], divider: { x: number | null; y: number | null }): void {
@@ -120,7 +120,7 @@ export class CanvasRenderer implements Renderer {
 
     // Frozen frames never blit: pane boundaries make the single-body-shift
     // assumption of `blitScroll` unsound. Invalidate its cache too.
-    this.lastViewport = null;
+    this.last_viewport = null;
 
     for (const pane of panes) {
       const viewport: Viewport = {

@@ -76,8 +76,8 @@ export function validateRangeArtifact(
   mode: BenchmarkMode,
 ): RangeGateArtifact {
   assertGateIdentity("range", mode, artifact);
-  const rowCounts = mode === "smoke" ? [10_000] : [10_000, 100_000, 1_000_000];
-  const expected = rowCounts.flatMap((rows) =>
+  const row_counts = mode === "smoke" ? [10_000] : [10_000, 100_000, 1_000_000];
+  const expected = row_counts.flatMap((rows) =>
     RANGE_WORKLOADS.map((workload) => `${rows}:${workload}`),
   );
   validateExactMatrix(
@@ -137,14 +137,14 @@ export function validateRangeArtifact(
         }
         break;
       case "clipboard bulk read": {
-        const selectedCells = Math.min(result.rows, 10_000);
+        const selected_cells = Math.min(result.rows, 10_000);
         if (
-          result.addressedCells !== selectedCells ||
+          result.addressedCells !== selected_cells ||
           result.documentOperationCount !== 0 ||
-          result.jsPatchObjectCount !== selectedCells ||
+          result.jsPatchObjectCount !== selected_cells ||
           result.ffiCalls > 4 ||
-          result.maxTransferredArrayLength < selectedCells * 2 ||
-          result.maxTransferredArrayLength > selectedCells * 3 + 32 ||
+          result.maxTransferredArrayLength < selected_cells * 2 ||
+          result.maxTransferredArrayLength > selected_cells * 3 + 32 ||
           result.outputSentinel !== JSON.stringify(["first", null])
         ) {
           throw new Error(

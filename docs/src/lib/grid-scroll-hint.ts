@@ -15,7 +15,7 @@ const SCROLLER_SELECTOR = ".sheetwrite-scroller";
 /** Sub-pixel layout can leave a fraction of a pixel of overflow at the end. */
 const EDGE_TOLERANCE_PX = 2;
 
-function updateEdges(scroller: HTMLElement): void {
+function update_edges(scroller: HTMLElement): void {
   const viewport = scroller.parentElement;
   if (viewport === null) return;
   const hidden = scroller.scrollWidth - scroller.clientWidth;
@@ -28,25 +28,25 @@ function updateEdges(scroller: HTMLElement): void {
 }
 
 /** Watches one Grid viewport; the returned function stops every observation it started. */
-function watchScroller(scroller: HTMLElement, resize: ResizeObserver): () => void {
+function watch_scroller(scroller: HTMLElement, resize: ResizeObserver): () => void {
   // The position is read after the scroll ends where the browser says so, else on every scroll.
   const settled = "onscrollend" in window ? "scrollend" : "scroll";
-  const onSettled = () => updateEdges(scroller);
-  scroller.addEventListener(settled, onSettled, { passive: true });
+  const on_settled = () => update_edges(scroller);
+  scroller.addEventListener(settled, on_settled, { passive: true });
   resize.observe(scroller);
   // The sizer grows when columns load or resize, without a scroller resize.
   const sizer = scroller.firstElementChild;
   if (sizer !== null) resize.observe(sizer);
-  updateEdges(scroller);
+  update_edges(scroller);
   return () => {
-    scroller.removeEventListener(settled, onSettled);
+    scroller.removeEventListener(settled, on_settled);
     resize.unobserve(scroller);
     if (sizer !== null) resize.unobserve(sizer);
   };
 }
 
 /** Whether `nodes` holds a Grid scroller, or an element with one inside. */
-function holdsScroller(nodes: NodeList): boolean {
+function holds_scroller(nodes: NodeList): boolean {
   for (const node of nodes) {
     if (
       node instanceof Element &&
@@ -67,13 +67,13 @@ export function installGridScrollHints(root: HTMLElement = document.body): () =>
       const scroller = target.matches(SCROLLER_SELECTOR)
         ? target
         : target.closest<HTMLElement>(SCROLLER_SELECTOR);
-      if (scroller !== null) updateEdges(scroller);
+      if (scroller !== null) update_edges(scroller);
     }
   });
 
   const sync = () => {
     for (const scroller of root.querySelectorAll<HTMLElement>(SCROLLER_SELECTOR)) {
-      if (!watched.has(scroller)) watched.set(scroller, watchScroller(scroller, resize));
+      if (!watched.has(scroller)) watched.set(scroller, watch_scroller(scroller, resize));
     }
     // Destroyed Grids leave the document; drop their listeners and size
     // observations with them.
@@ -90,7 +90,7 @@ export function installGridScrollHints(root: HTMLElement = document.body): () =>
   const mutations = new MutationObserver((records) => {
     if (
       records.some(
-        (record) => holdsScroller(record.addedNodes) || holdsScroller(record.removedNodes),
+        (record) => holds_scroller(record.addedNodes) || holds_scroller(record.removedNodes),
       )
     ) {
       sync();

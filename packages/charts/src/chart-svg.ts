@@ -111,43 +111,43 @@ interface Axis {
 }
 
 /** CSS color of series (or pie slice) `index`. */
-function seriesColor(index: number): string {
+function series_color(index: number): string {
   return `var(--sheetwrite-chart-${(index % CHART_COLOR_COUNT) + 1})`;
 }
 
-function textWidth(text: string, fontSize = FONT_SIZE): number {
-  return text.length * fontSize * GLYPH_WIDTH_RATIO;
+function text_width(text: string, font_size = FONT_SIZE): number {
+  return text.length * font_size * GLYPH_WIDTH_RATIO;
 }
 
-/** Shortens `text` with an ellipsis so its estimated width fits `maxWidth`. */
-function fitText(text: string, maxWidth: number, fontSize = FONT_SIZE): string {
-  if (textWidth(text, fontSize) <= maxWidth) return text;
+/** Shortens `text` with an ellipsis so its estimated width fits `max_width`. */
+function fit_text(text: string, max_width: number, font_size = FONT_SIZE): string {
+  if (text_width(text, font_size) <= max_width) return text;
 
-  const characters = Math.floor(maxWidth / (fontSize * GLYPH_WIDTH_RATIO)) - 1;
+  const characters = Math.floor(max_width / (font_size * GLYPH_WIDTH_RATIO)) - 1;
   return characters < 1 ? "" : `${text.slice(0, characters)}${ELLIPSIS}`;
 }
 
-function axisPixel(axis: Axis, value: number): number {
+function axis_pixel(axis: Axis, value: number): number {
   const span = axis.scale.max - axis.scale.min;
   return axis.start + ((value - axis.scale.min) / span) * (axis.end - axis.start);
 }
 
-function formatValue(value: number, format: string | null, locale: string | null): string {
+function format_value(value: number, format: string | null, locale: string | null): string {
   return formatNumber(value, format ?? undefined, locale ?? undefined);
 }
 
-function categoryText(
+function category_text(
   category: string | number | boolean | null | undefined,
   format: string | null,
   locale: string | null,
 ): string {
   if (category === null || category === undefined) return "";
-  if (typeof category === "number") return formatValue(category, format, locale);
+  if (typeof category === "number") return format_value(category, format, locale);
   if (typeof category === "boolean") return category ? "TRUE" : "FALSE";
   return category;
 }
 
-function pointCount(series: readonly ChartSeriesView[]): number {
+function point_count(series: readonly ChartSeriesView[]): number {
   return series.reduce((count, entry) => Math.max(count, entry.values.length), 0);
 }
 
@@ -157,7 +157,7 @@ function pointCount(series: readonly ChartSeriesView[]): number {
  * text of its levels from the outside in, joined by spaces: an outer label
  * shows at the first category of its group, as Excel's one-row labels do.
  */
-function categoryLabels(series: readonly ChartSeriesView[], count: number): string[] {
+function category_labels(series: readonly ChartSeriesView[], count: number): string[] {
   const source = series.find((entry) => entry.categories.length > 0);
   const labels: string[] = [];
 
@@ -170,11 +170,12 @@ function categoryLabels(series: readonly ChartSeriesView[], count: number): stri
     const locale = source.numberLocale;
     let label = "";
     for (const level of source.categoryLevels) {
-      const text = categoryText(level.labels[index], level.formats[index] ?? null, locale);
+      const text = category_text(level.labels[index], level.formats[index] ?? null, locale);
       if (text !== "") label += `${text} `;
     }
     labels.push(
-      label + categoryText(source.categories[index], source.categoryFormats[index] ?? null, locale),
+      label +
+        category_text(source.categories[index], source.categoryFormats[index] ?? null, locale),
     );
   }
 
@@ -186,7 +187,7 @@ function categoryLabels(series: readonly ChartSeriesView[], count: number): stri
  * source" axis uses the first series. A General first series keeps General
  * ticks even when a later series has a format.
  */
-function valueAxisFormat(series: readonly ChartSeriesView[]): {
+function value_axis_format(series: readonly ChartSeriesView[]): {
   format: string | null;
   locale: string | null;
 } {
@@ -197,7 +198,7 @@ function valueAxisFormat(series: readonly ChartSeriesView[]): {
   };
 }
 
-function valueRange(series: readonly ChartSeriesView[]): { min: number; max: number } {
+function value_range(series: readonly ChartSeriesView[]): { min: number; max: number } {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
 
@@ -213,7 +214,7 @@ function valueRange(series: readonly ChartSeriesView[]): { min: number; max: num
 }
 
 /** The tick count that keeps ticks at least `spacing` pixels apart. */
-function maxTickCount(length: number, spacing: number): number {
+function max_tick_count(length: number, spacing: number): number {
   return Math.max(1, Math.floor(length / spacing));
 }
 
@@ -225,9 +226,9 @@ interface ValueTicks {
   widest: number;
 }
 
-function valueTicks(scale: TickScale, label: (tick: number) => string): ValueTicks {
+function value_ticks(scale: TickScale, label: (tick: number) => string): ValueTicks {
   const labels = scale.ticks.map(label);
-  return { scale, labels, widest: Math.max(0, ...labels.map((text) => textWidth(text))) };
+  return { scale, labels, widest: Math.max(0, ...labels.map((text) => text_width(text))) };
 }
 
 /**
@@ -235,23 +236,23 @@ function valueTicks(scale: TickScale, label: (tick: number) => string): ValueTic
  * on their ticks, so they need as much room as the widest label, not one
  * fixed spacing: the tick count starts at one per `HORIZONTAL_TICK_SPACING`
  * and drops until the widest label fits between neighbouring ticks.
- * `axisLength` is the length of the axis once the widest label is known,
+ * `axis_length` is the length of the axis once the widest label is known,
  * because an end label can need room past the plot.
  */
-function horizontalValueTicks(
+function horizontal_value_ticks(
   min: number,
   max: number,
   label: (tick: number) => string,
-  axisLength: (widest: number) => number,
+  axis_length: (widest: number) => number,
 ): ValueTicks {
-  let maxTicks = maxTickCount(axisLength(0), HORIZONTAL_TICK_SPACING);
+  let max_ticks = max_tick_count(axis_length(0), HORIZONTAL_TICK_SPACING);
   for (;;) {
-    const ticks = valueTicks(tickScale(min, max, maxTicks, true), label);
+    const ticks = value_ticks(tickScale(min, max, max_ticks, true), label);
     const steps = ticks.scale.ticks.length - 1;
-    const pitch = axisLength(ticks.widest) / Math.max(1, steps);
-    if (maxTicks <= 1 || steps <= 1 || pitch >= ticks.widest + AXIS_LABEL_GAP) return ticks;
+    const pitch = axis_length(ticks.widest) / Math.max(1, steps);
+    if (max_ticks <= 1 || steps <= 1 || pitch >= ticks.widest + AXIS_LABEL_GAP) return ticks;
     // Fewer steps than this scale has, so the step grows and the loop ends.
-    maxTicks = Math.min(maxTicks, steps) - 1;
+    max_ticks = Math.min(max_ticks, steps) - 1;
   }
 }
 
@@ -259,19 +260,19 @@ function horizontalValueTicks(
  * Draw every n-th tick label so labels that take `extent` pixels along the
  * axis do not overlap; 1 when all fit. Ticks are evenly spaced.
  */
-function labelStride(axis: Axis, extent: number): number {
+function label_stride(axis: Axis, extent: number): number {
   const steps = axis.scale.ticks.length - 1;
   if (steps < 1) return 1;
   const pitch = Math.abs(axis.end - axis.start) / steps;
   return Math.max(1, Math.ceil(extent / pitch));
 }
 
-function chartName(view: ChartView): string {
+function chart_name(view: ChartView): string {
   const kind = `${KIND_NAMES[view.chart.kind]} chart`;
   return view.chart.title ? `${view.chart.title} (${kind})` : kind;
 }
 
-function chartDescription(view: ChartView): string {
+function chart_description(view: ChartView): string {
   if (view.series.length === 0) return "No series.";
 
   const parts = view.series.map((entry) => {
@@ -281,36 +282,36 @@ function chartDescription(view: ChartView): string {
   return `Series: ${parts.join(", ")}.`;
 }
 
-function chartNotes(view: ChartView): string[] {
+function chart_notes(view: ChartView): string[] {
   const notes: string[] = [];
   if (view.series.some((entry) => entry.truncated)) notes.push(TRUNCATED_NOTE);
   if (view.series.some((entry) => entry.referenceError)) notes.push(REFERENCE_ERROR_NOTE);
   return notes;
 }
 
-function isRound(kind: ChartKind): boolean {
+function is_round(kind: ChartKind): boolean {
   return kind === "pie" || kind === "doughnut";
 }
 
-function legendEntries(view: ChartView): LegendEntry[] {
-  if (!isRound(view.chart.kind)) {
-    return view.series.map((entry, index) => ({ label: entry.name, color: seriesColor(index) }));
+function legend_entries(view: ChartView): LegendEntry[] {
+  if (!is_round(view.chart.kind)) {
+    return view.series.map((entry, index) => ({ label: entry.name, color: series_color(index) }));
   }
 
   // A pie shows one series, so its legend names the slices.
   const first = view.series[0];
   if (!first) return [];
-  const labels = categoryLabels([first], first.values.length);
-  return labels.map((label, index) => ({ label, color: seriesColor(index) }));
+  const labels = category_labels([first], first.values.length);
+  return labels.map((label, index) => ({ label, color: series_color(index) }));
 }
 
-function drawTitle(context: DrawContext, box: Box): Box {
+function draw_title(context: DrawContext, box: Box): Box {
   const title = context.view.chart.title;
   if (!title) return box;
 
   const width = box.right - box.left;
   context.svg.text(
-    fitText(title, width, TITLE_FONT_SIZE),
+    fit_text(title, width, TITLE_FONT_SIZE),
     {
       class: "sheetwrite-chart-title",
       x: box.left + width / 2,
@@ -324,14 +325,14 @@ function drawTitle(context: DrawContext, box: Box): Box {
   return { ...box, top: box.top + TITLE_LINE_HEIGHT };
 }
 
-function drawNotes(context: DrawContext, box: Box): Box {
-  const notes = chartNotes(context.view);
+function draw_notes(context: DrawContext, box: Box): Box {
+  const notes = chart_notes(context.view);
   let bottom = box.bottom;
 
   // The last note sits at the bottom edge, so draw upward from it.
   for (const note of notes.toReversed()) {
     context.svg.text(
-      fitText(note, box.right - box.left),
+      fit_text(note, box.right - box.left),
       {
         class: "sheetwrite-chart-note",
         x: box.left,
@@ -347,20 +348,20 @@ function drawNotes(context: DrawContext, box: Box): Box {
   return { ...box, bottom };
 }
 
-function drawLegendItem(
+function draw_legend_item(
   context: DrawContext,
   parent: Element,
   entry: LegendEntry,
   x: number,
-  centerY: number,
-  maxWidth: number,
+  center_y: number,
+  max_width: number,
 ): void {
   const item = context.svg.element("g", { class: "sheetwrite-chart-legend-item" }, parent);
   context.svg.element(
     "rect",
     {
       x,
-      y: centerY - LEGEND_SWATCH_SIZE / 2,
+      y: center_y - LEGEND_SWATCH_SIZE / 2,
       width: LEGEND_SWATCH_SIZE,
       height: LEGEND_SWATCH_SIZE,
       fill: entry.color,
@@ -368,10 +369,10 @@ function drawLegendItem(
     item,
   );
   context.svg.text(
-    fitText(entry.label, maxWidth - LEGEND_SWATCH_SIZE - LEGEND_SWATCH_GAP),
+    fit_text(entry.label, max_width - LEGEND_SWATCH_SIZE - LEGEND_SWATCH_GAP),
     {
       x: x + LEGEND_SWATCH_SIZE + LEGEND_SWATCH_GAP,
-      y: centerY,
+      y: center_y,
       "dominant-baseline": "central",
       "font-size": FONT_SIZE,
     },
@@ -379,18 +380,18 @@ function drawLegendItem(
   );
 }
 
-function legendItemWidth(entry: LegendEntry): number {
-  return LEGEND_SWATCH_SIZE + LEGEND_SWATCH_GAP + textWidth(entry.label);
+function legend_item_width(entry: LegendEntry): number {
+  return LEGEND_SWATCH_SIZE + LEGEND_SWATCH_GAP + text_width(entry.label);
 }
 
-function drawSideLegend(
+function draw_side_legend(
   context: DrawContext,
   entries: readonly LegendEntry[],
   side: "left" | "right",
   box: Box,
 ): Box {
   const width = Math.min(
-    Math.max(...entries.map(legendItemWidth)),
+    Math.max(...entries.map(legend_item_width)),
     (box.right - box.left) * LEGEND_MAX_SHARE,
   );
   const fitting = entries.slice(0, Math.max(1, Math.floor((box.bottom - box.top) / LINE_HEIGHT)));
@@ -403,7 +404,7 @@ function drawSideLegend(
   const top = (box.top + box.bottom - fitting.length * LINE_HEIGHT) / 2;
 
   fitting.forEach((entry, index) => {
-    drawLegendItem(context, legend, entry, x, top + (index + 0.5) * LINE_HEIGHT, width);
+    draw_legend_item(context, legend, entry, x, top + (index + 0.5) * LINE_HEIGHT, width);
   });
 
   return side === "right"
@@ -411,7 +412,7 @@ function drawSideLegend(
     : { ...box, left: x + width + LEGEND_ITEM_GAP };
 }
 
-function drawRowLegend(
+function draw_row_legend(
   context: DrawContext,
   entries: readonly LegendEntry[],
   side: "top" | "bottom",
@@ -422,7 +423,7 @@ function drawRowLegend(
 
   // Wrap entries into centered rows; entries past the last row are left out, as Excel does.
   for (const entry of entries) {
-    const width = Math.min(legendItemWidth(entry), available);
+    const width = Math.min(legend_item_width(entry), available);
     const row = rows[rows.length - 1];
     if (row && row.width + LEGEND_ITEM_GAP + width <= available) {
       row.entries.push(entry);
@@ -442,12 +443,12 @@ function drawRowLegend(
   const height = rows.length * LINE_HEIGHT;
   const top = side === "top" ? box.top : box.bottom - height;
 
-  rows.forEach((row, rowIndex) => {
+  rows.forEach((row, row_index) => {
     let x = box.left + (available - row.width) / 2;
-    const centerY = top + (rowIndex + 0.5) * LINE_HEIGHT;
+    const center_y = top + (row_index + 0.5) * LINE_HEIGHT;
     for (const entry of row.entries) {
-      const width = Math.min(legendItemWidth(entry), available);
-      drawLegendItem(context, legend, entry, x, centerY, width);
+      const width = Math.min(legend_item_width(entry), available);
+      draw_legend_item(context, legend, entry, x, center_y, width);
       x += width + LEGEND_ITEM_GAP;
     }
   });
@@ -457,24 +458,24 @@ function drawRowLegend(
     : { ...box, bottom: box.bottom - height - AXIS_LABEL_GAP };
 }
 
-function drawLegend(context: DrawContext, box: Box): Box {
+function draw_legend(context: DrawContext, box: Box): Box {
   const placement = context.view.chart.legend ?? DEFAULT_LEGEND;
-  const entries = legendEntries(context.view);
+  const entries = legend_entries(context.view);
   if (placement === "none" || entries.length === 0) return box;
 
   return placement === "left" || placement === "right"
-    ? drawSideLegend(context, entries, placement, box)
-    : drawRowLegend(context, entries, placement, box);
+    ? draw_side_legend(context, entries, placement, box)
+    : draw_row_legend(context, entries, placement, box);
 }
 
 /** Draws the axis titles and returns the box that is left for tick labels and the plot. */
-function drawAxisTitles(context: DrawContext, box: Box): Box {
+function draw_axis_titles(context: DrawContext, box: Box): Box {
   const axes = context.view.chart.axes;
   const region = { ...box };
 
   if (axes?.xTitle) {
     context.svg.text(
-      fitText(axes.xTitle, region.right - region.left),
+      fit_text(axes.xTitle, region.right - region.left),
       {
         class: "sheetwrite-chart-axis-title",
         "data-axis": "x",
@@ -489,17 +490,17 @@ function drawAxisTitles(context: DrawContext, box: Box): Box {
   }
 
   if (axes?.yTitle) {
-    const centerX = region.left + FONT_SIZE;
-    const centerY = (region.top + region.bottom) / 2;
+    const center_x = region.left + FONT_SIZE;
+    const center_y = (region.top + region.bottom) / 2;
     context.svg.text(
-      fitText(axes.yTitle, region.bottom - region.top),
+      fit_text(axes.yTitle, region.bottom - region.top),
       {
         class: "sheetwrite-chart-axis-title",
         "data-axis": "y",
-        x: centerX,
-        y: centerY,
+        x: center_x,
+        y: center_y,
         "text-anchor": "middle",
-        transform: `rotate(-90 ${centerX} ${centerY})`,
+        transform: `rotate(-90 ${center_x} ${center_y})`,
         "font-size": FONT_SIZE,
       },
       context.root,
@@ -512,26 +513,26 @@ function drawAxisTitles(context: DrawContext, box: Box): Box {
 
 /**
  * Value labels plus a grid line at each tick; `vertical` axes run from bottom
- * to top. Each label takes `labelExtent` pixels along the axis; on an axis
+ * to top. Each label takes `label_extent` pixels along the axis; on an axis
  * too short for all of them, every n-th label is drawn, as on category axes.
  */
-function drawValueAxis(
+function draw_value_axis(
   context: DrawContext,
   axis: Axis,
   plot: Box,
   vertical: boolean,
   labels: readonly string[],
-  labelExtent: number,
+  label_extent: number,
 ): void {
   const group = context.svg.element(
     "g",
     { class: "sheetwrite-chart-value-axis", "font-size": FONT_SIZE },
     context.root,
   );
-  const stride = labelStride(axis, labelExtent);
+  const stride = label_stride(axis, label_extent);
 
   axis.scale.ticks.forEach((tick, index) => {
-    const pixel = axisPixel(axis, tick);
+    const pixel = axis_pixel(axis, tick);
     context.svg.element(
       "line",
       vertical
@@ -560,14 +561,14 @@ function drawValueAxis(
 /**
  * Category labels on one axis. When labels would overlap, only every n-th label
  * is drawn, so the visible labels keep their full text where they fit.
- * `labelWidth` is the room left of a vertical axis; horizontal labels fit their band.
+ * `label_width` is the room left of a vertical axis; horizontal labels fit their band.
  */
-function drawCategoryLabels(
+function draw_category_labels(
   context: DrawContext,
   labels: readonly string[],
   plot: Box,
   vertical: boolean,
-  labelWidth: number,
+  label_width: number,
 ): void {
   if (labels.length === 0) return;
 
@@ -578,27 +579,27 @@ function drawCategoryLabels(
   );
   const length = vertical ? plot.bottom - plot.top : plot.right - plot.left;
   const band = length / labels.length;
-  const labelExtent = vertical
+  const label_extent = vertical
     ? LINE_HEIGHT
-    : Math.max(...labels.map((label) => textWidth(label))) + AXIS_LABEL_GAP;
-  const fitStride = Math.max(1, Math.ceil(labelExtent / band));
+    : Math.max(...labels.map((label) => text_width(label))) + AXIS_LABEL_GAP;
+  const fit_stride = Math.max(1, Math.ceil(label_extent / band));
   // A horizontal label wider than its band moves right, by up to half the
   // difference, to stay over the plot (below). The stride leaves room for
   // that move, so the labels keep one spacing along the axis.
-  const widest = labelExtent - AXIS_LABEL_GAP;
+  const widest = label_extent - AXIS_LABEL_GAP;
   const stride =
     vertical || widest <= band
-      ? fitStride
-      : Math.max(fitStride, Math.ceil((1.5 * widest + AXIS_LABEL_GAP) / band - 0.5));
+      ? fit_stride
+      : Math.max(fit_stride, Math.ceil((1.5 * widest + AXIS_LABEL_GAP) / band - 0.5));
 
   // The right edge of the last horizontal label drawn.
-  let drawnRight = Number.NEGATIVE_INFINITY;
+  let drawn_right = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < labels.length; index += stride) {
     const label = labels[index] ?? "";
     const center = (index + 0.5) * band;
     if (vertical) {
       context.svg.text(
-        fitText(label, labelWidth),
+        fit_text(label, label_width),
         {
           x: plot.left - AXIS_LABEL_GAP,
           y: plot.top + center,
@@ -608,14 +609,14 @@ function drawCategoryLabels(
         group,
       );
     } else {
-      const text = fitText(label, band * stride - AXIS_LABEL_GAP);
+      const text = fit_text(label, band * stride - AXIS_LABEL_GAP);
       // A label wider than its band stays over the plot: past the plot's left
       // edge, the first one ran into the value axis's lowest label ($0). A
       // label that would still reach the one before it is left out.
-      const half = textWidth(text) / 2;
+      const half = text_width(text) / 2;
       const x = Math.min(Math.max(plot.left + center, plot.left + half), plot.right - half);
-      if (x - half < drawnRight + AXIS_LABEL_GAP) continue;
-      drawnRight = x + half;
+      if (x - half < drawn_right + AXIS_LABEL_GAP) continue;
+      drawn_right = x + half;
       context.svg.text(
         text,
         { x, y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE, "text-anchor": "middle" },
@@ -650,12 +651,12 @@ interface CategoryTiers {
  * groups multi-level labels: a group starts at a label on its level or where
  * a group of an outer level starts, and a blank label continues it.
  */
-function categoryTiers(source: ChartSeriesView, count: number): CategoryTiers {
+function category_tiers(source: ChartSeriesView, count: number): CategoryTiers {
   const locale = source.numberLocale;
   const inner: string[] = [];
   for (let index = 0; index < count; index += 1) {
     inner.push(
-      categoryText(source.categories[index], source.categoryFormats[index] ?? null, locale),
+      category_text(source.categories[index], source.categoryFormats[index] ?? null, locale),
     );
   }
 
@@ -675,7 +676,7 @@ function categoryTiers(source: ChartSeriesView, count: number): CategoryTiers {
     let start = 0;
     for (let index = 1; index <= count; index += 1) {
       if (starts[index] === 0) continue;
-      const label = categoryText(level.labels[start], level.formats[start] ?? null, locale);
+      const label = category_text(level.labels[start], level.formats[start] ?? null, locale);
       groups.push({ start, end: index, label });
       start = index;
     }
@@ -690,12 +691,12 @@ function categoryTiers(source: ChartSeriesView, count: number): CategoryTiers {
 }
 
 /**
- * `text` wrapped at spaces onto lines of at most `maxWidth`, as Excel wraps
+ * `text` wrapped at spaces onto lines of at most `max_width`, as Excel wraps
  * the labels of outer category levels. The last line ends with an ellipsis
  * when text is left over.
  */
-function wrapText(text: string, maxWidth: number): string[] {
-  const characters = Math.floor(maxWidth / (FONT_SIZE * GLYPH_WIDTH_RATIO));
+function wrap_text(text: string, max_width: number): string[] {
+  const characters = Math.floor(max_width / (FONT_SIZE * GLYPH_WIDTH_RATIO));
   const lines: string[] = [];
   let rest = text;
 
@@ -706,7 +707,7 @@ function wrapText(text: string, maxWidth: number): string[] {
     rest = rest.slice(space + 1);
   }
 
-  lines.push(fitText(rest, maxWidth));
+  lines.push(fit_text(rest, max_width));
   return lines;
 }
 
@@ -724,28 +725,28 @@ interface TierLayout {
 
 /**
  * The layout of `tiers` over category bands of `band` pixels. On a vertical
- * axis the inner labels take `innerSize` and each outer label reads upward,
+ * axis the inner labels take `inner_size` and each outer label reads upward,
  * because Excel has no horizontal outer labels in bar charts. On a horizontal
  * axis inner labels that do not fit turn upward and take at most
- * `innerSize`, and outer labels wrap within their group.
+ * `inner_size`, and outer labels wrap within their group.
  */
-function tierLayout(
+function tier_layout(
   tiers: CategoryTiers,
   band: number,
   vertical: boolean,
-  innerSize: number,
+  inner_size: number,
 ): TierLayout {
-  const widest = Math.max(0, ...tiers.inner.map((label) => textWidth(label)));
+  const widest = Math.max(0, ...tiers.inner.map((label) => text_width(label)));
   const rotated = !vertical && widest + AXIS_LABEL_GAP > band;
   const stride = vertical || rotated ? Math.max(1, Math.ceil(LINE_HEIGHT / band)) : 1;
-  const sizes = [vertical ? innerSize : rotated ? Math.min(widest, innerSize) : LINE_HEIGHT];
+  const sizes = [vertical ? inner_size : rotated ? Math.min(widest, inner_size) : LINE_HEIGHT];
 
   const lines = tiers.outer.map((groups) => {
     const row = groups.map((group) => {
       const span = (group.end - group.start) * band - AXIS_LABEL_GAP;
-      return vertical ? [fitText(group.label, span)] : wrapText(group.label, span);
+      return vertical ? [fit_text(group.label, span)] : wrap_text(group.label, span);
     });
-    sizes.push(Math.max(1, ...row.map((groupLines) => groupLines.length)) * LINE_HEIGHT);
+    sizes.push(Math.max(1, ...row.map((group_lines) => group_lines.length)) * LINE_HEIGHT);
     return row;
   });
 
@@ -753,7 +754,7 @@ function tierLayout(
 }
 
 /** The distance from the axis to the far edge of all label rows. */
-function tierExtent(layout: TierLayout): number {
+function tier_extent(layout: TierLayout): number {
   return layout.sizes.reduce((total, size) => total + AXIS_LABEL_GAP + size, 0);
 }
 
@@ -763,7 +764,7 @@ function tierExtent(layout: TierLayout): number {
  * divider between two categories crosses the inner row and every outer row
  * where a group ends there.
  */
-function drawCategoryTiers(
+function draw_category_tiers(
   context: DrawContext,
   tiers: CategoryTiers,
   layout: TierLayout,
@@ -803,7 +804,7 @@ function drawCategoryTiers(
     { class: "sheetwrite-chart-category-axis", "font-size": FONT_SIZE },
     context.root,
   );
-  const innerSize = layout.sizes[0] ?? 0;
+  const inner_size = layout.sizes[0] ?? 0;
   for (let index = 0; index < count; index += layout.stride) {
     const label = tiers.inner[index] ?? "";
     const center = start + (index + 0.5) * band;
@@ -824,17 +825,17 @@ function drawCategoryTiers(
             transform: `rotate(-90 ${center} ${y})`,
           }
         : { x: center, y: y + FONT_SIZE, "text-anchor": "middle" };
-    const fitted = fitText(label, vertical || layout.rotated ? innerSize : band - AXIS_LABEL_GAP);
+    const fitted = fit_text(label, vertical || layout.rotated ? inner_size : band - AXIS_LABEL_GAP);
     context.svg.text(fitted, { ...attributes, "data-level": 0 }, group);
   }
 
-  layout.lines.forEach((row, rowIndex) => {
-    const near = (edges[rowIndex] ?? 0) + AXIS_LABEL_GAP;
-    const groups = tiers.outer[rowIndex] ?? [];
+  layout.lines.forEach((row, row_index) => {
+    const near = (edges[row_index] ?? 0) + AXIS_LABEL_GAP;
+    const groups = tiers.outer[row_index] ?? [];
 
-    groups.forEach((entry, groupIndex) => {
+    groups.forEach((entry, group_index) => {
       const center = start + ((entry.start + entry.end) / 2) * band;
-      (row[groupIndex] ?? []).forEach((line, lineIndex) => {
+      (row[group_index] ?? []).forEach((line, line_index) => {
         if (line === "") return;
 
         const x = plot.left - near - LINE_HEIGHT / 2;
@@ -848,19 +849,19 @@ function drawCategoryTiers(
             }
           : {
               x: center,
-              y: plot.bottom + near + FONT_SIZE + lineIndex * LINE_HEIGHT,
+              y: plot.bottom + near + FONT_SIZE + line_index * LINE_HEIGHT,
               "text-anchor": "middle",
             };
-        context.svg.text(line, { ...attributes, "data-level": rowIndex + 1 }, group);
+        context.svg.text(line, { ...attributes, "data-level": row_index + 1 }, group);
       });
     });
   });
 }
 
 /** The pixel of value zero, or of the nearest axis end when zero is outside the axis. */
-function baselinePixel(axis: Axis): number {
+function baseline_pixel(axis: Axis): number {
   const zero = Math.min(Math.max(0, axis.scale.min), axis.scale.max);
-  return axisPixel(axis, zero);
+  return axis_pixel(axis, zero);
 }
 
 /**
@@ -868,22 +869,22 @@ function baselinePixel(axis: Axis): number {
  * axis, each series draws its bars as the subpaths of one path instead, with
  * the same geometry. A 10,000-point series then adds one element, not 10,000.
  */
-function drawBars(context: DrawContext, axis: Axis, plot: Box, horizontal: boolean): void {
+function draw_bars(context: DrawContext, axis: Axis, plot: Box, horizontal: boolean): void {
   const series = context.view.series;
-  const count = pointCount(series);
+  const count = point_count(series);
   if (count === 0 || series.length === 0) return;
 
   const length = horizontal ? plot.bottom - plot.top : plot.right - plot.left;
-  const isDense = count > length;
+  const is_dense = count > length;
   const band = length / count;
-  const barSize = (band * BAR_GROUP_SHARE) / series.length;
-  const groupOffset = (band * (1 - BAR_GROUP_SHARE)) / 2;
-  const baseline = baselinePixel(axis);
+  const bar_size = (band * BAR_GROUP_SHARE) / series.length;
+  const group_offset = (band * (1 - BAR_GROUP_SHARE)) / 2;
+  const baseline = baseline_pixel(axis);
 
-  series.forEach((entry, seriesIndex) => {
+  series.forEach((entry, series_index) => {
     const group = context.svg.element(
       "g",
-      { class: "sheetwrite-chart-series", fill: seriesColor(seriesIndex) },
+      { class: "sheetwrite-chart-series", fill: series_color(series_index) },
       context.root,
     );
     let path = "";
@@ -891,14 +892,14 @@ function drawBars(context: DrawContext, axis: Axis, plot: Box, horizontal: boole
     entry.values.forEach((value, index) => {
       if (value === null) return;
 
-      const valuePixel = axisPixel(axis, value);
-      const along = index * band + groupOffset + seriesIndex * barSize;
-      const low = Math.min(valuePixel, baseline);
-      const extent = Math.abs(valuePixel - baseline);
+      const value_pixel = axis_pixel(axis, value);
+      const along = index * band + group_offset + series_index * bar_size;
+      const low = Math.min(value_pixel, baseline);
+      const extent = Math.abs(value_pixel - baseline);
       const rect = horizontal
-        ? { x: low, y: plot.top + along, width: extent, height: barSize }
-        : { x: plot.left + along, y: low, width: barSize, height: extent };
-      if (isDense) {
+        ? { x: low, y: plot.top + along, width: extent, height: bar_size }
+        : { x: plot.left + along, y: low, width: bar_size, height: extent };
+      if (is_dense) {
         path += `M${rect.x} ${rect.y}h${rect.width}v${rect.height}h${-rect.width}Z`;
       } else {
         context.svg.element("rect", { class: "sheetwrite-chart-bar", ...rect }, group);
@@ -917,13 +918,13 @@ interface PlottedSeries {
 }
 
 /** Indices to draw: every point when the series fits the plot width, the per-pixel extremes otherwise. */
-function drawnIndices(points: PlottedSeries, plotWidth: number): number[] {
-  if (points.values.length <= plotWidth) return points.values.map((_, index) => index);
+function drawn_indices(points: PlottedSeries, plot_width: number): number[] {
+  if (points.values.length <= plot_width) return points.values.map((_, index) => index);
   return thinToPixels(points.xs, points.values);
 }
 
 /** Runs of consecutive drawable points; a `null` value or a missing x ends a run. */
-function pointRuns(
+function point_runs(
   points: PlottedSeries,
   indices: readonly number[],
   axis: Axis,
@@ -939,30 +940,30 @@ function pointRuns(
       current = [];
       continue;
     }
-    current.push([x, axisPixel(axis, value)]);
+    current.push([x, axis_pixel(axis, value)]);
   }
   if (current.length > 0) runs.push(current);
 
   return runs;
 }
 
-function pathData(run: ReadonlyArray<readonly [number, number]>): string {
+function path_data(run: ReadonlyArray<readonly [number, number]>): string {
   return run.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join("");
 }
 
-function drawLines(
+function draw_lines(
   context: DrawContext,
   axis: Axis,
   plot: Box,
   plotted: readonly PlottedSeries[],
   filled: boolean,
 ): void {
-  const baseline = baselinePixel(axis);
+  const baseline = baseline_pixel(axis);
 
-  plotted.forEach((points, seriesIndex) => {
-    const color = seriesColor(seriesIndex);
+  plotted.forEach((points, series_index) => {
+    const color = series_color(series_index);
     const group = context.svg.element("g", { class: "sheetwrite-chart-series" }, context.root);
-    const runs = pointRuns(points, drawnIndices(points, plot.right - plot.left), axis);
+    const runs = point_runs(points, drawn_indices(points, plot.right - plot.left), axis);
 
     for (const run of runs) {
       const first = run[0];
@@ -974,7 +975,7 @@ function drawLines(
           "path",
           {
             class: "sheetwrite-chart-area",
-            d: `${pathData(run)}L${last[0]} ${baseline}L${first[0]} ${baseline}Z`,
+            d: `${path_data(run)}L${last[0]} ${baseline}L${first[0]} ${baseline}Z`,
             fill: color,
             "fill-opacity": AREA_FILL_OPACITY,
             stroke: color,
@@ -986,7 +987,7 @@ function drawLines(
           "path",
           {
             class: "sheetwrite-chart-line",
-            d: pathData(run),
+            d: path_data(run),
             fill: "none",
             stroke: color,
             "stroke-width": LINE_WIDTH,
@@ -1012,27 +1013,27 @@ function drawLines(
   });
 }
 
-function drawPoints(
+function draw_points(
   context: DrawContext,
   axis: Axis,
   plot: Box,
   plotted: readonly PlottedSeries[],
 ): void {
-  plotted.forEach((points, seriesIndex) => {
+  plotted.forEach((points, series_index) => {
     const group = context.svg.element(
       "g",
-      { class: "sheetwrite-chart-series", fill: seriesColor(seriesIndex) },
+      { class: "sheetwrite-chart-series", fill: series_color(series_index) },
       context.root,
     );
 
-    for (const index of drawnIndices(points, plot.right - plot.left)) {
+    for (const index of drawn_indices(points, plot.right - plot.left)) {
       const value = points.values[index] ?? null;
       const x = points.xs[index] ?? Number.NaN;
       if (value === null || !Number.isFinite(x)) continue;
 
       context.svg.element(
         "circle",
-        { class: "sheetwrite-chart-point", cx: x, cy: axisPixel(axis, value), r: POINT_RADIUS },
+        { class: "sheetwrite-chart-point", cx: x, cy: axis_pixel(axis, value), r: POINT_RADIUS },
         group,
       );
     }
@@ -1040,18 +1041,19 @@ function drawPoints(
 }
 
 /** Scatter x values: the categories when they are all numbers, otherwise 1, 2, 3… as in Excel. */
-function scatterXs(entry: ChartSeriesView): Array<number | null> {
+function scatter_xs(entry: ChartSeriesView): Array<number | null> {
   const present = entry.categories.filter((category) => category !== null);
-  const isNumeric = present.length > 0 && present.every((category) => typeof category === "number");
+  const is_numeric =
+    present.length > 0 && present.every((category) => typeof category === "number");
 
   return entry.values.map((_, index) => {
-    if (!isNumeric) return index + 1;
+    if (!is_numeric) return index + 1;
     const category = entry.categories[index];
     return typeof category === "number" ? category : null;
   });
 }
 
-function scatterXFormat(series: readonly ChartSeriesView[]): string | null {
+function scatter_x_format(series: readonly ChartSeriesView[]): string | null {
   for (const entry of series) {
     const format = entry.categoryFormats.find((code) => code !== null);
     if (format !== undefined) return format;
@@ -1059,43 +1061,43 @@ function scatterXFormat(series: readonly ChartSeriesView[]): string | null {
   return null;
 }
 
-function drawCartesian(context: DrawContext, box: Box): void {
+function draw_cartesian(context: DrawContext, box: Box): void {
   const { series, chart } = context.view;
   const kind = chart.kind;
   const horizontal = kind === "bar";
-  const region = drawAxisTitles(context, box);
+  const region = draw_axis_titles(context, box);
 
   // Bars and areas grow from zero, so their axis always contains it.
-  const range = valueRange(series);
-  const fromZero = kind === "column" || kind === "bar" || kind === "area";
-  const valueMin = fromZero ? Math.min(0, range.min) : range.min;
-  const valueMax = fromZero ? Math.max(0, range.max) : range.max;
-  const { format, locale } = valueAxisFormat(series);
-  const valueLabel = (tick: number) => formatValue(tick, format, locale);
+  const range = value_range(series);
+  const from_zero = kind === "column" || kind === "bar" || kind === "area";
+  const value_min = from_zero ? Math.min(0, range.min) : range.min;
+  const value_max = from_zero ? Math.max(0, range.max) : range.max;
+  const { format, locale } = value_axis_format(series);
+  const value_label = (tick: number) => format_value(tick, format, locale);
 
-  const count = pointCount(series);
-  const labels = kind === "scatter" ? [] : categoryLabels(series, count);
-  const levelSource = series.find((entry) => entry.categories.length > 0);
-  const hasTiers =
+  const count = point_count(series);
+  const labels = kind === "scatter" ? [] : category_labels(series, count);
+  const level_source = series.find((entry) => entry.categories.length > 0);
+  const has_tiers =
     kind !== "scatter" &&
     count > 0 &&
-    levelSource !== undefined &&
-    levelSource.categoryLevels.length > 0 &&
+    level_source !== undefined &&
+    level_source.categoryLevels.length > 0 &&
     chart.axes?.multiLevelLabels !== false;
-  const tiers = hasTiers ? categoryTiers(levelSource, count) : null;
+  const tiers = has_tiers ? category_tiers(level_source, count) : null;
 
   if (horizontal) {
-    const categoryWidth = Math.min(
-      Math.max(0, ...(tiers?.inner ?? labels).map((label) => textWidth(label))),
+    const category_width = Math.min(
+      Math.max(0, ...(tiers?.inner ?? labels).map((label) => text_width(label))),
       (region.right - region.left) * CATEGORY_LABEL_MAX_SHARE,
     );
-    const outerWidth = (tiers?.outer.length ?? 0) * (LINE_HEIGHT + AXIS_LABEL_GAP);
-    const left = region.left + outerWidth + categoryWidth + AXIS_LABEL_GAP;
+    const outer_width = (tiers?.outer.length ?? 0) * (LINE_HEIGHT + AXIS_LABEL_GAP);
+    const left = region.left + outer_width + category_width + AXIS_LABEL_GAP;
     // The last label is centered on the plot's right edge, so half of it is past the plot.
-    const value = horizontalValueTicks(
-      valueMin,
-      valueMax,
-      valueLabel,
+    const value = horizontal_value_ticks(
+      value_min,
+      value_max,
+      value_label,
       (widest) => region.right - widest / 2 - left,
     );
     const plot = {
@@ -1107,53 +1109,53 @@ function drawCartesian(context: DrawContext, box: Box): void {
     if (plot.right - plot.left < MIN_PLOT_SIZE || plot.bottom - plot.top < MIN_PLOT_SIZE) return;
 
     const axis = { scale: value.scale, start: plot.left, end: plot.right };
-    drawValueAxis(context, axis, plot, false, value.labels, value.widest + AXIS_LABEL_GAP);
-    drawBars(context, axis, plot, true);
-    drawBaseline(context, plot, baselinePixel(axis), true);
+    draw_value_axis(context, axis, plot, false, value.labels, value.widest + AXIS_LABEL_GAP);
+    draw_bars(context, axis, plot, true);
+    draw_baseline(context, plot, baseline_pixel(axis), true);
     if (tiers) {
-      const layout = tierLayout(tiers, (plot.bottom - plot.top) / count, true, categoryWidth);
-      drawCategoryTiers(context, tiers, layout, plot, true);
+      const layout = tier_layout(tiers, (plot.bottom - plot.top) / count, true, category_width);
+      draw_category_tiers(context, tiers, layout, plot, true);
     } else {
-      drawCategoryLabels(context, labels, plot, true, categoryWidth);
+      draw_category_labels(context, labels, plot, true, category_width);
     }
     return;
   }
 
-  const valueCount = maxTickCount(region.bottom - region.top, VERTICAL_TICK_SPACING);
-  const value = valueTicks(tickScale(valueMin, valueMax, valueCount, true), valueLabel);
+  const value_count = max_tick_count(region.bottom - region.top, VERTICAL_TICK_SPACING);
+  const value = value_ticks(tickScale(value_min, value_max, value_count, true), value_label);
   const left = region.left + value.widest + AXIS_LABEL_GAP;
   // A scatter chart's x axis is a value axis too: its last label is centered on the plot's right edge.
-  const scatter = kind === "scatter" ? scatterXTicks(series, region.right, left) : null;
+  const scatter = kind === "scatter" ? scatter_x_ticks(series, region.right, left) : null;
   const right = region.right - (scatter ? scatter.ticks.widest / 2 : 0);
-  const maxRotated = (region.bottom - region.top) * CATEGORY_LABEL_MAX_SHARE;
-  const layout = tiers ? tierLayout(tiers, (right - left) / count, false, maxRotated) : null;
+  const max_rotated = (region.bottom - region.top) * CATEGORY_LABEL_MAX_SHARE;
+  const layout = tiers ? tier_layout(tiers, (right - left) / count, false, max_rotated) : null;
   const plot = {
     left,
     right,
     top: region.top + FONT_SIZE / 2,
-    bottom: region.bottom - (layout ? tierExtent(layout) : LINE_HEIGHT + AXIS_LABEL_GAP),
+    bottom: region.bottom - (layout ? tier_extent(layout) : LINE_HEIGHT + AXIS_LABEL_GAP),
   };
   if (plot.right - plot.left < MIN_PLOT_SIZE || plot.bottom - plot.top < MIN_PLOT_SIZE) return;
 
   const axis = { scale: value.scale, start: plot.bottom, end: plot.top };
-  drawValueAxis(context, axis, plot, true, value.labels, LINE_HEIGHT);
+  draw_value_axis(context, axis, plot, true, value.labels, LINE_HEIGHT);
 
   if (kind === "column") {
-    drawBars(context, axis, plot, false);
+    draw_bars(context, axis, plot, false);
   } else if (scatter) {
-    drawScatter(context, axis, plot, scatter);
+    draw_scatter(context, axis, plot, scatter);
   } else {
     const band = (plot.right - plot.left) / Math.max(1, count);
     const plotted = series.map((entry) => ({
       xs: entry.values.map((_, index) => plot.left + (index + 0.5) * band),
       values: entry.values,
     }));
-    drawLines(context, axis, plot, plotted, kind === "area");
+    draw_lines(context, axis, plot, plotted, kind === "area");
   }
 
-  drawBaseline(context, plot, baselinePixel(axis), false);
-  if (tiers && layout) drawCategoryTiers(context, tiers, layout, plot, false);
-  else drawCategoryLabels(context, labels, plot, false, 0);
+  draw_baseline(context, plot, baseline_pixel(axis), false);
+  if (tiers && layout) draw_category_tiers(context, tiers, layout, plot, false);
+  else draw_category_labels(context, labels, plot, false, 0);
 }
 
 /** The x values of a scatter chart and the ticks of its horizontal value axis. */
@@ -1163,8 +1165,12 @@ interface ScatterX {
 }
 
 /** Scatter x ticks for a plot that starts at `left` and leaves half the last label before `right`. */
-function scatterXTicks(series: readonly ChartSeriesView[], right: number, left: number): ScatterX {
-  const values = series.map(scatterXs);
+function scatter_x_ticks(
+  series: readonly ChartSeriesView[],
+  right: number,
+  left: number,
+): ScatterX {
+  const values = series.map(scatter_xs);
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   for (const value of values.flat()) {
@@ -1173,20 +1179,20 @@ function scatterXTicks(series: readonly ChartSeriesView[], right: number, left: 
     max = Math.max(max, value);
   }
 
-  const format = scatterXFormat(series);
+  const format = scatter_x_format(series);
   const locale = series[0]?.numberLocale ?? null;
-  const ticks = horizontalValueTicks(
+  const ticks = horizontal_value_ticks(
     min,
     max,
-    (tick) => formatValue(tick, format, locale),
+    (tick) => format_value(tick, format, locale),
     (widest) => right - widest / 2 - left,
   );
   return { values, ticks };
 }
 
-function drawScatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): void {
-  const xAxis = { scale: x.ticks.scale, start: plot.left, end: plot.right };
-  const stride = labelStride(xAxis, x.ticks.widest + AXIS_LABEL_GAP);
+function draw_scatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): void {
+  const x_axis = { scale: x.ticks.scale, start: plot.left, end: plot.right };
+  const stride = label_stride(x_axis, x.ticks.widest + AXIS_LABEL_GAP);
   const group = context.svg.element(
     "g",
     { class: "sheetwrite-chart-category-axis", "font-size": FONT_SIZE },
@@ -1196,19 +1202,19 @@ function drawScatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): 
   // edge, so a first x label centered on that corner would run into it. As
   // other chart libraries do, the first x label starts at the plot's left
   // edge instead, and is left out when that would reach the next x label.
-  const ticks = xAxis.scale.ticks;
-  const nextTick = ticks[stride];
-  const nextLeft =
-    nextTick === undefined
+  const ticks = x_axis.scale.ticks;
+  const next_tick = ticks[stride];
+  const next_left =
+    next_tick === undefined
       ? Number.POSITIVE_INFINITY
-      : axisPixel(xAxis, nextTick) - textWidth(x.ticks.labels[stride] ?? "") / 2;
-  const firstFits = plot.left + textWidth(x.ticks.labels[0] ?? "") + AXIS_LABEL_GAP <= nextLeft;
+      : axis_pixel(x_axis, next_tick) - text_width(x.ticks.labels[stride] ?? "") / 2;
+  const first_fits = plot.left + text_width(x.ticks.labels[0] ?? "") + AXIS_LABEL_GAP <= next_left;
   ticks.forEach((tick, index) => {
-    if (index % stride !== 0 || (index === 0 && !firstFits)) return;
+    if (index % stride !== 0 || (index === 0 && !first_fits)) return;
     context.svg.text(
       x.ticks.labels[index] ?? "",
       {
-        x: index === 0 ? plot.left : axisPixel(xAxis, tick),
+        x: index === 0 ? plot.left : axis_pixel(x_axis, tick),
         y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE,
         "text-anchor": index === 0 ? "start" : "middle",
       },
@@ -1216,17 +1222,17 @@ function drawScatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): 
     );
   });
 
-  const plotted = context.view.series.map((entry, seriesIndex) => ({
-    xs: (x.values[seriesIndex] ?? []).map((value) =>
-      value === null ? Number.NaN : axisPixel(xAxis, value),
+  const plotted = context.view.series.map((entry, series_index) => ({
+    xs: (x.values[series_index] ?? []).map((value) =>
+      value === null ? Number.NaN : axis_pixel(x_axis, value),
     ),
     values: entry.values,
   }));
-  drawPoints(context, axis, plot, plotted);
+  draw_points(context, axis, plot, plotted);
 }
 
 /** The category axis line, drawn at value zero so negative values fall below it. */
-function drawBaseline(context: DrawContext, plot: Box, pixel: number, vertical: boolean): void {
+function draw_baseline(context: DrawContext, plot: Box, pixel: number, vertical: boolean): void {
   const ends = vertical
     ? { x1: pixel, x2: pixel, y1: plot.top, y2: plot.bottom }
     : { x1: plot.left, x2: plot.right, y1: pixel, y2: pixel };
@@ -1237,50 +1243,55 @@ function drawBaseline(context: DrawContext, plot: Box, pixel: number, vertical: 
   );
 }
 
-function polar(centerX: number, centerY: number, radius: number, angle: number): [number, number] {
-  return [centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle)];
+function polar(
+  center_x: number,
+  center_y: number,
+  radius: number,
+  angle: number,
+): [number, number] {
+  return [center_x + radius * Math.cos(angle), center_y + radius * Math.sin(angle)];
 }
 
 /** Path of one slice from `start` to `end` (radians, clockwise from 12 o'clock); `inner > 0` cuts a doughnut hole. */
-function slicePath(
-  centerX: number,
-  centerY: number,
+function slice_path(
+  center_x: number,
+  center_y: number,
   outer: number,
   inner: number,
   start: number,
   end: number,
 ): string {
-  const largeArc = end - start > Math.PI ? 1 : 0;
-  const [outerStartX, outerStartY] = polar(centerX, centerY, outer, start);
-  const [outerEndX, outerEndY] = polar(centerX, centerY, outer, end);
-  const outerArc = `M${outerStartX} ${outerStartY}A${outer} ${outer} 0 ${largeArc} 1 ${outerEndX} ${outerEndY}`;
+  const large_arc = end - start > Math.PI ? 1 : 0;
+  const [outer_start_x, outer_start_y] = polar(center_x, center_y, outer, start);
+  const [outer_end_x, outer_end_y] = polar(center_x, center_y, outer, end);
+  const outer_arc = `M${outer_start_x} ${outer_start_y}A${outer} ${outer} 0 ${large_arc} 1 ${outer_end_x} ${outer_end_y}`;
 
-  if (inner <= 0) return `${outerArc}L${centerX} ${centerY}Z`;
+  if (inner <= 0) return `${outer_arc}L${center_x} ${center_y}Z`;
 
-  const [innerEndX, innerEndY] = polar(centerX, centerY, inner, end);
-  const [innerStartX, innerStartY] = polar(centerX, centerY, inner, start);
-  return `${outerArc}L${innerEndX} ${innerEndY}A${inner} ${inner} 0 ${largeArc} 0 ${innerStartX} ${innerStartY}Z`;
+  const [inner_end_x, inner_end_y] = polar(center_x, center_y, inner, end);
+  const [inner_start_x, inner_start_y] = polar(center_x, center_y, inner, start);
+  return `${outer_arc}L${inner_end_x} ${inner_end_y}A${inner} ${inner} 0 ${large_arc} 0 ${inner_start_x} ${inner_start_y}Z`;
 }
 
 /** A full ring: an arc cannot start and end at one point, so a single slice is two circles. */
-function ringPath(centerX: number, centerY: number, outer: number, inner: number): string {
+function ring_path(center_x: number, center_y: number, outer: number, inner: number): string {
   const circle = (radius: number) =>
-    `M${centerX - radius} ${centerY}a${radius} ${radius} 0 1 0 ${radius * 2} 0a${radius} ${radius} 0 1 0 ${-radius * 2} 0Z`;
+    `M${center_x - radius} ${center_y}a${radius} ${radius} 0 1 0 ${radius * 2} 0a${radius} ${radius} 0 1 0 ${-radius * 2} 0Z`;
   return inner > 0 ? `${circle(outer)}${circle(inner)}` : circle(outer);
 }
 
-function drawPie(context: DrawContext, box: Box): void {
+function draw_pie(context: DrawContext, box: Box): void {
   const first = context.view.series[0];
   if (!first) return;
 
   const radius = Math.min(box.right - box.left, box.bottom - box.top) / 2;
   if (radius * 2 < MIN_PLOT_SIZE) return;
 
-  const centerX = (box.left + box.right) / 2;
-  const centerY = (box.top + box.bottom) / 2;
+  const center_x = (box.left + box.right) / 2;
+  const center_y = (box.top + box.bottom) / 2;
   const inner = context.view.chart.kind === "doughnut" ? radius * DOUGHNUT_HOLE_SHARE : 0;
-  const labels = categoryLabels([first], first.values.length);
-  const showsNames = context.view.chart.legend === "none";
+  const labels = category_labels([first], first.values.length);
+  const shows_names = context.view.chart.legend === "none";
 
   // Excel draws a negative slice by its size, so the sign does not remove it.
   const magnitudes = first.values.map((value) => (value === null ? 0 : Math.abs(value)));
@@ -1288,7 +1299,7 @@ function drawPie(context: DrawContext, box: Box): void {
   if (total <= 0) return;
 
   const group = context.svg.element("g", { class: "sheetwrite-chart-series" }, context.root);
-  const labelGroup = context.svg.element(
+  const label_group = context.svg.element(
     "g",
     {
       class: "sheetwrite-chart-slice-labels",
@@ -1307,15 +1318,15 @@ function drawPie(context: DrawContext, box: Box): void {
     if (magnitude === 0) return;
 
     const sweep = (magnitude / total) * Math.PI * 2;
-    const isWhole = magnitude === total;
+    const is_whole = magnitude === total;
     context.svg.element(
       "path",
       {
         class: "sheetwrite-chart-slice",
-        d: isWhole
-          ? ringPath(centerX, centerY, radius, inner)
-          : slicePath(centerX, centerY, radius, inner, angle, angle + sweep),
-        fill: seriesColor(index),
+        d: is_whole
+          ? ring_path(center_x, center_y, radius, inner)
+          : slice_path(center_x, center_y, radius, inner, angle, angle + sweep),
+        fill: series_color(index),
         "fill-rule": "evenodd",
         stroke: BACKGROUND_COLOR,
       },
@@ -1323,13 +1334,13 @@ function drawPie(context: DrawContext, box: Box): void {
     );
 
     if (sweep >= MIN_LABELED_SLICE_ANGLE) {
-      const labelRadius = inner > 0 ? (radius + inner) / 2 : radius * PIE_LABEL_RADIUS_SHARE;
-      const [x, y] = isWhole
-        ? [centerX, centerY - labelRadius]
-        : polar(centerX, centerY, labelRadius, angle + sweep / 2);
+      const label_radius = inner > 0 ? (radius + inner) / 2 : radius * PIE_LABEL_RADIUS_SHARE;
+      const [x, y] = is_whole
+        ? [center_x, center_y - label_radius]
+        : polar(center_x, center_y, label_radius, angle + sweep / 2);
       const percent = formatNumber(magnitude / total, PERCENT_FORMAT);
       const name = labels[index] ?? "";
-      context.svg.text(showsNames && name ? `${name} ${percent}` : percent, { x, y }, labelGroup);
+      context.svg.text(shows_names && name ? `${name} ${percent}` : percent, { x, y }, label_group);
     }
 
     angle += sweep;
@@ -1374,8 +1385,8 @@ export function renderChartSvg(
     style: "font: var(--sheetwrite-font); overflow: hidden",
   });
 
-  svg.element("title", {}, root).textContent = chartName(view);
-  svg.element("desc", {}, root).textContent = chartDescription(view);
+  svg.element("title", {}, root).textContent = chart_name(view);
+  svg.element("desc", {}, root).textContent = chart_description(view);
 
   const context: DrawContext = { svg, root, view };
   let box: Box = {
@@ -1384,12 +1395,12 @@ export function renderChartSvg(
     right: width - OUTER_PADDING,
     bottom: height - OUTER_PADDING,
   };
-  box = drawTitle(context, box);
-  box = drawNotes(context, box);
-  box = drawLegend(context, box);
+  box = draw_title(context, box);
+  box = draw_notes(context, box);
+  box = draw_legend(context, box);
 
-  if (isRound(view.chart.kind)) drawPie(context, box);
-  else drawCartesian(context, box);
+  if (is_round(view.chart.kind)) draw_pie(context, box);
+  else draw_cartesian(context, box);
 
   return root;
 }

@@ -41,7 +41,7 @@ const TAX_RATE: FormulaFunctionMetadata = {
 const EU_RATE = 0.2;
 const OTHER_RATE = 0.07;
 
-function taxRate(region: FormulaArgument): number {
+function tax_rate(region: FormulaArgument): number {
   return region === "EU" ? EU_RATE : OTHER_RATE;
 }
 
@@ -56,17 +56,17 @@ function define(meta: FormulaFunctionMetadata, implementation: FormulaFunction) 
 /** Every grid of the page gets this function from `initSheetwrite`. */
 const PAGE_FUNCTION = define(metadata("PAGEID"), () => 7);
 
-function setFormula(store: Store, row: number, col: number, src: string): void {
+function set_formula(store: Store, row: number, col: number, src: string): void {
   store.applyTransaction({
     patches: [{ op: "set", addr: address(row, col), value: { kind: "formula", src } }],
   });
 }
 
-let restoreCanvas: () => void;
+let restore_canvas: () => void;
 const grids: Grid[] = [];
 
 /** A grid created with grid-specific `functions`. */
-function gridWith(functions: readonly FormulaFunctionDefinition[], rows = 4): Grid {
+function grid_with(functions: readonly FormulaFunctionDefinition[], rows = 4): Grid {
   const host = document.createElement("div");
   document.body.append(host);
   const grid = createGrid(host, {
@@ -83,24 +83,24 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  restoreCanvas = installCanvasTestStubs();
+  restore_canvas = installCanvasTestStubs();
 });
 
 afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
   document.body.replaceChildren();
-  restoreCanvas();
+  restore_canvas();
 });
 
 describe("host formula functions", () => {
   it("apply init functions to every grid, and grid-specific functions, which win by name, to their grid only", () => {
-    const taxed = gridWith([define(TAX_RATE, taxRate)]).store;
-    const plain = gridWith([]).store;
-    const replaced = gridWith([define(metadata("PAGEID"), () => 8)]).store;
+    const taxed = grid_with([define(TAX_RATE, tax_rate)]).store;
+    const plain = grid_with([]).store;
+    const replaced = grid_with([define(metadata("PAGEID"), () => 8)]).store;
 
     for (const store of [taxed, plain, replaced]) {
-      setFormula(store, 0, 0, "=PAGEID()");
-      setFormula(store, 0, 1, '=TAXRATE("EU")');
+      set_formula(store, 0, 0, "=PAGEID()");
+      set_formula(store, 0, 1, '=TAXRATE("EU")');
     }
 
     expect([taxed, plain, replaced].map((store) => store.getCell(address(0, 0)).resolved)).toEqual([
@@ -117,7 +117,7 @@ describe("host formula functions", () => {
       return typeof value === "number" ? value : 0;
     });
     const rows = 20;
-    const grid = gridWith([seen], rows);
+    const grid = grid_with([seen], rows);
     const links = (first: number, extra: number[] = []): ExternalLink[] => [
       {
         book: "Budget.xlsx",
@@ -136,7 +136,7 @@ describe("host formula functions", () => {
     ];
     grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: links(100) }] });
     for (let row = 0; row < rows; row += 1) {
-      setFormula(grid.store, row, 0, `=SEEN([Budget.xlsx]Annual!A${row + 1})`);
+      set_formula(grid.store, row, 0, `=SEEN([Budget.xlsx]Annual!A${row + 1})`);
     }
 
     calls = 0;
@@ -152,11 +152,11 @@ describe("host formula functions", () => {
   });
 
   it("calculate with their inputs, survive memory release, and leave only formula text in snapshots", async () => {
-    const store = gridWith([define(TAX_RATE, taxRate)]).store;
+    const store = grid_with([define(TAX_RATE, tax_rate)]).store;
     store.applyTransaction({
       patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: "EU" } }],
     });
-    setFormula(store, 0, 1, "=taxrate(A1)*100");
+    set_formula(store, 0, 1, "=taxrate(A1)*100");
     expect(store.getCell(address(0, 1)).resolved).toBe(EU_RATE * 100);
 
     await releaseEngineMemory();
@@ -178,18 +178,18 @@ describe("host formula functions", () => {
 
   it("keep calculated values and send no change event across a memory release", async () => {
     let draws = 0;
-    const store = gridWith([
+    const store = grid_with([
       define({ ...metadata("DRAW"), volatile: true }, () => {
         draws += 1;
         return draws;
       }),
-      define(TAX_RATE, taxRate),
+      define(TAX_RATE, tax_rate),
     ]).store;
-    setFormula(store, 0, 0, "=DRAW()");
-    setFormula(store, 0, 1, "=NOW()");
-    setFormula(store, 0, 2, '=TAXRATE("EU")');
+    set_formula(store, 0, 0, "=DRAW()");
+    set_formula(store, 0, 1, "=NOW()");
+    set_formula(store, 0, 2, '=TAXRATE("EU")');
     const before = Array.from(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2]).values);
-    const drawsBefore = draws;
+    const draws_before = draws;
     let changes = 0;
     const unsubscribe = store.on("change", () => {
       changes += 1;
@@ -200,17 +200,17 @@ describe("host formula functions", () => {
 
     const after = Array.from(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2]).values);
     expect(after).toEqual(before);
-    expect(draws).toBe(drawsBefore);
+    expect(draws).toBe(draws_before);
     expect(changes).toBe(0);
 
     // The replacement store still calls the volatile function on the next edit.
-    setFormula(store, 1, 0, "=1");
-    expect(store.getCell(address(0, 0)).resolved).toBe(drawsBefore + 1);
+    set_formula(store, 1, 0, "=1");
+    expect(store.getCell(address(0, 0)).resolved).toBe(draws_before + 1);
   });
 
   it("receive blocks as row arrays and turn failures into #VALUE!", () => {
     const received: (readonly FormulaArgument[])[] = [];
-    const store = gridWith([
+    const store = grid_with([
       define(metadata("ECHO"), (...values) => {
         received.push(values);
         return values.length;
@@ -231,10 +231,10 @@ describe("host formula functions", () => {
       ],
     });
 
-    setFormula(store, 2, 0, "=ECHO(A1:B2,A1,,1/0)");
-    setFormula(store, 2, 1, '=ECHO(A1:B2,A1,,"x")');
-    setFormula(store, 3, 0, "=FAIL()");
-    setFormula(store, 3, 1, "=LATER()");
+    set_formula(store, 2, 0, "=ECHO(A1:B2,A1,,1/0)");
+    set_formula(store, 2, 1, '=ECHO(A1:B2,A1,,"x")');
+    set_formula(store, 3, 0, "=FAIL()");
+    set_formula(store, 3, 1, "=LATER()");
 
     expect(store.getCell(address(2, 0)).resolved).toBe("#DIV/0!");
     expect(store.getCell(address(2, 1)).resolved).toBe(4);
@@ -252,7 +252,7 @@ describe("host formula functions", () => {
   });
 
   it("list built-in and host metadata in one list and refuse names that are not free", async () => {
-    const store = gridWith([define(TAX_RATE, taxRate)], 2).store;
+    const store = grid_with([define(TAX_RATE, tax_rate)], 2).store;
 
     const functions = await listFunctions(store);
     const names = functions.map((entry) => entry.name);
@@ -303,7 +303,7 @@ describe("host formula functions", () => {
 
   it("refuse store reads and changes during a call and leave the store usable", () => {
     const refusals: unknown[] = [];
-    const recordRefusal = (use: () => void): number => {
+    const record_refusal = (use: () => void): number => {
       try {
         use();
       } catch (error) {
@@ -314,15 +314,15 @@ describe("host formula functions", () => {
     };
     // The functions only run after the grid exists, so they read it through this binding.
     let store: Store | undefined;
-    const liveStore = (): Store => {
+    const live_store = (): Store => {
       if (store === undefined) throw new Error("the grid is not created yet");
       return store;
     };
-    store = gridWith([
-      define(metadata("PEEK"), () => recordRefusal(() => liveStore().getCell(address(0, 0)))),
+    store = grid_with([
+      define(metadata("PEEK"), () => record_refusal(() => live_store().getCell(address(0, 0)))),
       define(metadata("POKE"), () =>
-        recordRefusal(() =>
-          liveStore().applyTransaction({
+        record_refusal(() =>
+          live_store().applyTransaction({
             patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 99 } }],
           }),
         ),
@@ -332,8 +332,8 @@ describe("host formula functions", () => {
       patches: [{ op: "set", addr: address(0, 0), value: { kind: "literal", value: 5 } }],
     });
 
-    setFormula(store, 1, 0, "=PEEK()");
-    setFormula(store, 1, 1, "=POKE()");
+    set_formula(store, 1, 0, "=PEEK()");
+    set_formula(store, 1, 1, "=POKE()");
 
     expect(store.getCell(address(1, 0)).resolved).toBe("#VALUE!");
     expect(store.getCell(address(1, 1)).resolved).toBe("#VALUE!");
@@ -352,36 +352,36 @@ describe("host formula functions", () => {
     } finally {
       restored.dispose();
     }
-    setFormula(store, 2, 0, "=A1*2");
+    set_formula(store, 2, 0, "=A1*2");
     expect(store.getCell(address(2, 0)).resolved).toBe(10);
   });
 
   it("stay on the live engine store when a memory release aborts", async () => {
-    const store = gridWith([
-      define(TAX_RATE, taxRate),
+    const store = grid_with([
+      define(TAX_RATE, tax_rate),
       define(metadata("TWICE"), (value) => Number(value) * 2),
     ]).store;
     const failing = new SheetwriteStore(makeWorkbook(1));
-    const failingEngine = storeEngine(failing);
-    if (failingEngine === null) throw new Error("store has no engine");
-    const prepare = failingEngine.prepareMemoryRelease.bind(failingEngine);
+    const failing_engine = storeEngine(failing);
+    if (failing_engine === null) throw new Error("store has no engine");
+    const prepare = failing_engine.prepareMemoryRelease.bind(failing_engine);
     try {
       // The second store fails after the first one prepared its replacement,
       // so the release aborts and frees that replacement.
-      failingEngine.prepareMemoryRelease = () => {
+      failing_engine.prepareMemoryRelease = () => {
         throw new Error("forced preparation failure");
       };
 
       await expect(releaseEngineMemory()).rejects.toThrow("preparation failed");
 
-      setFormula(store, 0, 0, '=TAXRATE("EU")');
-      setFormula(store, 0, 1, "=TWICE(21)");
+      set_formula(store, 0, 0, '=TAXRATE("EU")');
+      set_formula(store, 0, 1, "=TWICE(21)");
       expect(store.getCell(address(0, 0)).resolved).toBe(EU_RATE);
       expect(store.getCell(address(0, 1)).resolved).toBe(42);
     } finally {
       // The disposed engine stays listed until it is collected, so later
       // releases in the same process must see its real preparation again.
-      failingEngine.prepareMemoryRelease = prepare;
+      failing_engine.prepareMemoryRelease = prepare;
       failing.dispose();
     }
   });

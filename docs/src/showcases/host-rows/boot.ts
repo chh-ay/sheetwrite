@@ -63,10 +63,10 @@ export async function startAccountsGrid(
   handlers: AccountsHandlers,
 ): Promise<AccountsGrid> {
   await initSheetwrite();
-  let nextId = INITIAL_ACCOUNTS.length + 1;
-  let denyNext = false;
-  let serverResponses = 0;
-  let applyingServerResult = false;
+  let next_id = INITIAL_ACCOUNTS.length + 1;
+  let deny_next = false;
+  let server_responses = 0;
+  let applying_server_result = false;
 
   const input = createSimpleGridInput({
     columns: ACCOUNT_COLUMNS,
@@ -89,7 +89,7 @@ export async function startAccountsGrid(
     columns: ACCOUNT_COLUMNS,
     defaultRows: INITIAL_ACCOUNTS,
     getRowId: (row) => row.id,
-    createRowId: () => `account-${String(nextId++).padStart(3, "0")}`,
+    createRowId: () => `account-${String(next_id++).padStart(3, "0")}`,
   });
 
   const controller = createGridController(
@@ -99,14 +99,14 @@ export async function startAccountsGrid(
       theme: { ...siteGridTheme(host), rowHeight: ROW_HEIGHT },
       config: GRID_CONFIG,
       protectionResolver: () => {
-        if (!denyNext) return "allow";
-        denyNext = false;
+        if (!deny_next) return "allow";
+        deny_next = false;
         return "deny";
       },
     },
     {
       onRowDelta: (projection) => {
-        if (!applyingServerResult) handlers.onProjection(projection);
+        if (!applying_server_result) handlers.onProjection(projection);
       },
       onMutationRejected: () =>
         handlers.onProjection(
@@ -122,14 +122,14 @@ export async function startAccountsGrid(
   const grid = controller.grid;
   // The grid paints with resolved colors, so it re-reads the site tokens when
   // the page theme changes.
-  const stopTheme = observeSiteTheme(() =>
+  const stop_theme = observeSiteTheme(() =>
     controller.setTheme({ ...siteGridTheme(host), rowHeight: ROW_HEIGHT }),
   );
 
   return {
     grid,
     rejectNextEdit() {
-      denyNext = true;
+      deny_next = true;
       grid.applyTransaction({
         patches: [
           {
@@ -144,33 +144,33 @@ export async function startAccountsGrid(
       // The server accepts the host's request in a normalized form. The Grid
       // must show the stored result, so apply it first and report it to the
       // host once, as the transformed acceptance, not also as a remote change.
-      applyingServerResult = true;
+      applying_server_result = true;
       let applied = false;
       try {
         applied = grid.applyRemoteOperations(SERVER_NORMALIZED_OPERATIONS).status === "applied";
       } finally {
-        applyingServerResult = false;
+        applying_server_result = false;
       }
       if (!applied) return;
       handlers.onProjection(
         bridge.reconcile({
           status: "transformed",
-          transactionId: `server-normalized-${serverResponses++}`,
+          transactionId: `server-normalized-${server_responses++}`,
           operations: SERVER_NORMALIZED_OPERATIONS,
           requestedOperations: REQUESTED_OPERATIONS,
         }),
       );
     },
-    importLeads(startRow) {
+    importLeads(start_row) {
       const started = performance.now();
-      grid.insertRows(startRow, LEAD_IMPORT_ROWS);
-      const insertMs = performance.now() - started;
-      const loadStarted = performance.now();
+      grid.insertRows(start_row, LEAD_IMPORT_ROWS);
+      const insert_ms = performance.now() - started;
+      const load_started = performance.now();
       let batches = 0;
       for (let offset = 0; offset < LEAD_IMPORT_ROWS; offset += LEAD_LOAD_BATCH_ROWS) {
-        const rowCount = Math.min(LEAD_LOAD_BATCH_ROWS, LEAD_IMPORT_ROWS - offset);
+        const row_count = Math.min(LEAD_LOAD_BATCH_ROWS, LEAD_IMPORT_ROWS - offset);
         const patches: DocumentOp[] = [];
-        for (let index = 0; index < rowCount; index++) {
+        for (let index = 0; index < row_count; index++) {
           const lead = offset + index;
           const values = [
             revenueAccountName(lead + INITIAL_ACCOUNTS.length),
@@ -184,7 +184,7 @@ export async function startAccountsGrid(
             if (value !== undefined)
               patches.push({
                 op: "set",
-                addr: { sheet: "sheet1", row: startRow + lead, col },
+                addr: { sheet: "sheet1", row: start_row + lead, col },
                 value: { kind: "literal", value },
               });
           }
@@ -192,11 +192,11 @@ export async function startAccountsGrid(
         grid.applyTransaction({ patches });
         batches++;
       }
-      grid.scrollToCell({ sheet: "sheet1", row: startRow, col: 0 });
-      return { insertMs, loadMs: performance.now() - loadStarted, batches };
+      grid.scrollToCell({ sheet: "sheet1", row: start_row, col: 0 });
+      return { insertMs: insert_ms, loadMs: performance.now() - load_started, batches };
     },
     dispose() {
-      stopTheme();
+      stop_theme();
       controller.destroy();
     },
   };

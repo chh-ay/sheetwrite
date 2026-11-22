@@ -2,18 +2,18 @@ import { resolve, sep } from "node:path";
 
 import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 
-const repositoryRoot = resolve(import.meta.dir, "..");
-const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
+const repository_root = resolve(import.meta.dir, "..");
+const output_root = resolve(repository_root, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 const LOCAL_VERCEL_SCRIPTS = new Set([
   "/_vercel/insights/script.js",
   "/_vercel/speed-insights/script.js",
 ]);
 
-function outputPath(pathname: string): string | null {
+function output_path(pathname: string): string | null {
   const relative = pathname.replace(/^\/+/, "");
-  const candidate = resolve(outputRoot, relative.endsWith("/") ? relative : relative || ".");
-  if (candidate !== outputRoot && !candidate.startsWith(`${outputRoot}${sep}`)) return null;
+  const candidate = resolve(output_root, relative.endsWith("/") ? relative : relative || ".");
+  if (candidate !== output_root && !candidate.startsWith(`${output_root}${sep}`)) return null;
   return relative === "" || relative.endsWith("/") ? resolve(candidate, "index.html") : candidate;
 }
 
@@ -35,20 +35,20 @@ const server = Bun.serve({
       return new Response(null, { status: 308, headers: { location: moved } });
     }
     // Same trailing-slash redirect as the deployment config.
-    const page = pathname.endsWith("/") ? null : outputPath(route);
+    const page = pathname.endsWith("/") ? null : output_path(route);
     if (page !== null && (await Bun.file(page).exists())) {
       return new Response(null, {
         status: 308,
         headers: { location: `${url.pathname}/${url.search}` },
       });
     }
-    const candidate = outputPath(pathname);
+    const candidate = output_path(pathname);
     if (candidate !== null) {
       const file = Bun.file(candidate);
       if (await file.exists()) return new Response(file);
     }
-    const notFound = Bun.file(resolve(outputRoot, "404.html"));
-    return new Response((await notFound.exists()) ? await notFound.arrayBuffer() : "Not found", {
+    const not_found = Bun.file(resolve(output_root, "404.html"));
+    return new Response((await not_found.exists()) ? await not_found.arrayBuffer() : "Not found", {
       status: 404,
       headers: { "content-type": "text/html; charset=utf-8" },
     });

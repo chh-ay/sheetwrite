@@ -36,35 +36,35 @@ const snapshot: WorkbookSnapshot = {
   ],
 };
 
-async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElement) {
+async function exercise_collaboration(host_a: HTMLDivElement, host_b: HTMLDivElement) {
   await initSheetwrite();
   const server = new ShowcaseCollaborationServer(snapshot);
-  const gridA = createGridFromSnapshot(hostA, snapshot);
-  const gridB = createGridFromSnapshot(hostB, snapshot);
-  let nextMutation = 1;
-  const syncA = new SyncCoordinator(gridA, server, {
+  const grid_a = createGridFromSnapshot(host_a, snapshot);
+  const grid_b = createGridFromSnapshot(host_b, snapshot);
+  let next_mutation = 1;
+  const sync_a = new SyncCoordinator(grid_a, server, {
     documentId: "browser-collaboration",
     serverVersion: 0,
-    createMutationId: () => `browser-a-${nextMutation++}`,
+    createMutationId: () => `browser-a-${next_mutation++}`,
   });
-  const syncB = new SyncCoordinator(gridB, server, {
+  const sync_b = new SyncCoordinator(grid_b, server, {
     documentId: "browser-collaboration",
     serverVersion: 0,
   });
-  const presenceBus = new ShowcasePresenceBus();
-  const presenceA = new PresenceCoordinator(gridA, presenceBus.endpoint(), {
+  const presence_bus = new ShowcasePresenceBus();
+  const presence_a = new PresenceCoordinator(grid_a, presence_bus.endpoint(), {
     actor: { id: "actor-a", displayName: "Actor A", color: "#dc2626" },
     heartbeatMs: 0,
   });
-  const presenceB = new PresenceCoordinator(gridB, presenceBus.endpoint(), {
+  const presence_b = new PresenceCoordinator(grid_b, presence_bus.endpoint(), {
     actor: { id: "actor-b", displayName: "Actor B", color: "#2563eb" },
     heartbeatMs: 0,
   });
 
   try {
-    syncA.subscribe(server);
-    syncB.subscribe(server);
-    gridA.applyTransaction({
+    sync_a.subscribe(server);
+    sync_b.subscribe(server);
+    grid_a.applyTransaction({
       patches: [
         {
           op: "set",
@@ -73,8 +73,8 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
         },
       ],
     });
-    await syncA.sendNext();
-    gridA.applyTransaction({
+    await sync_a.sendNext();
+    grid_a.applyTransaction({
       patches: [
         {
           op: "set",
@@ -83,26 +83,26 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
         },
       ],
     });
-    await syncA.sendNext();
-    gridA.renameSheet("s1", "Shared");
-    await syncA.sendNext();
+    await sync_a.sendNext();
+    grid_a.renameSheet("s1", "Shared");
+    await sync_a.sendNext();
 
-    const literal = gridB.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved;
-    const formula = gridB.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved;
-    const sheetName = gridB.store.getWorkbook().sheets[0]?.name;
-    if (literal !== 21 || formula !== 42 || sheetName !== "Shared") {
+    const literal = grid_b.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved;
+    const formula = grid_b.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved;
+    const sheet_name = grid_b.store.getWorkbook().sheets[0]?.name;
+    if (literal !== 21 || formula !== 42 || sheet_name !== "Shared") {
       throw new Error("Two-grid server sequencing did not converge cell/formula/metadata state");
     }
 
-    gridA.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
-    await presenceA.publishNow();
-    gridB.refresh();
-    const presenceRects = hostB.querySelectorAll('[data-sheetwrite-presence="actor-a"]');
-    if (presenceRects.length === 0) throw new Error("Remote presence overlay was not painted");
+    grid_a.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
+    await presence_a.publishNow();
+    grid_b.refresh();
+    const presence_rects = host_b.querySelectorAll('[data-sheetwrite-presence="actor-a"]');
+    if (presence_rects.length === 0) throw new Error("Remote presence overlay was not painted");
 
-    const databaseName = "sheetwrite-browser-collaboration-test";
-    await deleteShowcaseDatabase(databaseName);
-    const durable = new IndexedDbPendingCommitStorage({ databaseName });
+    const database_name = "sheetwrite-browser-collaboration-test";
+    await deleteShowcaseDatabase(database_name);
+    const durable = new IndexedDbPendingCommitStorage({ databaseName: database_name });
     const pending: PendingCommit = {
       documentId: "browser-collaboration",
       baseVersion: 3,
@@ -118,7 +118,7 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
     await durable.put(pending);
     durable.close();
     await Promise.resolve();
-    const reopened = new IndexedDbPendingCommitStorage({ databaseName });
+    const reopened = new IndexedDbPendingCommitStorage({ databaseName: database_name });
     try {
       const restored = await reopened.load("browser-collaboration", PENDING_LOAD_BOUNDS);
       if (restored.length !== 1 || restored[0]?.clientMutationId !== "durable-browser-m1") {
@@ -131,47 +131,48 @@ async function exerciseCollaboration(hostA: HTMLDivElement, hostB: HTMLDivElemen
       return {
         literal,
         formula,
-        sheetName,
-        presenceRects: presenceRects.length,
+        sheetName: sheet_name,
+        presenceRects: presence_rects.length,
         restoredMutation: restored[0]?.clientMutationId,
-        version: syncB.serverVersion,
+        version: sync_b.serverVersion,
       };
     } finally {
       reopened.close();
     }
   } finally {
-    presenceA.destroy();
-    presenceB.destroy();
-    syncA.destroy();
-    syncB.destroy();
-    gridA.destroy();
-    gridB.destroy();
+    presence_a.destroy();
+    presence_b.destroy();
+    sync_a.destroy();
+    sync_b.destroy();
+    grid_a.destroy();
+    grid_b.destroy();
   }
 }
 
 export function CollaborationFixture() {
-  let hostA: HTMLDivElement | undefined;
-  let hostB: HTMLDivElement | undefined;
-  const [result, setResult] = createSignal<{ status: "running" | "ready" | "error"; text: string }>(
-    {
-      status: "running",
-      text: "running",
-    },
-  );
+  let host_a: HTMLDivElement | undefined;
+  let host_b: HTMLDivElement | undefined;
+  const [result, set_result] = createSignal<{
+    status: "running" | "ready" | "error";
+    text: string;
+  }>({
+    status: "running",
+    text: "running",
+  });
 
   onMount(() => {
-    if (hostA === undefined || hostB === undefined) return;
+    if (host_a === undefined || host_b === undefined) return;
     let cancelled = false;
     onCleanup(() => {
       cancelled = true;
     });
-    void exerciseCollaboration(hostA, hostB).then(
+    void exercise_collaboration(host_a, host_b).then(
       (payload) => {
-        if (!cancelled) setResult({ status: "ready", text: JSON.stringify(payload) });
+        if (!cancelled) set_result({ status: "ready", text: JSON.stringify(payload) });
       },
       (error: unknown) => {
         if (!cancelled) {
-          setResult({
+          set_result({
             status: "error",
             text: error instanceof Error ? (error.stack ?? error.message) : String(error),
           });
@@ -187,13 +188,13 @@ export function CollaborationFixture() {
       </pre>
       <div
         ref={(element) => {
-          hostA = element;
+          host_a = element;
         }}
         style={GRID_HOST_STYLE}
       />
       <div
         ref={(element) => {
-          hostB = element;
+          host_b = element;
         }}
         style={GRID_HOST_STYLE}
       />

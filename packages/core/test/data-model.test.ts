@@ -22,11 +22,11 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
 const columns = (count: number): Column[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -41,12 +41,12 @@ const table = (
   id: string,
   sheet: string,
   col: number,
-  columnIds: [string, string],
+  column_ids: [string, string],
 ): WorkbookTable => ({
   id,
   name: id,
   range: { sheet, start: { row: 0, col }, end: { row: 4, col: col + 1 } },
-  columns: columnIds.map((columnId) => ({ id: columnId, name: columnId })),
+  columns: column_ids.map((column_id) => ({ id: column_id, name: column_id })),
   headerRow: true,
   totalsRow: false,
 });
@@ -69,13 +69,13 @@ const workbook = (): Workbook => ({
   ],
 });
 
-const ordersToCustomers: TableRelationship = {
+const orders_to_customers: TableRelationship = {
   id: "r-orders-customers",
   from: { table: "orders", column: "customer" },
   to: { table: "customers", column: "id" },
 };
 
-const customersToRegions: TableRelationship = {
+const customers_to_regions: TableRelationship = {
   id: "r-customers-regions",
   from: { table: "customers", column: "region" },
   to: { table: "regions", column: "code" },
@@ -96,7 +96,7 @@ const snapshot = (relationships: TableRelationship[]): WorkbookSnapshot => ({
 });
 
 const grids: Grid[] = [];
-const mountGrid = (): Grid => {
+const mount_grid = (): Grid => {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGrid(host, { workbook: workbook() });
@@ -107,7 +107,7 @@ afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
 });
 
-const revenueMeasure = {
+const revenue_measure = {
   id: "revenue",
   name: "Revenue",
   table: "orders",
@@ -116,16 +116,16 @@ const revenueMeasure = {
 
 describe("saved measures", () => {
   it("preserves measures through relationship edits, snapshot loading, undo and redo", () => {
-    const grid = mountGrid();
+    const grid = mount_grid();
     const apply = (operation: unknown) =>
       grid.applyTransaction({ patches: [operation as DocumentOp] }).status;
 
-    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
-    expect(apply({ op: "setRelationship", relationship: ordersToCustomers })).toBe("applied");
-    expect(apply({ op: "removeRelationship", id: ordersToCustomers.id })).toBe("applied");
+    expect(apply({ op: "setMeasure", measure: revenue_measure })).toBe("applied");
+    expect(apply({ op: "setRelationship", relationship: orders_to_customers })).toBe("applied");
+    expect(apply({ op: "removeRelationship", id: orders_to_customers.id })).toBe("applied");
     expect(grid.store.getWorkbook().dataModel).toEqual({
       relationships: [],
-      measures: [revenueMeasure],
+      measures: [revenue_measure],
     });
 
     const exported = grid.store.exportSnapshot?.();
@@ -138,33 +138,33 @@ describe("saved measures", () => {
       restored.dispose();
     }
 
-    expect(apply({ op: "removeMeasure", id: revenueMeasure.id })).toBe("applied");
+    expect(apply({ op: "removeMeasure", id: revenue_measure.id })).toBe("applied");
     expect(grid.store.getWorkbook().dataModel).toBeUndefined();
     grid.undo();
-    expect(grid.store.getWorkbook().dataModel?.measures).toEqual([revenueMeasure]);
+    expect(grid.store.getWorkbook().dataModel?.measures).toEqual([revenue_measure]);
     grid.redo();
     expect(grid.store.getWorkbook().dataModel).toBeUndefined();
   });
 
   it("reports a measure's syntax and home table from the saved model on any engine", () => {
-    const grid = mountGrid();
+    const grid = mount_grid();
     const store = grid.store;
     if (!(store instanceof SheetwriteStore)) throw new Error("the grid must use a SheetwriteStore");
-    const broken = { ...revenueMeasure, id: "broken", name: "Broken", formula: "=SUM(" };
-    expect(store.setMeasure(revenueMeasure).status).toBe("applied");
+    const broken = { ...revenue_measure, id: "broken", name: "Broken", formula: "=SUM(" };
+    expect(store.setMeasure(revenue_measure).status).toBe("applied");
     expect(store.setMeasure(broken).status).toBe("applied");
 
-    expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "ok" });
+    expect(store.getMeasureStatus(revenue_measure.id)).toEqual({ status: "ok" });
     expect(store.getMeasureStatus(broken.id)).toEqual({ status: "syntax" });
     expect(store.getMeasureStatus("unknown")).toEqual({ status: "unavailable" });
 
     const removal: DocumentOp = { op: "removeTable", sheet: "data", tableId: "orders" };
     expect(grid.applyTransaction({ patches: [removal] }).status).toBe("applied");
-    expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "missingTable" });
+    expect(store.getMeasureStatus(revenue_measure.id)).toEqual({ status: "missingTable" });
   });
 
   it("renames table, column and measure references in measure formulas, undone in one step", () => {
-    const grid = mountGrid();
+    const grid = mount_grid();
     const apply = (operation: DocumentOp) => grid.applyTransaction({ patches: [operation] }).status;
     const share = {
       id: "share",
@@ -174,10 +174,10 @@ describe("saved measures", () => {
     };
     const formulas = () =>
       grid.store.getWorkbook().dataModel?.measures?.map((measure) => measure.formula);
-    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
+    expect(apply({ op: "setMeasure", measure: revenue_measure })).toBe("applied");
     expect(apply({ op: "setMeasure", measure: share })).toBe("applied");
 
-    const renamedTable: DocumentOp = {
+    const renamed_table: DocumentOp = {
       op: "updateTable",
       sheet: "data",
       tableId: "orders",
@@ -189,13 +189,13 @@ describe("saved measures", () => {
         ],
       },
     };
-    expect(apply(renamedTable)).toBe("applied");
+    expect(apply(renamed_table)).toBe("applied");
     expect(formulas()).toEqual([
       "=SUM(Sales[Net])",
       "=[revenue] / COUNTA(Customers[id]) + Sales[@Net]",
     ]);
 
-    expect(apply({ op: "setMeasure", measure: { ...revenueMeasure, name: "Income" } })).toBe(
+    expect(apply({ op: "setMeasure", measure: { ...revenue_measure, name: "Income" } })).toBe(
       "applied",
     );
     expect(formulas()).toEqual([
@@ -216,14 +216,14 @@ describe("saved measures", () => {
   });
 
   it("validates saved measure names and formulas without parsing them in TypeScript", () => {
-    expect(validateDocumentOperationShape({ op: "setMeasure", measure: revenueMeasure })).toEqual(
+    expect(validateDocumentOperationShape({ op: "setMeasure", measure: revenue_measure })).toEqual(
       [],
     );
     for (const patch of [{ name: "" }, { name: "[Revenue]" }, { formula: "SUM(orders[amount])" }]) {
       expect(
         validateDocumentOperationShape({
           op: "setMeasure",
-          measure: { ...revenueMeasure, ...patch },
+          measure: { ...revenue_measure, ...patch },
         }).length,
       ).toBeGreaterThan(0);
     }
@@ -237,27 +237,27 @@ describe("relationship shape", () => {
       from: { table: "regions", column: "name" },
       to: { table: "orders", column: "customer" },
     };
-    const reversedPair: TableRelationship = {
+    const reversed_pair: TableRelationship = {
       id: "r-customers-orders",
       from: { table: "customers", column: "id" },
       to: { table: "orders", column: "customer" },
     };
-    const selfLink: TableRelationship = {
+    const self_link: TableRelationship = {
       id: "r-self",
       from: { table: "orders", column: "customer" },
       to: { table: "orders", column: "amount" },
     };
 
     for (const relationships of [
-      [ordersToCustomers, customersToRegions, cycle],
-      [ordersToCustomers, reversedPair],
-      [selfLink],
-      [ordersToCustomers, { ...customersToRegions, id: ordersToCustomers.id }],
-      [{ ...ordersToCustomers, to: { table: "customers" } } as TableRelationship],
+      [orders_to_customers, customers_to_regions, cycle],
+      [orders_to_customers, reversed_pair],
+      [self_link],
+      [orders_to_customers, { ...customers_to_regions, id: orders_to_customers.id }],
+      [{ ...orders_to_customers, to: { table: "customers" } } as TableRelationship],
     ]) {
       expect(validateWorkbookSnapshot(snapshot(relationships)).ok).toBe(false);
     }
-    expect(validateWorkbookSnapshot(snapshot([ordersToCustomers, customersToRegions])).ok).toBe(
+    expect(validateWorkbookSnapshot(snapshot([orders_to_customers, customers_to_regions])).ok).toBe(
       true,
     );
   });
@@ -265,12 +265,14 @@ describe("relationship shape", () => {
 
 describe("relationships in the store", () => {
   it("round-trips through a snapshot and drops an empty model", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers, customersToRegions]));
+    const store = SheetwriteStore.fromSnapshot(
+      snapshot([orders_to_customers, customers_to_regions]),
+    );
     const empty = SheetwriteStore.fromSnapshot(snapshot([]));
     try {
-      expect(store.getRelationships()).toEqual([ordersToCustomers, customersToRegions]);
+      expect(store.getRelationships()).toEqual([orders_to_customers, customers_to_regions]);
       expect(store.exportSnapshot().workbook.dataModel).toEqual({
-        relationships: [ordersToCustomers, customersToRegions],
+        relationships: [orders_to_customers, customers_to_regions],
       });
       expect(empty.exportSnapshot().workbook.dataModel).toBeUndefined();
     } finally {
@@ -282,32 +284,36 @@ describe("relationships in the store", () => {
   it("admits a relationship only between existing columns and without a cycle", () => {
     const store = SheetwriteStore.fromSnapshot(snapshot([]));
     try {
-      expect(store.setRelationship(ordersToCustomers).status).toBe("applied");
-      expect(store.setRelationship(customersToRegions).status).toBe("applied");
+      expect(store.setRelationship(orders_to_customers).status).toBe("applied");
+      expect(store.setRelationship(customers_to_regions).status).toBe("applied");
 
-      const missingColumn = {
-        ...ordersToCustomers,
+      const missing_column = {
+        ...orders_to_customers,
         id: "r2",
         to: { table: "regions", column: "x" },
       };
-      const missingTable = { ...ordersToCustomers, id: "r3", to: { table: "gone", column: "id" } };
+      const missing_table = {
+        ...orders_to_customers,
+        id: "r3",
+        to: { table: "gone", column: "id" },
+      };
       const cycle: TableRelationship = {
         id: "r4",
         from: { table: "regions", column: "name" },
         to: { table: "orders", column: "customer" },
       };
-      for (const refused of [missingColumn, missingTable, cycle]) {
+      for (const refused of [missing_column, missing_table, cycle]) {
         expect(store.setRelationship(refused).status).not.toBe("applied");
       }
 
       // Replacing by ID may change the key columns of the same pair.
-      const replaced = { ...ordersToCustomers, from: { table: "orders", column: "amount" } };
+      const replaced = { ...orders_to_customers, from: { table: "orders", column: "amount" } };
       expect(store.setRelationship(replaced).status).toBe("applied");
-      expect(store.getRelationships()).toEqual([replaced, customersToRegions]);
+      expect(store.getRelationships()).toEqual([replaced, customers_to_regions]);
 
       expect(store.removeRelationship("unknown").status).not.toBe("applied");
       expect(store.removeRelationship(replaced.id).status).toBe("applied");
-      expect(store.getRelationships()).toEqual([customersToRegions]);
+      expect(store.getRelationships()).toEqual([customers_to_regions]);
     } finally {
       store.dispose();
     }
@@ -316,9 +322,9 @@ describe("relationships in the store", () => {
 
 describe("relationship history", () => {
   it("keeps a relationship whose table is removed, so undo restores a working model", () => {
-    const grid = mountGrid();
+    const grid = mount_grid();
     grid.applyTransaction({
-      patches: [{ op: "setRelationship", relationship: ordersToCustomers }],
+      patches: [{ op: "setRelationship", relationship: orders_to_customers }],
     });
 
     expect(
@@ -326,7 +332,7 @@ describe("relationship history", () => {
         patches: [{ op: "removeTable", sheet: "data", tableId: "customers" }],
       }).status,
     ).toBe("applied");
-    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([orders_to_customers]);
 
     // A saved relationship to a removed table is valid in a snapshot.
     const exported = grid.store.exportSnapshot?.();
@@ -336,13 +342,13 @@ describe("relationship history", () => {
     grid.undo();
     const tables = grid.store.getWorkbook().sheets[0]?.tables?.map((entry) => entry.id);
     expect(tables).toContain("customers");
-    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([ordersToCustomers]);
+    expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([orders_to_customers]);
   });
 });
 
 describe("relationship collaboration", () => {
   it("conflicts on concurrent model changes and on a removed or changed table", () => {
-    const local: DocumentOp[] = [{ op: "setRelationship", relationship: ordersToCustomers }];
+    const local: DocumentOp[] = [{ op: "setRelationship", relationship: orders_to_customers }];
 
     expect(
       rebaseDocumentOperations(local, [{ op: "addRows", sheet: "data", at: 0, count: 2 }]),
@@ -352,9 +358,9 @@ describe("relationship collaboration", () => {
     ).toEqual({ status: "rebased", operations: local });
 
     for (const remote of [
-      { op: "setRelationship", relationship: customersToRegions },
+      { op: "setRelationship", relationship: customers_to_regions },
       { op: "removeRelationship", id: "anything" },
-      { op: "setMeasure", measure: revenueMeasure },
+      { op: "setMeasure", measure: revenue_measure },
       { op: "removeMeasure", id: "anything" },
       { op: "removeTable", sheet: "data", tableId: "customers" },
       { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
@@ -371,7 +377,7 @@ describe("relationship collaboration", () => {
   });
 
   it("conflicts on a measure write and a concurrent table or column rename, either way", () => {
-    const measure: DocumentOp = { op: "setMeasure", measure: revenueMeasure };
+    const measure: DocumentOp = { op: "setMeasure", measure: revenue_measure };
     const renames: DocumentOp[] = [
       { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
       {
@@ -441,7 +447,7 @@ const orders: SavedQuery = {
   output: { table: "orders-table", tableName: "Orders", anchor: { sheet: "data", row: 0, col: 0 } },
 };
 
-const querySnapshot = (queries: SavedQuery[]): WorkbookSnapshot => ({
+const query_snapshot = (queries: SavedQuery[]): WorkbookSnapshot => ({
   schemaVersion: 1,
   workbook: { activeSheet: "data", queries },
   sheets: [{ id: "data", name: "Data", order: 0, rowCount: 20, columns: columns(6), cells: [] }],
@@ -486,26 +492,26 @@ describe("saved query shape", () => {
       ...customers,
       steps: [{ kind: "join", input: "orders", keys: [["id", "customer"]], join: "inner" }],
     };
-    const sharedTable: SavedQuery = { ...customers, output: orders.output };
+    const shared_table: SavedQuery = { ...customers, output: orders.output };
 
     for (const list of [
       [customers, { ...orders, id: "customers" }],
       [customers, { ...orders, name: "CUSTOMERS" }],
       [orders],
       [loop, orders],
-      [sharedTable, orders],
+      [shared_table, orders],
     ]) {
-      expect(validateWorkbookSnapshot(querySnapshot(list)).ok).toBe(false);
+      expect(validateWorkbookSnapshot(query_snapshot(list)).ok).toBe(false);
     }
 
-    expect(validateWorkbookSnapshot(querySnapshot([customers, orders])).ok).toBe(true);
+    expect(validateWorkbookSnapshot(query_snapshot([customers, orders])).ok).toBe(true);
   });
 });
 
 describe("saved queries in the store", () => {
   it("round-trips through a snapshot and drops an empty list", () => {
-    const store = SheetwriteStore.fromSnapshot(querySnapshot([customers, orders]));
-    const empty = SheetwriteStore.fromSnapshot(querySnapshot([]));
+    const store = SheetwriteStore.fromSnapshot(query_snapshot([customers, orders]));
+    const empty = SheetwriteStore.fromSnapshot(query_snapshot([]));
     try {
       expect(store.exportSnapshot().workbook.queries).toEqual([customers, orders]);
       expect(empty.exportSnapshot().workbook.queries).toBeUndefined();
@@ -537,7 +543,7 @@ describe("saved query collaboration", () => {
 });
 
 describe("kept Power Query members on a retained graph", () => {
-  const snapshotWith = (unsupportedQueries: unknown): unknown => ({
+  const snapshot_with = (unsupported_queries: unknown): unknown => ({
     schemaVersion: 1,
     workbook: {
       activeSheet: "data",
@@ -558,7 +564,7 @@ describe("kept Power Query members on a retained graph", () => {
             type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
             target: "customXml/item1.xml",
             queries: "0123456789abcdef",
-            unsupportedQueries,
+            unsupportedQueries: unsupported_queries,
             parts: ["customXml/item1.xml"],
             dependencies: [],
           },
@@ -574,19 +580,19 @@ describe("kept Power Query members on a retained graph", () => {
   const path = "workbook.xlsxSource.graphs[0].unsupportedQueries";
 
   it("accepts bounded member names and reasons, and rejects anything past the caps", () => {
-    expect(paths(snapshotWith([{ member: "Budget", reason: "schema" }]))).not.toContain(path);
-    expect(paths(snapshotWith("Budget"))).toContain(path);
-    expect(paths(snapshotWith([{ member: "Budget" }]))).toContain(`${path}[0].reason`);
-    expect(paths(snapshotWith([{ member: "Budget", reason: "x".repeat(65) }]))).toContain(
+    expect(paths(snapshot_with([{ member: "Budget", reason: "schema" }]))).not.toContain(path);
+    expect(paths(snapshot_with("Budget"))).toContain(path);
+    expect(paths(snapshot_with([{ member: "Budget" }]))).toContain(`${path}[0].reason`);
+    expect(paths(snapshot_with([{ member: "Budget", reason: "x".repeat(65) }]))).toContain(
       `${path}[0].reason`,
     );
-    expect(paths(snapshotWith([{ member: "m".repeat(1025), reason: "schema" }]))).toContain(
+    expect(paths(snapshot_with([{ member: "m".repeat(1025), reason: "schema" }]))).toContain(
       `${path}[0].member`,
     );
     const many = Array.from({ length: 257 }, (_, index) => ({
       member: `M${index}`,
       reason: "schema",
     }));
-    expect(paths(snapshotWith(many))).toContain(path);
+    expect(paths(snapshot_with(many))).toContain(path);
   });
 });

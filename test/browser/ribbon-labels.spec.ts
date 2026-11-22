@@ -14,7 +14,7 @@ import { expect, nextFrames, test } from "./fixtures.js";
  * icon and no visible text, except the rows Excel draws as icons, and every
  * label cut by its button, the ribbon's scrolling rows or the page edge.
  */
-function labelProblemsOnEveryTab(page: Page): Promise<string[]> {
+function label_problems_on_every_tab(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
     const ribbon = document.querySelector(".sheetwrite-ribbon");
     if (ribbon === null) return ["no ribbon"];
@@ -35,7 +35,7 @@ function labelProblemsOnEveryTab(page: Page): Promise<string[]> {
       }
       return false;
     };
-    const hasText = (button: Element) => {
+    const has_text = (button: Element) => {
       const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
       for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
         if ((text.textContent ?? "").trim() === "") continue;
@@ -93,7 +93,7 @@ function labelProblemsOnEveryTab(page: Page): Promise<string[]> {
         const clipped = cut(button);
         if (clipped !== undefined) found.push(`${where} label "${clipped.trim()}" is cut`);
         const icon = button.querySelector("svg, .sheetwrite-icon");
-        if (icon === null || !shown(icon) || hasText(button)) continue;
+        if (icon === null || !shown(icon) || has_text(button)) continue;
         if (button.closest(".sheetwrite-ribbon-row") !== null) continue;
         if (button.closest('.sheetwrite-ribbon-group[aria-label="Zoom"]') !== null) continue;
         found.push(`${where} shows an icon without its label`);
@@ -112,8 +112,8 @@ test("every ribbon button shows its whole label, on any tab, 1440 px to 320 px",
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
   const problems = new Set<string>();
 
-  for (const sidePanel of [false, true]) {
-    if (sidePanel) {
+  for (const side_panel of [false, true]) {
+    if (side_panel) {
       await page.setViewportSize({ width: 1_440, height: 900 });
       await page.getByRole("tab", { name: "Data" }).click();
       await page.getByRole("button", { name: "Custom Sort" }).first().click();
@@ -122,8 +122,8 @@ test("every ribbon button shows its whole label, on any tab, 1440 px to 320 px",
     for (let width = 1_440; width >= 320; width -= 20) {
       await page.setViewportSize({ width, height: 900 });
       await nextFrames(page);
-      for (const problem of await labelProblemsOnEveryTab(page)) {
-        problems.add(`${sidePanel ? "with" : "without"} panel at ${width} px, ${problem}`);
+      for (const problem of await label_problems_on_every_tab(page)) {
+        problems.add(`${side_panel ? "with" : "without"} panel at ${width} px, ${problem}`);
       }
     }
   }
@@ -179,27 +179,27 @@ test("running a command from a collapsed group's dropdown closes it", async ({ p
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
   await page.getByRole("tab", { name: "Data" }).click();
   const popups = page.locator(".sheetwrite-ribbon-popup");
-  const sortGroup = page.locator(
+  const sort_group = page.locator(
     '.sheetwrite-ribbon-group[aria-label="Sort & Filter"] .sheetwrite-ribbon-group-button',
   );
 
   // Pointer: Custom Sort opens the Sort panel, and the dropdown is gone.
-  await sortGroup.click();
-  await expect(sortGroup).toHaveAttribute("aria-expanded", "true");
+  await sort_group.click();
+  await expect(sort_group).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: "Custom Sort" }).first().click();
   await expect(page.locator(".sheetwrite-panel-host:not([hidden])")).toBeVisible();
   await expect(popups).toHaveCount(0);
-  await expect(sortGroup).toHaveAttribute("aria-expanded", "false");
+  await expect(sort_group).toHaveAttribute("aria-expanded", "false");
 
   // Keyboard: the dropdown closes, and focus goes where the command leaves it,
   // here the grid, not into the ribbon or nowhere.
   await page.setViewportSize({ width: 1_000, height: 900 });
-  const showHide = page.locator(
+  const show_hide = page.locator(
     '.sheetwrite-ribbon-group[aria-label="Show/Hide"] .sheetwrite-ribbon-group-button',
   );
-  await showHide.focus();
+  await show_hide.focus();
   await page.keyboard.press("Enter");
-  await expect(showHide).toHaveAttribute("aria-expanded", "true");
+  await expect(show_hide).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Enter");
   await expect(popups).toHaveCount(0);
   const focus = await page.evaluate(() => {

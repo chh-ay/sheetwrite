@@ -35,7 +35,7 @@ import {
 const NOT_RUN = "Not run";
 
 /** "pass" when every cell, formula, sheet, merge and frozen row came back. */
-function roundTripOutcome(report: RoundTripReport): "pass" | "partial" {
+function round_trip_outcome(report: RoundTripReport): "pass" | "partial" {
   return report.formulasPreserved === report.formulasBefore &&
     report.sheetsPreserved &&
     report.mergePreserved &&
@@ -45,7 +45,7 @@ function roundTripOutcome(report: RoundTripReport): "pass" | "partial" {
     : "partial";
 }
 
-function formatCurrency(value: number | null): string {
+function format_currency(value: number | null): string {
   return value === null
     ? "Unavailable"
     : new Intl.NumberFormat("en-US", {
@@ -55,13 +55,13 @@ function formatCurrency(value: number | null): string {
       }).format(value);
 }
 
-function formatPercent(value: number | null): string {
+function format_percent(value: number | null): string {
   return value === null
     ? "Unavailable"
     : new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 2 }).format(value);
 }
 
-function formatSerialDate(value: number | null): string {
+function format_serial_date(value: number | null): string {
   if (value === null) return "Unavailable";
   return new Date(Date.UTC(1899, 11, 30) + Math.trunc(value) * 86_400_000)
     .toISOString()
@@ -84,13 +84,13 @@ function ExchangeSource() {
 function FormulaModel() {
   const model = modelReadout;
   const results = () => [
-    ["XLOOKUP rate", "interop-model-rate", formatPercent(model()?.selectedRate ?? null)],
-    ["PMT / month", "interop-model-payment", formatCurrency(model()?.payment ?? null)],
-    ["NPV", "interop-model-npv", formatCurrency(model()?.npv ?? null)],
-    ["IRR", "interop-model-irr", formatPercent(model()?.irr ?? null)],
-    ["STDEV.S", "interop-model-statistical", formatCurrency(model()?.statistical ?? null)],
-    ["LET remaining payments", "interop-model-let", formatCurrency(model()?.letResult ?? null)],
-    ["Schedule end", "interop-model-date", formatSerialDate(model()?.scheduleEnd ?? null)],
+    ["XLOOKUP rate", "interop-model-rate", format_percent(model()?.selectedRate ?? null)],
+    ["PMT / month", "interop-model-payment", format_currency(model()?.payment ?? null)],
+    ["NPV", "interop-model-npv", format_currency(model()?.npv ?? null)],
+    ["IRR", "interop-model-irr", format_percent(model()?.irr ?? null)],
+    ["STDEV.S", "interop-model-statistical", format_currency(model()?.statistical ?? null)],
+    ["LET remaining payments", "interop-model-let", format_currency(model()?.letResult ?? null)],
+    ["Schedule end", "interop-model-date", format_serial_date(model()?.scheduleEnd ?? null)],
     [
       "SEQUENCE output",
       "interop-model-spill",
@@ -167,10 +167,10 @@ function FormulaModel() {
       </fieldset>
       <dl class="sw-si-model__results" data-testid="interop-model-readout">
         <For each={results()}>
-          {([label, testId, value]) => (
+          {([label, test_id, value]) => (
             <div>
               <dt>{label}</dt>
-              <dd data-testid={testId}>{value}</dd>
+              <dd data-testid={test_id}>{value}</dd>
             </div>
           )}
         </For>
@@ -216,7 +216,7 @@ function ExchangeControls() {
           aria-live="polite"
           data-state={(() => {
             const current = report();
-            return current ? roundTripOutcome(current) : "ready";
+            return current ? round_trip_outcome(current) : "ready";
           })()}
           data-testid={report() ? "interop-roundtrip-report" : "interop-fidelity-ledger"}
         >
@@ -368,22 +368,28 @@ function ExchangeControls() {
 
 /** The interoperability showcase's island: the exchange workbook and its panel. */
 export function InteropStage() {
-  let gridHost!: HTMLDivElement;
-  let formulaRow!: HTMLDivElement;
-  let statusRow!: HTMLDivElement;
+  let grid_host!: HTMLDivElement;
+  let formula_row!: HTMLDivElement;
+  let status_row!: HTMLDivElement;
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(gridHost, () => {
-      void import("./engine.js").then(({ createInteropEngine }) => {
+    const stop_waiting = whenNearViewport(grid_host, () => {
+      void import("./engine.js").then(({ createInteropEngine: create_interop_engine }) => {
         if (!disposed) {
-          setEngine(createInteropEngine({ grid: gridHost, formulaRow, statusRow }));
+          setEngine(
+            create_interop_engine({
+              grid: grid_host,
+              formulaRow: formula_row,
+              statusRow: status_row,
+            }),
+          );
         }
       });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       engine()?.dispose();
       setEngine(null);
     });
@@ -421,7 +427,7 @@ export function InteropStage() {
               <div
                 class="sheetwrite-shell-row sheetwrite-shell-formula-row"
                 ref={(element) => {
-                  formulaRow = element;
+                  formula_row = element;
                 }}
               />
               {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
@@ -429,14 +435,14 @@ export function InteropStage() {
                 aria-label="Interoperability workbench grid"
                 class="sheetwrite-shell-grid sw-si-grid"
                 ref={(element) => {
-                  gridHost = element;
+                  grid_host = element;
                 }}
                 role="group"
               />
               <div
                 class="sheetwrite-shell-row sheetwrite-shell-bottom-row"
                 ref={(element) => {
-                  statusRow = element;
+                  status_row = element;
                 }}
               />
             </div>

@@ -13,16 +13,16 @@ import {
   pressLikeWebKit,
 } from "./fixtures.js";
 
-let restoreCanvas: () => void;
-let reportErrorDescriptor: PropertyDescriptor | undefined;
+let restore_canvas: () => void;
+let report_error_descriptor: PropertyDescriptor | undefined;
 
 beforeAll(async () => {
   await initSheetwrite();
 });
 
 beforeEach(() => {
-  reportErrorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "reportError");
-  restoreCanvas = installCanvasTestStubs();
+  report_error_descriptor = Object.getOwnPropertyDescriptor(globalThis, "reportError");
+  restore_canvas = installCanvasTestStubs();
 });
 
 const mounted: { grid: GridImpl; store: SheetwriteStore }[] = [];
@@ -32,9 +32,9 @@ afterEach(() => {
     grid.destroy();
     store.dispose();
   }
-  restoreCanvas();
-  if (reportErrorDescriptor) {
-    Object.defineProperty(globalThis, "reportError", reportErrorDescriptor);
+  restore_canvas();
+  if (report_error_descriptor) {
+    Object.defineProperty(globalThis, "reportError", report_error_descriptor);
   } else {
     Reflect.deleteProperty(globalThis, "reportError");
   }
@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 /** A grid over a store of `options.workbook` filled with `makeColumnarData`. */
-function mountGrid(options: GridOptions & { workbook: Workbook }) {
+function mount_grid(options: GridOptions & { workbook: Workbook }) {
   const { workbook } = options;
   const store = new SheetwriteStore(workbook, makeColumnarData(workbook.sheets[0]!.rowCount));
   const host = mountHost();
@@ -52,7 +52,7 @@ function mountGrid(options: GridOptions & { workbook: Workbook }) {
 }
 
 it("shows a list cell's dropdown arrow, opens the list from it or by typing, and edits text on F2", () => {
-  const requestFrame = globalThis.requestAnimationFrame;
+  const request_frame = globalThis.requestAnimationFrame;
   // Paint at once, so the test reads the state that the next frame shows.
   globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
     callback(0);
@@ -67,7 +67,7 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
       policy: "reject",
     },
   ];
-  const { grid, store, host } = mountGrid({ workbook });
+  const { grid, store, host } = mount_grid({ workbook });
   const press = (target: Element | null, key: string) =>
     target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   const options = () =>
@@ -79,13 +79,13 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
   const button = host.querySelector<HTMLElement>(".sheetwrite-list-button");
   expect(button).not.toBeNull();
   // The arrow sits just right of B2, as in Excel.
-  const cellRight = DEFAULT_THEME.rowHeaderWidth + 160 + 120;
-  expect(button?.style.left).toBe(`${cellRight}px`);
+  const cell_right = DEFAULT_THEME.rowHeaderWidth + 160 + 120;
+  expect(button?.style.left).toBe(`${cell_right}px`);
 
   const scroller = host.querySelector(".sheetwrite-scroller");
   const click = new PointerEvent("pointerdown", {
     // The middle of the arrow, clear of the fill handle at the cell's corner.
-    clientX: cellRight + 9,
+    clientX: cell_right + 9,
     clientY: DEFAULT_THEME.headerHeight + 2 * DEFAULT_THEME.rowHeight - 9,
     button: 0,
     pointerType: "mouse",
@@ -114,7 +114,7 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
   press(host, "F2");
   expect(host.querySelector('[role="listbox"]')).toBeNull();
   expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("West");
-  globalThis.requestAnimationFrame = requestFrame;
+  globalThis.requestAnimationFrame = request_frame;
 });
 
 it("removes grid DOM when disposing its owned store fails", () => {
@@ -135,23 +135,23 @@ it("removes grid DOM when disposing its owned store fails", () => {
 });
 
 it("updates aria-rowcount when rows are inserted", () => {
-  const requestFrame = globalThis.requestAnimationFrame;
+  const request_frame = globalThis.requestAnimationFrame;
   // Paint at once, so the test reads the state that the next frame shows.
   globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
     callback(0);
     return 0;
   };
-  const { grid, host } = mountGrid({ workbook: makeWorkbook(3) });
+  const { grid, host } = mount_grid({ workbook: makeWorkbook(3) });
   try {
     grid.applyTransaction({ patches: [{ op: "addRows", sheet: "s1", at: 0, count: 2 }] });
 
     expect(host.querySelector('[role="grid"]')?.getAttribute("aria-rowcount")).toBe("6");
   } finally {
-    globalThis.requestAnimationFrame = requestFrame;
+    globalThis.requestAnimationFrame = request_frame;
   }
 });
 
-function withEditors(workbook: Workbook): Workbook {
+function with_editors(workbook: Workbook): Workbook {
   for (const column of workbook.sheets[0]!.columns) column.editor = "input";
   workbook.sheets[0]!.validationRules = [
     {
@@ -180,7 +180,7 @@ interface EditorStats {
   contexts: CellEditorContext[];
 }
 
-function inputEditor(stats: EditorStats): CellEditor {
+function input_editor(stats: EditorStats): CellEditor {
   return {
     mount(host, context) {
       stats.mounts += 1;
@@ -212,7 +212,7 @@ function inputEditor(stats: EditorStats): CellEditor {
   };
 }
 
-function editorStats(): EditorStats {
+function editor_stats(): EditorStats {
   return {
     mounts: 0,
     updates: 0,
@@ -224,7 +224,7 @@ function editorStats(): EditorStats {
   };
 }
 
-function activeEditorInput(host: HTMLElement): HTMLInputElement {
+function active_editor_input(host: HTMLElement): HTMLInputElement {
   const input = host.querySelector(".sheetwrite-custom-editor input");
   if (!(input instanceof HTMLInputElement)) throw new Error("custom editor input missing");
   return input;
@@ -232,12 +232,12 @@ function activeEditorInput(host: HTMLElement): HTMLInputElement {
 
 describe("custom editor canonical lifecycle", () => {
   it("parses commits, enforces validation/protection, updates, histories, navigates, and restores focus", async () => {
-    const workbook = withEditors(makeWorkbook(2));
-    const stats = editorStats();
-    const { grid, store, host } = mountGrid({
+    const workbook = with_editors(makeWorkbook(2));
+    const stats = editor_stats();
+    const { grid, store, host } = mount_grid({
       workbook,
       presentation: "data-grid",
-      editors: { input: inputEditor(stats) },
+      editors: { input: input_editor(stats) },
     });
     const rejected: string[][] = [];
     let changes = 0;
@@ -247,7 +247,7 @@ describe("custom editor canonical lifecycle", () => {
     });
 
     grid.beginEdit(0, 1);
-    let input = activeEditorInput(host);
+    let input = active_editor_input(host);
     expect(input.getAttribute("aria-label")).toContain("Amount");
     expect(input.getAttribute("aria-label")).toMatch(/\b1\b/);
     expect(stats.contexts[0]?.address).toEqual({ sheet: "s1", row: 0, col: 1 });
@@ -279,7 +279,7 @@ describe("custom editor canonical lifecycle", () => {
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
 
     grid.beginEdit(0, 1);
-    input = activeEditorInput(host);
+    input = active_editor_input(host);
     input.value = "-1";
     press(input, "Tab");
     // The rule's Stop alert refuses the entry before it reaches the store.
@@ -288,14 +288,14 @@ describe("custom editor canonical lifecycle", () => {
     expect(rejected).toEqual([]);
 
     grid.beginEdit(0, 0);
-    input = activeEditorInput(host);
+    input = active_editor_input(host);
     input.value = "blocked";
     press(input, "Enter");
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
     expect(rejected.at(-1)).toEqual(["protection"]);
 
     grid.beginEdit(1, 2, "B", false);
-    input = activeEditorInput(host);
+    input = active_editor_input(host);
     press(input, "Escape");
     expect(stats.cancels).toBe(1);
     expectSame(document.activeElement, host);
@@ -310,10 +310,10 @@ describe("custom editor canonical lifecycle", () => {
     let attempt = 0;
     let cancels = 0;
     let destroys = 0;
-    let latestContext: CellEditorContext | undefined;
+    let latest_context: CellEditorContext | undefined;
     const editor: CellEditor = {
       mount(root, context) {
-        latestContext = context;
+        latest_context = context;
         const input = document.createElement("input");
         root.appendChild(input);
         return {
@@ -333,11 +333,11 @@ describe("custom editor canonical lifecycle", () => {
         };
       },
     };
-    const { grid, store, host } = mountGrid({ workbook, editors: { boundary: editor } });
+    const { grid, store, host } = mount_grid({ workbook, editors: { boundary: editor } });
 
     for (let index = 0; index < 2; index += 1) {
       grid.beginEdit(0, 0);
-      press(activeEditorInput(host), "Enter");
+      press(active_editor_input(host), "Enter");
       await Promise.resolve();
       await Promise.resolve();
       expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
@@ -346,8 +346,8 @@ describe("custom editor canonical lifecycle", () => {
     expect({ cancels, destroys }).toEqual({ cancels: 2, destroys: 2 });
 
     grid.beginEdit(0, 0);
-    expect(() => latestContext?.commit(42 as never)).not.toThrow();
-    expect(latestContext?.signal.aborted).toBe(true);
+    expect(() => latest_context?.commit(42 as never)).not.toThrow();
+    expect(latest_context?.signal.aborted).toBe(true);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
     expect({ cancels, destroys }).toEqual({ cancels: 3, destroys: 3 });
@@ -379,19 +379,19 @@ describe("custom editor canonical lifecycle", () => {
         };
       },
     };
-    const { grid, host } = mountGrid({ workbook, editors: { stepper: editor } });
+    const { grid, host } = mount_grid({ workbook, editors: { stepper: editor } });
 
     grid.beginEdit(0, 0);
-    expectSame(document.activeElement, activeEditorInput(host));
+    expectSame(document.activeElement, active_editor_input(host));
     pressLikeWebKit(host.querySelector<HTMLButtonElement>(".sheetwrite-custom-editor button")!);
     expect({ commits, steps }).toEqual({ commits: 0, steps: 1 });
     expect(host.querySelector(".sheetwrite-custom-editor")).not.toBeNull();
-    press(activeEditorInput(host), "Enter");
+    press(active_editor_input(host), "Enter");
     expect(commits).toBe(1);
   });
 
   it("keeps async commits bound to their canonical row through sort, clearView, and filter", async () => {
-    for (const viewChange of ["sort", "clearView", "filter"] as const) {
+    for (const view_change of ["sort", "clearView", "filter"] as const) {
       const workbook = makeWorkbook(3);
       workbook.sheets[0]!.columns[0]!.editor = "pending";
       const result = Promise.withResolvers<string>();
@@ -412,38 +412,38 @@ describe("custom editor canonical lifecycle", () => {
           };
         },
       };
-      const { grid, store, host } = mountGrid({ workbook, editors: { pending: editor } });
-      if (viewChange === "clearView") grid.setViewSort([{ col: 1, ascending: false }]);
+      const { grid, store, host } = mount_grid({ workbook, editors: { pending: editor } });
+      if (view_change === "clearView") grid.setViewSort([{ col: 1, ascending: false }]);
       grid.beginEdit(0, 0);
-      const originalDataRow = viewChange === "clearView" ? 2 : 0;
-      const otherDataRow = viewChange === "clearView" ? 0 : 2;
+      const original_data_row = view_change === "clearView" ? 2 : 0;
+      const other_data_row = view_change === "clearView" ? 0 : 2;
       const committed: CellEditorContext["address"][] = [];
       grid.on("edit-commit", ({ addr }) => {
         committed.push(addr);
       });
-      press(activeEditorInput(host), "Enter");
+      press(active_editor_input(host), "Enter");
 
-      if (viewChange === "clearView") grid.clearView();
-      else if (viewChange === "filter") grid.filterBy(0, "Customer 0");
+      if (view_change === "clearView") grid.clearView();
+      else if (view_change === "filter") grid.filterBy(0, "Customer 0");
       else grid.setViewSort([{ col: 1, ascending: false }]);
-      const expectedViewRow = viewChange === "filter" ? 0 : 2;
+      const expected_view_row = view_change === "filter" ? 0 : 2;
       expect(contexts.at(-1)?.address).toEqual({
         sheet: "s1",
-        row: originalDataRow,
+        row: original_data_row,
         col: 0,
       });
-      expect(contexts.at(-1)?.viewAddress.row).toBe(expectedViewRow);
+      expect(contexts.at(-1)?.viewAddress.row).toBe(expected_view_row);
 
-      result.resolve(`${viewChange} target`);
+      result.resolve(`${view_change} target`);
       await result.promise;
       await Promise.resolve();
-      expect(store.getCell({ sheet: "s1", row: originalDataRow, col: 0 }).resolved).toBe(
-        `${viewChange} target`,
+      expect(store.getCell({ sheet: "s1", row: original_data_row, col: 0 }).resolved).toBe(
+        `${view_change} target`,
       );
-      expect(store.getCell({ sheet: "s1", row: otherDataRow, col: 0 }).resolved).toBe(
-        `Customer ${otherDataRow}`,
+      expect(store.getCell({ sheet: "s1", row: other_data_row, col: 0 }).resolved).toBe(
+        `Customer ${other_data_row}`,
       );
-      expect(committed).toEqual([{ sheet: "s1", row: expectedViewRow, col: 0 }]);
+      expect(committed).toEqual([{ sheet: "s1", row: expected_view_row, col: 0 }]);
     }
   });
 
@@ -456,7 +456,7 @@ describe("custom editor canonical lifecycle", () => {
    * Open the editor of the cell at view row 0, column A: a list rule's list
    * opens on Alt+Down, as in Excel; F2 would edit its text.
    */
-  const openEditor = (grid: GridImpl, host: HTMLElement, kind: string): void => {
+  const open_editor = (grid: GridImpl, host: HTMLElement, kind: string): void => {
     if (kind !== "list") {
       grid.beginEdit(0, 0);
       return;
@@ -484,7 +484,7 @@ describe("custom editor canonical lifecycle", () => {
   } as const;
 
   /** Give column A of `workbook` a list or checkbox rule whose chosen value is `choice`. */
-  const choiceRule = (
+  const choice_rule = (
     workbook: Workbook,
     kind: keyof typeof EDITOR_FIELD,
     choice: string,
@@ -504,56 +504,56 @@ describe("custom editor canonical lifecycle", () => {
     ];
   };
 
-  for (const editorKind of ["stock", "list", "checkbox"] as const) {
-    for (const viewChange of ["sort", "clearView", "filter"] as const) {
-      it(`commits the ${editorKind} editor to its canonical row after ${viewChange}`, () => {
+  for (const editor_kind of ["stock", "list", "checkbox"] as const) {
+    for (const view_change of ["sort", "clearView", "filter"] as const) {
+      it(`commits the ${editor_kind} editor to its canonical row after ${view_change}`, () => {
         const workbook = makeWorkbook(3);
-        choiceRule(workbook, editorKind, "Edited choice", "warn");
-        const { grid, store, host } = mountGrid({ workbook });
-        if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
-        openEditor(grid, host, editorKind);
-        const selector = EDITOR_FIELD[editorKind];
+        choice_rule(workbook, editor_kind, "Edited choice", "warn");
+        const { grid, store, host } = mount_grid({ workbook });
+        if (view_change !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
+        open_editor(grid, host, editor_kind);
+        const selector = EDITOR_FIELD[editor_kind];
         const editor = host.querySelector<HTMLElement>(selector);
-        if (!editor) throw new Error(`${editorKind} editor missing`);
+        if (!editor) throw new Error(`${editor_kind} editor missing`);
         if (editor instanceof HTMLTextAreaElement) editor.value = "Edited choice";
         const committed: CellEditorContext["address"][] = [];
         grid.on("edit-commit", ({ addr }) => committed.push(addr));
 
-        if (viewChange === "clearView") grid.clearView();
-        else if (viewChange === "filter") grid.filterBy(0, "Customer 2");
+        if (view_change === "clearView") grid.clearView();
+        else if (view_change === "filter") grid.filterBy(0, "Customer 2");
         else grid.setViewSort([{ col: 1, ascending: false }]);
         expectSame(host.querySelector(selector), editor);
-        if (editorKind === "list") press(editor, "ArrowDown");
-        press(editor, editorKind === "checkbox" ? " " : "Enter");
+        if (editor_kind === "list") press(editor, "ArrowDown");
+        press(editor, editor_kind === "checkbox" ? " " : "Enter");
 
-        const canonicalRow = viewChange === "sort" ? 0 : 2;
-        const otherRow = viewChange === "sort" ? 2 : 0;
-        const viewRow = viewChange === "filter" ? 0 : 2;
-        expect(store.getCell({ sheet: "s1", row: canonicalRow, col: 0 }).resolved).toBe(
+        const canonical_row = view_change === "sort" ? 0 : 2;
+        const other_row = view_change === "sort" ? 2 : 0;
+        const view_row = view_change === "filter" ? 0 : 2;
+        expect(store.getCell({ sheet: "s1", row: canonical_row, col: 0 }).resolved).toBe(
           "Edited choice",
         );
-        expect(store.getCell({ sheet: "s1", row: otherRow, col: 0 }).resolved).toBe(
-          `Customer ${otherRow}`,
+        expect(store.getCell({ sheet: "s1", row: other_row, col: 0 }).resolved).toBe(
+          `Customer ${other_row}`,
         );
-        expect(committed).toEqual([{ sheet: "s1", row: viewRow, col: 0 }]);
+        expect(committed).toEqual([{ sheet: "s1", row: view_row, col: 0 }]);
         expect(host.querySelector(selector)).toBeNull();
         grid.undo();
-        expect(store.getCell({ sheet: "s1", row: canonicalRow, col: 0 }).resolved).toBe(
-          `Customer ${canonicalRow}`,
+        expect(store.getCell({ sheet: "s1", row: canonical_row, col: 0 }).resolved).toBe(
+          `Customer ${canonical_row}`,
         );
       });
     }
   }
 
   it("cancels every editor when filtering removes its canonical row, including pending custom commits", async () => {
-    for (const editorKind of ["stock", "list", "checkbox", "custom"] as const) {
+    for (const editor_kind of ["stock", "list", "checkbox", "custom"] as const) {
       const workbook = makeWorkbook(3);
-      choiceRule(workbook, editorKind, "Stale choice", "reject");
-      const stats = editorStats();
+      choice_rule(workbook, editor_kind, "Stale choice", "reject");
+      const stats = editor_stats();
       const pending = Promise.withResolvers<string>();
-      const custom = inputEditor(stats);
-      if (editorKind === "custom") workbook.sheets[0]!.columns[0]!.editor = "pending";
-      const { grid, store, host } = mountGrid({
+      const custom = input_editor(stats);
+      if (editor_kind === "custom") workbook.sheets[0]!.columns[0]!.editor = "pending";
+      const { grid, store, host } = mount_grid({
         workbook,
         editors: {
           pending: {
@@ -566,24 +566,24 @@ describe("custom editor canonical lifecycle", () => {
       });
       const committed: unknown[] = [];
       grid.on("edit-commit", (event) => committed.push(event));
-      openEditor(grid, host, editorKind);
-      const selector = EDITOR_FIELD[editorKind];
+      open_editor(grid, host, editor_kind);
+      const selector = EDITOR_FIELD[editor_kind];
       const editor = host.querySelector<HTMLElement>(selector);
-      if (!editor) throw new Error(`${editorKind} editor missing`);
+      if (!editor) throw new Error(`${editor_kind} editor missing`);
       if (editor instanceof HTMLTextAreaElement) editor.value = "Stale choice";
-      if (editorKind === "custom") press(editor, "Enter");
+      if (editor_kind === "custom") press(editor, "Enter");
 
       grid.filterBy(0, "Customer 2");
       expect(host.querySelector(selector)).toBeNull();
-      if (editorKind === "list") press(editor, "ArrowDown");
-      press(editor, editorKind === "checkbox" ? " " : "Enter");
+      if (editor_kind === "list") press(editor, "ArrowDown");
+      press(editor, editor_kind === "checkbox" ? " " : "Enter");
       pending.resolve("Stale choice");
       await pending.promise;
       await Promise.resolve();
       expect(committed).toEqual([]);
       expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
       expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Customer 2");
-      if (editorKind === "custom") {
+      if (editor_kind === "custom") {
         expect(stats.contexts[0]?.signal.aborted).toBe(true);
         expect({ cancels: stats.cancels, destroys: stats.destroys }).toEqual({
           cancels: 1,
@@ -597,14 +597,17 @@ describe("custom editor canonical lifecycle", () => {
     it(`does not mount an obsolete editor after edit-begin replaces the ${replacement}`, () => {
       const workbook = makeWorkbook(3);
       const sheet = workbook.sheets[0];
-      const otherSheet = makeWorkbook(3).sheets[0];
-      if (!sheet || !otherSheet) throw new Error("editor workbook sheets missing");
+      const other_sheet = makeWorkbook(3).sheets[0];
+      if (!sheet || !other_sheet) throw new Error("editor workbook sheets missing");
       for (const column of sheet.columns) column.editor = "input";
-      otherSheet.id = "s2";
-      otherSheet.name = "Other sheet";
-      workbook.sheets.push(otherSheet);
-      const stats = editorStats();
-      const { grid, store, host } = mountGrid({ workbook, editors: { input: inputEditor(stats) } });
+      other_sheet.id = "s2";
+      other_sheet.name = "Other sheet";
+      workbook.sheets.push(other_sheet);
+      const stats = editor_stats();
+      const { grid, store, host } = mount_grid({
+        workbook,
+        editors: { input: input_editor(stats) },
+      });
       const begins: CellEditorContext["address"][] = [];
       grid.on("edit-begin", ({ addr }) => {
         begins.push(addr);
@@ -629,7 +632,7 @@ describe("custom editor canonical lifecycle", () => {
         expect(grid.getCellInput(0, 0)?.address.sheet).toBe("s2");
       } else {
         expect(stats.contexts[0]?.address).toEqual({ sheet: "s1", row: 1, col: 0 });
-        const input = activeEditorInput(host);
+        const input = active_editor_input(host);
         input.value = "Replacement edit";
         input.dispatchEvent(
           new KeyboardEvent("keydown", {
@@ -653,7 +656,7 @@ describe("custom editor canonical lifecycle", () => {
     const workbook = makeWorkbook(1);
     workbook.sheets[0]!.columns[0]!.editor = "hostile";
     const host = mountHost();
-    const hookSignals: boolean[] = [];
+    const hook_signals: boolean[] = [];
     const editor: CellEditor = {
       mount(root, context) {
         root.appendChild(document.createElement("input"));
@@ -662,10 +665,10 @@ describe("custom editor canonical lifecycle", () => {
           reposition() {},
           commit() {},
           cancel() {
-            hookSignals.push(context.signal.aborted);
+            hook_signals.push(context.signal.aborted);
           },
           destroy() {
-            hookSignals.push(context.signal.aborted);
+            hook_signals.push(context.signal.aborted);
             throw new Error("hostile destroy");
           },
         };
@@ -676,18 +679,18 @@ describe("custom editor canonical lifecycle", () => {
       data: makeColumnarData(1),
       editors: { hostile: editor },
     });
-    const ownedStore = grid.store;
-    if (!(ownedStore instanceof SheetwriteStore)) throw new Error("owned store missing");
-    const originalDispose = ownedStore.dispose.bind(ownedStore);
+    const owned_store = grid.store;
+    if (!(owned_store instanceof SheetwriteStore)) throw new Error("owned store missing");
+    const original_dispose = owned_store.dispose.bind(owned_store);
     let disposals = 0;
-    ownedStore.dispose = () => {
+    owned_store.dispose = () => {
       disposals += 1;
-      originalDispose();
+      original_dispose();
     };
 
     grid.beginEdit(0, 0);
-    press(activeEditorInput(host), "Escape");
-    expect(hookSignals).toEqual([true, true]);
+    press(active_editor_input(host), "Escape");
+    expect(hook_signals).toEqual([true, true]);
     expect(host.querySelector(".sheetwrite-custom-editor")).toBeNull();
     expectSame(document.activeElement, host);
     expect(reported).toHaveLength(1);

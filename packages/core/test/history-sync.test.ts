@@ -40,14 +40,14 @@ afterAll(() => {
   }
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: new IDBFactory() });
 });
 
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
 function snapshot(): WorkbookSnapshot {
   return {
@@ -109,14 +109,14 @@ async function authority() {
   return { adapter, archive, journal };
 }
 
-function client(adapter: MemoryPersistenceAdapter, authorId: string, serverVersion = 0) {
+function client(adapter: MemoryPersistenceAdapter, author_id: string, server_version = 0) {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGridFromSnapshot(host, snapshot());
   const sync = new SyncCoordinator(grid, adapter, {
     documentId: DOCUMENT,
-    serverVersion,
-    authorId,
+    serverVersion: server_version,
+    authorId: author_id,
   });
   const events: SyncCoordinatorEvent[] = [];
   sync.on((event) => events.push(event));
@@ -158,29 +158,29 @@ describe("authored history through sync", () => {
 
   it("keeps the durable author of a pending edit across a restart", async () => {
     const { adapter, journal } = await authority();
-    const pendingStorage = new IndexedDbPendingCommitStorage({ databaseName: "history-restart" });
+    const pending_storage = new IndexedDbPendingCommitStorage({ databaseName: "history-restart" });
 
     const host = document.createElement("div");
-    const offlineGrid = createGridFromSnapshot(host, snapshot());
-    const offline = new SyncCoordinator(offlineGrid, adapter, {
+    const offline_grid = createGridFromSnapshot(host, snapshot());
+    const offline = new SyncCoordinator(offline_grid, adapter, {
       documentId: DOCUMENT,
       serverVersion: 0,
       authorId: "alice",
-      pendingStorage,
+      pendingStorage: pending_storage,
       initialConnection: "offline",
     });
     await offline.ready();
 
-    offlineGrid.applyTransaction({ patches: [set(0, 5)] });
+    offline_grid.applyTransaction({ patches: [set(0, 5)] });
     await offline.ready();
     offline.destroy();
-    offlineGrid.destroy();
+    offline_grid.destroy();
 
     const restarted = new SyncCoordinator(createGridFromSnapshot(host, snapshot()), adapter, {
       documentId: DOCUMENT,
       serverVersion: 0,
       authorId: "bob",
-      pendingStorage,
+      pendingStorage: pending_storage,
     });
     await restarted.ready();
     await restarted.flush();

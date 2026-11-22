@@ -40,10 +40,10 @@ const POSTER_AT = 5;
 const MIN_CHANGED_FRAMES = 0.02;
 
 /** The compositor's clock: every frame, also the warm-up ones, one interval later than the last. */
-let frameTicks = 0;
-function nextFrameTicks(): number {
-  frameTicks += FRAME_MS;
-  return frameTicks;
+let frame_ticks = 0;
+function next_frame_ticks(): number {
+  frame_ticks += FRAME_MS;
+  return frame_ticks;
 }
 
 /**
@@ -79,7 +79,7 @@ const CHROME_FLAGS = [
   "--remote-debugging-port=0",
 ];
 
-function headlessShell(): string {
+function headless_shell(): string {
   const cache = join(homedir(), ".cache/ms-playwright");
   const folder = readdirSync(cache).find((name) => name.startsWith("chromium_headless_shell-"));
   if (folder === undefined)
@@ -89,7 +89,7 @@ function headlessShell(): string {
 
 /** A small CDP client over the browser's WebSocket, with flat sessions. */
 class Cdp {
-  private nextId = 1;
+  private next_id = 1;
   private readonly pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -126,7 +126,7 @@ class Cdp {
   }
 
   send(method: string, params: object = {}, sessionId?: string): Promise<unknown> {
-    const id = this.nextId++;
+    const id = this.next_id++;
     const { promise, resolve, reject } = Promise.withResolvers<unknown>();
     this.pending.set(id, { resolve, reject });
     this.socket.send(JSON.stringify({ id, method, params, sessionId }));
@@ -160,7 +160,7 @@ function field(value: unknown, key: string): unknown {
 }
 
 /** Mulberry32, so the typing rhythm is the same on every run. */
-function seededRandom(seed: number): () => number {
+function seeded_random(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -179,7 +179,7 @@ type Step =
 
 /** The session, with the pause before each step in milliseconds. */
 function session(): { at: number; step: Step }[] {
-  const random = seededRandom(SEED);
+  const random = seeded_random(SEED);
   const steps: { at: number; step: Step }[] = [];
   let time = 0;
   const wait = (ms: number): void => {
@@ -280,7 +280,7 @@ const KEY_CODES: Readonly<Record<string, number>> = {
 const CTRL = 2;
 
 /** Send one step to the page; `reveal` scrolls a selected cell into view first. */
-async function dispatch(cdp: Cdp, sessionId: string, step: Step, reveal: boolean): Promise<void> {
+async function dispatch(cdp: Cdp, session_id: string, step: Step, reveal: boolean): Promise<void> {
   if (step.kind === "select") {
     const addr = /^([A-Z]+)([0-9]+)$/.exec(step.cell);
     const [, letters = "A", digits = "1"] = addr ?? [];
@@ -297,7 +297,7 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step, reveal: boolean
           document.querySelector('textarea[aria-label="Formula bar"]').focus();
         })()`,
       },
-      sessionId,
+      session_id,
     );
     return;
   }
@@ -306,9 +306,9 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step, reveal: boolean
     await cdp.send(
       "Input.dispatchKeyEvent",
       { type: "keyDown", key: char, text: char, unmodifiedText: char },
-      sessionId,
+      session_id,
     );
-    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: char }, sessionId);
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: char }, session_id);
     return;
   }
   const code = KEY_CODES[step.key] ?? 0;
@@ -324,12 +324,12 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step, reveal: boolean
       modifiers,
       text,
     },
-    sessionId,
+    session_id,
   );
   await cdp.send(
     "Input.dispatchKeyEvent",
     { type: "keyUp", key: step.key, code: step.key, windowsVirtualKeyCode: code, modifiers },
-    sessionId,
+    session_id,
   );
 }
 
@@ -348,7 +348,7 @@ async function launch(scale: number): Promise<{ url: string; stop: () => void }>
   const profile = mkdtempSync(join(tmpdir(), "sheetwrite-record-profile-"));
   const child = Bun.spawn(
     [
-      headlessShell(),
+      headless_shell(),
       ...CHROME_FLAGS,
       `--force-device-scale-factor=${scale}`,
       `--user-data-dir=${profile}`,
@@ -380,18 +380,18 @@ async function launch(scale: number): Promise<{ url: string; stop: () => void }>
 }
 
 /** Draw frames in real time, without keeping them, until `ready` holds. */
-async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<void> {
+async function pump_until(cdp: Cdp, session_id: string, ready: string): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   for (;;) {
     await cdp.send(
       "HeadlessExperimental.beginFrame",
-      { frameTimeTicks: nextFrameTicks(), interval: FRAME_MS, noDisplayUpdates: false },
-      sessionId,
+      { frameTimeTicks: next_frame_ticks(), interval: FRAME_MS, noDisplayUpdates: false },
+      session_id,
     );
     const result = await cdp.send(
       "Runtime.evaluate",
       { expression: ready, returnByValue: true },
-      sessionId,
+      session_id,
     );
     if (field(field(result, "result"), "value") === true) return;
     if (Date.now() > deadline) {
@@ -401,7 +401,7 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
           expression: `JSON.stringify({ focused: document.activeElement?.getAttribute("aria-label"), bar: document.querySelector('textarea[aria-label="Formula bar"]')?.value })`,
           returnByValue: true,
         },
-        sessionId,
+        session_id,
       );
       throw new Error(
         `Timed out waiting for ${ready}; page: ${String(field(field(state, "result"), "value"))}`,
@@ -412,7 +412,7 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
 }
 
 /** Record one take into `scratch/<take>.mp4`, a near-lossless master; returns its frame count. */
-async function recordTake(name: TakeName, origin: string, scratch: string): Promise<number> {
+async function record_take(name: TakeName, origin: string, scratch: string): Promise<number> {
   const take = TAKES[name];
   const browser = await launch(take.scale);
   const cdp = await Cdp.connect(browser.url);
@@ -428,9 +428,9 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       targetId: field(target, "targetId"),
       flatten: true,
     });
-    const sessionId = String(field(attached, "sessionId"));
+    const session_id = String(field(attached, "sessionId"));
     for (const method of ["Page.enable", "Runtime.enable", "HeadlessExperimental.enable"]) {
-      await cdp.send(method, {}, sessionId);
+      await cdp.send(method, {}, session_id);
     }
     await cdp.send(
       "Emulation.setDeviceMetricsOverride",
@@ -440,29 +440,33 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
         deviceScaleFactor: take.scale,
         mobile: take.mobile,
       },
-      sessionId,
+      session_id,
     );
-    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true }, sessionId);
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true }, session_id);
     await cdp.send(
       "Page.navigate",
       { url: `${origin}/assist.html?theme=${take.theme}` },
-      sessionId,
+      session_id,
     );
-    await pumpUntil(cdp, sessionId, "document.documentElement.dataset.figureReady === 'true'");
+    await pump_until(cdp, session_id, "document.documentElement.dataset.figureReady === 'true'");
 
     // Warm up: one formula edit loads the add-on's predictor, then the page is put back.
     // An open cell: its neighbours give a suggestion as soon as `=` is typed.
-    await dispatch(cdp, sessionId, { kind: "select", cell: "H6" }, take.reveal);
-    await dispatch(cdp, sessionId, { kind: "text", char: "=" }, take.reveal);
-    await pumpUntil(cdp, sessionId, "document.querySelector('.sheetwrite-formula-ghost') !== null");
-    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" }, take.reveal);
-    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" }, take.reveal);
-    await dispatch(cdp, sessionId, { kind: "select", cell: "A1" }, take.reveal);
-    await cdp.send("Runtime.evaluate", { expression: "document.activeElement.blur()" }, sessionId);
-    await pumpUntil(cdp, sessionId, "true");
+    await dispatch(cdp, session_id, { kind: "select", cell: "H6" }, take.reveal);
+    await dispatch(cdp, session_id, { kind: "text", char: "=" }, take.reveal);
+    await pump_until(
+      cdp,
+      session_id,
+      "document.querySelector('.sheetwrite-formula-ghost') !== null",
+    );
+    await dispatch(cdp, session_id, { kind: "key", key: "Escape" }, take.reveal);
+    await dispatch(cdp, session_id, { kind: "key", key: "Escape" }, take.reveal);
+    await dispatch(cdp, session_id, { kind: "select", cell: "A1" }, take.reveal);
+    await cdp.send("Runtime.evaluate", { expression: "document.activeElement.blur()" }, session_id);
+    await pump_until(cdp, session_id, "true");
 
     // From here the page's clock advances only with the frames.
-    await cdp.send("Emulation.setVirtualTimePolicy", { policy: "pause" }, sessionId);
+    await cdp.send("Emulation.setVirtualTimePolicy", { policy: "pause" }, session_id);
     const steps = session();
     const last = steps.at(-1)?.at ?? 0;
     const frames = Math.ceil(last / FRAME_MS) + 1;
@@ -499,20 +503,20 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       const now = frame * FRAME_MS;
       while (next < steps.length && (steps[next]?.at ?? Number.POSITIVE_INFINITY) <= now) {
         const due = steps[next];
-        if (due !== undefined) await dispatch(cdp, sessionId, due.step, take.reveal);
+        if (due !== undefined) await dispatch(cdp, session_id, due.step, take.reveal);
         next++;
       }
       const expired = cdp.once("Emulation.virtualTimeBudgetExpired");
       await cdp.send(
         "Emulation.setVirtualTimePolicy",
         { policy: "advance", budget: FRAME_MS },
-        sessionId,
+        session_id,
       );
       await expired;
       const result = await cdp.send(
         "HeadlessExperimental.beginFrame",
-        { frameTimeTicks: nextFrameTicks(), interval: FRAME_MS, screenshot: { format: "png" } },
-        sessionId,
+        { frameTimeTicks: next_frame_ticks(), interval: FRAME_MS, screenshot: { format: "png" } },
+        session_id,
       );
       const data = field(result, "screenshotData");
       // A frame without changes has no new picture: the previous one stands, so the count holds.
@@ -538,7 +542,7 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
 }
 
 /** A video file's frame count, counted by decoding it, and its size in pixels. */
-async function probeVideo(
+async function probe_video(
   path: string,
 ): Promise<{ frames: number; width: number; height: number }> {
   const child = Bun.spawn(
@@ -637,7 +641,7 @@ async function publish(name: TakeName, master: string, frames: number): Promise<
   const take = TAKES[name];
   const size = { width: take.width * take.scale, height: take.height * take.scale };
   for (const file of ["demo.mp4", "demo.webm"]) {
-    const written = await probeVideo(out(file));
+    const written = await probe_video(out(file));
     if (written.frames !== frames)
       throw new Error(
         `${name}-${file} has ${written.frames} frames, not ${frames}: a frame was dropped`,
@@ -654,11 +658,11 @@ async function publish(name: TakeName, master: string, frames: number): Promise<
 }
 
 const wanted = process.argv.slice(2);
-function isTakeName(name: string): name is TakeName {
+function is_take_name(name: string): name is TakeName {
   return name in TAKES;
 }
 const takes = (wanted.length === 0 ? Object.keys(TAKES) : wanted).map((name) => {
-  if (!isTakeName(name))
+  if (!is_take_name(name))
     throw new Error(`Unknown take ${name}; takes: ${Object.keys(TAKES).join(", ")}`);
   return name;
 });
@@ -677,7 +681,7 @@ const address = server.httpServer?.address();
 if (address === null || typeof address !== "object") throw new Error("The stage did not start");
 try {
   for (const name of takes) {
-    const frames = await recordTake(name, `http://127.0.0.1:${address.port}`, scratch);
+    const frames = await record_take(name, `http://127.0.0.1:${address.port}`, scratch);
     await publish(name, join(scratch, `${name}.mp4`), frames);
   }
 } finally {

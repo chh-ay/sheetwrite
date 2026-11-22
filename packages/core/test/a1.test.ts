@@ -59,28 +59,28 @@ describe("shiftA1Refs", () => {
 });
 
 describe("remapFormulaA1Refs", () => {
-  const removeColumnB = { kind: "shift", at: 1, delta: -1 } as const;
-  const removeRow2 = { kind: "shift", at: 1, delta: -1 } as const;
-  const removeRows1To2 = { kind: "shift", at: 0, delta: -2 } as const;
-  const removeColumnA = { kind: "shift", at: 0, delta: -1 } as const;
-  const moveRows = { kind: "move", from: 0, count: 2, to: 1 } as const;
-  const insertRow = { kind: "shift", at: 0, delta: 1 } as const;
+  const remove_column_b = { kind: "shift", at: 1, delta: -1 } as const;
+  const remove_row2 = { kind: "shift", at: 1, delta: -1 } as const;
+  const remove_rows1_to2 = { kind: "shift", at: 0, delta: -2 } as const;
+  const remove_column_a = { kind: "shift", at: 0, delta: -1 } as const;
+  const move_rows = { kind: "move", from: 0, count: 2, to: 1 } as const;
+  const insert_row = { kind: "shift", at: 0, delta: 1 } as const;
   it.each([
-    ["=A1+B1+C1", "column", removeColumnB, "=A1+#REF!+B1"],
+    ["=A1+B1+C1", "column", remove_column_b, "=A1+#REF!+B1"],
     // A spill reference moves with its anchor and breaks when the anchor goes.
-    ["=SUM(A3#)", "row", removeRow2, "=SUM(A2#)"],
-    ["=SUM(A2#)", "row", removeRow2, "=SUM(#REF!)"],
+    ["=SUM(A3#)", "row", remove_row2, "=SUM(A2#)"],
+    ["=SUM(A2#)", "row", remove_row2, "=SUM(#REF!)"],
     // A range shrinks when a corner goes, and breaks with no row left.
-    ["=SUM(A1:B4)", "row", removeRows1To2, "=SUM(A1:B2)"],
-    ["=SUM(A4:B1)", "row", removeRows1To2, "=SUM(A1:B2)"],
-    ["=SUM(A1:B2)+C3", "row", removeRows1To2, "=SUM(#REF!)+C1"],
+    ["=SUM(A1:B4)", "row", remove_rows1_to2, "=SUM(A1:B2)"],
+    ["=SUM(A4:B1)", "row", remove_rows1_to2, "=SUM(A1:B2)"],
+    ["=SUM(A1:B2)+C3", "row", remove_rows1_to2, "=SUM(#REF!)+C1"],
     // A whole column goes with its column; whole rows stay.
-    ["=SUM(B:B)+SUM(A:A)", "column", removeColumnA, "=SUM(A:A)+SUM(#REF!)"],
-    ["=SUM(2:2)", "column", removeColumnA, "=SUM(2:2)"],
-    ["=A1+A2+A4", "row", moveRows, "=A2+A3+A4"],
+    ["=SUM(B:B)+SUM(A:A)", "column", remove_column_a, "=SUM(A:A)+SUM(#REF!)"],
+    ["=SUM(2:2)", "column", remove_column_a, "=SUM(2:2)"],
+    ["=A1+A2+A4", "row", move_rows, "=A2+A3+A4"],
     // Function names and array text stay.
-    ["=LOG10(A1)+BIN2DEC(B1)", "row", insertRow, "=LOG10(A2)+BIN2DEC(B2)"],
-    ['=A1&{"A1","B2";"C3","D4"}', "row", insertRow, '=A2&{"A1","B2";"C3","D4"}'],
+    ["=LOG10(A1)+BIN2DEC(B1)", "row", insert_row, "=LOG10(A2)+BIN2DEC(B2)"],
+    ['=A1&{"A1","B2";"C3","D4"}', "row", insert_row, '=A2&{"A1","B2";"C3","D4"}'],
   ] as const)("remaps %s on a %s edit", (formula, axis, edit, expected) => {
     expect(remapFormulaA1Refs(formula, axis, edit)).toBe(expected);
   });

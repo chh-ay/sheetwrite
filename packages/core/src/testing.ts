@@ -37,7 +37,7 @@ export interface CanvasTestStubOptions {
   height?: number;
 }
 
-function makeRecordingContext(canvas: HTMLCanvasElement): RecordingContext2D {
+function make_recording_context(canvas: HTMLCanvasElement): RecordingContext2D {
   const calls: Record<string, number> = {};
   const target: Record<string, unknown> = {
     calls,
@@ -87,9 +87,12 @@ export function installCanvasTestStubs(options: CanvasTestStubOptions = {}): () 
   const width = options.width ?? 800;
   const height = options.height ?? 400;
 
-  const originalGetContext = HTMLCanvasElement.prototype.getContext;
-  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-  const originalClientHeight = Object.getOwnPropertyDescriptor(
+  const original_get_context = HTMLCanvasElement.prototype.getContext;
+  const original_client_width = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    "clientWidth",
+  );
+  const original_client_height = Object.getOwnPropertyDescriptor(
     HTMLElement.prototype,
     "clientHeight",
   );
@@ -98,7 +101,7 @@ export function installCanvasTestStubs(options: CanvasTestStubOptions = {}): () 
   const stub = function (this: HTMLCanvasElement): CanvasRenderingContext2D {
     let context = contexts.get(this);
     if (!context) {
-      context = makeRecordingContext(this);
+      context = make_recording_context(this);
       contexts.set(this, context);
     }
     return context as unknown as CanvasRenderingContext2D;
@@ -116,14 +119,14 @@ export function installCanvasTestStubs(options: CanvasTestStubOptions = {}): () 
   });
 
   return () => {
-    HTMLCanvasElement.prototype.getContext = originalGetContext;
-    if (originalClientWidth) {
-      Object.defineProperty(HTMLElement.prototype, "clientWidth", originalClientWidth);
+    HTMLCanvasElement.prototype.getContext = original_get_context;
+    if (original_client_width) {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", original_client_width);
     } else {
       Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
     }
-    if (originalClientHeight) {
-      Object.defineProperty(HTMLElement.prototype, "clientHeight", originalClientHeight);
+    if (original_client_height) {
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", original_client_height);
     } else {
       Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
     }

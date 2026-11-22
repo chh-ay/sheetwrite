@@ -46,12 +46,12 @@ const REFERENCE_PREFIX = "=";
 
 type Legend = NonNullable<ChartDefinition["legend"]>;
 
-function isLegend(value: string): value is Legend {
+function is_legend(value: string): value is Legend {
   return LEGEND_OPTIONS.some(([option]) => option !== "" && option === value);
 }
 
 /** Copy `chart` with `key` set to `value`, or without `key` when `value` is undefined. */
-function withOptional<K extends "title" | "legend" | "axes">(
+function with_optional<K extends "title" | "legend" | "axes">(
   chart: ChartDefinition,
   key: K,
   value: ChartDefinition[K] | undefined,
@@ -65,7 +65,7 @@ function withOptional<K extends "title" | "legend" | "axes">(
 type AxisSettings = NonNullable<ChartDefinition["axes"]>;
 
 /** Copy `chart` with axis setting `key` set to `value`, or without it when `value` is undefined. */
-function withAxisSetting<K extends keyof AxisSettings>(
+function with_axis_setting<K extends keyof AxisSettings>(
   chart: ChartDefinition,
   key: K,
   value: AxisSettings[K] | undefined,
@@ -73,18 +73,18 @@ function withAxisSetting<K extends keyof AxisSettings>(
   const axes = { ...chart.axes };
   if (value === undefined) delete axes[key];
   else axes[key] = value;
-  return withOptional(chart, "axes", Object.keys(axes).length === 0 ? undefined : axes);
+  return with_optional(chart, "axes", Object.keys(axes).length === 0 ? undefined : axes);
 }
 
 /** The Chart panel for the chart `ref`; `grid.openPanel` shows it. */
 export function chartPanel(grid: Grid, ref: ChartRef, icons?: IconOverrides): GridPanel {
   return {
     title: "Chart",
-    render: (body) => renderChartPanel(body, grid, ref, icons),
+    render: (body) => render_chart_panel(body, grid, ref, icons),
   };
 }
 
-function renderChartPanel(
+function render_chart_panel(
   body: HTMLElement,
   grid: Grid,
   ref: ChartRef,
@@ -93,7 +93,7 @@ function renderChartPanel(
   const read = (): ChartDefinition | null =>
     grid.getCharts(ref.sheet).find((chart) => chart.id === ref.id) ?? null;
   const sheets = () => grid.store.getWorkbook().sheets;
-  const rangeText = (range: ChartRange): string =>
+  const range_text = (range: ChartRange): string =>
     range === "#REF!" ? range : formatRangeText(range, sheets(), ref.sheet);
 
   /** Commit one edit of the current chart; returns an error message or null. */
@@ -107,12 +107,12 @@ function renderChartPanel(
 
   // Kind: a radio group of toggle buttons. Arrow keys move and select, as in
   // any radio group, and each selection is one change.
-  const kindSection = panelSection("Chart type");
+  const kind_section = panelSection("Chart type");
   const kinds = document.createElement("div");
   kinds.className = "sheetwrite-panel-kinds";
   kinds.setAttribute("role", "radiogroup");
   kinds.setAttribute("aria-label", "Chart type");
-  const kindButtons = CHART_KINDS.map(({ kind, label, icon }) => {
+  const kind_buttons = CHART_KINDS.map(({ kind, label, icon }) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-panel-kind";
@@ -125,19 +125,19 @@ function renderChartPanel(
     const text = document.createElement("span");
     text.textContent = label;
     button.append(glyph, text);
-    button.addEventListener("click", () => selectKind(kind));
+    button.addEventListener("click", () => select_kind(kind));
     return button;
   });
-  kinds.append(...kindButtons);
-  kindSection.appendChild(kinds);
+  kinds.append(...kind_buttons);
+  kind_section.appendChild(kinds);
 
-  const selectKind = (kind: ChartKind): void => {
+  const select_kind = (kind: ChartKind): void => {
     if (read()?.kind !== kind) commit((chart) => ({ ...chart, kind }));
-    showKind(kind);
-    kindButtons.find((button) => button.dataset.kind === kind)?.focus();
+    show_kind(kind);
+    kind_buttons.find((button) => button.dataset.kind === kind)?.focus();
   };
-  const showKind = (kind: ChartKind | undefined): void => {
-    for (const button of kindButtons) {
+  const show_kind = (kind: ChartKind | undefined): void => {
+    for (const button of kind_buttons) {
       const checked = button.dataset.kind === kind;
       button.setAttribute("aria-checked", String(checked));
       // Roving tab stop: Tab reaches the group once, on the checked kind.
@@ -145,9 +145,9 @@ function renderChartPanel(
     }
   };
   kinds.addEventListener("keydown", (event) => {
-    const index = kindButtons.findIndex((button) => button === event.target);
+    const index = kind_buttons.findIndex((button) => button === event.target);
     if (index === -1) return;
-    const count = kindButtons.length;
+    const count = kind_buttons.length;
     const moves: Record<string, number> = {
       ArrowRight: (index + 1) % count,
       ArrowDown: (index + 1) % count,
@@ -160,32 +160,32 @@ function renderChartPanel(
     const kind = next === undefined ? undefined : CHART_KINDS[next]?.kind;
     if (kind === undefined) return;
     event.preventDefault();
-    selectKind(kind);
+    select_kind(kind);
   });
 
   // Series: one group of A1 fields per series.
-  const seriesSection = panelSection("Data");
-  let seriesViews: SeriesView[] = [];
-  const buildSeries = (chart: ChartDefinition): void => {
-    for (const view of seriesViews) view.element.remove();
-    seriesViews = chart.series.map((series, index) =>
-      seriesView(index, series, { commit, rangeText, sheets, sheet: ref.sheet }),
+  const series_section = panelSection("Data");
+  let series_views: SeriesView[] = [];
+  const build_series = (chart: ChartDefinition): void => {
+    for (const view of series_views) view.element.remove();
+    series_views = chart.series.map((series, index) =>
+      series_view(index, series, { commit, rangeText: range_text, sheets, sheet: ref.sheet }),
     );
-    seriesSection.append(...seriesViews.map((view) => view.element));
+    series_section.append(...series_views.map((view) => view.element));
   };
 
   // Values of a chart over a pivot: one checkbox per value field, measures
   // next to fields, as the Field List picks a PivotChart's values.
-  const valueSection = panelSection("Values");
-  const valueList = document.createElement("div");
-  valueList.setAttribute("role", "group");
-  valueList.setAttribute("aria-label", "Values to plot");
-  const valueError = document.createElement("p");
-  valueError.className = "sheetwrite-panel-note";
-  valueError.hidden = true;
-  valueSection.append(valueList, valueError);
-  let valueCaptions = "";
-  const showValues = (chart: ChartDefinition): void => {
+  const value_section = panelSection("Values");
+  const value_list = document.createElement("div");
+  value_list.setAttribute("role", "group");
+  value_list.setAttribute("aria-label", "Values to plot");
+  const value_error = document.createElement("p");
+  value_error.className = "sheetwrite-panel-note";
+  value_error.hidden = true;
+  value_section.append(value_list, value_error);
+  let value_captions = "";
+  const show_values = (chart: ChartDefinition): void => {
     const pivot = grid.getPivots(ref.sheet).find((candidate) => candidate.id === chart.pivot);
     const values = pivot?.values ?? [];
     const fields = pivot === undefined ? [] : grid.getPivotFields(ref.sheet, pivot.id);
@@ -195,9 +195,9 @@ function renderChartPanel(
         fields.find((candidate) => candidate.index === field)?.header ?? `Field ${field + 1}`,
       (id) => findMeasure(grid.store.getWorkbook().dataModel, id)?.name,
     );
-    if (captions.join("\n") !== valueCaptions) {
-      valueCaptions = captions.join("\n");
-      valueList.replaceChildren(
+    if (captions.join("\n") !== value_captions) {
+      value_captions = captions.join("\n");
+      value_list.replaceChildren(
         ...captions.map((caption, slot) => {
           const label = document.createElement("label");
           label.className = "sheetwrite-panel-check";
@@ -209,8 +209,8 @@ function renderChartPanel(
               (current) =>
                 withPivotValue(current, captions.length, slot, box.checked) ?? LAST_PIVOT_VALUE,
             );
-            valueError.textContent = message ?? "";
-            valueError.hidden = message === null;
+            value_error.textContent = message ?? "";
+            value_error.hidden = message === null;
             if (message !== null) box.checked = !box.checked;
           });
           label.append(box, document.createTextNode(caption));
@@ -218,46 +218,46 @@ function renderChartPanel(
         }),
       );
     }
-    valueList.querySelectorAll("input").forEach((box, slot) => {
+    value_list.querySelectorAll("input").forEach((box, slot) => {
       box.checked = plotsPivotValue(chart, slot);
     });
   };
 
   // Titles and legend.
-  const textSection = panelSection("Titles");
-  const titleField = textField("Chart title", "title", (text) =>
-    commit((chart) => withOptional(chart, "title", text === "" ? undefined : text)),
+  const text_section = panelSection("Titles");
+  const title_field = text_field("Chart title", "title", (text) =>
+    commit((chart) => with_optional(chart, "title", text === "" ? undefined : text)),
   );
-  const xField = textField("Horizontal axis title", "x-title", (text) =>
-    commit((chart) => withAxisSetting(chart, "xTitle", text === "" ? undefined : text)),
+  const x_field = text_field("Horizontal axis title", "x-title", (text) =>
+    commit((chart) => with_axis_setting(chart, "xTitle", text === "" ? undefined : text)),
   );
-  const yField = textField("Vertical axis title", "y-title", (text) =>
-    commit((chart) => withAxisSetting(chart, "yTitle", text === "" ? undefined : text)),
+  const y_field = text_field("Vertical axis title", "y-title", (text) =>
+    commit((chart) => with_axis_setting(chart, "yTitle", text === "" ? undefined : text)),
   );
-  textSection.append(titleField.field.element, xField.field.element, yField.field.element);
+  text_section.append(title_field.field.element, x_field.field.element, y_field.field.element);
 
   // Format Axis › Multi-level Category Labels in Excel; it shows only when the categories have levels.
-  const axisSection = panelSection("Category axis");
-  const levelsLabel = document.createElement("label");
-  levelsLabel.className = "sheetwrite-panel-check";
-  const levelsBox = document.createElement("input");
-  levelsBox.type = "checkbox";
-  levelsBox.dataset.focusKey = "multi-level-labels";
-  levelsBox.addEventListener("change", () => {
-    const on = levelsBox.checked;
-    if (commit((chart) => withAxisSetting(chart, "multiLevelLabels", on ? undefined : false))) {
-      levelsBox.checked = !on;
+  const axis_section = panelSection("Category axis");
+  const levels_label = document.createElement("label");
+  levels_label.className = "sheetwrite-panel-check";
+  const levels_box = document.createElement("input");
+  levels_box.type = "checkbox";
+  levels_box.dataset.focusKey = "multi-level-labels";
+  levels_box.addEventListener("change", () => {
+    const on = levels_box.checked;
+    if (commit((chart) => with_axis_setting(chart, "multiLevelLabels", on ? undefined : false))) {
+      levels_box.checked = !on;
     }
   });
-  levelsLabel.append(levelsBox, document.createTextNode("Multi-level category labels"));
-  axisSection.appendChild(levelsLabel);
+  levels_label.append(levels_box, document.createTextNode("Multi-level category labels"));
+  axis_section.appendChild(levels_label);
 
   /**
    * Whether the categories of `chart` have levels: several pivot row fields,
    * or a category range of several rows and several columns, as charts-live
    * reads them. The panel chunk does not load charts-live for it.
    */
-  const hasCategoryLevels = (chart: ChartDefinition): boolean => {
+  const has_category_levels = (chart: ChartDefinition): boolean => {
     const { kind } = chart;
     if (kind === "pie" || kind === "doughnut" || kind === "scatter") return false;
     if (chart.pivot === undefined) {
@@ -273,15 +273,15 @@ function renderChartPanel(
     return (pivot?.rows.length ?? 0) > 1;
   };
 
-  const legendSection = panelSection("Legend");
+  const legend_section = panelSection("Legend");
   const legend = panelField("Legend position", selectOf(LEGEND_OPTIONS, ""), "legend");
   legend.control.addEventListener("change", () => {
     const value = legend.control.value;
     legend.setError(
-      commit((chart) => withOptional(chart, "legend", isLegend(value) ? value : undefined)),
+      commit((chart) => with_optional(chart, "legend", is_legend(value) ? value : undefined)),
     );
   });
-  legendSection.appendChild(legend.element);
+  legend_section.appendChild(legend.element);
 
   const missing = document.createElement("p");
   missing.className = "sheetwrite-panel-note";
@@ -290,39 +290,39 @@ function renderChartPanel(
 
   body.append(
     missing,
-    kindSection,
-    seriesSection,
-    valueSection,
-    textSection,
-    axisSection,
-    legendSection,
+    kind_section,
+    series_section,
+    value_section,
+    text_section,
+    axis_section,
+    legend_section,
   );
 
   const show = (): void => {
     const chart = read();
     missing.hidden = chart !== null;
-    for (const section of [kindSection, seriesSection, textSection, legendSection]) {
+    for (const section of [kind_section, series_section, text_section, legend_section]) {
       section.hidden = chart === null;
     }
     if (chart === null) {
-      valueSection.hidden = true;
-      axisSection.hidden = true;
+      value_section.hidden = true;
+      axis_section.hidden = true;
       return;
     }
 
-    showKind(chart.kind);
+    show_kind(chart.kind);
     // A chart over a pivot takes its data from the pivot, not from ranges.
-    seriesSection.hidden = chart.pivot !== undefined;
-    valueSection.hidden = chart.pivot === undefined;
-    if (chart.pivot !== undefined) showValues(chart);
-    if (seriesViews.length !== chart.series.length) buildSeries(chart);
-    else chart.series.forEach((series, index) => seriesViews[index]?.show(series));
-    titleField.input.show(chart.title ?? "");
-    xField.input.show(chart.axes?.xTitle ?? "");
-    yField.input.show(chart.axes?.yTitle ?? "");
+    series_section.hidden = chart.pivot !== undefined;
+    value_section.hidden = chart.pivot === undefined;
+    if (chart.pivot !== undefined) show_values(chart);
+    if (series_views.length !== chart.series.length) build_series(chart);
+    else chart.series.forEach((series, index) => series_views[index]?.show(series));
+    title_field.input.show(chart.title ?? "");
+    x_field.input.show(chart.axes?.xTitle ?? "");
+    y_field.input.show(chart.axes?.yTitle ?? "");
     legend.control.value = chart.legend ?? "";
-    axisSection.hidden = !hasCategoryLevels(chart);
-    levelsBox.checked = chart.axes?.multiLevelLabels !== false;
+    axis_section.hidden = !has_category_levels(chart);
+    levels_box.checked = chart.axes?.multiLevelLabels !== false;
   };
 
   show();
@@ -334,9 +334,9 @@ interface TextField {
   readonly input: CommittingInput;
 }
 
-function textField(
+function text_field(
   label: string,
-  focusKey: string,
+  focus_key: string,
   commit: (text: string) => string | null,
 ): TextField {
   let field: PanelField<HTMLInputElement> | null = null;
@@ -345,7 +345,7 @@ function textField(
     (text) => commit(text.trim()),
     (message) => field?.setError(message),
   );
-  field = panelField(label, input.input, focusKey);
+  field = panelField(label, input.input, focus_key);
   return { field, input };
 }
 
@@ -361,9 +361,9 @@ interface SeriesView {
   show(series: ChartSeries): void;
 }
 
-function seriesView(index: number, series: ChartSeries, context: SeriesContext): SeriesView {
-  const { commit, rangeText, sheets, sheet } = context;
-  const editSeries = (edit: (series: ChartSeries) => ChartSeries | string) =>
+function series_view(index: number, series: ChartSeries, context: SeriesContext): SeriesView {
+  const { commit, rangeText: range_text, sheets, sheet } = context;
+  const edit_series = (edit: (series: ChartSeries) => ChartSeries | string) =>
     commit((chart) => {
       const current = chart.series[index];
       if (current === undefined) return MISSING_CHART;
@@ -375,29 +375,29 @@ function seriesView(index: number, series: ChartSeries, context: SeriesContext):
       };
     });
 
-  const nameText = (entry: ChartSeries): string =>
+  const name_text = (entry: ChartSeries): string =>
     entry.nameRange === undefined
       ? (entry.name ?? "")
-      : `${REFERENCE_PREFIX}${rangeText(entry.nameRange)}`;
+      : `${REFERENCE_PREFIX}${range_text(entry.nameRange)}`;
 
-  const name = textField("Name", `series-${index}-name`, (text) =>
-    editSeries((entry) => {
-      const { name: _name, nameRange: _nameRange, ...rest } = entry;
+  const name = text_field("Name", `series-${index}-name`, (text) =>
+    edit_series((entry) => {
+      const { name: _name, nameRange: _name_range, ...rest } = entry;
       if (text === "") return rest;
       if (!text.startsWith(REFERENCE_PREFIX)) return { ...rest, name: text };
       const parsed = parseRangeText(text.slice(REFERENCE_PREFIX.length), sheets(), sheet);
       return "error" in parsed ? parsed.error : { ...rest, nameRange: parsed.range };
     }),
   );
-  const values = textField("Values", `series-${index}-values`, (text) =>
-    editSeries((entry) => {
+  const values = text_field("Values", `series-${index}-values`, (text) =>
+    edit_series((entry) => {
       if (text === "") return VALUES_REQUIRED;
       const parsed = parseRangeText(text, sheets(), sheet);
       return "error" in parsed ? parsed.error : { ...entry, values: parsed.range };
     }),
   );
-  const categories = textField("Categories", `series-${index}-categories`, (text) =>
-    editSeries((entry) => {
+  const categories = text_field("Categories", `series-${index}-categories`, (text) =>
+    edit_series((entry) => {
       const { categories: _categories, ...rest } = entry;
       if (text === "") return rest;
       const parsed = parseRangeText(text, sheets(), sheet);
@@ -413,9 +413,9 @@ function seriesView(index: number, series: ChartSeries, context: SeriesContext):
   element.append(legend, name.field.element, values.field.element, categories.field.element);
 
   const show = (entry: ChartSeries): void => {
-    name.input.show(nameText(entry));
-    values.input.show(rangeText(entry.values));
-    categories.input.show(entry.categories === undefined ? "" : rangeText(entry.categories));
+    name.input.show(name_text(entry));
+    values.input.show(range_text(entry.values));
+    categories.input.show(entry.categories === undefined ? "" : range_text(entry.categories));
   };
   show(series);
   return { element, show };

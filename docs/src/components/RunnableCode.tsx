@@ -10,8 +10,8 @@ import { children, createSignal, type JSX, lazy, mergeProps, Show, Suspense } fr
  * button shows under the closed disclosure.
  */
 
-const loadPlayground = () => import("../playground/Playground.js");
-const Playground = lazy(() => loadPlayground().then((module) => ({ default: module.Playground })));
+const load_playground = () => import("../playground/Playground.js");
+const Playground = lazy(() => load_playground().then((module) => ({ default: module.Playground })));
 
 /** Expressive Code's copy button keeps the fence text with U+007F between lines. */
 const COPY_LINE_SEPARATOR = "\u007f";
@@ -23,7 +23,7 @@ interface Example {
 }
 
 /** Reads the example's text and title from the rendered code block. */
-function readExample(block: HTMLElement): Example {
+function read_example(block: HTMLElement): Example {
   const code = block.querySelector<HTMLElement>(".copy button[data-code]")?.dataset.code;
   if (code === undefined) throw new Error("A runnable example has no code to run");
   return {
@@ -71,13 +71,13 @@ function PendingPlayground(props: Readonly<{ children?: JSX.Element; example: Ex
 export function RunnableCode(rawProps: RunnableCodeProps) {
   const props = mergeProps({ disclosed: false }, rawProps);
   let block!: HTMLDivElement;
-  const [example, setExample] = createSignal<Example>();
+  const [example, set_example] = createSignal<Example>();
   // Resolved once: the same code block moves into the pending frame instead of
   // rendering a second time.
   const code = children(() => props.children);
 
-  const tryIt = () => {
-    setExample(readExample(block));
+  const try_it = () => {
+    set_example(read_example(block));
   };
 
   return (
@@ -97,10 +97,10 @@ export function RunnableCode(rawProps: RunnableCodeProps) {
                 class="sw-button"
                 data-size="sm"
                 data-variant="primary"
-                onClick={tryIt}
+                onClick={try_it}
                 // Start the download while the pointer is on its way to a click.
-                onFocus={() => void loadPlayground()}
-                onPointerEnter={() => void loadPlayground()}
+                onFocus={() => void load_playground()}
+                onPointerEnter={() => void load_playground()}
                 type="button"
               >
                 {/* The page's icon sprite; importing Icon here would split it out of the shared chunk. */}

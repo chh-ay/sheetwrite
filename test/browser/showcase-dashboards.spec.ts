@@ -5,21 +5,21 @@ test("a slicer filters the dashboard and each change is one undo step", async ({
   const controls = page.getByRole("complementary", { name: "Controls" });
   const item = (id: string) => page.getByTestId(`dashboard-item-${id}`);
   // The Revenue KPI card's value, as the dashboard draws it.
-  const revenueCard = page
+  const revenue_card = page
     .getByTestId("dashboard-grid")
     .locator(".sheetwrite-dashboard-kpi")
     .filter({ hasText: /^\$/ })
     .first();
-  await expect(revenueCard).toHaveText(/^\$[\d,]+$/, { timeout: 30_000 });
-  const allRegions = (await revenueCard.textContent()) ?? "";
+  await expect(revenue_card).toHaveText(/^\$[\d,]+$/, { timeout: 30_000 });
+  const all_regions = (await revenue_card.textContent()) ?? "";
 
   // The slicer narrows the KPI card it filters; undo brings every region back.
   await controls.getByRole("button", { name: /in the Region slicer/ }).click();
   await expect(page.getByTestId("dashboard-region-selection")).toHaveText("Americas");
-  await expect(revenueCard).not.toHaveText(allRegions);
+  await expect(revenue_card).not.toHaveText(all_regions);
   await controls.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByTestId("dashboard-region-selection")).toHaveText("Every region");
-  await expect(revenueCard).toHaveText(allRegions);
+  await expect(revenue_card).toHaveText(all_regions);
 
   await controls.getByRole("button", { name: "Swap the chart and the pivot" }).click();
   await expect(item("channel-pivot")).toHaveText(/^col 1, row 4/);

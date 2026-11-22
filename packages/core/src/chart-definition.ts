@@ -65,15 +65,15 @@ export interface ChartSheetBounds {
   readonly columns: { readonly length: number };
 }
 
-function isChartKind(value: unknown): value is ChartKind {
+function is_chart_kind(value: unknown): value is ChartKind {
   return typeof value === "string" && Object.hasOwn(CHART_KIND_LABELS, value);
 }
 
-function isLegendPosition(value: unknown): value is NonNullable<ChartDefinition["legend"]> {
+function is_legend_position(value: unknown): value is NonNullable<ChartDefinition["legend"]> {
   return LEGEND_POSITIONS.has(value);
 }
 
-function validChartId(value: unknown): value is string {
+function valid_chart_id(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length > 0 &&
@@ -83,7 +83,7 @@ function validChartId(value: unknown): value is string {
   );
 }
 
-function validChartText(value: unknown): value is string {
+function valid_chart_text(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length <= MAX_CHART_TEXT_LENGTH &&
@@ -100,11 +100,11 @@ function pixels(value: unknown, positive: boolean): value is number {
   );
 }
 
-function sanitizeChartRange(value: unknown): ChartRange | null {
+function sanitize_chart_range(value: unknown): ChartRange | null {
   return value === "#REF!" ? value : sanitizeRange(value);
 }
 
-function sanitizeAnchor(value: unknown): ChartAnchor | null {
+function sanitize_anchor(value: unknown): ChartAnchor | null {
   const anchor = dataProperties(value, ANCHOR_KEYS);
   if (
     !anchor ||
@@ -132,38 +132,38 @@ function sanitizeAnchor(value: unknown): ChartAnchor | null {
   };
 }
 
-function sanitizeSeries(value: unknown): ChartSeries | null {
+function sanitize_series(value: unknown): ChartSeries | null {
   const series = dataProperties(value, SERIES_KEYS);
   if (!series) return null;
 
-  const values = sanitizeChartRange(series.values);
-  const nameRange =
-    series.nameRange === undefined ? undefined : sanitizeChartRange(series.nameRange);
+  const values = sanitize_chart_range(series.values);
+  const name_range =
+    series.nameRange === undefined ? undefined : sanitize_chart_range(series.nameRange);
   const categories =
-    series.categories === undefined ? undefined : sanitizeChartRange(series.categories);
+    series.categories === undefined ? undefined : sanitize_chart_range(series.categories);
   if (
     !values ||
-    nameRange === null ||
+    name_range === null ||
     categories === null ||
-    (series.name !== undefined && !validChartText(series.name))
+    (series.name !== undefined && !valid_chart_text(series.name))
   ) {
     return null;
   }
 
   return {
     ...(series.name !== undefined ? { name: series.name } : {}),
-    ...(nameRange !== undefined ? { nameRange } : {}),
+    ...(name_range !== undefined ? { nameRange: name_range } : {}),
     values,
     ...(categories !== undefined ? { categories } : {}),
   };
 }
 
-function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
+function sanitize_axes(value: unknown): ChartDefinition["axes"] | null {
   const axes = dataProperties(value, AXES_KEYS);
   if (
     !axes ||
-    (axes.xTitle !== undefined && !validChartText(axes.xTitle)) ||
-    (axes.yTitle !== undefined && !validChartText(axes.yTitle)) ||
+    (axes.xTitle !== undefined && !valid_chart_text(axes.xTitle)) ||
+    (axes.yTitle !== undefined && !valid_chart_text(axes.yTitle)) ||
     (axes.multiLevelLabels !== undefined && typeof axes.multiLevelLabels !== "boolean")
   ) {
     return null;
@@ -181,7 +181,7 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
  * `MAX_CHART_SERIES` distinct whole numbers below `MAX_CHART_SERIES`, or
  * null when `value` is not one.
  */
-function sanitizePivotValues(value: unknown): number[] | null {
+function sanitize_pivot_values(value: unknown): number[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHART_SERIES) return null;
   const positions: number[] = [];
   for (const position of value) {
@@ -208,30 +208,30 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
     const chart = dataProperties(value, CHART_KEYS);
     if (
       !chart ||
-      !validChartId(chart.id) ||
-      !isChartKind(chart.kind) ||
-      (chart.title !== undefined && !validChartText(chart.title)) ||
-      (chart.legend !== undefined && !isLegendPosition(chart.legend)) ||
-      (chart.pivot !== undefined && !validChartText(chart.pivot)) ||
+      !valid_chart_id(chart.id) ||
+      !is_chart_kind(chart.kind) ||
+      (chart.title !== undefined && !valid_chart_text(chart.title)) ||
+      (chart.legend !== undefined && !is_legend_position(chart.legend)) ||
+      (chart.pivot !== undefined && !valid_chart_text(chart.pivot)) ||
       !Array.isArray(chart.series) ||
       chart.series.length > MAX_CHART_SERIES
     ) {
       return null;
     }
 
-    const anchor = sanitizeAnchor(chart.anchor);
-    const axes = chart.axes === undefined ? undefined : sanitizeAxes(chart.axes);
+    const anchor = sanitize_anchor(chart.anchor);
+    const axes = chart.axes === undefined ? undefined : sanitize_axes(chart.axes);
     // Value positions only mean something for a chart over a pivot.
-    const pivotValues =
+    const pivot_values =
       chart.pivotValues === undefined || chart.pivot === undefined
         ? undefined
-        : sanitizePivotValues(chart.pivotValues);
-    if (!anchor || axes === null || pivotValues === null) return null;
+        : sanitize_pivot_values(chart.pivotValues);
+    if (!anchor || axes === null || pivot_values === null) return null;
     if (chart.pivotValues !== undefined && chart.pivot === undefined) return null;
 
     const series: ChartSeries[] = [];
     for (const entry of chart.series) {
-      const sanitized = sanitizeSeries(entry);
+      const sanitized = sanitize_series(entry);
       if (!sanitized) return null;
       series.push(sanitized);
     }
@@ -243,7 +243,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       ...(axes !== undefined ? { axes } : {}),
       ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
       ...(chart.pivot !== undefined ? { pivot: chart.pivot } : {}),
-      ...(pivotValues !== undefined ? { pivotValues } : {}),
+      ...(pivot_values !== undefined ? { pivotValues: pivot_values } : {}),
       anchor,
       series,
     };
@@ -361,7 +361,7 @@ export function mapChartSources(
   map: (range: Range) => ChartRange,
 ): ChartDefinition {
   let changed = false;
-  const mapRange = (range: ChartRange): ChartRange => {
+  const map_range = (range: ChartRange): ChartRange => {
     if (range === "#REF!") return range;
     const next = map(range);
     if (next !== range) changed = true;
@@ -369,9 +369,9 @@ export function mapChartSources(
   };
 
   const series = chart.series.map((entry) => {
-    const next: ChartSeries = { ...entry, values: mapRange(entry.values) };
-    if (entry.nameRange !== undefined) next.nameRange = mapRange(entry.nameRange);
-    if (entry.categories !== undefined) next.categories = mapRange(entry.categories);
+    const next: ChartSeries = { ...entry, values: map_range(entry.values) };
+    if (entry.nameRange !== undefined) next.nameRange = map_range(entry.nameRange);
+    if (entry.categories !== undefined) next.categories = map_range(entry.categories);
     return next;
   });
   return changed ? { ...chart, series } : chart;
@@ -411,7 +411,7 @@ export type ChartAxisEdit =
  * The new inclusive span of `[start, end]`, or null when every index was deleted.
  * Insert and delete are O(1) from the edit; only moves walk the endpoints.
  */
-function rebaseSpan(start: number, end: number, edit: ChartAxisEdit): [number, number] | null {
+function rebase_span(start: number, end: number, edit: ChartAxisEdit): [number, number] | null {
   const low = Math.min(start, end);
   const high = Math.max(start, end);
   if (edit.kind === "insert") {
@@ -423,15 +423,15 @@ function rebaseSpan(start: number, end: number, edit: ChartAxisEdit): [number, n
     if (low >= edit.at && high < after) return null;
 
     // A deleted endpoint clamps to the nearest surviving index inside the span.
-    const nextLow = low < edit.at ? low : low < after ? edit.at : low - edit.count;
-    const nextHigh = high < edit.at ? high : high < after ? edit.at - 1 : high - edit.count;
-    return [nextLow, nextHigh];
+    const next_low = low < edit.at ? low : low < after ? edit.at : low - edit.count;
+    const next_high = high < edit.at ? high : high < after ? edit.at - 1 : high - edit.count;
+    return [next_low, next_high];
   }
 
   return remapSpan(low, high, (index) => moveIndex(index, edit.from, edit.count, edit.to));
 }
 
-function rebaseAnchorIndex(index: number, edit: ChartAxisEdit): number {
+function rebase_anchor_index(index: number, edit: ChartAxisEdit): number {
   if (edit.kind === "insert") return index >= edit.at ? index + edit.count : index;
   if (edit.kind === "move") return moveIndex(index, edit.from, edit.count, edit.to);
   if (index < edit.at) return index;
@@ -456,7 +456,7 @@ export function rebaseChartAxis(
 
     const start = rows ? range.start.row : range.start.col;
     const end = rows ? range.end.row : range.end.col;
-    const span = rebaseSpan(start, end, edit);
+    const span = rebase_span(start, end, edit);
     if (!span) return "#REF!";
     if (span[0] === Math.min(start, end) && span[1] === Math.max(start, end)) return range;
 
@@ -475,7 +475,7 @@ export function rebaseChartAxis(
   if (owner !== edit.sheet) return rebased;
 
   const index = rows ? chart.anchor.row : chart.anchor.col;
-  const mapped = rebaseAnchorIndex(index, edit);
+  const mapped = rebase_anchor_index(index, edit);
   if (mapped === index) return rebased;
 
   return {

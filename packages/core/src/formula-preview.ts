@@ -47,18 +47,18 @@ export type {
  */
 export function previewFormula(store: Store, cell: CellAddress, text: string): FormulaPreview {
   const engine = storeEngine(store);
-  if (engine === null) throw invalidPreview("previewFormula needs a SheetwriteStore");
-  if (!isCellIndex(cell.row) || !isCellIndex(cell.col)) {
-    throw invalidPreview("previewFormula needs a whole-number row and column from 0");
+  if (engine === null) throw invalid_preview("previewFormula needs a SheetwriteStore");
+  if (!is_cell_index(cell.row) || !is_cell_index(cell.col)) {
+    throw invalid_preview("previewFormula needs a whole-number row and column from 0");
   }
 
   return engine.previewFormula(cell, text);
 }
 
-function isCellIndex(value: number): boolean {
+function is_cell_index(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 0xff_ff_ff_ff;
 }
 
-function invalidPreview(message: string): SheetwriteError {
+function invalid_preview(message: string): SheetwriteError {
   return new SheetwriteError("invalid-argument", "store", `Sheetwrite: ${message}`);
 }

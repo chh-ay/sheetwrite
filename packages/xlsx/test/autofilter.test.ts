@@ -17,7 +17,7 @@ beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
-const oneSheet = (body: string) => rawXlsx({ sheets: [{ name: "Raw", xml: worksheet(body) }] });
+const one_sheet = (body: string) => rawXlsx({ sheets: [{ name: "Raw", xml: worksheet(body) }] });
 
 /** A1:C6: a header row, five orders, and a note row below the range. */
 function orders(filters: [number, ColumnFilter][]): WorkbookSnapshot {
@@ -84,7 +84,7 @@ describe("AutoFilter XLSX interchange", () => {
     const filter =
       '<autoFilter ref="A1:A3"><filterColumn colId="0"><dynamicFilter type="M3"/></filterColumn></autoFilter>';
     const imported = sheetAt(
-      await backend.fromXlsxWorkbook(oneSheet(`<sheetData>${cells}</sheetData>${filter}`)),
+      await backend.fromXlsxWorkbook(one_sheet(`<sheetData>${cells}</sheetData>${filter}`)),
     );
     expect(imported.filters).toEqual([[0, { kind: "dynamic", type: "M3" }]]);
   });
@@ -126,7 +126,7 @@ describe("AutoFilter XLSX interchange", () => {
   });
 
   it("reads an Excel-made autoFilter: value lists by shown text, custom and non-blank conditions", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const cells =
       '<row r="1"><c r="A1" t="inlineStr"><is><t>Item</t></is></c><c r="B1" t="inlineStr"><is><t>Qty</t></is></c><c r="C1" t="inlineStr"><is><t>When</t></is></c><c r="D1" t="inlineStr"><is><t>Note</t></is></c></row>' +
       '<row r="2"><c r="A2" t="inlineStr"><is><t>Apple</t></is></c><c r="B2"><v>3</v></c><c r="D2" t="inlineStr"><is><t>x</t></is></c></row>' +
@@ -141,8 +141,8 @@ describe("AutoFilter XLSX interchange", () => {
       '<filterColumn colId="3"><customFilters><customFilter operator="notEqual" val=" "/></customFilters></filterColumn>' +
       "</autoFilter>";
     const imported = sheetAt(
-      await backend.fromXlsxWorkbook(oneSheet(`<sheetData>${cells}</sheetData>${filter}`), {
-        onWarning,
+      await backend.fromXlsxWorkbook(one_sheet(`<sheetData>${cells}</sheetData>${filter}`), {
+        onWarning: on_warning,
       }),
     );
 
@@ -171,7 +171,7 @@ describe("AutoFilter XLSX interchange", () => {
   });
 
   it("keeps one filter per column: a repeated filterColumn is dropped with a warning", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const cells = Array.from(
       { length: 4 },
       (_unused, row) => `<row r="${row + 1}"><c r="A${row + 1}"><v>${row}</v></c></row>`,
@@ -183,8 +183,10 @@ describe("AutoFilter XLSX interchange", () => {
     ).join("");
     const imported = sheetAt(
       await backend.fromXlsxWorkbook(
-        oneSheet(`<sheetData>${cells}</sheetData><autoFilter ref="A1:A4">${repeated}</autoFilter>`),
-        { onWarning },
+        one_sheet(
+          `<sheetData>${cells}</sheetData><autoFilter ref="A1:A4">${repeated}</autoFilter>`,
+        ),
+        { onWarning: on_warning },
       ),
     );
     expect(imported.filters).toEqual([[0, { kind: "values", values: [1] }]]);
@@ -193,14 +195,14 @@ describe("AutoFilter XLSX interchange", () => {
   });
 
   it("drops a custom filter whose operator is not Excel's, not the whole import", async () => {
-    const { warnings, onWarning } = collectWarnings();
+    const { warnings, onWarning: on_warning } = collectWarnings();
     const imported = sheetAt(
       await backend.fromXlsxWorkbook(
-        oneSheet(
+        one_sheet(
           '<sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="A2"><v>2</v></c></row></sheetData>' +
             '<autoFilter ref="A1:A2"><filterColumn colId="0"><customFilters><customFilter operator="constructor" val="1"/></customFilters></filterColumn></autoFilter>',
         ),
-        { onWarning },
+        { onWarning: on_warning },
       ),
     );
     expect(imported.autoFilter?.range.end).toEqual({ row: 1, col: 0 });
@@ -213,7 +215,7 @@ describe("AutoFilter XLSX interchange", () => {
   it("reads Excel's one-condition custom filter, which has no join, as an and", async () => {
     const imported = sheetAt(
       await backend.fromXlsxWorkbook(
-        oneSheet(
+        one_sheet(
           '<dimension ref="A1:C6"/><sheetData/><autoFilter ref="A1:C6"><filterColumn colId="1"><customFilters><customFilter operator="greaterThan" val="5"/></customFilters></filterColumn></autoFilter>',
         ),
       ),

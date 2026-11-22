@@ -74,9 +74,9 @@ function field(label: string, control: HTMLElement): HTMLLabelElement {
 function select(options: readonly (readonly [string, string])[], value: string): HTMLSelectElement {
   const element = document.createElement("select");
   element.className = "sheetwrite-dialog-control";
-  for (const [optionValue, label] of options) {
+  for (const [option_value, label] of options) {
     const option = document.createElement("option");
-    option.value = optionValue;
+    option.value = option_value;
     option.textContent = label;
     element.append(option);
   }
@@ -104,14 +104,14 @@ function radios(
 ): { group: HTMLFieldSetElement; value: () => string; inputs: HTMLInputElement[] } {
   const group = document.createElement("fieldset");
   group.className = "sheetwrite-dialog-choices";
-  const inputs = options.map(([optionValue, label]) => {
+  const inputs = options.map(([option_value, label]) => {
     const wrapper = document.createElement("label");
     wrapper.className = "sheetwrite-dialog-choice";
     const input = document.createElement("input");
     input.type = "radio";
     input.name = name;
-    input.value = optionValue;
-    input.checked = optionValue === value;
+    input.value = option_value;
+    input.checked = option_value === value;
     wrapper.append(input, label);
     group.append(wrapper);
     return input;
@@ -124,7 +124,7 @@ function radios(
 }
 
 /** `#rgb` or `#rrggbb` as the `#rrggbb` a color input takes; black otherwise. */
-function colorInputValue(color: string | undefined): string {
+function color_input_value(color: string | undefined): string {
   if (color === undefined) return "#000000";
   if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase();
   const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(color);
@@ -133,7 +133,7 @@ function colorInputValue(color: string | undefined): string {
     : "#000000";
 }
 
-let dialogCount = 0;
+let dialog_count = 0;
 
 /**
  * Open Format Cells for the selection behind `deps`, showing its active
@@ -157,12 +157,12 @@ export function formatSelectionDialog(
     row: deps.toDataRow(anchor.row),
     col: anchor.col,
   });
-  const numberFormat = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
+  const number_format = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
   const rects: SelRect[] = [];
   deps.selection().forEachRect((rect) => rects.push(rect));
   const color = deps.theme().fg;
   const input = {
-    style: { ...cell.style, numberFormat },
+    style: { ...cell.style, numberFormat: number_format },
     sample: cell.resolved,
     font,
     onChange:
@@ -183,19 +183,19 @@ export function formatCellsDialog(
   grid: DialogHost,
   input: FormatCellsInput,
 ): { readonly result: Promise<FormatCellsChange | null>; close(): void } {
-  const id = `sheetwrite-format-cells-${++dialogCount}`;
+  const id = `sheetwrite-format-cells-${++dialog_count}`;
   const { style } = input;
   const body = document.createElement("div");
   body.className = "sheetwrite-format-cells";
 
   // Tabs.
-  const tabList = document.createElement("div");
-  tabList.setAttribute("role", "tablist");
-  tabList.setAttribute("aria-label", "Format Cells");
-  tabList.className = "sheetwrite-format-cells-tabs";
+  const tab_list = document.createElement("div");
+  tab_list.setAttribute("role", "tablist");
+  tab_list.setAttribute("aria-label", "Format Cells");
+  tab_list.className = "sheetwrite-format-cells-tabs";
   const tabs: HTMLButtonElement[] = [];
   const panels: HTMLDivElement[] = [];
-  const addTab = (label: string): HTMLDivElement => {
+  const add_tab = (label: string): HTMLDivElement => {
     const index = tabs.length;
     const tab = document.createElement("button");
     tab.type = "button";
@@ -209,13 +209,13 @@ export function formatCellsDialog(
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-labelledby", tab.id);
     tab.setAttribute("aria-controls", panel.id);
-    tab.addEventListener("click", () => showTab(index));
+    tab.addEventListener("click", () => show_tab(index));
     tabs.push(tab);
     panels.push(panel);
-    tabList.append(tab);
+    tab_list.append(tab);
     return panel;
   };
-  const showTab = (index: number, focus = false): void => {
+  const show_tab = (index: number, focus = false): void => {
     for (const [at, tab] of tabs.entries()) {
       const selected = at === index;
       tab.setAttribute("aria-selected", String(selected));
@@ -224,7 +224,7 @@ export function formatCellsDialog(
     }
     if (focus) tabs[index]?.focus();
   };
-  tabList.addEventListener("keydown", (event) => {
+  tab_list.addEventListener("keydown", (event) => {
     const current = tabs.findIndex((tab) => tab === event.target);
     if (current < 0) return;
     const last = tabs.length - 1;
@@ -244,16 +244,16 @@ export function formatCellsDialog(
               : -1;
     if (next < 0) return;
     event.preventDefault();
-    showTab(next, true);
+    show_tab(next, true);
   });
 
   // Number.
-  const numberPanel = addTab("Number");
-  const startParts = numberFormatParts(style.numberFormat);
-  const startCode = numberFormatCode(startParts);
+  const number_panel = add_tab("Number");
+  const start_parts = numberFormatParts(style.numberFormat);
+  const start_code = numberFormatCode(start_parts);
   const category = select(
     CATEGORIES.map((name) => [name, name] as const),
-    startParts.category,
+    start_parts.category,
   );
   category.size = CATEGORIES.length;
   const decimals = document.createElement("input");
@@ -261,41 +261,41 @@ export function formatCellsDialog(
   decimals.min = "0";
   decimals.max = String(MAX_DECIMALS);
   decimals.className = "sheetwrite-dialog-control";
-  decimals.value = String(startParts.decimals);
-  const thousands = checkbox("Use 1000 Separator (,)", startParts.thousands);
+  decimals.value = String(start_parts.decimals);
+  const thousands = checkbox("Use 1000 Separator (,)", start_parts.thousands);
   const negative = select(
     [
       ["minus", "-1,234.10"],
       ["parentheses", "(1,234.10)"],
     ],
-    startParts.parentheses ? "parentheses" : "minus",
+    start_parts.parentheses ? "parentheses" : "minus",
   );
-  const dateType = select(
+  const date_type = select(
     DATE_TYPES.map((code) => [code, code] as const),
-    startParts.category === "Date" ? startParts.code : DATE_TYPES[0]!,
+    start_parts.category === "Date" ? start_parts.code : DATE_TYPES[0]!,
   );
-  const timeType = select(
+  const time_type = select(
     TIME_TYPES.map((code) => [code, code] as const),
-    startParts.category === "Time" ? startParts.code : TIME_TYPES[0]!,
+    start_parts.category === "Time" ? start_parts.code : TIME_TYPES[0]!,
   );
-  const fractionType = select(
+  const fraction_type = select(
     FRACTION_TYPES,
-    startParts.category === "Fraction" ? startParts.code : FRACTION_TYPES[0]![0],
+    start_parts.category === "Fraction" ? start_parts.code : FRACTION_TYPES[0]![0],
   );
   const custom = document.createElement("input");
   custom.type = "text";
   custom.className = "sheetwrite-dialog-control";
   custom.maxLength = 255;
-  custom.value = startCode;
+  custom.value = start_code;
   const sample = document.createElement("output");
   sample.className = "sheetwrite-format-cells-sample";
   sample.setAttribute("aria-live", "polite");
-  const decimalsField = field("Decimal places", decimals);
-  const negativeField = field("Negative numbers", negative);
-  const dateField = field("Type", dateType);
-  const timeField = field("Type", timeType);
-  const fractionField = field("Type", fractionType);
-  const customField = field("Type", custom);
+  const decimals_field = field("Decimal places", decimals);
+  const negative_field = field("Negative numbers", negative);
+  const date_field = field("Type", date_type);
+  const time_field = field("Type", time_type);
+  const fraction_field = field("Type", fraction_type);
+  const custom_field = field("Type", custom);
   const parts = (): NumberFormatParts => {
     const name = category.value as NumberCategory;
     const count = Math.min(MAX_DECIMALS, Math.max(0, Math.trunc(Number(decimals.value) || 0)));
@@ -306,17 +306,17 @@ export function formatCellsDialog(
       parentheses: negative.value === "parentheses",
       code:
         name === "Date"
-          ? dateType.value
+          ? date_type.value
           : name === "Time"
-            ? timeType.value
+            ? time_type.value
             : name === "Fraction"
-              ? fractionType.value
+              ? fraction_type.value
               : custom.value.trim(),
     };
   };
-  const refreshNumber = (): void => {
+  const refresh_number = (): void => {
     const name = category.value as NumberCategory;
-    decimalsField.hidden = ![
+    decimals_field.hidden = ![
       "Number",
       "Currency",
       "Accounting",
@@ -324,11 +324,11 @@ export function formatCellsDialog(
       "Scientific",
     ].includes(name);
     thousands.wrapper.hidden = name !== "Number";
-    negativeField.hidden = name !== "Number" && name !== "Currency";
-    dateField.hidden = name !== "Date";
-    timeField.hidden = name !== "Time";
-    fractionField.hidden = name !== "Fraction";
-    customField.hidden = name !== "Custom";
+    negative_field.hidden = name !== "Number" && name !== "Currency";
+    date_field.hidden = name !== "Date";
+    time_field.hidden = name !== "Time";
+    fraction_field.hidden = name !== "Fraction";
+    custom_field.hidden = name !== "Custom";
     const code = numberFormatCode(parts());
     custom.setAttribute("aria-invalid", String(name === "Custom" && code === ""));
     let shown = "";
@@ -349,38 +349,38 @@ export function formatCellsDialog(
   };
   // Choosing Custom starts from the code the other settings made, as Excel does.
   category.addEventListener("change", () => {
-    if (category.value === "Custom" && custom.value.trim() === "") custom.value = startCode;
-    refreshNumber();
+    if (category.value === "Custom" && custom.value.trim() === "") custom.value = start_code;
+    refresh_number();
   });
   for (const control of [
     decimals,
     thousands.input,
     negative,
-    dateType,
-    timeType,
-    fractionType,
+    date_type,
+    time_type,
+    fraction_type,
     custom,
   ]) {
-    control.addEventListener("input", refreshNumber);
-    control.addEventListener("change", refreshNumber);
+    control.addEventListener("input", refresh_number);
+    control.addEventListener("change", refresh_number);
   }
-  numberPanel.append(
+  number_panel.append(
     field("Category", category),
     field("Sample", sample),
-    decimalsField,
+    decimals_field,
     thousands.wrapper,
-    negativeField,
-    dateField,
-    timeField,
-    fractionField,
-    customField,
+    negative_field,
+    date_field,
+    time_field,
+    fraction_field,
+    custom_field,
   );
-  refreshNumber();
+  refresh_number();
 
   // Alignment.
-  const alignmentPanel = addTab("Alignment");
-  const startAlign = style.align ?? "general";
-  const startVertical = style.verticalAlign ?? "middle";
+  const alignment_panel = add_tab("Alignment");
+  const start_align = style.align ?? "general";
+  const start_vertical = style.verticalAlign ?? "middle";
   const horizontal = select(
     [
       ["general", "General"],
@@ -388,7 +388,7 @@ export function formatCellsDialog(
       ["center", "Center"],
       ["right", "Right"],
     ],
-    startAlign,
+    start_align,
   );
   const vertical = select(
     [
@@ -396,58 +396,62 @@ export function formatCellsDialog(
       ["middle", "Center"],
       ["bottom", "Bottom"],
     ],
-    startVertical,
+    start_vertical,
   );
   const wrap = checkbox("Wrap text", style.wrap === true);
-  alignmentPanel.append(field("Horizontal", horizontal), field("Vertical", vertical), wrap.wrapper);
+  alignment_panel.append(
+    field("Horizontal", horizontal),
+    field("Vertical", vertical),
+    wrap.wrapper,
+  );
 
   // Font.
-  const fontPanel = addTab("Font");
-  const themeFont = fontShorthandParts(input.font);
-  const startFamily = style.fontFamily ?? "";
+  const font_panel = add_tab("Font");
+  const theme_font = fontShorthandParts(input.font);
+  const start_family = style.fontFamily ?? "";
   const family = select(
     [
-      ["", `${themeFont.family ?? "Theme font"} (default)`],
-      ...FONT_FAMILIES.filter((name) => name !== themeFont.family).map(
+      ["", `${theme_font.family ?? "Theme font"} (default)`],
+      ...FONT_FAMILIES.filter((name) => name !== theme_font.family).map(
         (name) => [name, name] as const,
       ),
-      ...(startFamily !== "" && !FONT_FAMILIES.includes(startFamily)
-        ? [[startFamily, startFamily] as const]
+      ...(start_family !== "" && !FONT_FAMILIES.includes(start_family)
+        ? [[start_family, start_family] as const]
         : []),
     ],
-    startFamily,
+    start_family,
   );
-  const startPoints = pixelsToPoints(style.fontSize ?? themeFont.px ?? pointsToPixels(11));
-  const sizes = [...new Set([...FONT_SIZES_PT, startPoints])].sort((a, b) => a - b);
+  const start_points = pixelsToPoints(style.fontSize ?? theme_font.px ?? pointsToPixels(11));
+  const sizes = [...new Set([...FONT_SIZES_PT, start_points])].sort((a, b) => a - b);
   const size = select(
     sizes.map((points) => [String(points), String(points)] as const),
-    String(startPoints),
+    String(start_points),
   );
   const bold = checkbox("Bold", style.bold === true);
   const italic = checkbox("Italic", style.italic === true);
   const underline = checkbox("Underline", style.underline === true);
   const strikethrough = checkbox("Strikethrough", style.strikethrough === true);
-  const automaticColor = checkbox("Automatic color", style.color === undefined);
+  const automatic_color = checkbox("Automatic color", style.color === undefined);
   const color = document.createElement("input");
   color.type = "color";
-  color.value = colorInputValue(style.color);
+  color.value = color_input_value(style.color);
   color.disabled = style.color === undefined;
-  automaticColor.input.addEventListener("change", () => {
-    color.disabled = automaticColor.input.checked;
+  automatic_color.input.addEventListener("change", () => {
+    color.disabled = automatic_color.input.checked;
   });
-  fontPanel.append(
+  font_panel.append(
     field("Font", family),
     field("Size", size),
     bold.wrapper,
     italic.wrapper,
     underline.wrapper,
     strikethrough.wrapper,
-    automaticColor.wrapper,
+    automatic_color.wrapper,
     field("Color", color),
   );
 
   // Border.
-  const borderPanel = addTab("Border");
+  const border_panel = add_tab("Border");
   const border = radios(
     `${id}-border`,
     [
@@ -464,31 +468,31 @@ export function formatCellsDialog(
     "keep",
   );
   border.group.setAttribute("aria-label", "Presets");
-  borderPanel.append(border.group);
+  border_panel.append(border.group);
 
   // Fill.
-  const fillPanel = addTab("Fill");
-  const startFill = style.backgroundColor === undefined ? "none" : "color";
+  const fill_panel = add_tab("Fill");
+  const start_fill = style.backgroundColor === undefined ? "none" : "color";
   const fill = radios(
     `${id}-fill`,
     [
       ["none", "No fill"],
       ["color", "Color"],
     ],
-    startFill,
+    start_fill,
   );
   fill.group.setAttribute("aria-label", "Background");
-  const fillColor = document.createElement("input");
-  fillColor.type = "color";
-  fillColor.value = colorInputValue(style.backgroundColor ?? "#ffffff");
-  fillColor.setAttribute("aria-label", "Background color");
-  fillColor.addEventListener("input", () => {
+  const fill_color = document.createElement("input");
+  fill_color.type = "color";
+  fill_color.value = color_input_value(style.backgroundColor ?? "#ffffff");
+  fill_color.setAttribute("aria-label", "Background color");
+  fill_color.addEventListener("input", () => {
     for (const option of fill.inputs) option.checked = option.value === "color";
   });
-  fillPanel.append(fill.group, fillColor);
+  fill_panel.append(fill.group, fill_color);
 
-  body.append(tabList, ...panels);
-  showTab(0);
+  body.append(tab_list, ...panels);
+  show_tab(0);
   // Each setting the user changes previews at once, as OK would apply it.
   const notify = (): void => input.onChange?.(change());
   body.addEventListener("input", notify);
@@ -498,15 +502,15 @@ export function formatCellsDialog(
   const change = (): FormatCellsChange => {
     const next: Partial<CellStyle> = {};
     const code = numberFormatCode(parts());
-    if (code !== startCode) next.numberFormat = code;
-    if (horizontal.value !== startAlign) {
+    if (code !== start_code) next.numberFormat = code;
+    if (horizontal.value !== start_align) {
       next.align = horizontal.value === "general" ? undefined : (horizontal.value as CellAlign);
     }
-    if (vertical.value !== startVertical) next.verticalAlign = vertical.value as CellVerticalAlign;
+    if (vertical.value !== start_vertical) next.verticalAlign = vertical.value as CellVerticalAlign;
     if (wrap.input.checked !== (style.wrap === true)) next.wrap = wrap.input.checked;
-    if (family.value !== startFamily)
+    if (family.value !== start_family)
       next.fontFamily = family.value === "" ? undefined : family.value;
-    if (Number(size.value) !== startPoints) next.fontSize = pointsToPixels(Number(size.value));
+    if (Number(size.value) !== start_points) next.fontSize = pointsToPixels(Number(size.value));
     for (const [key, box] of [
       ["bold", bold],
       ["italic", italic],
@@ -515,16 +519,16 @@ export function formatCellsDialog(
     ] as const) {
       if (box.input.checked !== (style[key] === true)) next[key] = box.input.checked;
     }
-    const nextColor = automaticColor.input.checked ? undefined : color.value;
-    if (nextColor !== (style.color === undefined ? undefined : colorInputValue(style.color))) {
-      next.color = nextColor;
+    const next_color = automatic_color.input.checked ? undefined : color.value;
+    if (next_color !== (style.color === undefined ? undefined : color_input_value(style.color))) {
+      next.color = next_color;
     }
-    const nextFill = fill.value() === "none" ? undefined : fillColor.value;
+    const next_fill = fill.value() === "none" ? undefined : fill_color.value;
     if (
-      nextFill !==
-      (style.backgroundColor === undefined ? undefined : colorInputValue(style.backgroundColor))
+      next_fill !==
+      (style.backgroundColor === undefined ? undefined : color_input_value(style.backgroundColor))
     ) {
-      next.backgroundColor = nextFill;
+      next.backgroundColor = next_fill;
     }
     const preset = border.value();
     return { style: next, border: preset === "keep" ? null : (preset as BorderPreset) };
@@ -541,7 +545,7 @@ export function formatCellsDialog(
     initialFocus: tabs[0],
     accept: () => {
       if (category.value !== "Custom" || custom.value.trim() !== "") return true;
-      showTab(0);
+      show_tab(0);
       custom.focus();
       return false;
     },

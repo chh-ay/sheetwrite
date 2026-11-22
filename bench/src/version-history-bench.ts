@@ -72,7 +72,7 @@ function maximum(left: Observation, right: Observation): Observation {
   };
 }
 
-async function collectGarbage(): Promise<void> {
+async function collect_garbage(): Promise<void> {
   for (let turn = 0; turn < GC_TURNS; turn++) {
     const next = Promise.withResolvers<void>();
     setImmediate(next.resolve);
@@ -81,7 +81,7 @@ async function collectGarbage(): Promise<void> {
   }
 }
 
-function cellValue(row: number, col: number): CellValue {
+function cell_value(row: number, col: number): CellValue {
   if (col === COLS - 1) {
     return { kind: "formula", src: `=SUM(B${row + 1}:S${row + 1})` };
   }
@@ -103,7 +103,7 @@ function workbook(): WorkbookSnapshot {
       cells.push({
         rowOffset: row,
         colOffset: col,
-        value: cellValue(row, col),
+        value: cell_value(row, col),
         ...(styled ? { style: { numberFormat: "#,##0.00" } } : {}),
       });
     }
@@ -170,7 +170,7 @@ function commit(revision: number, source: WorkbookSnapshot): CommittedTransactio
   return entry;
 }
 
-async function instanceStartupMs(): Promise<number> {
+async function instance_startup_ms(): Promise<number> {
   const samples: number[] = [];
 
   for (let sample = 0; sample < INSTANCE_SAMPLES; sample++) {
@@ -183,7 +183,7 @@ async function instanceStartupMs(): Promise<number> {
   return median(samples);
 }
 
-async function replayMs(archive: HistoryArchive, id: string): Promise<number> {
+async function replay_ms(archive: HistoryArchive, id: string): Promise<number> {
   const samples: number[] = [];
 
   for (let sample = 0; sample < REPLAY_SAMPLES; sample++) {
@@ -198,11 +198,11 @@ async function replayMs(archive: HistoryArchive, id: string): Promise<number> {
 }
 
 async function session() {
-  await collectGarbage();
+  await collect_garbage();
   const baseline = observation();
 
   const source = workbook();
-  const snapshotBytes = new TextEncoder().encode(JSON.stringify(source)).length;
+  const snapshot_bytes = new TextEncoder().encode(JSON.stringify(source)).length;
   const archive = await HistoryArchive.open({
     documentId: "forecast",
     storage: new MemoryHistoryStorage(),
@@ -212,13 +212,13 @@ async function session() {
   await archive.initialize(source, 0);
 
   let peak = baseline;
-  let reviewId = "";
+  let review_id = "";
   for (let revision = 1; revision <= TRANSACTIONS; revision++) {
     const entry = commit(revision, source);
     await archive.record(entry, () => source);
 
     if (revision === TRANSACTIONS - 1) {
-      reviewId = (await archive.saveVersion("Review", "alice", entry.time)).id;
+      review_id = (await archive.saveVersion("Review", "alice", entry.time)).id;
     }
 
     if (revision % SAMPLE_EVERY === 0) {
@@ -226,31 +226,31 @@ async function session() {
     }
   }
 
-  const recordMs = performance.now() - started;
+  const record_ms = performance.now() - started;
 
   const usage = await archive.storageUsage();
   assert(usage.encodedBytes < MAX_RETAINED_BYTES, "Session exceeds the 20 MiB storage target");
 
-  await collectGarbage();
+  await collect_garbage();
   const retained = observation();
 
-  const readVersionMs = await replayMs(archive, reviewId);
-  await collectGarbage();
-  const afterReplay = observation();
+  const read_version_ms = await replay_ms(archive, review_id);
+  await collect_garbage();
+  const after_replay = observation();
 
   return {
     cells: ROWS * COLS,
     transactions: TRANSACTIONS,
     sessionHours: SESSION_MS / 3_600_000,
     encodedTransactionBytes: TRANSACTION_BYTES,
-    snapshotBytes,
+    snapshotBytes: snapshot_bytes,
     usage,
-    recordMs,
-    readVersionMs,
+    recordMs: record_ms,
+    readVersionMs: read_version_ms,
     baseline,
     peak,
     retained,
-    afterReplay,
+    afterReplay: after_replay,
   };
 }
 
@@ -258,7 +258,7 @@ async function session() {
 const RESTORE_TRANSACTIONS = 1_000;
 
 /** Median time to restore one version on a live grid; each sample is undone again. */
-async function restoreMs(
+async function restore_ms(
   archive: HistoryArchive,
   grid: Grid,
   id: string,
@@ -284,13 +284,13 @@ async function restoreMs(
  * kernel and compiles its code; `afterSamples` is measured after the timed
  * diffs, so its difference from `firstUse` is what closed diffs keep.
  */
-async function diffMs(archive: HistoryArchive, from: string, to: string) {
-  await collectGarbage();
+async function diff_ms(archive: HistoryArchive, from: string, to: string) {
+  await collect_garbage();
   const before = observation();
 
   await archive.diffVersions({ from, to });
-  await collectGarbage();
-  const firstUse = observation();
+  await collect_garbage();
+  const first_use = observation();
 
   const samples: number[] = [];
   let changes = 0;
@@ -303,10 +303,16 @@ async function diffMs(archive: HistoryArchive, from: string, to: string) {
     changes = page.cells.flags.length;
   }
 
-  await collectGarbage();
-  const afterSamples = observation();
+  await collect_garbage();
+  const after_samples = observation();
 
-  return { firstPageMs: median(samples), changes, before, firstUse, afterSamples };
+  return {
+    firstPageMs: median(samples),
+    changes,
+    before,
+    firstUse: first_use,
+    afterSamples: after_samples,
+  };
 }
 
 /**
@@ -317,9 +323,11 @@ async function diffMs(archive: HistoryArchive, from: string, to: string) {
 async function restore() {
   // The DOM is installed only now, so the session measurements above do not include it.
   await import("./dom-setup.js");
-  const { createGridFromSnapshot } = await import("../../packages/core/src/persistence.js");
-  const { installCanvasTestStubs } = await import("../../packages/core/src/testing.js");
-  const restoreCanvas = installCanvasTestStubs();
+  const { createGridFromSnapshot: create_grid_from_snapshot } =
+    await import("../../packages/core/src/persistence.js");
+  const { installCanvasTestStubs: install_canvas_test_stubs } =
+    await import("../../packages/core/src/testing.js");
+  const restore_canvas = install_canvas_test_stubs();
 
   const source = workbook();
   const archive = await HistoryArchive.open({
@@ -341,21 +349,21 @@ async function restore() {
 
   const host = document.createElement("div");
   document.body.appendChild(host);
-  const grid = createGridFromSnapshot(host, source);
+  const grid = create_grid_from_snapshot(host, source);
 
   try {
     return {
       transactions: RESTORE_TRANSACTIONS,
-      workbookToStartMs: await restoreMs(archive, grid, start.id, { kind: "workbook" }),
-      sheetToPreviousMs: await restoreMs(archive, grid, previous, {
+      workbookToStartMs: await restore_ms(archive, grid, start.id, { kind: "workbook" }),
+      sheetToPreviousMs: await restore_ms(archive, grid, previous, {
         kind: "sheet",
         sheet: "sales",
       }),
-      diff: await diffMs(archive, start.id, previous),
+      diff: await diff_ms(archive, start.id, previous),
     };
   } finally {
     grid.destroy();
-    restoreCanvas();
+    restore_canvas();
   }
 }
 
@@ -431,7 +439,7 @@ async function bundles() {
   }
 }
 
-async function engineHashes() {
+async function engine_hashes() {
   const engines: Record<string, { bytes: number; sha256: string }> = {};
 
   for (const name of ["wasm", "formulas"]) {
@@ -446,7 +454,7 @@ async function engineHashes() {
 }
 
 /** The history diff kernel WASM, which loads only when a diff runs. */
-async function kernelWasm() {
+async function kernel_wasm() {
   const bytes = await readFile(
     resolve(ROOT, "packages/wasm/pkg-history/sheetwrite_history_bg.wasm"),
   );
@@ -460,22 +468,22 @@ async function kernelWasm() {
 
 await initSheetwrite();
 
-const startupMs = await instanceStartupMs();
+const startup_ms = await instance_startup_ms();
 const capture = await session();
 
 // Measured after the session frame returns, so no local keeps the archive alive.
-await collectGarbage();
-const afterRelease = observation();
+await collect_garbage();
+const after_release = observation();
 
 const report = {
   platform: process.platform,
   arch: process.arch,
-  instanceStartupMs: startupMs,
-  capture: { ...capture, afterRelease },
+  instanceStartupMs: startup_ms,
+  capture: { ...capture, afterRelease: after_release },
   restore: await restore(),
   bundles: await bundles(),
-  kernel: await kernelWasm(),
-  engines: await engineHashes(),
+  kernel: await kernel_wasm(),
+  engines: await engine_hashes(),
 };
 
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

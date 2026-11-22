@@ -11,7 +11,7 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-function styleAt(store: SheetwriteStore, row: number) {
+function style_at(store: SheetwriteStore, row: number) {
   const view = store.getVisibleWindow("s1", { start: row, end: row + 1 }, [1]);
   return view.styles[view.styleIds[0]!] ?? {};
 }
@@ -36,17 +36,17 @@ describe("conditional formula formats", () => {
       ],
     });
 
-    expect(styleAt(store, 0).backgroundColor).toBeUndefined();
-    expect(styleAt(store, 1).backgroundColor).toBe("#00FF00");
-    expect(styleAt(store, 2).backgroundColor).toBe("#00FF00");
+    expect(style_at(store, 0).backgroundColor).toBeUndefined();
+    expect(style_at(store, 1).backgroundColor).toBe("#00FF00");
+    expect(style_at(store, 2).backgroundColor).toBe("#00FF00");
 
     store.applyTransaction({
       patches: [
         { op: "set", addr: { sheet: "s1", row: 1, col: 0 }, value: { kind: "literal", value: 2 } },
       ],
     });
-    expect(styleAt(store, 1).backgroundColor).toBeUndefined();
-    expect(styleAt(store, 2).backgroundColor).toBe("#00FF00");
+    expect(style_at(store, 1).backgroundColor).toBeUndefined();
+    expect(style_at(store, 2).backgroundColor).toBe("#00FF00");
   });
 
   it("uses array order as precedence and applies stopIfTrue before mask folding", () => {
@@ -65,7 +65,7 @@ describe("conditional formula formats", () => {
       },
     ];
     const store = new SheetwriteStore(workbook);
-    expect(styleAt(store, 0)).toMatchObject({
+    expect(style_at(store, 0)).toMatchObject({
       color: "#111111",
       bold: true,
       italic: true,
@@ -81,8 +81,8 @@ describe("conditional formula formats", () => {
         },
       ],
     });
-    expect(styleAt(store, 0)).toMatchObject({ color: "#111111", bold: true });
-    expect(styleAt(store, 0).italic).toBeUndefined();
+    expect(style_at(store, 0)).toMatchObject({ color: "#111111", bold: true });
+    expect(style_at(store, 0).italic).toBeUndefined();
   });
 
   it("rejects a 33rd renderer rule before snapshot allocation", () => {

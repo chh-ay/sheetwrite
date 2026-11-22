@@ -51,9 +51,9 @@ const workbook: Workbook = {
 };
 
 await initSheetwrite();
-const restoreCanvas = installCanvasTestStubs();
-const originalRaf = globalThis.requestAnimationFrame;
-const originalCancelRaf = globalThis.cancelAnimationFrame;
+const restore_canvas = installCanvasTestStubs();
+const original_raf = globalThis.requestAnimationFrame;
+const original_cancel_raf = globalThis.cancelAnimationFrame;
 globalThis.requestAnimationFrame = (callback) => {
   callback(0);
   return 0;
@@ -65,7 +65,7 @@ const samples = {
   prefetch: [] as number[],
 };
 const residency: Array<{ allocatedBytes: number; chunks: number; loadedCells: number }> = [];
-const prefetchEvidence: Array<{ residencyRatio: number; p95VisibleWaitMs: number }> = [];
+const prefetch_evidence: Array<{ residencyRatio: number; p95VisibleWaitMs: number }> = [];
 try {
   for (let sample = -WARMUPS; sample < SAMPLES; sample++) {
     Bun.gc(true);
@@ -132,7 +132,7 @@ try {
       cacheBytes: CACHE_BYTES,
     });
     try {
-      const readColumns = Array.from({ length: READ_COLUMNS }, (_, column) => column);
+      const read_columns = Array.from({ length: READ_COLUMNS }, (_, column) => column);
       store.loadPage(
         "s1",
         0,
@@ -144,14 +144,14 @@ try {
           },
         ],
         Array.from({ length: READ_LOADED_ROWS }, (_, row) =>
-          Object.fromEntries(readColumns.map((column) => [`c${column}`, row])),
+          Object.fromEntries(read_columns.map((column) => [`c${column}`, row])),
         ),
       );
       const started = performance.now();
       let checksum = 0;
       for (let iteration = 0; iteration < READ_ITERATIONS; iteration++) {
         const start = iteration % READ_CYCLE_ROWS;
-        const view = store.getVisibleWindow("s1", { start, end: start + PAINT_ROWS }, readColumns);
+        const view = store.getVisibleWindow("s1", { start, end: start + PAINT_ROWS }, read_columns);
         const value = view.values[0];
         if (typeof value !== "number") throw new Error("Window benchmark bulk read was not loaded");
         checksum += value;
@@ -167,7 +167,7 @@ try {
     for (let iteration = 0; iteration < PREFETCH_ITERATIONS; iteration++) {
       const report = await runDatasourcePrefetchBenchmark();
       if (sample >= 0 && iteration === 0) {
-        prefetchEvidence.push({
+        prefetch_evidence.push({
           residencyRatio: report.medianResidencyRatio,
           p95VisibleWaitMs: report.p95VisibleWaitMs,
         });
@@ -184,7 +184,7 @@ try {
       offscreenMerges: OFFSCREEN_MERGE_COUNT,
       samples,
       residency,
-      prefetchEvidence,
+      prefetchEvidence: prefetch_evidence,
       iterations: {
         scroll: SCROLL_ITERATIONS,
         reads: READ_ITERATIONS,
@@ -193,7 +193,7 @@ try {
     })}\n`,
   );
 } finally {
-  globalThis.requestAnimationFrame = originalRaf;
-  globalThis.cancelAnimationFrame = originalCancelRaf;
-  restoreCanvas();
+  globalThis.requestAnimationFrame = original_raf;
+  globalThis.cancelAnimationFrame = original_cancel_raf;
+  restore_canvas();
 }

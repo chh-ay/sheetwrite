@@ -37,13 +37,17 @@ const ARR_CELLS = {
   end: { row: 1, col: 1 },
 };
 
-function project(operations: DocumentOp[], commitReason: CommitReason): Map<string, HostEntity> {
+function project(operations: DocumentOp[], commit_reason: CommitReason): Map<string, HostEntity> {
   const bridge = createRowBridge({
     columns: COLUMNS,
     defaultRows: ROWS,
     getRowId: (row) => row.id,
   });
-  const projection = bridge.reconcile({ status: "accepted", operations, commitReason });
+  const projection = bridge.reconcile({
+    status: "accepted",
+    operations,
+    commitReason: commit_reason,
+  });
   const store = applyHostProjection(new Map(ROWS.map((row) => [row.id, row])), projection);
   return store;
 }
@@ -53,7 +57,7 @@ describe("host account store", () => {
     ["paste", "paste"],
     ["fill", "fill"],
     ["range", "api"],
-  ] as const)("applies a %s write to every account it covers", (_kind, commitReason) => {
+  ] as const)("applies a %s write to every account it covers", (_kind, commit_reason) => {
     const store = project(
       [
         {
@@ -65,7 +69,7 @@ describe("host account store", () => {
           ],
         },
       ],
-      commitReason,
+      commit_reason,
     );
 
     expect(store.get("account-001")?.amount).toBe(90_000);

@@ -45,7 +45,7 @@ export function isRunnableMeta(meta: string | null | undefined): boolean {
 }
 
 /** `import { RunnableCode } from "…"` as an MDX ESM node, with the tree MDX compiles. */
-function componentImport(): RunnableHastNode {
+function component_import(): RunnableHastNode {
   const identifier = { type: "Identifier", name: COMPONENT };
   return {
     type: "mdxjsEsm",
@@ -72,7 +72,7 @@ function componentImport(): RunnableHastNode {
 }
 
 /** Whether a node is a raw HTML block that opens or closes a `<details>` disclosure. */
-function detailsTag(node: RunnableHastNode): "open" | "close" | "both" | undefined {
+function details_tag(node: RunnableHastNode): "open" | "close" | "both" | undefined {
   if (node.type !== "raw") return undefined;
   const value = node.value ?? "";
   const opens = /<details[\s>]/.test(value);
@@ -87,7 +87,7 @@ function detailsTag(node: RunnableHastNode): "open" | "close" | "both" | undefin
  * setup") that holds no other code block. Markdown keeps the disclosure's
  * tags as raw HTML blocks among its content until a later step parses them.
  */
-function disclosureAround(
+function disclosure_around(
   siblings: readonly RunnableHastNode[],
   index: number,
 ): [number, number] | undefined {
@@ -95,7 +95,7 @@ function disclosureAround(
     for (let at = index + step; at >= 0 && at < siblings.length; at += step) {
       const sibling = siblings[at] as RunnableHastNode;
       if (sibling.tagName === "pre") return undefined;
-      const tag = detailsTag(sibling);
+      const tag = details_tag(sibling);
       if (tag !== undefined) return tag === wanted ? at : undefined;
     }
     return undefined;
@@ -127,7 +127,7 @@ export function runnableCodeBlocks() {
           continue;
         }
         found = true;
-        const disclosure = disclosureAround(children, index);
+        const disclosure = disclosure_around(children, index);
         if (disclosure === undefined) {
           output.push({
             type: "mdxJsxFlowElement",
@@ -151,6 +151,6 @@ export function runnableCodeBlocks() {
       node.children = output;
     };
     visit(tree);
-    if (found) tree.children?.unshift(componentImport());
+    if (found) tree.children?.unshift(component_import());
   };
 }

@@ -57,7 +57,7 @@ interface LifetimeRun {
   readonly liveObjects: number;
 }
 
-function numberArgument(args: readonly string[], name: string, fallback: number): number {
+function number_argument(args: readonly string[], name: string, fallback: number): number {
   const text = optionValue(args, name);
   if (text === undefined) return fallback;
   const value = Number(text);
@@ -67,11 +67,11 @@ function numberArgument(args: readonly string[], name: string, fallback: number)
   return value;
 }
 
-function retainedBytes(observation: HeapObservation): number {
+function retained_bytes(observation: HeapObservation): number {
   return observation.jsBytes + observation.embedderBytes;
 }
 
-async function observeRetainedHeap(session: CDPSession): Promise<HeapObservation> {
+async function observe_retained_heap(session: CDPSession): Promise<HeapObservation> {
   await Bun.sleep(SETTLE_MS);
   // V8's full collection also traces Blink's heap (unified heap), so detached
   // grid DOM that nothing holds is freed before the counters are read.
@@ -89,24 +89,24 @@ async function observeRetainedHeap(session: CDPSession): Promise<HeapObservation
   };
 }
 
-async function measureRun(
-  baseUrl: string,
+async function measure_run(
+  base_url: string,
   run: number,
   options: LifetimeOptions,
 ): Promise<LifetimeRun> {
   const browser = await chromium.launch({ headless: true, args: ["--js-flags=--expose-gc"] });
   try {
     const page = await browser.newPage({ viewport: { width: 1_200, height: 800 } });
-    const pageErrors: string[] = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
+    const page_errors: string[] = [];
+    page.on("pageerror", (error) => page_errors.push(error.message));
     page.on("console", (message) => {
-      if (message.type() === "error") pageErrors.push(message.text());
+      if (message.type() === "error") page_errors.push(message.text());
     });
 
-    await page.goto(`${baseUrl}?warmup=${options.warmup}&cycles=${options.cycles}`, {
+    await page.goto(`${base_url}?warmup=${options.warmup}&cycles=${options.cycles}`, {
       waitUntil: "load",
     });
-    const runPhase = async (done: string): Promise<void> => {
+    const run_phase = async (done: string): Promise<void> => {
       // A real click (CDP input). `dispatchEvent` would run Playwright's
       // injected script in the page's own world and add its objects to the heap.
       await page.locator("#bench-run").click();
@@ -114,56 +114,64 @@ async function measureRun(
         .locator(`#bench-status[data-status="${done}"], #bench-status[data-status="error"]`)
         .waitFor({ timeout: PAGE_TIMEOUT_MS });
       const status = await page.locator("#bench-status").getAttribute("data-status");
-      if (status !== done || pageErrors.length > 0) {
+      if (status !== done || page_errors.length > 0) {
         throw new Error(
-          `Run ${run} failed in the page: ${pageErrors.join("; ") || "error status"}`,
+          `Run ${run} failed in the page: ${page_errors.join("; ") || "error status"}`,
         );
       }
     };
     await page.locator('#bench-status[data-status="idle"]').waitFor({ timeout: PAGE_TIMEOUT_MS });
     const session = await page.context().newCDPSession(page);
 
-    await runPhase("ready");
-    const baseline = await observeRetainedHeap(session);
-    await runPhase("done");
-    const after = await observeRetainedHeap(session);
-    await runPhase("counted");
-    const statusElement = page.locator("#bench-status");
-    const trackedObjects = Number(await statusElement.getAttribute("data-tracked-objects"));
-    const liveObjects = Number(await statusElement.getAttribute("data-live-objects"));
+    await run_phase("ready");
+    const baseline = await observe_retained_heap(session);
+    await run_phase("done");
+    const after = await observe_retained_heap(session);
+    await run_phase("counted");
+    const status_element = page.locator("#bench-status");
+    const tracked_objects = Number(await status_element.getAttribute("data-tracked-objects"));
+    const live_objects = Number(await status_element.getAttribute("data-live-objects"));
 
     return {
       run,
       baseline,
       after,
       growthPercent:
-        ((retainedBytes(after) - retainedBytes(baseline)) / retainedBytes(baseline)) * 100,
-      trackedObjects,
-      liveObjects,
+        ((retained_bytes(after) - retained_bytes(baseline)) / retained_bytes(baseline)) * 100,
+      trackedObjects: tracked_objects,
+      liveObjects: live_objects,
     };
   } finally {
     await browser.close();
   }
 }
 
-function markdownTable(
+function markdown_table(
   runs: readonly LifetimeRun[],
   options: LifetimeOptions,
   verdict: number,
 ): string {
   const mib = (bytes: number): string => (bytes / 1024 / 1024).toFixed(2);
   const pair = (before: string | number, after: string | number): string => `${before} → ${after}`;
-  const rows = runs.map(({ run, baseline, after, growthPercent, trackedObjects, liveObjects }) =>
-    [
+  const rows = runs.map(
+    ({
       run,
-      pair(mib(baseline.jsBytes), mib(after.jsBytes)),
-      pair(mib(baseline.embedderBytes), mib(after.embedderBytes)),
-      pair(mib(retainedBytes(baseline)), mib(retainedBytes(after))),
-      `${growthPercent.toFixed(2)}%`,
-      pair(baseline.nodes, after.nodes),
-      pair(baseline.jsEventListeners, after.jsEventListeners),
-      `${liveObjects} of ${trackedObjects}`,
-    ].join(" | "),
+      baseline,
+      after,
+      growthPercent: growth_percent,
+      trackedObjects: tracked_objects,
+      liveObjects: live_objects,
+    }) =>
+      [
+        run,
+        pair(mib(baseline.jsBytes), mib(after.jsBytes)),
+        pair(mib(baseline.embedderBytes), mib(after.embedderBytes)),
+        pair(mib(retained_bytes(baseline)), mib(retained_bytes(after))),
+        `${growth_percent.toFixed(2)}%`,
+        pair(baseline.nodes, after.nodes),
+        pair(baseline.jsEventListeners, after.jsEventListeners),
+        `${live_objects} of ${tracked_objects}`,
+      ].join(" | "),
   );
 
   return [
@@ -176,13 +184,13 @@ function markdownTable(
   ].join("\n");
 }
 
-async function runBenchmark(args: readonly string[]): Promise<void> {
-  const runs = numberArgument(args, "--runs", 3);
+async function run_benchmark(args: readonly string[]): Promise<void> {
+  const runs = number_argument(args, "--runs", 3);
   const options: LifetimeOptions = {
-    warmup: numberArgument(args, "--warmup", 50),
-    cycles: numberArgument(args, "--cycles", 100),
+    warmup: number_argument(args, "--warmup", 50),
+    cycles: number_argument(args, "--cycles", 100),
   };
-  const outputPath = optionValue(args, "--output");
+  const output_path = optionValue(args, "--output");
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -202,41 +210,41 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
   try {
     for (let run = 1; run <= runs; run++) {
       process.stderr.write(`grid lifetime benchmark: run ${run}/${runs}\n`);
-      results.push(await measureRun(`http://${server.hostname}:${server.port}/`, run, options));
+      results.push(await measure_run(`http://${server.hostname}:${server.port}/`, run, options));
     }
   } finally {
     await server.stop(true);
   }
 
   const verdict = median(results.map((entry) => entry.growthPercent));
-  process.stdout.write(`${markdownTable(results, options, verdict)}\n`);
-  if (outputPath) {
+  process.stdout.write(`${markdown_table(results, options, verdict)}\n`);
+  if (output_path) {
     const artifact = {
       ...options,
       maxGrowthPercent: MAX_GROWTH_PERCENT,
       medianGrowthPercent: verdict,
       runs: results,
     };
-    await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+    await writeFile(output_path, `${JSON.stringify(artifact, null, 2)}\n`);
   }
   if (verdict > MAX_GROWTH_PERCENT) {
     throw new Error(
       `Median retained heap growth ${verdict.toFixed(2)}% is above ${MAX_GROWTH_PERCENT}%.`,
     );
   }
-  const retainingRun = results.find(
-    ({ baseline, after, liveObjects }) =>
-      liveObjects > 0 ||
+  const retaining_run = results.find(
+    ({ baseline, after, liveObjects: live_objects }) =>
+      live_objects > 0 ||
       after.nodes > baseline.nodes ||
       after.jsEventListeners > baseline.jsEventListeners,
   );
-  if (retainingRun) {
+  if (retaining_run) {
     throw new Error(
-      `Run ${retainingRun.run} kept grid objects, DOM nodes or event listeners of destroyed grids.`,
+      `Run ${retaining_run.run} kept grid objects, DOM nodes or event listeners of destroyed grids.`,
     );
   }
 }
 
 if (import.meta.main) {
-  await runBenchmark(process.argv.slice(2).filter((argument) => argument !== "--"));
+  await run_benchmark(process.argv.slice(2).filter((argument) => argument !== "--"));
 }

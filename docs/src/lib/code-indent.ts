@@ -7,7 +7,7 @@ const HANGING_INDENT = 2;
 const MAX_INDENT = 40;
 
 /** The class that gives a line of `indent` leading characters its hanging indent. */
-const indentClass = (indent: number) => `sw-i${Math.min(indent, MAX_INDENT)}`;
+const indent_class = (indent: number) => `sw-i${Math.min(indent, MAX_INDENT)}`;
 
 /**
  * Per-line hanging indent for wrapped code, without inline styles. A wrapped
@@ -22,15 +22,15 @@ export function codeHangingIndent(): ExpressiveCodePlugin {
   const rules = Array.from(
     { length: MAX_INDENT },
     (_, index) =>
-      `.ec-line.${indentClass(index + 1)} { --ecIndent: ${index + 1 + HANGING_INDENT}ch; }`,
+      `.ec-line.${indent_class(index + 1)} { --ecIndent: ${index + 1 + HANGING_INDENT}ch; }`,
   );
   return definePlugin({
     name: "Hanging indent",
     baseStyles: `.ec-line { --ecIndent: ${HANGING_INDENT}ch; }\n${rules.join("\n")}`,
     hooks: {
-      postprocessRenderedLine: ({ line, renderData }) => {
+      postprocessRenderedLine: ({ line, renderData: render_data }) => {
         const indent = line.text.match(/^\s*/)?.[0].length ?? 0;
-        if (indent > 0) addClassName(renderData.lineAst, indentClass(indent));
+        if (indent > 0) addClassName(render_data.lineAst, indent_class(indent));
       },
     },
   });

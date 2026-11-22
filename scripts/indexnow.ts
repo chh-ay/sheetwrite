@@ -18,7 +18,7 @@ interface IndexNowPayload {
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-function decodeXmlText(value: string): string {
+function decode_xml_text(value: string): string {
   return value
     .replaceAll("&amp;", "&")
     .replaceAll("&lt;", "<")
@@ -32,7 +32,7 @@ export function urlsFromSitemap(xml: string): readonly string[] {
   for (const match of xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)) {
     const value = match[1];
     if (value === undefined) continue;
-    const url = new URL(decodeXmlText(value));
+    const url = new URL(decode_xml_text(value));
     if (url.origin !== SITE_URL) {
       throw new Error(`Sitemap URL is outside ${SITE_URL}: ${url.href}`);
     }
@@ -71,34 +71,34 @@ export async function submitIndexNow(
   return urls.length;
 }
 
-async function submitProductionSitemap(): Promise<void> {
+async function submit_production_sitemap(): Promise<void> {
   if (process.env.VERCEL_ENV !== "production") {
     process.stdout.write("IndexNow submission skipped outside a production deployment\n");
     return;
   }
-  const outputRoot = resolve(
+  const output_root = resolve(
     import.meta.dir,
     "..",
     process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client",
   );
-  const sitemap = await readFile(resolve(outputRoot, "sitemap.xml"), "utf8");
+  const sitemap = await readFile(resolve(output_root, "sitemap.xml"), "utf8");
   const urls = urlsFromSitemap(sitemap);
-  let lastError: unknown;
+  let last_error: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const submitted = await submitIndexNow(urls);
       console.log(`IndexNow accepted ${submitted} canonical URLs`);
       return;
     } catch (error) {
-      lastError = error;
+      last_error = error;
       if (attempt < 3) await Bun.sleep(attempt * 1_000);
     }
   }
   console.warn(
-    `IndexNow submission did not complete after three attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    `IndexNow submission did not complete after three attempts: ${last_error instanceof Error ? last_error.message : String(last_error)}`,
   );
 }
 
 if (import.meta.main) {
-  await submitProductionSitemap();
+  await submit_production_sitemap();
 }

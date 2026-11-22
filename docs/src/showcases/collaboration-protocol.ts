@@ -24,9 +24,9 @@ import {
 export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOperationSource {
   private readonly adapter: MemoryPersistenceAdapter;
   private readonly listeners = new Set<(operation: VersionedOperation) => void>();
-  private readonly commitListeners = new Set<(record: ShowcaseCommitRecord) => void>();
+  private readonly commit_listeners = new Set<(record: ShowcaseCommitRecord) => void>();
   private readonly versions = new Map<string, number>();
-  private nextServerMutation = 1;
+  private next_server_mutation = 1;
 
   constructor(...snapshots: readonly WorkbookSnapshot[]) {
     this.adapter = new MemoryPersistenceAdapter(...snapshots);
@@ -57,7 +57,7 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
       version: response.status === "conflict" ? response.currentVersion : response.version,
       operationCount: request.operations.length,
     };
-    for (const listener of this.commitListeners) listener(record);
+    for (const listener of this.commit_listeners) listener(record);
     return response;
   }
   async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
@@ -84,14 +84,14 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
       operationCount: request.operations.length,
       batchVersions: request.versionOperationCounts.length,
     };
-    for (const listener of this.commitListeners) listener(record);
+    for (const listener of this.commit_listeners) listener(record);
     return response;
   }
 
   /** Observes every sequencing decision: applied, duplicate, and conflict acks. */
   observeCommits(listener: (record: ShowcaseCommitRecord) => void): () => void {
-    this.commitListeners.add(listener);
-    return () => this.commitListeners.delete(listener);
+    this.commit_listeners.add(listener);
+    return () => this.commit_listeners.delete(listener);
   }
 
   /** Latest version the server has sequenced for a document. */
@@ -116,7 +116,7 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
     const response = await this.commit({
       documentId,
       baseVersion: this.versions.get(documentId) ?? 0,
-      clientMutationId: `showcase-server-${this.nextServerMutation++}`,
+      clientMutationId: `showcase-server-${this.next_server_mutation++}`,
       operations,
     });
     if (response.status !== "applied") {
@@ -205,18 +205,18 @@ export interface ShowcaseLinkState {
  */
 export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationSource {
   private listener?: (operation: VersionedOperation) => void;
-  private disposeUpstream?: () => void;
+  private dispose_upstream?: () => void;
   private readonly queued: VersionedOperation[] = [];
   private readonly held: VersionedOperation[] = [];
   /** Broadcasts that arrived while no coordinator was subscribed (boot, remount). */
   private readonly unclaimed: VersionedOperation[] = [];
   /** Versions at or below this are already in the snapshot the next coordinator mounts. */
-  private snapshotVersion = -1;
-  private readonly suppressedEchoes = new Set<string>();
-  private readonly stateListeners = new Set<(state: ShowcaseLinkState) => void>();
-  private connectedState = true;
-  private dropNextAck = false;
-  private holdNext = false;
+  private snapshot_version = -1;
+  private readonly suppressed_echoes = new Set<string>();
+  private readonly state_listeners = new Set<(state: ShowcaseLinkState) => void>();
+  private connected_state = true;
+  private drop_next_ack = false;
+  private hold_next = false;
 
   /**
    * Broadcast-less adapters (e.g. the database proof) are valid servers too.
@@ -224,7 +224,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
    * snapshot load and the coordinator subscribing is kept, not lost.
    */
   constructor(private readonly server: PersistenceAdapter & Partial<RemoteOperationSource>) {
-    this.disposeUpstream = this.server.subscribe?.((operation) => this.receive(operation));
+    this.dispose_upstream = this.server.subscribe?.((operation) => this.receive(operation));
   }
 
   /**
@@ -232,68 +232,68 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
    * already contains, keep newer ones for delivery on subscribe.
    */
   startFrom(version: number): void {
-    this.snapshotVersion = version;
+    this.snapshot_version = version;
     const newer = this.unclaimed.filter((operation) => operation.version > version);
     this.unclaimed.splice(0, this.unclaimed.length, ...newer);
   }
 
   get connected(): boolean {
-    return this.connectedState;
+    return this.connected_state;
   }
 
   state(): ShowcaseLinkState {
     return {
-      connected: this.connectedState,
+      connected: this.connected_state,
       queuedBroadcasts: this.queued.length,
       heldBroadcasts: this.held.length,
-      dropNextAcknowledgement: this.dropNextAck,
+      dropNextAcknowledgement: this.drop_next_ack,
     };
   }
 
   subscribeState(listener: (state: ShowcaseLinkState) => void): () => void {
-    this.stateListeners.add(listener);
-    return () => this.stateListeners.delete(listener);
+    this.state_listeners.add(listener);
+    return () => this.state_listeners.delete(listener);
   }
 
   /** Reconnecting replays every broadcast queued while offline, in order. */
   setConnected(connected: boolean): void {
-    if (this.connectedState === connected) return;
-    this.connectedState = connected;
+    if (this.connected_state === connected) return;
+    this.connected_state = connected;
     if (connected) {
-      while (this.connectedState && this.queued.length > 0) {
+      while (this.connected_state && this.queued.length > 0) {
         const operation = this.queued.shift();
         if (operation) this.deliver(operation);
       }
     }
-    this.publishState();
+    this.publish_state();
   }
 
   /** The next applied commit succeeds server-side but its acknowledgement is lost. */
   dropNextAcknowledgement(): void {
-    this.dropNextAck = true;
-    this.publishState();
+    this.drop_next_ack = true;
+    this.publish_state();
   }
 
   /** Parks the next inbound broadcast so later versions arrive first (a version gap). */
   holdNextBroadcast(): void {
-    this.holdNext = true;
-    this.publishState();
+    this.hold_next = true;
+    this.publish_state();
   }
 
   /** Delivers every held broadcast in version order and cancels a pending hold, closing the gap. */
   releaseHeldBroadcasts(): void {
-    this.holdNext = false;
+    this.hold_next = false;
     const releasing = this.held.splice(0).sort((a, b) => a.version - b.version);
     for (const operation of releasing) this.deliver(operation);
-    this.publishState();
+    this.publish_state();
   }
 
   /** Drops parked traffic after a remount made it stale (e.g. conflict recovery). */
   discardParkedBroadcasts(): void {
     this.held.length = 0;
     this.queued.length = 0;
-    this.holdNext = false;
-    this.publishState();
+    this.hold_next = false;
+    this.publish_state();
   }
 
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
@@ -315,26 +315,26 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     request: PersistenceCommitRequest,
     commit: () => Promise<PersistenceCommitResponse>,
   ): Promise<PersistenceCommitResponse> {
-    if (!this.connectedState) {
+    if (!this.connected_state) {
       throw new ShowcaseLinkError("offline", "The client link is offline; the commit never left");
     }
-    const dropAck = this.dropNextAck;
-    if (dropAck) {
-      this.dropNextAck = false;
+    const drop_ack = this.drop_next_ack;
+    if (drop_ack) {
+      this.drop_next_ack = false;
       // Suppress this client's own echo broadcast too, so the pending commit
       // genuinely survives until an explicit idempotent retry.
-      this.suppressedEchoes.add(request.clientMutationId);
-      this.publishState();
+      this.suppressed_echoes.add(request.clientMutationId);
+      this.publish_state();
     }
     const response = await commit();
-    if (dropAck) {
+    if (drop_ack) {
       if (response.status === "applied") {
         throw new ShowcaseLinkError(
           "ack-lost",
           `The server applied ${request.clientMutationId}, but its acknowledgement was lost in transit`,
         );
       }
-      this.suppressedEchoes.delete(request.clientMutationId);
+      this.suppressed_echoes.delete(request.clientMutationId);
     }
     return response;
   }
@@ -349,37 +349,37 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
   }
 
   destroy(): void {
-    this.disposeUpstream?.();
-    this.disposeUpstream = undefined;
+    this.dispose_upstream?.();
+    this.dispose_upstream = undefined;
     this.listener = undefined;
     this.queued.length = 0;
     this.unclaimed.length = 0;
     this.held.length = 0;
-    this.suppressedEchoes.clear();
-    this.stateListeners.clear();
+    this.suppressed_echoes.clear();
+    this.state_listeners.clear();
   }
 
   private receive(operation: VersionedOperation): void {
-    if (operation.version <= this.snapshotVersion) return;
+    if (operation.version <= this.snapshot_version) return;
     if (
       operation.clientMutationId !== undefined &&
-      this.suppressedEchoes.has(operation.clientMutationId)
+      this.suppressed_echoes.has(operation.clientMutationId)
     ) {
       if (!operation.batch || operation.batch.index === operation.batch.count - 1) {
-        this.suppressedEchoes.delete(operation.clientMutationId);
+        this.suppressed_echoes.delete(operation.clientMutationId);
       }
-      this.publishState();
+      this.publish_state();
       return;
     }
-    if (!this.connectedState) {
+    if (!this.connected_state) {
       this.queued.push(operation);
-      this.publishState();
+      this.publish_state();
       return;
     }
-    if (this.holdNext) {
-      this.holdNext = false;
+    if (this.hold_next) {
+      this.hold_next = false;
       this.held.push(operation);
-      this.publishState();
+      this.publish_state();
       return;
     }
     this.deliver(operation);
@@ -390,13 +390,13 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
    * one while a client remounts. Versions its snapshot already holds are dropped.
    */
   private deliver(operation: VersionedOperation): void {
-    if (operation.version <= this.snapshotVersion) return;
+    if (operation.version <= this.snapshot_version) return;
     if (this.listener) this.listener(operation);
     else this.unclaimed.push(operation);
   }
 
-  private publishState(): void {
+  private publish_state(): void {
     const state = this.state();
-    for (const listener of this.stateListeners) listener(state);
+    for (const listener of this.state_listeners) listener(state);
   }
 }

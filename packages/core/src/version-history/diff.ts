@@ -165,7 +165,7 @@ export function diffPageSize(request: HistoryDiffRequest): number {
   return size;
 }
 
-function engineOf(store: SheetwriteStore): StoreDataEngine {
+function engine_of(store: SheetwriteStore): StoreDataEngine {
   const engine = storeEngine(store);
   if (!engine) {
     throw new HistoryError("integrity", "A rebuilt version has no document engine");
@@ -203,7 +203,7 @@ export interface SheetShape {
   colCount: number;
 }
 
-function sheetOf(operation: DocumentOp): SheetId | undefined {
+function sheet_of(operation: DocumentOp): SheetId | undefined {
   if ("addr" in operation) {
     return operation.addr.sheet;
   }
@@ -279,7 +279,7 @@ function track(state: Tracking, operation: DocumentOp, author: number): void {
     return;
   }
 
-  const sheet = sheetOf(operation);
+  const sheet = sheet_of(operation);
   if (sheet === undefined) {
     state.workbookAuthor = author;
     return;
@@ -368,7 +368,7 @@ export function styleTables(
 }
 
 /** Fields of two objects whose values differ, ignoring `skip`. */
-function changedFields(
+function changed_fields(
   before: object,
   after: object,
   skip: Readonly<Record<string, true>>,
@@ -399,7 +399,7 @@ const WORKBOOK_SKIP: Readonly<Record<string, true>> = {
 };
 
 /** Sheets that were added, removed, or changed outside their cell values. */
-function sheetChanges(before: Workbook, after: Workbook, state: Tracking): HistoryDiffSheet[] {
+function sheet_changes(before: Workbook, after: Workbook, state: Tracking): HistoryDiffSheet[] {
   const changes: HistoryDiffSheet[] = [];
   const earlier = new Map(before.sheets.map((sheet, order) => [sheet.id, { sheet, order }]));
   const later = new Set(after.sheets.map((sheet) => sheet.id));
@@ -418,7 +418,7 @@ function sheetChanges(before: Workbook, after: Workbook, state: Tracking): Histo
       return;
     }
 
-    const fields = changedFields(previous.sheet, sheet, SHEET_SKIP);
+    const fields = changed_fields(previous.sheet, sheet, SHEET_SKIP);
     if (previous.order !== order) {
       fields.push("order");
     }
@@ -485,8 +485,8 @@ function spans(
 }
 
 function pieces(
-  rowSegments: Uint32Array,
-  colSegments: Uint32Array,
+  row_segments: Uint32Array,
+  col_segments: Uint32Array,
   row0: number,
   rows: number,
   cols: number,
@@ -494,24 +494,24 @@ function pieces(
 ): Piece[] {
   const out: Piece[] = [];
 
-  for (const [row, rowCount, beforeRow] of spans(rowSegments, row0, rows)) {
-    for (const [col, colCount, beforeCol] of spans(colSegments, 0, cols)) {
+  for (const [row, row_count, before_row] of spans(row_segments, row0, rows)) {
+    for (const [col, col_count, before_col] of spans(col_segments, 0, cols)) {
       // A position outside the earlier sheet can only come from a log that is
       // not complete; such cells are compared with nothing.
       const known =
         earlier !== undefined &&
-        beforeRow !== HISTORY_DIFF_NONE &&
-        beforeCol !== HISTORY_DIFF_NONE &&
-        beforeRow + rowCount <= earlier.rowCount &&
-        beforeCol + colCount <= earlier.colCount;
+        before_row !== HISTORY_DIFF_NONE &&
+        before_col !== HISTORY_DIFF_NONE &&
+        before_row + row_count <= earlier.rowCount &&
+        before_col + col_count <= earlier.colCount;
 
       out.push({
         row: row - row0,
         col,
-        rows: rowCount,
-        cols: colCount,
-        beforeRow: known ? beforeRow : HISTORY_DIFF_NONE,
-        beforeCol: known ? beforeCol : HISTORY_DIFF_NONE,
+        rows: row_count,
+        cols: col_count,
+        beforeRow: known ? before_row : HISTORY_DIFF_NONE,
+        beforeCol: known ? before_col : HISTORY_DIFF_NONE,
       });
     }
   }
@@ -520,7 +520,7 @@ function pieces(
 }
 
 /** Rows of the later version that one scan window holds. */
-function windowRows(cols: number): number {
+function window_rows(cols: number): number {
   return Math.max(1, Math.floor(WINDOW_CELLS / cols));
 }
 
@@ -539,14 +539,14 @@ export function comparedPieces(
     return [];
   }
 
-  const rowSegments = Uint32Array.from(state.kernel.rowSegments(slot));
-  const colSegments = Uint32Array.from(state.kernel.colSegments(slot));
-  const step = windowRows(later.colCount);
+  const row_segments = Uint32Array.from(state.kernel.rowSegments(slot));
+  const col_segments = Uint32Array.from(state.kernel.colSegments(slot));
+  const step = window_rows(later.colCount);
   const out: Piece[] = [];
 
   for (let row0 = 0; row0 < later.rowCount; row0 += step) {
     const rows = Math.min(step, later.rowCount - row0);
-    for (const part of pieces(rowSegments, colSegments, row0, rows, later.colCount, earlier)) {
+    for (const part of pieces(row_segments, col_segments, row0, rows, later.colCount, earlier)) {
       out.push({ ...part, row: row0 + part.row });
     }
   }
@@ -575,7 +575,7 @@ export function transferOf(
 }
 
 /** Validate a cursor against the later version's sheets. */
-function startAt(cursor: HistoryDiffCursor | undefined, sheets: number): HistoryDiffCursor {
+function start_at(cursor: HistoryDiffCursor | undefined, sheets: number): HistoryDiffCursor {
   if (!cursor) {
     return { sheet: 0, row: 0, piece: 0, cell: 0 };
   }
@@ -605,7 +605,7 @@ function scan(
   signal: AbortSignal | undefined,
 ): HistoryDiffCursor | undefined {
   const { kernel } = state;
-  const earlierSheets = new Map(shapesOf(earlier).map((sheet) => [sheet.id, sheet]));
+  const earlier_sheets = new Map(shapes_of(earlier).map((sheet) => [sheet.id, sheet]));
 
   for (let index = start.sheet; index < later.sheets.length; index++) {
     const sheet = later.sheets[index];
@@ -615,9 +615,9 @@ function scan(
     }
 
     const cols = sheet.columns.length;
-    const step = windowRows(cols);
-    const rowSegments = Uint32Array.from(kernel.rowSegments(slot));
-    const colSegments = Uint32Array.from(kernel.colSegments(slot));
+    const step = window_rows(cols);
+    const row_segments = Uint32Array.from(kernel.rowSegments(slot));
+    const col_segments = Uint32Array.from(kernel.colSegments(slot));
     const resuming = index === start.sheet;
 
     for (let row0 = resuming ? start.row : 0; row0 < sheet.rowCount; row0 += step) {
@@ -628,7 +628,14 @@ function scan(
         throw new HistoryError("integrity", "The diff kernel rejected a rebuilt window");
       }
 
-      const parts = pieces(rowSegments, colSegments, row0, rows, cols, earlierSheets.get(sheet.id));
+      const parts = pieces(
+        row_segments,
+        col_segments,
+        row0,
+        rows,
+        cols,
+        earlier_sheets.get(sheet.id),
+      );
       const first = resuming && row0 === start.row ? start.piece : 0;
 
       for (let at = first; at < parts.length; at++) {
@@ -637,9 +644,9 @@ function scan(
           continue;
         }
 
-        const earlierCells = part.beforeRow !== HISTORY_DIFF_NONE;
+        const earlier_cells = part.beforeRow !== HISTORY_DIFF_NONE;
         if (
-          earlierCells &&
+          earlier_cells &&
           !kernel.loadBefore(
             transferOf(before, sheet.id, part.beforeRow, part.beforeCol, part.rows, part.cols),
           )
@@ -650,7 +657,7 @@ function scan(
         const from = resuming && row0 === start.row && at === start.piece ? start.cell : 0;
         const next = kernel.compare(
           slot,
-          earlierCells,
+          earlier_cells,
           part.row,
           part.col,
           part.rows,
@@ -691,7 +698,7 @@ export function cellIn(
 }
 
 /** The sheets of a rebuilt version, as the diff kernel sees them. */
-function shapesOf(workbook: Workbook): SheetShape[] {
+function shapes_of(workbook: Workbook): SheetShape[] {
   return workbook.sheets.map((sheet) => ({
     id: sheet.id,
     rowCount: sheet.rowCount,
@@ -711,8 +718,9 @@ export async function trackLog(
   request: HistoryDiffRequest,
 ): Promise<Tracking> {
   const size = diffPageSize(request);
-  const { DiffKernel, loadHistoryKernel } = await import("@sheetwrite/wasm/history");
-  await loadHistoryKernel(request.kernel);
+  const { DiffKernel, loadHistoryKernel: load_history_kernel } =
+    await import("@sheetwrite/wasm/history");
+  await load_history_kernel(request.kernel);
   request.signal?.throwIfAborted();
 
   const state: Tracking = {
@@ -766,14 +774,14 @@ export interface TrackedInput {
  */
 export function diffTracked(state: Tracking, input: TrackedInput): HistoryDiffPage {
   const { request } = input;
-  const before = engineOf(input.before);
-  const after = engineOf(input.after);
+  const before = engine_of(input.before);
+  const after = engine_of(input.after);
   const earlier = input.before.getWorkbook();
   const later = input.after.getWorkbook();
-  const start = startAt(request.cursor, later.sheets.length);
+  const start = start_at(request.cursor, later.sheets.length);
 
-  const [beforeStyles, afterStyles] = styleTables(before, after);
-  state.kernel.setStyles(beforeStyles, afterStyles);
+  const [before_styles, after_styles] = styleTables(before, after);
+  state.kernel.setStyles(before_styles, after_styles);
 
   const cursor = scan(state, before, after, earlier, later, start, request.signal);
 
@@ -786,8 +794,8 @@ export function diffTracked(state: Tracking, input: TrackedInput): HistoryDiffPa
  */
 export async function diffStores(input: DiffInput): Promise<HistoryDiffPage> {
   const state = await trackLog(
-    shapesOf(input.before.getWorkbook()),
-    shapesOf(input.after.getWorkbook()),
+    shapes_of(input.before.getWorkbook()),
+    shapes_of(input.after.getWorkbook()),
     input.commits,
     input.request,
   );
@@ -808,9 +816,9 @@ function page(
   cursor: HistoryDiffCursor | undefined,
 ): HistoryDiffPage {
   const { kernel } = state;
-  const slotSheets = new Map([...state.slots].map(([sheet, slot]) => [slot, sheet]));
-  const sheetIds: SheetId[] = [];
-  const sheetIndex = new Map<string, number>();
+  const slot_sheets = new Map([...state.slots].map(([sheet, slot]) => [slot, sheet]));
+  const sheet_ids: SheetId[] = [];
+  const sheet_index = new Map<string, number>();
 
   const slots = Uint32Array.from(kernel.pageSheets());
   const cells: HistoryDiffCells = {
@@ -826,26 +834,28 @@ function page(
   const details: HistoryDiffDetail[] = [];
   for (let at = 0; at < slots.length; at++) {
     const slot = slots[at] ?? 0;
-    const sheet = slotSheets.get(slot) ?? "";
-    cells.sheet[at] = intern(sheetIds, sheetIndex, sheet);
+    const sheet = slot_sheets.get(slot) ?? "";
+    cells.sheet[at] = intern(sheet_ids, sheet_index, sheet);
 
     const row = cells.row[at] ?? 0;
     const col = cells.col[at] ?? 0;
-    const beforeRow = cells.beforeRow[at] ?? HISTORY_DIFF_NONE;
-    const beforeCol = cells.beforeCol[at] ?? HISTORY_DIFF_NONE;
+    const before_row = cells.beforeRow[at] ?? HISTORY_DIFF_NONE;
+    const before_col = cells.beforeCol[at] ?? HISTORY_DIFF_NONE;
 
     details.push({
       before:
-        beforeRow === HISTORY_DIFF_NONE ? null : cellIn(input.before, sheet, beforeRow, beforeCol),
+        before_row === HISTORY_DIFF_NONE
+          ? null
+          : cellIn(input.before, sheet, before_row, before_col),
       after: cellIn(input.after, sheet, row, col),
       writers: [...kernel.cellAuthors(slot, row, col)],
     });
   }
 
   return {
-    sheets: sheetChanges(earlier, later, state),
-    workbook: changedFields(earlier, later, WORKBOOK_SKIP),
-    sheetIds,
+    sheets: sheet_changes(earlier, later, state),
+    workbook: changed_fields(earlier, later, WORKBOOK_SKIP),
+    sheetIds: sheet_ids,
     authors: state.authors,
     cells,
     details,

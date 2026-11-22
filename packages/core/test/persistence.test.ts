@@ -16,13 +16,13 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
-afterEach(() => restoreStubs());
+afterEach(() => restore_stubs());
 
-function richSnapshot(): WorkbookSnapshot {
+function rich_snapshot(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: "doc-1",
@@ -129,7 +129,7 @@ function richSnapshot(): WorkbookSnapshot {
 
 describe("snapshot persistence boundary", () => {
   it("round-trips a rich workbook deterministically without hydration events", () => {
-    const source = richSnapshot();
+    const source = rich_snapshot();
     source.workbook.calculation = { iterate: true, maxIterations: 50, maxChange: 0.01 };
     const store = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(source)));
 
@@ -185,7 +185,7 @@ describe("snapshot persistence boundary", () => {
   it("mounts without a user change or undo entry and rejects invalid input cleanly", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
-    const grid = createGridFromSnapshot(host, richSnapshot());
+    const grid = createGridFromSnapshot(host, rich_snapshot());
     let changes = 0;
     grid.on("change", () => {
       changes += 1;
@@ -196,45 +196,45 @@ describe("snapshot persistence boundary", () => {
     expect(changes).toBe(0);
     grid.destroy();
 
-    const invalidHost = document.createElement("div");
+    const invalid_host = document.createElement("div");
     expect(() =>
-      createGridFromSnapshot(invalidHost, { ...richSnapshot(), schemaVersion: 99 }),
+      createGridFromSnapshot(invalid_host, { ...rich_snapshot(), schemaVersion: 99 }),
     ).toThrow(PersistenceError);
-    expect(invalidHost.childElementCount).toBe(0);
+    expect(invalid_host.childElementCount).toBe(0);
   });
 
   it("surfaces malformed snapshots as validation errors at public load boundaries", () => {
-    const malformed = { ...richSnapshot(), sheets: [null] };
+    const malformed = { ...rich_snapshot(), sheets: [null] };
 
-    let storeError: unknown;
+    let store_error: unknown;
     try {
       SheetwriteStore.fromSnapshot(malformed);
     } catch (error) {
-      storeError = error;
+      store_error = error;
     }
-    expect(storeError).not.toBeInstanceOf(TypeError);
-    expect(storeError).toBeInstanceOf(SnapshotValidationError);
-    if (!(storeError instanceof SnapshotValidationError)) {
+    expect(store_error).not.toBeInstanceOf(TypeError);
+    expect(store_error).toBeInstanceOf(SnapshotValidationError);
+    if (!(store_error instanceof SnapshotValidationError)) {
       throw new Error("store did not expose snapshot validation details");
     }
-    expect(storeError.errors).toContainEqual(
+    expect(store_error.errors).toContainEqual(
       expect.objectContaining({ path: "sheets[0]", code: "invalid-value" }),
     );
 
     const host = document.createElement("div");
-    let gridError: unknown;
+    let grid_error: unknown;
     try {
       createGridFromSnapshot(host, malformed);
     } catch (error) {
-      gridError = error;
+      grid_error = error;
     }
-    expect(gridError).not.toBeInstanceOf(TypeError);
-    expect(gridError).toBeInstanceOf(PersistenceError);
-    if (!(gridError instanceof PersistenceError)) {
+    expect(grid_error).not.toBeInstanceOf(TypeError);
+    expect(grid_error).toBeInstanceOf(PersistenceError);
+    if (!(grid_error instanceof PersistenceError)) {
       throw new Error("grid did not wrap snapshot validation failure");
     }
-    expect(gridError.code).toBe("invalid-snapshot");
-    expect(gridError.cause).toBeInstanceOf(SnapshotValidationError);
+    expect(grid_error.code).toBe("invalid-snapshot");
+    expect(grid_error.cause).toBeInstanceOf(SnapshotValidationError);
     expect(host.childElementCount).toBe(0);
   });
   it("hydrates a million-row snapshot without allocating its rectangle", () => {
@@ -259,14 +259,14 @@ describe("snapshot persistence boundary", () => {
     };
 
     // Past the dense cell limit, dense storage continues in local pages.
-    const localStore = SheetwriteStore.fromSnapshot(snapshot);
-    expect(localStore.isPaged("large")).toBe(false);
-    expect(localStore.getPagedStats("large").allocatedBytes).toBe(0);
-    localStore.dispose();
-    const pagedStore = SheetwriteStore.fromSnapshot(snapshot, { storage: "paged" });
-    expect(pagedStore.isPaged("large")).toBe(true);
-    expect(pagedStore.getPagedStats("large").allocatedBytes).toBe(0);
-    pagedStore.dispose();
+    const local_store = SheetwriteStore.fromSnapshot(snapshot);
+    expect(local_store.isPaged("large")).toBe(false);
+    expect(local_store.getPagedStats("large").allocatedBytes).toBe(0);
+    local_store.dispose();
+    const paged_store = SheetwriteStore.fromSnapshot(snapshot, { storage: "paged" });
+    expect(paged_store.isPaged("large")).toBe(true);
+    expect(paged_store.getPagedStats("large").allocatedBytes).toBe(0);
+    paged_store.dispose();
 
     const host = document.createElement("div");
     const grid = createGridFromSnapshot(host, snapshot, {
@@ -292,7 +292,7 @@ describe("snapshot persistence boundary", () => {
   });
 
   it("persists operations through the cancellable in-memory reference adapter", async () => {
-    const adapter = new MemoryPersistenceAdapter(richSnapshot());
+    const adapter = new MemoryPersistenceAdapter(rich_snapshot());
     const loaded = await adapter.load("doc-1");
     expect(loaded.documentId).toBe("doc-1");
     await expect(adapter.load("missing")).rejects.toMatchObject({ code: "not-found" });
@@ -339,11 +339,11 @@ describe("snapshot persistence boundary", () => {
       ],
     });
 
-    const secondHost = document.createElement("div");
-    document.body.appendChild(secondHost);
+    const second_host = document.createElement("div");
+    document.body.appendChild(second_host);
     const persisted = await adapter.load("doc-1");
     expect(persisted.version).toBe(8);
-    const second = createGridFromSnapshot(secondHost, persisted);
+    const second = createGridFromSnapshot(second_host, persisted);
     expect(second.store.getCell({ sheet: "source", row: 0, col: 0 }).resolved).toBe(12);
     expect(second.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(13);
     second.destroy();
@@ -364,7 +364,7 @@ describe("snapshot persistence boundary", () => {
   });
 
   it("persists compact restores as an atomic versioned batch with retry-safe conflict history", async () => {
-    const adapter = new MemoryPersistenceAdapter(richSnapshot());
+    const adapter = new MemoryPersistenceAdapter(rich_snapshot());
     const restore = encodeRestoreBlock(
       { sheet: "source", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
       { rowCount: 1, colCount: 1, values: [23] },
@@ -415,7 +415,7 @@ describe("snapshot persistence boundary", () => {
   });
 
   it("rejects a malformed compact batch member without publishing earlier members or its mutation ID", async () => {
-    const initial = richSnapshot();
+    const initial = rich_snapshot();
     const adapter = new MemoryPersistenceAdapter(initial);
     const restore = encodeRestoreBlock(
       { sheet: "source", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },

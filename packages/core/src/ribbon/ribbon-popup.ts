@@ -38,7 +38,7 @@ interface OpenPopup {
 }
 
 /** Whether the trigger left the position its popup was placed against. */
-function triggerMoved(popup: OpenPopup): boolean {
+function trigger_moved(popup: OpenPopup): boolean {
   const rect = popup.trigger.getBoundingClientRect();
   return (
     Math.abs(rect.left - popup.anchor.left) >= 0.5 || Math.abs(rect.top - popup.anchor.top) >= 0.5
@@ -64,7 +64,7 @@ export function focusInSurface(surface: HTMLElement, element: HTMLElement): void
   showInSurface(surface, element);
 }
 
-let popupSerial = 0;
+let popup_serial = 0;
 
 export class RibbonPopup {
   /** Open popups, outermost first. */
@@ -73,10 +73,10 @@ export class RibbonPopup {
 
   constructor(private readonly host: HTMLElement) {
     const signal = this.listeners.signal;
-    document.addEventListener("pointerdown", this.onOutsidePointer, { capture: true, signal });
+    document.addEventListener("pointerdown", this.on_outside_pointer, { capture: true, signal });
     // Ignore delayed events when the popup already uses the current geometry.
-    window.addEventListener("resize", this.onResize, { signal });
-    document.addEventListener("scroll", this.onScroll, { capture: true, signal });
+    window.addEventListener("resize", this.on_resize, { signal });
+    document.addEventListener("scroll", this.on_scroll, { capture: true, signal });
   }
 
   isOpen(trigger: HTMLElement): boolean {
@@ -95,14 +95,14 @@ export class RibbonPopup {
   open(trigger: HTMLElement, surface: HTMLElement, options: PopupOptions): void {
     let parents = this.stack.length;
     while (parents > 0 && !this.stack[parents - 1]?.surface.contains(trigger)) parents -= 1;
-    this.closeAbove(parents, false);
+    this.close_above(parents, false);
 
-    popupSerial += 1;
-    surface.id = `sheetwrite-ribbon-popup-${popupSerial}`;
+    popup_serial += 1;
+    surface.id = `sheetwrite-ribbon-popup-${popup_serial}`;
     surface.classList.add("sheetwrite-ribbon-popup");
     surface.setAttribute("role", options.role);
     surface.setAttribute("aria-label", options.label);
-    surface.addEventListener("keydown", this.onKeydown);
+    surface.addEventListener("keydown", this.on_keydown);
     trigger.setAttribute("aria-expanded", "true");
     trigger.setAttribute("aria-controls", surface.id);
 
@@ -126,12 +126,12 @@ export class RibbonPopup {
   /** Close the popup `trigger` opened, and any popups opened from inside it. */
   closeFrom(trigger: HTMLElement, returnFocus: boolean): void {
     const index = this.stack.findIndex((popup) => popup.trigger === trigger);
-    if (index !== -1) this.closeAbove(index, returnFocus);
+    if (index !== -1) this.close_above(index, returnFocus);
   }
 
   /** Close every popup, e.g. after a command ran. */
   closeAll(returnFocus: boolean): void {
-    this.closeAbove(0, returnFocus);
+    this.close_above(0, returnFocus);
   }
 
   destroy(): void {
@@ -140,24 +140,24 @@ export class RibbonPopup {
   }
 
   /**
-   * Close popups from the top down until `keep` remain. With `returnFocus`,
+   * Close popups from the top down until `keep` remain. With `return_focus`,
    * focus goes to the trigger of the last popup closed, which is still on
    * screen because everything above it is gone. The trigger can be in a parent
    * popup, so the focus must not scroll the page (see `focusInSurface`).
    */
-  private closeAbove(keep: number, returnFocus: boolean): void {
-    let focusTarget: HTMLElement | null = null;
+  private close_above(keep: number, return_focus: boolean): void {
+    let focus_target: HTMLElement | null = null;
     while (this.stack.length > keep) {
       const popup = this.stack.pop();
       if (popup === undefined) break;
-      popup.surface.removeEventListener("keydown", this.onKeydown);
+      popup.surface.removeEventListener("keydown", this.on_keydown);
       popup.surface.remove();
       popup.trigger.setAttribute("aria-expanded", "false");
       popup.trigger.removeAttribute("aria-controls");
       popup.onClose?.();
-      focusTarget = popup.trigger;
+      focus_target = popup.trigger;
     }
-    if (returnFocus) focusTarget?.focus({ preventScroll: true });
+    if (return_focus) focus_target?.focus({ preventScroll: true });
   }
 
   /**
@@ -177,7 +177,7 @@ export class RibbonPopup {
   }
 
   /** A press outside closes every popup it is not inside. */
-  private readonly onOutsidePointer = (event: PointerEvent): void => {
+  private readonly on_outside_pointer = (event: PointerEvent): void => {
     const target = event.target;
     if (!(target instanceof Node)) return;
     let keep = this.stack.length;
@@ -188,7 +188,7 @@ export class RibbonPopup {
       }
       keep -= 1;
     }
-    this.closeAbove(keep, false);
+    this.close_above(keep, false);
   };
 
   /**
@@ -197,23 +197,23 @@ export class RibbonPopup {
    * a page scroll event that WebKit delivers after the popup opened, for a
    * scroll that happened before.
    */
-  private readonly onScroll = (): void => {
-    const moved = this.stack.findIndex(triggerMoved);
-    if (moved !== -1) this.closeAbove(moved, false);
+  private readonly on_scroll = (): void => {
+    const moved = this.stack.findIndex(trigger_moved);
+    if (moved !== -1) this.close_above(moved, false);
   };
 
   /** A late resize must not dismiss a popup placed after that resize. */
-  private readonly onResize = (): void => {
+  private readonly on_resize = (): void => {
     const changed = this.stack.findIndex(
       (popup) =>
         popup.viewportWidth !== window.innerWidth ||
         popup.viewportHeight !== window.innerHeight ||
-        triggerMoved(popup),
+        trigger_moved(popup),
     );
-    if (changed !== -1) this.closeAbove(changed, false);
+    if (changed !== -1) this.close_above(changed, false);
   };
 
-  private readonly onKeydown = (event: KeyboardEvent): void => {
+  private readonly on_keydown = (event: KeyboardEvent): void => {
     // Popups are mounted in the grid host too; see Ribbon.onKeydown.
     if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
     // Nested surfaces both hear the key; only the innermost one acts on it.
@@ -240,7 +240,7 @@ export class RibbonPopup {
     }
     if (event.key === "Escape" || event.key === "Tab") {
       if (event.key === "Escape") event.preventDefault();
-      this.closeAbove(this.stack.length - 1, true);
+      this.close_above(this.stack.length - 1, true);
       return;
     }
 

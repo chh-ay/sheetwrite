@@ -12,7 +12,7 @@ const NEEDS_NAME_AND_FORMULA = "Enter a name and a formula.";
 const NEEDS_TABLE = "Measures need a workbook table.";
 
 /** What a measure's status means to a user; null when it is ok. */
-function measureStatusText(status: MeasureStatus): string | null {
+function measure_status_text(status: MeasureStatus): string | null {
   switch (status.status) {
     case "ok":
       return null;
@@ -26,7 +26,7 @@ function measureStatusText(status: MeasureStatus): string | null {
 }
 
 /** The first `measure-N` ID that no measure uses. */
-function nextMeasureId(measures: readonly Measure[]): string {
+function next_measure_id(measures: readonly Measure[]): string {
   const ids = new Set(measures.map((measure) => measure.id));
   let index = 1;
   while (ids.has(`measure-${index}`)) index += 1;
@@ -37,7 +37,7 @@ function nextMeasureId(measures: readonly Measure[]): string {
  * The measures of each table that holds some, in table order, then the
  * measures whose table is gone, under a null table.
  */
-function measuresByTable(
+function measures_by_table(
   measures: readonly Measure[],
   tables: readonly WorkbookTable[],
 ): Array<[WorkbookTable | null, Measure[]]> {
@@ -51,17 +51,17 @@ function measuresByTable(
   return groups;
 }
 
-function button(label: string, run: () => void, focusKey?: string): HTMLButtonElement {
+function button(label: string, run: () => void, focus_key?: string): HTMLButtonElement {
   const control = document.createElement("button");
   control.type = "button";
   control.className = "sheetwrite-panel-control";
   control.textContent = label;
-  if (focusKey !== undefined) control.dataset.focusKey = focusKey;
+  if (focus_key !== undefined) control.dataset.focusKey = focus_key;
   control.addEventListener("click", run);
   return control;
 }
 
-function textInput(): HTMLInputElement {
+function text_input(): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "text";
   input.className = "sheetwrite-panel-input";
@@ -74,15 +74,15 @@ export function measurePanel(grid: Grid): GridPanel {
   return {
     title: "Measures",
     render(body) {
-      const listSection = panelSection("Measures");
+      const list_section = panelSection("Measures");
       const entries = document.createElement("div");
-      listSection.append(entries);
+      list_section.append(entries);
 
-      const editorSection = panelSection("Measure");
+      const editor_section = panelSection("Measure");
       const form = document.createElement("form");
-      const name = panelField("Name", textInput(), "measure-name");
+      const name = panelField("Name", text_input(), "measure-name");
       const table = panelField("Table", selectOf([], ""), "measure-table");
-      const formula = panelField("Formula", textInput(), "measure-formula");
+      const formula = panelField("Formula", text_input(), "measure-formula");
       formula.control.classList.add("sheetwrite-explain-formula");
       const save = document.createElement("button");
       save.type = "submit";
@@ -95,12 +95,12 @@ export function measurePanel(grid: Grid): GridPanel {
         save,
         button("New measure", () => edit(null), "new-measure"),
       );
-      editorSection.append(form);
+      editor_section.append(form);
 
       const note = document.createElement("p");
       note.className = "sheetwrite-panel-note";
       note.hidden = true;
-      body.append(listSection, editorSection, note);
+      body.append(list_section, editor_section, note);
 
       /** The ID of the measure the form edits; null for a new one. */
       let editing: string | null = null;
@@ -128,9 +128,9 @@ export function measurePanel(grid: Grid): GridPanel {
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const nextName = name.control.value.trim();
+        const next_name = name.control.value.trim();
         const source = formula.control.value.trim();
-        if (nextName === "" || source === "" || source === "=") {
+        if (next_name === "" || source === "" || source === "=") {
           formula.setError(NEEDS_NAME_AND_FORMULA);
           return;
         }
@@ -139,8 +139,8 @@ export function measurePanel(grid: Grid): GridPanel {
           return;
         }
         const measure: Measure = {
-          id: editing ?? nextMeasureId(grid.store.getWorkbook().dataModel?.measures ?? []),
-          name: nextName,
+          id: editing ?? next_measure_id(grid.store.getWorkbook().dataModel?.measures ?? []),
+          name: next_name,
           table: table.control.value,
           // Saved formulas keep their leading `=`.
           formula: source.startsWith("=") ? source : `=${source}`,
@@ -165,7 +165,7 @@ export function measurePanel(grid: Grid): GridPanel {
         table.control.replaceChildren(...selectOf(options, value).childNodes);
         table.control.value = value;
 
-        const groups = measuresByTable(workbook.dataModel?.measures ?? [], current);
+        const groups = measures_by_table(workbook.dataModel?.measures ?? [], current);
         entries.replaceChildren();
         if (groups.length === 0) {
           const empty = document.createElement("p");
@@ -182,7 +182,7 @@ export function measurePanel(grid: Grid): GridPanel {
             source.className = "sheetwrite-explain-formula";
             source.textContent = measure.formula;
             row.append(source);
-            const status = measureStatusText(
+            const status = measure_status_text(
               store.getMeasureStatus?.(measure.id) ?? { status: "ok" },
             );
             if (status !== null) {

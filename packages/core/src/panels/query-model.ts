@@ -188,24 +188,24 @@ class Reader {
 
 // --- Names -------------------------------------------------------------------
 
-function nameKey(name: string): string {
+function name_key(name: string): string {
   return name.toLowerCase();
 }
 
 /** Exact name first, then ASCII letter case ignored, as table headers match. */
-function findColumn(columns: readonly ModelColumn[], name: string): ModelColumn | undefined {
+function find_column(columns: readonly ModelColumn[], name: string): ModelColumn | undefined {
   return (
     columns.find((column) => column.name === name) ??
-    columns.find((column) => nameKey(column.name) === nameKey(name))
+    columns.find((column) => name_key(column.name) === name_key(name))
   );
 }
 
 function resolve(columns: readonly ModelColumn[], name: string): Parsed<string> {
-  const column = findColumn(columns, name);
+  const column = find_column(columns, name);
   return column === undefined ? { error: `No column is named ${name}.` } : { value: column.id };
 }
 
-function resolveAll(columns: readonly ModelColumn[], names: readonly string[]): Parsed<string[]> {
+function resolve_all(columns: readonly ModelColumn[], names: readonly string[]): Parsed<string[]> {
   const ids: string[] = [];
   for (const name of names) {
     const id = resolve(columns, name);
@@ -234,7 +234,7 @@ function quote(name: string): string {
   return PLAIN_NAME.test(name) ? name : `"${name.replaceAll('"', '""')}"`;
 }
 
-function nameOf(columns: readonly ModelColumn[], id: string): string {
+function name_of(columns: readonly ModelColumn[], id: string): string {
   return quote(columns.find((column) => column.id === id)?.name ?? id);
 }
 
@@ -253,11 +253,11 @@ export function parseSourceColumns(
     const name = (separator < 0 ? line : line.slice(0, separator)).trim();
     const type = separator < 0 ? "text" : line.slice(separator + 1).trim();
     if (name === "") return { error: "Each column line needs a name." };
-    const columnType = COLUMN_TYPES.find((candidate) => candidate === type);
-    if (columnType === undefined) {
+    const column_type = COLUMN_TYPES.find((candidate) => candidate === type);
+    if (column_type === undefined) {
       return { error: `Column ${name} has no type ${type}; use ${COLUMN_TYPES.join(", ")}.` };
     }
-    if (output.some((column) => nameKey(column.name) === nameKey(name))) {
+    if (output.some((column) => name_key(column.name) === name_key(name))) {
       return { error: `Two columns are named ${name}.` };
     }
 
@@ -265,7 +265,7 @@ export function parseSourceColumns(
     const kept = previous.find((column) => column.name === name && !taken.has(column.id));
     const id = kept?.id ?? freshId(name, new Set([...taken, ...previous.map((c) => c.id)]));
     taken.add(id);
-    output.push({ id, name, type: columnType });
+    output.push({ id, name, type: column_type });
   }
   if (output.length === 0) return { error: "Add at least one column." };
   return { value: output };
@@ -311,9 +311,9 @@ export function columnsAfterStep(
       const right = queries.find((candidate) => candidate.id === step.input);
       if (right === undefined || depth >= MAX_JOIN_DEPTH) return [...columns];
       const semi = step.join.endsWith("Semi") || step.join.endsWith("Anti");
-      const rightColumns = columnsAfter(right, queries, right.steps.length, depth + 1);
-      if (!semi) return [...columns, ...rightColumns];
-      return step.join.startsWith("right") ? rightColumns : [...columns];
+      const right_columns = columnsAfter(right, queries, right.steps.length, depth + 1);
+      if (!semi) return [...columns, ...right_columns];
+      return step.join.startsWith("right") ? right_columns : [...columns];
     }
     case "group":
       return [
@@ -331,27 +331,27 @@ export function columnsAfterStep(
 
 // --- Step text ---------------------------------------------------------------
 
-function literalText(value: string | number | boolean | null): string {
+function literal_text(value: string | number | boolean | null): string {
   if (typeof value === "string") return `"${value.replaceAll('"', '""')}"`;
   return String(value);
 }
 
-function predicateText(columns: readonly ModelColumn[], predicate: QueryPredicate): string {
+function predicate_text(columns: readonly ModelColumn[], predicate: QueryPredicate): string {
   switch (predicate.kind) {
     case "compare": {
       const op = Object.entries(COMPARE_OPS).find(([, code]) => code === predicate.op)?.[0] ?? "=";
-      return `${nameOf(columns, predicate.column)} ${op} ${literalText(predicate.value)}`;
+      return `${name_of(columns, predicate.column)} ${op} ${literal_text(predicate.value)}`;
     }
     case "isNull":
-      return `${nameOf(columns, predicate.column)} is null`;
+      return `${name_of(columns, predicate.column)} is null`;
     case "contains":
-      return `${nameOf(columns, predicate.column)} contains ${literalText(predicate.text)}`;
+      return `${name_of(columns, predicate.column)} contains ${literal_text(predicate.text)}`;
     case "not":
-      return `not ${predicateText(columns, predicate.predicate)}`;
+      return `not ${predicate_text(columns, predicate.predicate)}`;
     case "and":
     case "or":
       return predicate.predicates
-        .map((child) => predicateText(columns, child))
+        .map((child) => predicate_text(columns, child))
         .join(` ${predicate.kind} `);
   }
 }
@@ -364,35 +364,35 @@ export function stepText(
 ): string {
   switch (step.kind) {
     case "filter":
-      return predicateText(columns, step.predicate);
+      return predicate_text(columns, step.predicate);
     case "select":
-      return step.columns.map((id) => nameOf(columns, id)).join(", ");
+      return step.columns.map((id) => name_of(columns, id)).join(", ");
     case "rename":
       return step.columns
-        .map(([id, name]) => `${nameOf(columns, id)} -> ${quote(name)}`)
+        .map(([id, name]) => `${name_of(columns, id)} -> ${quote(name)}`)
         .join(", ");
     case "changeType":
-      return `${nameOf(columns, step.column)}: ${step.type}${step.onError === "null" ? " or null" : ""}`;
+      return `${name_of(columns, step.column)}: ${step.type}${step.onError === "null" ? " or null" : ""}`;
     case "join": {
       const right = queries.find((candidate) => candidate.id === step.input);
-      const rightColumns = right === undefined ? [] : columnsAfter(right, queries);
+      const right_columns = right === undefined ? [] : columnsAfter(right, queries);
       const keys = step.keys
-        .map(([left, key]) => `${nameOf(columns, left)} = ${nameOf(rightColumns, key)}`)
+        .map(([left, key]) => `${name_of(columns, left)} = ${name_of(right_columns, key)}`)
         .join(", ");
       return `${quote(right?.name ?? step.input)} (${step.join}) on ${keys}`;
     }
     case "group": {
-      const keys = step.keys.map((id) => nameOf(columns, id)).join(", ");
+      const keys = step.keys.map((id) => name_of(columns, id)).join(", ");
       const aggregates = step.aggregates
         .map(
           (aggregate) =>
-            `${quote(aggregate.name)} = ${aggregate.op}(${aggregate.column === undefined ? "" : nameOf(columns, aggregate.column)})`,
+            `${quote(aggregate.name)} = ${aggregate.op}(${aggregate.column === undefined ? "" : name_of(columns, aggregate.column)})`,
         )
         .join(", ");
       return `${keys}: ${aggregates}`;
     }
     case "unpivot":
-      return `${step.columns.map((id) => nameOf(columns, id)).join(", ")} -> ${quote(step.attribute.name)}, ${quote(step.value.name)}`;
+      return `${step.columns.map((id) => name_of(columns, id)).join(", ")} -> ${quote(step.attribute.name)}, ${quote(step.value.name)}`;
   }
 }
 
@@ -408,7 +408,7 @@ function literal(token: Token): string | number | boolean | null {
   return token.text.trim() !== "" && Number.isFinite(number) ? number : token.text;
 }
 
-function filterStep(reader: Reader, columns: readonly ModelColumn[]): Parsed<QueryPredicate> {
+function filter_step(reader: Reader, columns: readonly ModelColumn[]): Parsed<QueryPredicate> {
   const negated = reader.takeWord("not");
   const name = reader.name();
   if (name === undefined) return { error: "Start with a column name." };
@@ -454,13 +454,13 @@ export function parseStep(
   const list = tokens(text);
   if ("error" in list) return list;
   const reader = new Reader(list.value);
-  const parsed = parseKind(kind, reader, columns, queries, self);
+  const parsed = parse_kind(kind, reader, columns, queries, self);
   if ("error" in parsed) return parsed;
   if (!reader.done()) return { error: "Unexpected text at the end of the step." };
   return parsed;
 }
 
-function parseKind(
+function parse_kind(
   kind: StepKind,
   reader: Reader,
   columns: readonly ModelColumn[],
@@ -469,13 +469,13 @@ function parseKind(
 ): Parsed<QueryStep> {
   switch (kind) {
     case "filter": {
-      const predicate = filterStep(reader, columns);
+      const predicate = filter_step(reader, columns);
       return "error" in predicate ? predicate : { value: { kind, predicate: predicate.value } };
     }
     case "select": {
       const names = reader.names();
       if (names === undefined || names.length === 0) return { error: "List the columns to keep." };
-      const ids = resolveAll(columns, names);
+      const ids = resolve_all(columns, names);
       return "error" in ids ? ids : { value: { kind, columns: ids.value } };
     }
     case "rename": {
@@ -498,28 +498,28 @@ function parseKind(
       if (name === undefined || !colon || type === undefined) return { error: "Use Column: type." };
       const id = resolve(columns, name.text);
       if ("error" in id) return id;
-      const columnType = COLUMN_TYPES.find((candidate) => candidate === type.text);
-      if (columnType === undefined) return { error: `Use one of ${COLUMN_TYPES.join(", ")}.` };
-      const onError = reader.takeWord("or") && reader.takeWord("null") ? "null" : "error";
-      return { value: { kind, column: id.value, type: columnType, onError } };
+      const column_type = COLUMN_TYPES.find((candidate) => candidate === type.text);
+      if (column_type === undefined) return { error: `Use one of ${COLUMN_TYPES.join(", ")}.` };
+      const on_error = reader.takeWord("or") && reader.takeWord("null") ? "null" : "error";
+      return { value: { kind, column: id.value, type: column_type, onError: on_error } };
     }
     case "join": {
       const name = reader.name();
       const right = queries.find(
-        (candidate) => name !== undefined && nameKey(candidate.name) === nameKey(name.text),
+        (candidate) => name !== undefined && name_key(candidate.name) === name_key(name.text),
       );
       if (right === undefined || right.id === self) return { error: "Name another saved query." };
       let join: QueryJoinKind = "inner";
       if (reader.takeSymbol("(")) {
-        const kindName = reader.name();
-        const found = JOIN_KINDS.find((candidate) => candidate === kindName?.text);
+        const kind_name = reader.name();
+        const found = JOIN_KINDS.find((candidate) => candidate === kind_name?.text);
         if (found === undefined || !reader.takeSymbol(")")) {
           return { error: `Use one of ${JOIN_KINDS.join(", ")} in parentheses.` };
         }
         join = found;
       }
       if (!reader.takeWord("on")) return { error: "Use on Left = Right after the query." };
-      const rightColumns = columnsAfter(right, queries);
+      const right_columns = columnsAfter(right, queries);
       const keys: (readonly [string, string])[] = [];
       do {
         const left = reader.name();
@@ -527,20 +527,20 @@ function parseKind(
         const key = reader.name();
         if (left === undefined || !equals || key === undefined)
           return { error: "Use Left = Right." };
-        const leftId = resolve(columns, left.text);
-        if ("error" in leftId) return leftId;
-        const rightId = resolve(rightColumns, key.text);
-        if ("error" in rightId) return { error: `${right.name} has no column named ${key.text}.` };
-        keys.push([leftId.value, rightId.value]);
+        const left_id = resolve(columns, left.text);
+        if ("error" in left_id) return left_id;
+        const right_id = resolve(right_columns, key.text);
+        if ("error" in right_id) return { error: `${right.name} has no column named ${key.text}.` };
+        keys.push([left_id.value, right_id.value]);
       } while (reader.takeSymbol(","));
       return { value: { kind, input: right.id, keys, join } };
     }
     case "group": {
-      const keyNames = reader.names(":");
-      if (keyNames === undefined || !reader.takeSymbol(":")) {
+      const key_names = reader.names(":");
+      if (key_names === undefined || !reader.takeSymbol(":")) {
         return { error: "Use Keys: Name = op(Column)." };
       }
-      const keys = resolveAll(columns, keyNames);
+      const keys = resolve_all(columns, key_names);
       if ("error" in keys) return keys;
       const ids = new Set(keys.value);
       const aggregates: QueryAggregate[] = [];
@@ -553,18 +553,18 @@ function parseKind(
         if (name === undefined || !equals || op === undefined || !open || !reader.takeSymbol(")")) {
           return { error: "Use Name = op(Column), for example Total = sum(Amount)." };
         }
-        const aggregateOp = AGGREGATE_OPS.find((candidate) => candidate === op.text);
-        if (aggregateOp === undefined) return { error: `Use one of ${AGGREGATE_OPS.join(", ")}.` };
+        const aggregate_op = AGGREGATE_OPS.find((candidate) => candidate === op.text);
+        if (aggregate_op === undefined) return { error: `Use one of ${AGGREGATE_OPS.join(", ")}.` };
         const id = freshId(name.text, ids);
         ids.add(id);
         if (source === undefined) {
-          if (aggregateOp !== "countRows") return { error: `${aggregateOp} needs a column.` };
-          aggregates.push({ id, name: name.text, op: aggregateOp });
+          if (aggregate_op !== "countRows") return { error: `${aggregate_op} needs a column.` };
+          aggregates.push({ id, name: name.text, op: aggregate_op });
           continue;
         }
         const column = resolve(columns, source.text);
         if ("error" in column) return column;
-        aggregates.push({ id, name: name.text, op: aggregateOp, column: column.value });
+        aggregates.push({ id, name: name.text, op: aggregate_op, column: column.value });
       } while (reader.takeSymbol(","));
       return { value: { kind, keys: keys.value, aggregates } };
     }
@@ -573,7 +573,7 @@ function parseKind(
       if (names === undefined || names.length === 0 || !reader.takeSymbol("->")) {
         return { error: "Use Columns -> Attribute, Value." };
       }
-      const ids = resolveAll(columns, names);
+      const ids = resolve_all(columns, names);
       if ("error" in ids) return ids;
       const attribute = reader.name();
       const comma = reader.takeSymbol(",");
@@ -582,13 +582,13 @@ function parseKind(
         return { error: "Name the attribute and value columns." };
       }
       const used = taken(columns);
-      const attributeId = freshId(attribute.text, used);
-      used.add(attributeId);
+      const attribute_id = freshId(attribute.text, used);
+      used.add(attribute_id);
       return {
         value: {
           kind,
           columns: ids.value,
-          attribute: { id: attributeId, name: attribute.text },
+          attribute: { id: attribute_id, name: attribute.text },
           value: { id: freshId(value.text, used), name: value.text },
         },
       };

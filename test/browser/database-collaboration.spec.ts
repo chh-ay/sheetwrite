@@ -24,9 +24,9 @@ const FUTURE_QUEUE_VERSION = 1_000;
 const FORECAST_ADJUSTMENT = 500;
 
 /** One seed column by row, read from a showcase seed snapshot. */
-function seedColumn(snapshot: WorkbookSnapshot, sheetId: string, col: number): unknown[] {
-  const sheet = snapshot.sheets.find((candidate) => candidate.id === sheetId);
-  if (!sheet) throw new Error(`The seed has no ${sheetId} sheet`);
+function seed_column(snapshot: WorkbookSnapshot, sheet_id: string, col: number): unknown[] {
+  const sheet = snapshot.sheets.find((candidate) => candidate.id === sheet_id);
+  if (!sheet) throw new Error(`The seed has no ${sheet_id} sheet`);
   const values: unknown[] = [];
   for (const block of sheet.cells) {
     for (const cell of block.cells) {
@@ -41,25 +41,25 @@ function seedColumn(snapshot: WorkbookSnapshot, sheetId: string, col: number): u
 /** Both pages show money totals as whole US dollars, e.g. "$92,814". */
 const usd = (value: number): string => `$${value.toLocaleString("en-US")}`;
 const ledger = makeDatabaseSeedSnapshot();
-const seats = seedColumn(ledger, "ledger", 1).map(Number);
-const rates = seedColumn(ledger, "ledger", 2).map(Number);
+const seats = seed_column(ledger, "ledger", 1).map(Number);
+const rates = seed_column(ledger, "ledger", 2).map(Number);
 const DATABASE_SEED_TOTAL = usd(
   seats.reduce((total, count, row) => total + count * (rates[row] ?? 0), 0),
 );
 const plan = makeCollaborationSnapshot();
-const COLLABORATION_SEED_VALUE = seedColumn(plan, "plan", 2)
+const COLLABORATION_SEED_VALUE = seed_column(plan, "plan", 2)
   .filter((amount): amount is number => typeof amount === "number")
   .reduce((total, amount) => total + amount, 0);
 const COLLABORATION_SEED_TOTAL = usd(COLLABORATION_SEED_VALUE);
-const ANA_ACCOUNT = String(seedColumn(plan, "plan", 0)[0] ?? "the first row");
+const ANA_ACCOUNT = String(seed_column(plan, "plan", 0)[0] ?? "the first row");
 
 type DeletionOutcome = "deleted" | "blocked" | "failed";
 
 /** Deletes one IndexedDB database; an open connection that ignores the request blocks it. */
-function deleteDatabase(page: Page, name: string): Promise<DeletionOutcome> {
-  return page.evaluate(async (databaseName) => {
+function delete_database(page: Page, name: string): Promise<DeletionOutcome> {
+  return page.evaluate(async (database_name) => {
     const { promise, resolve } = Promise.withResolvers<DeletionOutcome>();
-    const request = indexedDB.deleteDatabase(databaseName);
+    const request = indexedDB.deleteDatabase(database_name);
     request.onsuccess = () => resolve("deleted");
     request.onerror = () => resolve("failed");
     request.onblocked = () => resolve("blocked");
@@ -67,35 +67,35 @@ function deleteDatabase(page: Page, name: string): Promise<DeletionOutcome> {
   }, name);
 }
 
-async function openDatabase(page: Page): Promise<void> {
+async function open_database(page: Page): Promise<void> {
   await page.goto("/showcases/database/");
   await expect(page.getByTestId("dbx-status")).toHaveAttribute("data-status", "ready", {
     timeout: READY_TIMEOUT,
   });
 }
 
-async function openCollaboration(page: Page): Promise<void> {
+async function open_collaboration(page: Page): Promise<void> {
   await page.goto("/showcases/collaboration/");
   await expect(page.getByTestId("clb-status")).toHaveAttribute("data-status", "ready", {
     timeout: READY_TIMEOUT,
   });
 }
 
-async function expectBothClients(page: Page, version: string, total?: string): Promise<void> {
+async function expect_both_clients(page: Page, version: string, total?: string): Promise<void> {
   await expect(page.getByTestId("clb-a-version")).toHaveText(version);
   await expect(page.getByTestId("clb-b-version")).toHaveText(version);
-  const expectedTotal = total ?? (await page.getByTestId("clb-b-total").textContent()) ?? "";
-  await expect(page.getByTestId("clb-a-total")).toHaveText(expectedTotal);
-  await expect(page.getByTestId("clb-b-total")).toHaveText(expectedTotal);
+  const expected_total = total ?? (await page.getByTestId("clb-b-total").textContent()) ?? "";
+  await expect(page.getByTestId("clb-a-total")).toHaveText(expected_total);
+  await expect(page.getByTestId("clb-b-total")).toHaveText(expected_total);
 }
 
-function logEntry(page: Page, text: string): Locator {
+function log_entry(page: Page, text: string): Locator {
   return page.getByTestId("dbx-log").locator("li", { hasText: text });
 }
 
 test.describe("database proof", () => {
   test("keeps durable pending work across a real page reload", async ({ page }) => {
-    await openDatabase(page);
+    await open_database(page);
     await page.getByRole("checkbox", { name: "Autosave" }).uncheck();
     const commit = page.getByRole("button", { name: "Add one seat" });
     await commit.click();
@@ -114,8 +114,8 @@ test.describe("database proof", () => {
     await expect(page.getByTestId("dbx-version")).toHaveText("2");
     await expect(page.getByTestId("dbx-total")).not.toHaveText(DATABASE_SEED_TOTAL);
     // One mount restored the queue: a second StrictMode boot would restore it twice.
-    await expect(logEntry(page, "Restored")).toHaveCount(1);
-    const drainedTotal = (await page.getByTestId("dbx-total").textContent()) ?? "";
+    await expect(log_entry(page, "Restored")).toHaveCount(1);
+    const drained_total = (await page.getByTestId("dbx-total").textContent()) ?? "";
 
     // The in-page session restart reads the same data back from IndexedDB.
     await page.getByRole("button", { name: "Close and reopen session" }).click();
@@ -123,7 +123,7 @@ test.describe("database proof", () => {
       timeout: READY_TIMEOUT,
     });
     await expect(page.getByTestId("dbx-version")).toHaveText("2");
-    await expect(page.getByTestId("dbx-total")).toHaveText(drainedTotal);
+    await expect(page.getByTestId("dbx-total")).toHaveText(drained_total);
 
     // The page's own crash test does the same: three held edits, then a real reload.
     await page.getByTestId("dbx-crash").click();
@@ -132,13 +132,13 @@ test.describe("database proof", () => {
     await expect(report).toContainText("restored 3");
     await expect(page.getByTestId("dbx-pending")).toHaveText("0", { timeout: READY_TIMEOUT });
     await expect(page.getByTestId("dbx-version")).toHaveText("5");
-    await expect(logEntry(page, "Restored")).toHaveCount(1);
+    await expect(log_entry(page, "Restored")).toHaveCount(1);
   });
 
   test("answers a lost acknowledgement idempotently and recovers from a conflict", async ({
     page,
   }) => {
-    await openDatabase(page);
+    await open_database(page);
     await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     const commit = page.getByRole("button", { name: "Add one seat" });
 
@@ -149,14 +149,14 @@ test.describe("database proof", () => {
     await commit.click();
     await expect(page.getByTestId("dbx-pending")).toHaveText("0", { timeout: READY_TIMEOUT });
     await expect(page.getByTestId("dbx-version")).toHaveText("1");
-    await expect(logEntry(page, "Duplicate acknowledgement")).toHaveCount(1);
+    await expect(log_entry(page, "Duplicate acknowledgement")).toHaveCount(1);
 
     // An external writer advances the head; the next local commit rebases over
     // the missed tail and resubmits in place, without a remount.
     await page.getByRole("button", { name: "External writer commit" }).click();
     await expect(commit).toBeEnabled();
     // A remount replaces the Grid element inside the host.
-    const mountedGrid = await page.getByTestId("dbx-grid").evaluateHandle((host) => {
+    const mounted_grid = await page.getByTestId("dbx-grid").evaluateHandle((host) => {
       const grid = host.firstElementChild;
       if (!grid) throw new Error("The database Grid is not mounted");
       return grid;
@@ -165,19 +165,19 @@ test.describe("database proof", () => {
     // Recovery applies the missed v2 operation to the live Grid, and the
     // rebased commit is resubmitted once, as v3.
     await expect(
-      logEntry(
+      log_entry(
         page,
         "Recovered at v2: applied 1 missed operation and resubmitted 1 rebased commit",
       ),
     ).toHaveCount(1, { timeout: READY_TIMEOUT });
-    expect(await mountedGrid.evaluate((grid) => grid.isConnected)).toBe(true);
+    expect(await mounted_grid.evaluate((grid) => grid.isConnected)).toBe(true);
     await expect(page.getByTestId("dbx-version")).toHaveText("3");
     await expect(page.getByTestId("dbx-pending")).toHaveText("0");
     // Seed $92,814 + row 0 seat ($29) + row 1 seat ($49), with row 4's
     // 65 seats repriced from $49 to $1.70 by the external v2 writer.
     await expect(page.getByTestId("dbx-total")).toHaveText("$89,817.5");
-    await expect(logEntry(page, "Recovered at v")).toHaveCount(1);
-    await expect(logEntry(page, "Duplicate acknowledgement")).toHaveCount(1);
+    await expect(log_entry(page, "Recovered at v")).toHaveCount(1);
+    await expect(log_entry(page, "Duplicate acknowledgement")).toHaveCount(1);
   });
 
   test.describe(() => {
@@ -205,11 +205,11 @@ test.describe("database proof", () => {
       await expect(page.getByTestId("dbx-status")).toHaveAttribute("data-status", "error", {
         timeout: READY_TIMEOUT,
       });
-      expect(await deleteDatabase(page, DOCUMENT_DATABASE)).toBe("deleted");
+      expect(await delete_database(page, DOCUMENT_DATABASE)).toBe("deleted");
     });
 
     test("leaving the page while a session reopens leaves no session open", async ({ page }) => {
-      await openDatabase(page);
+      await open_database(page);
       await page.getByRole("button", { name: "Close and reopen session" }).click();
       await page
         .getByRole("navigation", { name: "Site", exact: true })
@@ -219,7 +219,7 @@ test.describe("database proof", () => {
       // A boot that finished after unmount would keep its connection open and
       // block the deletion for good.
       await expect
-        .poll(() => deleteDatabase(page, DOCUMENT_DATABASE), { timeout: READY_TIMEOUT })
+        .poll(() => delete_database(page, DOCUMENT_DATABASE), { timeout: READY_TIMEOUT })
         .toBe("deleted");
     });
   });
@@ -228,14 +228,14 @@ test.describe("database proof", () => {
 test.describe("collaboration proof", () => {
   test("converges two clients with ordered commits and presence", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await openCollaboration(page);
-    await expectBothClients(page, "v0", COLLABORATION_SEED_TOTAL);
+    await open_collaboration(page);
+    await expect_both_clients(page, "v0", COLLABORATION_SEED_TOTAL);
 
     await page
       .locator('[data-client="a"]')
       .getByRole("button", { name: `Add $500 to ${ANA_ACCOUNT}` })
       .click();
-    await expectBothClients(page, "v1", usd(COLLABORATION_SEED_VALUE + FORECAST_ADJUSTMENT));
+    await expect_both_clients(page, "v1", usd(COLLABORATION_SEED_VALUE + FORECAST_ADJUSTMENT));
     await expect(page.getByTestId("clb-server-version")).toHaveText("v1");
 
     // Presence: the sample edit selected Ana's cell; Bram sees her.
@@ -250,7 +250,7 @@ test.describe("collaboration proof", () => {
     page,
   }) => {
     test.setTimeout(CHAOS_TIMEOUT + READY_TIMEOUT);
-    await openCollaboration(page);
+    await open_collaboration(page);
     await page.getByTestId("clb-chaos").click();
     await expect(page.locator(".sw-clb__chaos")).toHaveAttribute("data-phase", "converged", {
       timeout: CHAOS_TIMEOUT,
@@ -259,14 +259,14 @@ test.describe("collaboration proof", () => {
       `All ${COLLABORATION_WORKBOOK_ROWS * COLLABORATION_WORKBOOK_COLUMNS} cells match`,
     );
     // Both clients end on the server head with nothing queued.
-    await expectBothClients(
+    await expect_both_clients(
       page,
       (await page.getByTestId("clb-server-version").textContent()) ?? "",
     );
   });
 
   test("applies a multi-version restore as one atomic batch on the peer", async ({ page }) => {
-    await openCollaboration(page);
+    await open_collaboration(page);
     await page.getByTestId("clb-restore").click();
     const report = page.getByTestId("clb-batch-report");
     await expect(report).toHaveAttribute("data-state", "passed", { timeout: READY_TIMEOUT });
@@ -274,7 +274,7 @@ test.describe("collaboration proof", () => {
     await expect(report).toContainText("1 transaction");
     await expect(report).toContainText("525,000");
     // Both clients converge, and the untouched forecast keeps its total.
-    await expectBothClients(
+    await expect_both_clients(
       page,
       (await page.getByTestId("clb-server-version").textContent()) ?? "",
       COLLABORATION_SEED_TOTAL,
@@ -282,46 +282,46 @@ test.describe("collaboration proof", () => {
   });
 
   test("buffers version gaps and recovers from a base-version conflict", async ({ page }) => {
-    await openCollaboration(page);
+    await open_collaboration(page);
     // The fault panels render open, beside their diagram.
     await expect(page.locator(".sw-clb__advanced")).toHaveAttribute("open", "");
-    const holdNext = (slug: "a" | "b") =>
+    const hold_next = (slug: "a" | "b") =>
       page
         .locator(`[data-fault-client="${slug}"]`)
         .getByRole("button", { name: "Hold next broadcast" })
         .click();
-    const anaEdit = page
+    const ana_edit = page
       .locator('[data-client="a"]')
       .getByRole("button", { name: `Add $500 to ${ANA_ACCOUNT}` });
 
     // Gap: Bram's link holds v1 back, v2 arrives first and buffers.
-    await holdNext("b");
-    await anaEdit.click();
+    await hold_next("b");
+    await ana_edit.click();
     await expect(page.getByTestId("clb-a-version")).toHaveText("v1");
-    await anaEdit.click();
+    await ana_edit.click();
     await expect(page.getByTestId("clb-a-version")).toHaveText("v2");
     await expect(page.getByTestId("clb-b-version")).toHaveText("v0");
     await page
       .locator('[data-fault-client="b"]')
       .getByRole("button", { name: /Release held/ })
       .click();
-    await expectBothClients(page, "v2");
+    await expect_both_clients(page, "v2");
 
     // Conflict: Ana misses a server-authored commit and commits on a stale base.
-    await holdNext("a");
+    await hold_next("a");
     await page.getByRole("button", { name: "Server-authored commit" }).click();
     await expect(page.getByTestId("clb-b-version")).toHaveText("v3");
     await expect(page.getByTestId("clb-a-version")).toHaveText("v2");
-    await anaEdit.click();
+    await ana_edit.click();
     // Ana's rebased edit lands on top of the server-authored commit at both clients.
-    await expectBothClients(page, "v4");
+    await expect_both_clients(page, "v4");
   });
 });
 
 test("a manual retry of a commit whose acknowledgement was lost applies it once", async ({
   page,
 }) => {
-  await openDatabase(page);
+  await open_database(page);
   await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
   // The server stores v1 but the client keeps the commit pending; the retry
   // with the same mutation id must not apply it twice.
@@ -329,9 +329,9 @@ test("a manual retry of a commit whose acknowledgement was lost applies it once"
   await page.getByRole("button", { name: "Add one seat" }).click();
   await expect(page.getByTestId("dbx-pending")).toHaveText("1");
   await expect(page.getByTestId("dbx-version")).toHaveText("1");
-  const committedTotal = (await page.getByTestId("dbx-total").textContent()) ?? "";
+  const committed_total = (await page.getByTestId("dbx-total").textContent()) ?? "";
   await page.getByRole("button", { name: "Retry pending commit" }).click();
   await expect(page.getByTestId("dbx-pending")).toHaveText("0");
   await expect(page.getByTestId("dbx-version")).toHaveText("1");
-  await expect(page.getByTestId("dbx-total")).toHaveText(committedTotal);
+  await expect(page.getByTestId("dbx-total")).toHaveText(committed_total);
 });

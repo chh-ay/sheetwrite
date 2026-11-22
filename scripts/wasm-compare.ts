@@ -41,7 +41,7 @@ const SECTION_NAMES = [
 ];
 
 /** An unsigned LEB128 number at `offset`, and the offset after it. */
-function readLeb(bytes: Uint8Array, offset: number): [value: number, next: number] {
+function read_leb(bytes: Uint8Array, offset: number): [value: number, next: number] {
   let value = 0;
   let shift = 0;
   let at = offset;
@@ -60,12 +60,12 @@ function sections(bytes: Uint8Array): Section[] {
   let at = 8;
   while (at < bytes.length) {
     const id = bytes[at] ?? 0;
-    const [size, start] = readLeb(bytes, at + 1);
+    const [size, start] = read_leb(bytes, at + 1);
     const body = bytes.subarray(start, start + size);
     let name = SECTION_NAMES[id] ?? `section ${id}`;
     if (id === 0) {
-      const [nameLength, nameStart] = readLeb(body, 0);
-      name = `custom "${new TextDecoder().decode(body.subarray(nameStart, nameStart + nameLength))}"`;
+      const [name_length, name_start] = read_leb(body, 0);
+      name = `custom "${new TextDecoder().decode(body.subarray(name_start, name_start + name_length))}"`;
     }
     found.push({ name, body });
     at = start + size;
@@ -81,18 +81,18 @@ function hash(bytes: Uint8Array): string {
 function differences(before: Uint8Array, after: Uint8Array): { bytes: number; runs: number } {
   let bytes = 0;
   let runs = 0;
-  let inRun = false;
+  let in_run = false;
   for (let index = 0; index < before.length; index += 1) {
     const differs = before[index] !== after[index];
     if (differs) bytes += 1;
-    if (differs && !inRun) runs += 1;
-    inRun = differs;
+    if (differs && !in_run) runs += 1;
+    in_run = differs;
   }
   return { bytes, runs };
 }
 
 const args = process.argv.slice(2);
-const isRelocations = args.includes("--relocations");
+const is_relocations = args.includes("--relocations");
 const modules = args
   .filter((_, at) => args[at - 1] === "--module")
   .map((spec): [string, string] => {
@@ -101,19 +101,19 @@ const modules = args
       throw new Error(`--module ${spec}: expected <new>=<old>`);
     return [moved, original];
   });
-const [beforePath, afterPath] = args.filter(
+const [before_path, after_path] = args.filter(
   (arg, at) => !arg.startsWith("--") && args[at - 1] !== "--module",
 );
-if (beforePath === undefined || afterPath === undefined) {
+if (before_path === undefined || after_path === undefined) {
   throw new Error(
     "usage: bun scripts/wasm-compare.ts [--relocations [--module <new>=<old>]...] <before.wasm> <after.wasm>",
   );
 }
 
-const beforeBytes = new Uint8Array(await readFile(beforePath));
-const afterBytes = new Uint8Array(await readFile(afterPath));
-const before = sections(beforeBytes);
-const after = sections(afterBytes);
+const before_bytes = new Uint8Array(await readFile(before_path));
+const after_bytes = new Uint8Array(await readFile(after_path));
+const before = sections(before_bytes);
+const after = sections(after_bytes);
 const rows = ["| Section | Before | After |", "|---|---|---|"];
 const names = [...new Set([...before, ...after].map(({ name }) => name))];
 for (const name of names) {
@@ -127,18 +127,18 @@ process.stdout.write(`${rows.join("\n")}\n`);
 
 const code = [before, after].map((list) => list.find(({ name }) => name === "code")?.body);
 const data = [before, after].map((list) => list.find(({ name }) => name === "data")?.body);
-const sameCode = code[0] !== undefined && code[1] !== undefined && hash(code[0]) === hash(code[1]);
-const sameDataLength =
+const same_code = code[0] !== undefined && code[1] !== undefined && hash(code[0]) === hash(code[1]);
+const same_data_length =
   data[0] !== undefined && data[1] !== undefined && data[0].length === data[1].length;
 
-if (sameDataLength && data[0] !== undefined && data[1] !== undefined) {
+if (same_data_length && data[0] !== undefined && data[1] !== undefined) {
   const { bytes, runs } = differences(data[0], data[1]);
   process.stdout.write(`Data section: ${bytes} bytes differ, in ${runs} runs.\n`);
 }
-if (sameCode && sameDataLength) {
+if (same_code && same_data_length) {
   process.stdout.write("Code-neutral: identical code section, data section of the same length.\n");
-} else if (isRelocations) {
-  const report = compareRelocations(beforeBytes, afterBytes, modules);
+} else if (is_relocations) {
+  const report = compareRelocations(before_bytes, after_bytes, modules);
   process.stdout.write(`${report.lines.join("\n")}\n`);
   if (!report.isSameCode) process.exitCode = 1;
 } else {

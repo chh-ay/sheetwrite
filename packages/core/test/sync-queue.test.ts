@@ -14,7 +14,7 @@ function record(id: number): SyncMutationRecord {
 }
 
 /** The queue's head, pending count and version total against a plain array of records. */
-function expectQueue(queue: PendingRecordQueue, expected: readonly SyncMutationRecord[]): void {
+function expect_queue(queue: PendingRecordQueue, expected: readonly SyncMutationRecord[]): void {
   expect(queue.head()).toBe(expected[0]);
   expect(queue.count("pending")).toBe(expected.length);
   expect(queue.versionCount).toBe(expected.length);
@@ -49,6 +49,6 @@ describe("PendingRecordQueue", () => {
       }
       expect(queue.head()).toBe(live[0]);
     }
-    expectQueue(queue, live);
+    expect_queue(queue, live);
   });
 });

@@ -34,7 +34,7 @@ import {
 } from "./state.js";
 
 /** Every held edit came back, and the ledger shows the same total as before the reload. */
-function reloadTestPassed(report: CrashReport): boolean {
+function reload_test_passed(report: CrashReport): boolean {
   return report.restored === report.expected && report.totalAfter === report.totalBefore;
 }
 
@@ -42,8 +42,8 @@ function reloadTestPassed(report: CrashReport): boolean {
 export function runAction(command: (current: DatabaseEngine) => Promise<void> | void): void {
   const current = engine();
   if (!current) return;
-  void import("./engine.js").then(({ failureMessage }) =>
-    runGuarded(() => command(current), failureMessage),
+  void import("./engine.js").then(({ failureMessage: failure_message }) =>
+    runGuarded(() => command(current), failure_message),
   );
 }
 
@@ -51,7 +51,7 @@ export function runAction(command: (current: DatabaseEngine) => Promise<void> | 
 export const ready = () => status() === "ready" && !busy();
 
 function CrashReportView(props: Readonly<{ report: CrashReport }>) {
-  const passed = () => reloadTestPassed(props.report);
+  const passed = () => reload_test_passed(props.report);
   return (
     <div
       class="sw-dbx__report"
@@ -129,23 +129,23 @@ export function DatabaseStage(props: DatabaseStageProps) {
 
   onMount(() => {
     let disposed = false;
-    const stopWaiting = whenNearViewport(host, () => {
-      void import("./engine.js").then(({ createDatabaseEngine }) => {
+    const stop_waiting = whenNearViewport(host, () => {
+      void import("./engine.js").then(({ createDatabaseEngine: create_database_engine }) => {
         if (disposed) return;
-        const created = createDatabaseEngine(host);
+        const created = create_database_engine(host);
         setEngine(created);
         void created.boot(null, "Loaded from IndexedDB");
       });
     });
     onCleanup(() => {
       disposed = true;
-      stopWaiting();
+      stop_waiting();
       engine()?.dispose();
       setEngine(null);
     });
   });
 
-  const pendingCount = () => syncState()?.pendingCount ?? 0;
+  const pending_count = () => syncState()?.pendingCount ?? 0;
 
   return (
     <ShowcaseStage
@@ -186,10 +186,10 @@ export function DatabaseStage(props: DatabaseStageProps) {
                   label: "Pending writes",
                   value: (
                     <span
-                      data-state={pendingCount() > 0 ? "queued" : undefined}
+                      data-state={pending_count() > 0 ? "queued" : undefined}
                       data-testid="dbx-pending"
                     >
-                      {pendingCount()}
+                      {pending_count()}
                     </span>
                   ),
                 },

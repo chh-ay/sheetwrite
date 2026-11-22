@@ -12,8 +12,8 @@ import {
   ShowcaseIndexedDbAdapter,
 } from "../src/showcases/showcase-database.ts";
 
-const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
-const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
+const indexed_db_descriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+const key_range_descriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -25,9 +25,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (indexedDbDescriptor) Object.defineProperty(globalThis, "indexedDB", indexedDbDescriptor);
+  if (indexed_db_descriptor) Object.defineProperty(globalThis, "indexedDB", indexed_db_descriptor);
   else Reflect.deleteProperty(globalThis, "indexedDB");
-  if (keyRangeDescriptor) Object.defineProperty(globalThis, "IDBKeyRange", keyRangeDescriptor);
+  if (key_range_descriptor) Object.defineProperty(globalThis, "IDBKeyRange", key_range_descriptor);
   else Reflect.deleteProperty(globalThis, "IDBKeyRange");
 });
 
@@ -42,12 +42,12 @@ describe("IndexedDB showcase adapter", () => {
       makePersistenceConformanceSnapshot(),
       options,
     );
-    let writerStats: ShowcaseDatabaseStats | undefined;
+    let writer_stats: ShowcaseDatabaseStats | undefined;
     const report = await runPersistenceConformance({
       adapter,
       boundedConflictTail: { overflowCommits: 8 },
       reopen: async () => {
-        writerStats = adapter.stats();
+        writer_stats = adapter.stats();
         adapter.close();
         adapter = await ShowcaseIndexedDbAdapter.open(
           makePersistenceConformanceSnapshot(),
@@ -67,7 +67,7 @@ describe("IndexedDB showcase adapter", () => {
     expect(stats.tailLength).toBeLessThanOrEqual(4);
     expect(stats.reads).toBeGreaterThan(0);
     expect(stats.storedBytes).toBeGreaterThan(0);
-    expect(writerStats?.writes ?? 0).toBeGreaterThan(0);
+    expect(writer_stats?.writes ?? 0).toBeGreaterThan(0);
     adapter.close();
   });
 

@@ -8,7 +8,7 @@ const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
 
 type Section = "docs" | "showcases" | "releases" | undefined;
 
-function currentSection(pathname: string): Section {
+function current_section(pathname: string): Section {
   if (pathname.startsWith(releaseFacts.releasesHref)) return "releases";
   if (pathname.startsWith("/docs/")) return "docs";
   if (pathname.startsWith("/showcases/")) return "showcases";
@@ -25,7 +25,7 @@ function currentSection(pathname: string): Section {
  * region at `#main-content`, as the docs shell does.
  */
 export function SiteTopbar(props: { readonly pathname: string }) {
-  const section = () => currentSection(props.pathname);
+  const section = () => current_section(props.pathname);
   // A section's own page is the destination; deeper pages are inside the section.
   const marker = (name: Exclude<Section, undefined>, href: string) =>
     section() !== name ? undefined : props.pathname === href ? "page" : "true";

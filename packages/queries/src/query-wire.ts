@@ -18,7 +18,7 @@ const SOURCE_JSON = 2;
 const SOURCE_HOST = 3;
 const DEFAULT_CSV_DELIMITER = 44;
 
-function sourceCode(kind: SavedQuerySource["kind"]): number {
+function source_code(kind: SavedQuerySource["kind"]): number {
   switch (kind) {
     case "csv":
       return SOURCE_CSV;
@@ -68,7 +68,7 @@ export function encodeQueries(queries: readonly SavedQuery[]): PlanWire {
     const { source } = query;
     writer.string(query.id);
     writer.string(query.name);
-    writer.codes.push(sourceCode(source.kind));
+    writer.codes.push(source_code(source.kind));
     writer.string(source.sourceId);
     writer.optionalString(source.kind === "host" ? undefined : source.locator);
     writer.codes.push(source.columns.length);
@@ -239,7 +239,7 @@ class Reader {
     const id = this.string();
     const name = this.string();
     const kind = this.code();
-    const sourceId = this.string();
+    const source_id = this.string();
     const locator = this.optionalString();
     const columns = this.columns();
     const located = locator === undefined ? {} : { locator };
@@ -248,7 +248,7 @@ class Reader {
     if (kind === SOURCE_CSV) {
       source = {
         kind: "csv",
-        sourceId,
+        sourceId: source_id,
         ...located,
         columns,
         delimiter: this.code(),
@@ -257,9 +257,15 @@ class Reader {
       };
     } else if (kind === SOURCE_JSON) {
       const path = this.strings();
-      source = { kind: "json", sourceId, ...located, columns, ...(path.length ? { path } : {}) };
+      source = {
+        kind: "json",
+        sourceId: source_id,
+        ...located,
+        columns,
+        ...(path.length ? { path } : {}),
+      };
     } else if (kind === SOURCE_HOST) {
-      source = { kind: "host", sourceId, columns };
+      source = { kind: "host", sourceId: source_id, columns };
     } else {
       throw new Error("Query codec returned an invalid source kind");
     }

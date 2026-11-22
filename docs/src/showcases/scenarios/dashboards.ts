@@ -47,13 +47,13 @@ const ORDERS_TABLE: WorkbookTable = {
 /** The column index of an Orders field, which is its pivot field index. */
 const field = (id: string) => ORDERS_TABLE.columns.findIndex((column) => column.id === id);
 
-function pivot(id: string, name: string, rowField: string): PivotDefinition {
+function pivot(id: string, name: string, row_field: string): PivotDefinition {
   return {
     id,
     name,
     source: { table: ORDERS_TABLE.id },
     anchor: { row: 0, col: 0 },
-    rows: [field(rowField)],
+    rows: [field(row_field)],
     columns: [],
     values: [{ field: field("revenue"), aggregation: "SUM", name: "Revenue", numberFormat: MONEY }],
   };
@@ -127,7 +127,7 @@ export const PRODUCT_ITEM: DashboardItem = {
   box: { x: 0, y: 9, w: 6, h: 5 },
 };
 
-function orderRow(index: number): CellScalar[] {
+function order_row(index: number): CellScalar[] {
   const region = REGIONS[(index * 3 + Math.floor(index / 4)) % REGIONS.length] ?? REGIONS[0];
   const channel = CHANNELS[(index * 2 + Math.floor(index / 5)) % CHANNELS.length] ?? CHANNELS[0];
   const product = PRODUCTS[(index * 7) % PRODUCTS.length] ?? PRODUCTS[0];
@@ -136,7 +136,7 @@ function orderRow(index: number): CellScalar[] {
   return [`ORD-${7001 + index}`, region, channel, product, revenue];
 }
 
-function orderOperations(): DocumentOp[] {
+function order_operations(): DocumentOp[] {
   const set = (row: number, col: number, value: CellScalar): DocumentOp => ({
     op: "set",
     addr: { sheet: DATA_SHEET, row, col },
@@ -144,7 +144,7 @@ function orderOperations(): DocumentOp[] {
   });
   const operations = ORDERS_TABLE.columns.map((column, col) => set(0, col, column.name));
   for (let index = 0; index < ORDER_ROWS; index++) {
-    orderRow(index).forEach((value, col) => operations.push(set(index + 1, col, value)));
+    order_row(index).forEach((value, col) => operations.push(set(index + 1, col, value)));
   }
   operations.push({
     op: "setRangeStyle",
@@ -158,7 +158,7 @@ function orderOperations(): DocumentOp[] {
   return operations;
 }
 
-function dashboardWorkbook(): Workbook {
+function dashboard_workbook(): Workbook {
   const dashboard: Sheet = {
     id: DASHBOARD_SHEET,
     name: "Sales dashboard",
@@ -216,7 +216,7 @@ export interface DashboardScenario extends LiveScenario<DashboardSnapshot> {
 
 const PIVOT_NAMES = new Map(PIVOTS.map((entry) => [entry.id, entry.name]));
 
-function itemLabel(item: DashboardItem): string {
+function item_label(item: DashboardItem): string {
   switch (item.kind) {
     case "pivot":
       return PIVOT_NAMES.get(item.pivot) ?? item.pivot;
@@ -229,11 +229,11 @@ function itemLabel(item: DashboardItem): string {
   }
 }
 
-function itemReading(item: DashboardItem): ItemReading {
+function item_reading(item: DashboardItem): ItemReading {
   const { x, y, w, h } = item.box;
   return {
     id: item.id,
-    label: itemLabel(item),
+    label: item_label(item),
     place: `col ${x + 1}, row ${y + 1} · ${w}×${h}`,
     selected: item.kind === "slicer" && item.selected ? item.selected.join(", ") : null,
   };
@@ -254,7 +254,7 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
     if (!found) throw new Error(`The dashboard has no ${id} item`);
     return found;
   };
-  const setItems = (changed: readonly DashboardItem[], what: string) => {
+  const set_items = (changed: readonly DashboardItem[], what: string) => {
     const current = grid;
     if (!current) throw new Error("The dashboard is still loading");
     requireApplied(
@@ -271,25 +271,25 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
 
   const ready = (async () => {
     // The PivotChart draws through the optional charts package, loaded here.
-    const { chartsAddon } = await import("@sheetwrite/charts");
+    const { chartsAddon: charts_addon } = await import("@sheetwrite/charts");
     const shell = await mountShowcaseShell(
       host,
-      { workbook: dashboardWorkbook() },
+      { workbook: dashboard_workbook() },
       controller.signal,
-      [chartsAddon()],
+      [charts_addon()],
     );
     if (!shell) return;
     grid = shell.grid;
-    requireApplied(grid.applyRemoteOperations(orderOperations()), "The orders");
+    requireApplied(grid.applyRemoteOperations(order_operations()), "The orders");
     requireApplied(
       grid.applyRemoteOperations(
         PIVOTS.map((definition) => ({ op: "setPivot", sheet: DASHBOARD_SHEET, pivot: definition })),
       ),
       "The dashboard pivots",
     );
-    const stopChanges = grid.on("change", () => listeners.notify());
+    const stop_changes = grid.on("change", () => listeners.notify());
     dispose = () => {
-      stopChanges();
+      stop_changes();
       shell.dispose();
     };
   })();
@@ -298,25 +298,25 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
     ready,
     subscribe: listeners.subscribe,
     snapshot: () => ({
-      items: items().map(itemReading),
+      items: items().map(item_reading),
       hasProductPivot: items().some((candidate) => candidate.id === PRODUCT_ITEM.id),
       regionSelection:
         items()
-          .map(itemReading)
+          .map(item_reading)
           .find((entry) => entry.id === "region-slicer")?.selected ?? null,
     }),
     addProductPivot() {
-      setItems([PRODUCT_ITEM], "The new pivot item");
+      set_items([PRODUCT_ITEM], "The new pivot item");
     },
     swapChartAndPivot() {
       const chart = item("region-chart");
       const table = item("channel-pivot");
       // Each move must land on a free place, so the chart waits below every
       // item while the pivot takes its place: one undo step.
-      const freeRow = Math.max(...items().map((candidate) => candidate.box.y + candidate.box.h));
-      setItems(
+      const free_row = Math.max(...items().map((candidate) => candidate.box.y + candidate.box.h));
+      set_items(
         [
-          { ...chart, box: { ...chart.box, y: freeRow } },
+          { ...chart, box: { ...chart.box, y: free_row } },
           { ...table, box: { ...chart.box } },
           { ...chart, box: { ...table.box } },
         ],
@@ -326,7 +326,7 @@ export function createDashboardScenario(host: HTMLElement): DashboardScenario {
     keepFirstRegion() {
       const slicer = item("region-slicer");
       if (slicer.kind !== "slicer") throw new Error("The Region slicer is missing");
-      setItems([{ ...slicer, selected: [REGIONS[0]] }], "The slicer selection");
+      set_items([{ ...slicer, selected: [REGIONS[0]] }], "The slicer selection");
     },
     undo() {
       grid?.undo();

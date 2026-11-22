@@ -30,14 +30,14 @@ beforeAll(async () => {
 const addon = queriesAddon();
 const grids: Grid[] = [];
 const cleanups: Array<() => void> = [];
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
 });
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   for (const grid of grids.splice(0)) grid.destroy();
-  restoreStubs();
+  restore_stubs();
 });
 
 const encoder = new TextEncoder();
@@ -72,15 +72,15 @@ const unfiltered: SavedQuery = {
 type Sources = Record<string, string | (() => Promise<QueryFetchResult>)>;
 
 /** Applies the queries add-on to `grid`, as grid creation does; returns its cleanup. */
-function applyQueries(grid: Grid, sources?: Sources, requests: QueryFetchRequest[] = []) {
-  const fetchSource = async (request: QueryFetchRequest): Promise<QueryFetchResult> => {
+function apply_queries(grid: Grid, sources?: Sources, requests: QueryFetchRequest[] = []) {
+  const fetch_source = async (request: QueryFetchRequest): Promise<QueryFetchResult> => {
     requests.push(request);
     const source = sources?.[request.sourceId];
     if (typeof source === "function") return source();
     if (source === undefined) throw new Error(`No fixture for ${request.sourceId}`);
     return { kind: "bytes", bytes: encoder.encode(source) };
   };
-  const settings = sources ? { fetchSource } : undefined;
+  const settings = sources ? { fetchSource: fetch_source } : undefined;
   const cleanup =
     addon.grid?.({
       grid,
@@ -101,11 +101,11 @@ async function open(sources: Sources) {
   });
   grids.push(grid);
   const requests: QueryFetchRequest[] = [];
-  const cleanup = applyQueries(grid, sources, requests);
+  const cleanup = apply_queries(grid, sources, requests);
   return { grid, requests, cleanup, session: await querySessionOf(grid) };
 }
 
-function setCell(grid: Grid, row: number, col: number, value: CellValue): void {
+function set_cell(grid: Grid, row: number, col: number, value: CellValue): void {
   grid.applyTransaction({ patches: [{ op: "set", addr: { sheet: "data", row, col }, value }] });
 }
 
@@ -113,7 +113,7 @@ const cell = (grid: Grid, row: number, col: number) =>
   grid.store.getCell({ sheet: "data", row, col }).resolved;
 const cells = (grid: Grid, ...addresses: Array<[number, number]>) =>
   addresses.map(([row, col]) => cell(grid, row, col));
-const tableRange = (grid: Grid) =>
+const table_range = (grid: Grid) =>
   grid.store.getWorkbook().sheets[0]?.tables?.find((table) => table.id === "sales-table")?.range;
 const bytes = (text: string): Promise<QueryFetchResult> =>
   Promise.resolve({ kind: "bytes", bytes: encoder.encode(text) });
@@ -122,7 +122,7 @@ describe("saved query refresh", () => {
   it("writes typed values and cell errors into one table that formulas read, as one undoable change", async () => {
     const feed = "Region,Total,Day\nNorth,5,2024-01-02\nSouth,bad,2024-01-03\nEast,7,1900-01-01\n";
     const { grid, session, requests } = await open({ "sales-feed": feed });
-    setCell(grid, 0, 5, { kind: "formula", src: "=SUM(B2,B4)" });
+    set_cell(grid, 0, 5, { kind: "formula", src: "=SUM(B2,B4)" });
 
     expect(session.define(unfiltered).status).toBe("applied");
     expect((await session.refresh("sales")).status).toBe("applied");
@@ -131,7 +131,7 @@ describe("saved query refresh", () => {
     expect(cells(grid, [1, 0], [1, 1], [1, 2])).toEqual(["North", 5, 45293]);
     expect(grid.store.getFormula({ sheet: "data", row: 2, col: 1 })).toBe("=#VALUE!");
     expect(cells(grid, [3, 2], [0, 5])).toEqual([1, 12]);
-    expect(tableRange(grid)).toEqual({
+    expect(table_range(grid)).toEqual({
       sheet: "data",
       start: { row: 0, col: 0 },
       end: { row: 3, col: 2 },
@@ -140,7 +140,7 @@ describe("saved query refresh", () => {
     // Undo keeps the saved query; redo restores the values without another fetch.
     grid.undo();
     expect(cells(grid, [1, 0], [0, 5])).toEqual([null, 0]);
-    expect(tableRange(grid)).toBeUndefined();
+    expect(table_range(grid)).toBeUndefined();
     expect(grid.store.getWorkbook().queries?.map((query) => query.id)).toEqual(["sales"]);
     grid.redo();
     expect(cell(grid, 1, 0)).toBe("North");
@@ -161,12 +161,12 @@ describe("saved query refresh", () => {
     rows = "Only,1,2024-01-01\n";
     expect((await session.refresh("sales")).status).toBe("applied");
     expect(cells(grid, [1, 0], [2, 0])).toEqual(["Only", null]);
-    expect(tableRange(grid)?.end.row).toBe(1);
+    expect(table_range(grid)?.end.row).toBe(1);
 
     rows = "";
     expect((await session.refresh("sales")).status).toBe("applied");
     expect(cells(grid, [0, 0], [1, 0])).toEqual(["Region", null]);
-    expect(tableRange(grid)?.end.row).toBe(1);
+    expect(table_range(grid)?.end.row).toBe(1);
   });
 
   it("writes logical, date-time and mixed values with their worksheet types", async () => {
@@ -209,7 +209,7 @@ describe("saved query refresh", () => {
   it("does not overwrite unrelated cells when an output grows", async () => {
     const feed = "Region,Total,Day\nA,1,2024-01-01\nB,2,2024-01-01\nC,3,2024-01-01\n";
     const { grid, session } = await open({ "sales-feed": feed });
-    setCell(grid, 3, 1, { kind: "literal", value: "keep" });
+    set_cell(grid, 3, 1, { kind: "literal", value: "keep" });
     session.define(unfiltered);
 
     expect(await session.refresh("sales")).toEqual({
@@ -236,10 +236,10 @@ describe("refresh atomicity", () => {
       ],
       output: { table: "costs-table", tableName: "Costs", anchor: { ...A1, col: 4 } },
     };
-    let costFeed = '[{"Cost":"bad"}]';
+    let cost_feed = '[{"Cost":"bad"}]';
     const { grid, session } = await open({
       "sales-feed": SALES_CSV,
-      "costs-feed": () => bytes(costFeed),
+      "costs-feed": () => bytes(cost_feed),
     });
     session.define(unfiltered);
     session.define(costs);
@@ -251,7 +251,7 @@ describe("refresh atomicity", () => {
     });
     expect(cell(grid, 0, 0)).toBeNull();
 
-    costFeed = '[{"Cost":3}]';
+    cost_feed = '[{"Cost":3}]';
     expect((await session.refreshAll()).status).toBe("applied");
     expect(cells(grid, [1, 0], [1, 4])).toEqual(["North", 3]);
     grid.undo();
@@ -280,7 +280,7 @@ describe("refresh atomicity", () => {
 describe("query sources and definitions", () => {
   it("loads joined queries through the host callback only, without credentials", async () => {
     const code = { id: "code", name: "Code", type: "text" as const };
-    const regionCodes = {
+    const region_codes = {
       ...code,
       bytes: encoder.encode("South"),
       offsets: Uint32Array.of(0, 5),
@@ -289,21 +289,21 @@ describe("query sources and definitions", () => {
       errorCodes: new Uint32Array(),
       errorPool: [],
     };
-    const originalFetch = globalThis.fetch;
-    let globalFetches = 0;
+    const original_fetch = globalThis.fetch;
+    let global_fetches = 0;
     globalThis.fetch = Object.assign(
       () => {
-        globalFetches += 1;
+        global_fetches += 1;
         return Promise.reject(new Error("global fetch is not a query source"));
       },
-      { preconnect: originalFetch.preconnect },
+      { preconnect: original_fetch.preconnect },
     );
     try {
       const { grid, session, requests } = await open({
         "sales-feed": `${SALES_CSV}South,6,2024-01-03\n`,
         "region-table": async () => ({
           kind: "batch",
-          batch: { rowCount: 1, columns: [regionCodes] },
+          batch: { rowCount: 1, columns: [region_codes] },
         }),
       });
       const source = { kind: "host" as const, sourceId: "region-table", columns: [code] };
@@ -321,9 +321,9 @@ describe("query sources and definitions", () => {
       ]);
       expect(cells(grid, [1, 0], [2, 0])).toEqual(["South", null]);
     } finally {
-      globalThis.fetch = originalFetch;
+      globalThis.fetch = original_fetch;
     }
-    expect(globalFetches).toBe(0);
+    expect(global_fetches).toBe(0);
   });
 
   it("rejects a plan the engine cannot run before saving it, and ends with the add-on's cleanup", async () => {
@@ -357,18 +357,18 @@ describe("query sources and definitions", () => {
       grids.push(grid);
       return grid;
     }) as [Grid, Grid];
-    applyQueries(sender, { "sales-feed": SALES_CSV });
+    apply_queries(sender, { "sales-feed": SALES_CSV });
     // The peer gets the add-on without a fetchSource, so it has no session and never fetches.
-    applyQueries(peer);
+    apply_queries(peer);
     const options = { documentId: "query-sync", serverVersion: 0 };
-    const senderSync = new SyncCoordinator(sender, adapter, options);
-    const peerSync = new SyncCoordinator(peer, adapter, options);
+    const sender_sync = new SyncCoordinator(sender, adapter, options);
+    const peer_sync = new SyncCoordinator(peer, adapter, options);
     try {
       const session = await querySessionOf(sender);
       session.define(unfiltered);
       await session.refresh("sales");
-      expect(await senderSync.sendNext()).toMatchObject({ status: "applied" });
-      expect(await senderSync.sendNext()).toMatchObject({ status: "applied" });
+      expect(await sender_sync.sendNext()).toMatchObject({ status: "applied" });
+      expect(await sender_sync.sendNext()).toMatchObject({ status: "applied" });
 
       const tail = await adapter.commit({
         documentId: "query-sync",
@@ -380,7 +380,7 @@ describe("query sources and definitions", () => {
         throw new Error("the adapter must return the committed versions");
       }
       for (const version of tail.operationsSinceBase) {
-        await peerSync.applyVersionedOperation(version);
+        await peer_sync.applyVersionedOperation(version);
       }
 
       expect(peer.store.getCell({ ...A1, row: 1 }).resolved).toBe("North");
@@ -389,8 +389,8 @@ describe("query sources and definitions", () => {
         code: "optional-backend-unavailable",
       });
     } finally {
-      senderSync.destroy();
-      peerSync.destroy();
+      sender_sync.destroy();
+      peer_sync.destroy();
     }
   });
 });

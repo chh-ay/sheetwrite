@@ -14,7 +14,7 @@ import { relative, resolve } from "node:path";
  *   bun scripts/rust-lint.ts --report   print the counts as a Markdown table
  */
 const root = resolve(import.meta.dir, "..");
-const baselinePath = resolve(root, "scripts/rust-lint-baseline.json");
+const baseline_path = resolve(root, "scripts/rust-lint-baseline.json");
 
 const CRATES = {
   wasm: "packages/wasm",
@@ -59,20 +59,20 @@ interface CompilerMessage {
 }
 
 /** The `[lints...]` tables of a manifest, from the first one to the end of the file. */
-function lintTables(manifest: string): string {
+function lint_tables(manifest: string): string {
   const start = manifest.search(/^\[lints[.\]]/m);
   if (start < 0) return "";
   const rest = manifest.slice(start);
-  const nextTable = rest.search(/^\[(?!lints[.\]])/m);
-  return (nextTable < 0 ? rest : rest.slice(0, nextTable)).trim();
+  const next_table = rest.search(/^\[(?!lints[.\]])/m);
+  return (next_table < 0 ? rest : rest.slice(0, next_table)).trim();
 }
 
 /** Fails unless the three crates carry the same, non-empty lint tables. */
-async function checkLintTablesMatch(): Promise<void> {
+async function check_lint_tables_match(): Promise<void> {
   const tables = await Promise.all(
     Object.entries(CRATES).map(async ([name, dir]) => ({
       name,
-      table: lintTables(await readFile(resolve(root, dir, "Cargo.toml"), "utf8")),
+      table: lint_tables(await readFile(resolve(root, dir, "Cargo.toml"), "utf8")),
     })),
   );
   const [first] = tables;
@@ -89,7 +89,7 @@ async function checkLintTablesMatch(): Promise<void> {
   }
 }
 
-async function runClippy(crate: CrateName, args: readonly string[]): Promise<Finding[]> {
+async function run_clippy(crate: CrateName, args: readonly string[]): Promise<Finding[]> {
   const manifest = resolve(root, CRATES[crate], "Cargo.toml");
   const command = [
     "cargo",
@@ -101,7 +101,7 @@ async function runClippy(crate: CrateName, args: readonly string[]): Promise<Fin
     ...args,
   ];
   const child = Bun.spawn(command, { cwd: root, stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
@@ -110,15 +110,15 @@ async function runClippy(crate: CrateName, args: readonly string[]): Promise<Fin
   const findings = stdout
     .split("\n")
     .filter((line) => line.startsWith("{"))
-    .flatMap((line) => findingOf(JSON.parse(line) as CompilerMessage, crate, manifest));
-  const hasError = findings.some(({ level }) => level === "error");
-  if (exitCode !== 0 && !hasError) {
-    throw new Error(`${command.join(" ")} failed (exit ${exitCode}):\n${stderr}`);
+    .flatMap((line) => finding_of(JSON.parse(line) as CompilerMessage, crate, manifest));
+  const has_error = findings.some(({ level }) => level === "error");
+  if (exit_code !== 0 && !has_error) {
+    throw new Error(`${command.join(" ")} failed (exit ${exit_code}):\n${stderr}`);
   }
   return findings;
 }
 
-function findingOf(entry: CompilerMessage, crate: CrateName, manifest: string): Finding[] {
+function finding_of(entry: CompilerMessage, crate: CrateName, manifest: string): Finding[] {
   const { message } = entry;
   if (entry.reason !== "compiler-message" || message === undefined) return [];
   if (entry.manifest_path !== manifest) return [];
@@ -144,17 +144,17 @@ function findingOf(entry: CompilerMessage, crate: CrateName, manifest: string): 
 }
 
 /** One finding per place: the same line seen by several builds counts once. */
-async function collectFindings(): Promise<Finding[]> {
+async function collect_findings(): Promise<Finding[]> {
   const unique = new Map<string, Finding>();
   for (const { crate, args } of CLIPPY_RUNS) {
-    for (const finding of await runClippy(crate, args)) {
+    for (const finding of await run_clippy(crate, args)) {
       unique.set(`${finding.crate}|${finding.lint}|${finding.location}`, finding);
     }
   }
   return [...unique.values()];
 }
 
-function countFindings(findings: readonly Finding[]): Counts {
+function count_findings(findings: readonly Finding[]): Counts {
   const counts: Counts = { wasm: {}, history: {}, queries: {} };
   for (const { crate, lint } of findings) counts[crate][lint] = (counts[crate][lint] ?? 0) + 1;
   for (const crate of Object.keys(counts) as CrateName[]) {
@@ -166,7 +166,7 @@ function countFindings(findings: readonly Finding[]): Counts {
 }
 
 /** The (crate, lint) pairs whose count differs from the baseline. */
-function baselineChanges(
+function baseline_changes(
   current: Counts,
   baseline: Counts,
 ): { crate: CrateName; lint: string; was: number; now: number }[] {
@@ -182,8 +182,10 @@ function baselineChanges(
   return changes;
 }
 
-function markdownReport(counts: Counts): string {
-  const lints = [...new Set(Object.values(counts).flatMap((byLint) => Object.keys(byLint)))].sort();
+function markdown_report(counts: Counts): string {
+  const lints = [
+    ...new Set(Object.values(counts).flatMap((by_lint) => Object.keys(by_lint))),
+  ].sort();
   const crates = Object.keys(CRATES) as CrateName[];
   const totals = crates.map((crate) =>
     Object.values(counts[crate]).reduce((sum, count) => sum + count, 0),
@@ -205,16 +207,16 @@ function markdownReport(counts: Counts): string {
  * their dependencies (deny.toml). `bun scripts/install-rust-checks.ts`
  * installs both tools at their reviewed versions.
  */
-async function runSupplyChecks(): Promise<void> {
-  const crateDirs = Object.values(CRATES).map((dir) => resolve(root, dir));
+async function run_supply_checks(): Promise<void> {
+  const crate_dirs = Object.values(CRATES).map((dir) => resolve(root, dir));
   const commands: string[][] = [
     [
       "typos",
       "--config",
       resolve(root, "typos.toml"),
-      ...crateDirs.map((dir) => resolve(dir, "src")),
+      ...crate_dirs.map((dir) => resolve(dir, "src")),
     ],
-    ...crateDirs.map((dir) => [
+    ...crate_dirs.map((dir) => [
       "cargo",
       "deny",
       "--manifest-path",
@@ -227,10 +229,10 @@ async function runSupplyChecks(): Promise<void> {
   ];
   for (const command of commands) {
     const child = Bun.spawn(command, { cwd: root, stdout: "inherit", stderr: "inherit" });
-    const exitCode = await child.exited;
-    if (exitCode !== 0) {
+    const exit_code = await child.exited;
+    if (exit_code !== 0) {
       throw new Error(
-        `${command.slice(0, 2).join(" ")} failed (exit ${exitCode}); ` +
+        `${command.slice(0, 2).join(" ")} failed (exit ${exit_code}); ` +
           "install the reviewed tools with `bun scripts/install-rust-checks.ts`.",
       );
     }
@@ -239,9 +241,9 @@ async function runSupplyChecks(): Promise<void> {
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
-  await checkLintTablesMatch();
-  await runSupplyChecks();
-  const findings = await collectFindings();
+  await check_lint_tables_match();
+  await run_supply_checks();
+  const findings = await collect_findings();
 
   const errors = findings.filter(({ level }) => level === "error");
   if (errors.length > 0) {
@@ -249,19 +251,19 @@ async function main(): Promise<void> {
     throw new Error(`Clippy reported ${errors.length} errors`);
   }
 
-  const counts = countFindings(findings);
+  const counts = count_findings(findings);
   if (mode === "--report") {
-    process.stdout.write(`${markdownReport(counts)}\n`);
+    process.stdout.write(`${markdown_report(counts)}\n`);
     return;
   }
   if (mode === "--update") {
-    await writeFile(baselinePath, `${JSON.stringify(counts, null, 2)}\n`);
-    process.stdout.write(`Wrote ${relative(root, baselinePath)}\n`);
+    await writeFile(baseline_path, `${JSON.stringify(counts, null, 2)}\n`);
+    process.stdout.write(`Wrote ${relative(root, baseline_path)}\n`);
     return;
   }
 
-  const baseline = JSON.parse(await readFile(baselinePath, "utf8")) as Counts;
-  const changes = baselineChanges(counts, baseline);
+  const baseline = JSON.parse(await readFile(baseline_path, "utf8")) as Counts;
+  const changes = baseline_changes(counts, baseline);
   const raised = changes.filter(({ was, now }) => now > was);
   for (const { crate, lint } of raised) {
     const places = findings.filter((finding) => finding.crate === crate && finding.lint === lint);
@@ -272,7 +274,7 @@ async function main(): Promise<void> {
       ({ crate, lint, was, now }) => `  ${crate} ${lint}: ${was} -> ${now}`,
     );
     throw new Error(
-      `Rust lint counts differ from ${relative(root, baselinePath)}:\n${lines.join("\n")}\n` +
+      `Rust lint counts differ from ${relative(root, baseline_path)}:\n${lines.join("\n")}\n` +
         (raised.length > 0
           ? "Fix the new warnings shown above."
           : "Run `bun scripts/rust-lint.ts --update` to record the lower counts."),

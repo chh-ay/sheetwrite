@@ -33,7 +33,7 @@ export interface DemoVideoProps {
 const NARROW_QUERY = "(max-width: 640px)";
 
 /** The site's theme, as the theme toggle reads it: dark unless the page says light. */
-function siteTheme(): keyof DemoTakes {
+function site_theme(): keyof DemoTakes {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
@@ -47,21 +47,21 @@ function siteTheme(): keyof DemoTakes {
  * controls.
  */
 export function DemoVideo(props: DemoVideoProps) {
-  const [take, setTake] = createSignal<DemoTake | null>(null);
-  const [full, setFull] = createSignal(false);
+  const [take, set_take] = createSignal<DemoTake | null>(null);
+  const [full, set_full] = createSignal(false);
   let video: HTMLVideoElement | undefined;
 
   onMount(() => {
     const pick = (): void => {
       const shape = matchMedia(NARROW_QUERY).matches ? props.narrow : props.wide;
-      setTake(shape[siteTheme()]);
+      set_take(shape[site_theme()]);
     };
     pick();
     onCleanup(observeSiteTheme(pick));
   });
 
-  const playFull = (): void => {
-    setFull(true);
+  const play_full = (): void => {
+    set_full(true);
     // The <source> elements change with `full`; the video reads them again on load.
     queueMicrotask(() => {
       video?.load();
@@ -121,7 +121,7 @@ export function DemoVideo(props: DemoVideoProps) {
       <figcaption class="sw-demo-video__caption">
         <span>{props.label}</span>
         <Show when={!full()}>
-          <button class="sw-demo-video__full" onClick={playFull} type="button">
+          <button class="sw-demo-video__full" onClick={play_full} type="button">
             Watch the full demo ({props.duration})
           </button>
         </Show>

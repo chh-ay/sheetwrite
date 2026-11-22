@@ -15,14 +15,14 @@ const BLOCKED: Readonly<Record<string, string>> = {
 
 const READ_ONLY = "The grid is read-only; nothing was written.";
 
-function transactionMessage(result: ApplyTransactionResult): string | null {
+function transaction_message(result: ApplyTransactionResult): string | null {
   if (result.status === "applied") return null;
   if (result.status === "noop" && result.reason === "read-only") return READ_ONLY;
   if (result.status === "rejected") return result.issues[0]?.message ?? NOT_APPLIED;
   return NOT_APPLIED;
 }
 
-function diagnosticMessage(diagnostic: QueryDiagnostic): string {
+function diagnostic_message(diagnostic: QueryDiagnostic): string {
   const at = [
     diagnostic.step === null ? undefined : `step ${diagnostic.step + 1}`,
     diagnostic.column === null ? undefined : `column ${diagnostic.column}`,
@@ -31,17 +31,17 @@ function diagnosticMessage(diagnostic: QueryDiagnostic): string {
   return `The query engine reported ${diagnostic.code}${at.length > 0 ? ` at ${at.join(", ")}` : ""}.`;
 }
 
-function definitionMessage(result: QueryDefinitionResult): string | null {
-  if (result.status === "invalid") return diagnosticMessage(result.diagnostic);
-  return transactionMessage(result);
+function definition_message(result: QueryDefinitionResult): string | null {
+  if (result.status === "invalid") return diagnostic_message(result.diagnostic);
+  return transaction_message(result);
 }
 
-function refreshMessage(result: QueryRefreshResult): string | null {
+function refresh_message(result: QueryRefreshResult): string | null {
   switch (result.status) {
     case "applied":
-      return transactionMessage(result.transaction);
+      return transaction_message(result.transaction);
     case "failed":
-      return `Query ${result.queryId} failed: ${diagnosticMessage(result.diagnostic)} Nothing was written.`;
+      return `Query ${result.queryId} failed: ${diagnostic_message(result.diagnostic)} Nothing was written.`;
     case "blocked":
       return `Query ${result.queryId} was not written: ${BLOCKED[result.reason] ?? result.reason}.`;
     case "missing":
@@ -51,18 +51,18 @@ function refreshMessage(result: QueryRefreshResult): string | null {
     case "aborted":
       return "The refresh was cancelled; nothing was written.";
     case "rejected":
-      return transactionMessage(result.transaction) ?? NOT_APPLIED;
+      return transaction_message(result.transaction) ?? NOT_APPLIED;
   }
 }
 
 /** The grid commands' view of a session. */
 export function sessionCommands(session: QuerySession): QueryCommands {
   return {
-    define: (query) => definitionMessage(session.define(query)),
+    define: (query) => definition_message(session.define(query)),
     async refresh(ids, signal) {
-      if (ids === null) return refreshMessage(await session.refreshAll({ signal }));
+      if (ids === null) return refresh_message(await session.refreshAll({ signal }));
       for (const id of ids) {
-        const message = refreshMessage(await session.refresh(id, { signal }));
+        const message = refresh_message(await session.refresh(id, { signal }));
         if (message !== null) return message;
       }
       return null;

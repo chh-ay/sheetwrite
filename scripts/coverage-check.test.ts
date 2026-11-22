@@ -72,11 +72,11 @@ describe("LCOV parser", () => {
 });
 
 describe("coverage floors", () => {
-  const scoredPaths = new Set(["packages/core/src/a.ts", "packages/core/src/b.ts"]);
-  const fullyCovered = record("packages/core/src/a.ts", { covered: 100, total: 100 });
+  const scored_paths = new Set(["packages/core/src/a.ts", "packages/core/src/b.ts"]);
+  const fully_covered = record("packages/core/src/a.ts", { covered: 100, total: 100 });
   const evaluate = (
     records: CoverageRecord[],
-    paths = scoredPaths,
+    paths = scored_paths,
     language: CoverageLanguage = "typescript",
   ) => evaluateCoveragePolicy({ policy: POLICY, language, records, scoredPaths: paths });
 
@@ -93,22 +93,22 @@ describe("coverage floors", () => {
   });
 
   it("passes at the floor and fails one line below it, summing across files", () => {
-    const atFloor = [fullyCovered, record("packages/core/src/b.ts", { covered: 80, total: 100 })];
-    expect(evaluate(atFloor)).toEqual({
+    const at_floor = [fully_covered, record("packages/core/src/b.ts", { covered: 80, total: 100 })];
+    expect(evaluate(at_floor)).toEqual({
       lines: { covered: 180, total: 200 },
       functions: { covered: 34, total: 40 },
     });
-    const belowFloor = [
-      fullyCovered,
+    const below_floor = [
+      fully_covered,
       record("packages/core/src/b.ts", { covered: 79, total: 100 }),
     ];
-    expect(() => evaluate(belowFloor)).toThrow(
+    expect(() => evaluate(below_floor)).toThrow(
       "typescript lines coverage 89.50% (179/200) is below the 90% floor",
     );
   });
 
   it("fails on a missing scored source, scored generated output, and a Rust region floor", () => {
-    expect(() => evaluate([fullyCovered])).toThrow(
+    expect(() => evaluate([fully_covered])).toThrow(
       "Coverage report is missing scored source: packages/core/src/b.ts",
     );
     expect(() => evaluate([record("packages/core/dist/grid.js")], new Set())).toThrow(
@@ -163,14 +163,14 @@ describe("Rust LLVM normalization", () => {
       "SF:/repo/packages/wasm/src/calc.rs\nFNF:2\nFNH:2\nDA:1,3\nDA:2,0\nDA:3,2\nDA:4,1\nDA:5,1\nLF:5\nLH:4\nend_of_record",
       ROOT,
     );
-    const llvm = (prodCount: number) => ({
+    const llvm = (prod_count: number) => ({
       data: [
         {
           files: [{ filename: "/repo/packages/wasm/src/calc.rs" }],
           functions: [
             {
               name: "_RNv_prod",
-              count: prodCount,
+              count: prod_count,
               filenames: [
                 "/repo/packages/wasm/src/calc.rs",
                 "/toolchain/rustlib/src/thread_local.rs",

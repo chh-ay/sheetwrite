@@ -21,13 +21,13 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-let restoreStubs: () => void;
+let restore_stubs: () => void;
 let grid: Grid;
 let store: SheetwriteStore;
 let host: HTMLDivElement;
 
 beforeEach(() => {
-  restoreStubs = installCanvasTestStubs();
+  restore_stubs = installCanvasTestStubs();
   const workbook = makeWorkbook(10);
   store = new SheetwriteStore(workbook, makeColumnarData(10));
   host = mountHost();
@@ -37,7 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   grid.destroy();
   store.dispose();
-  restoreStubs();
+  restore_stubs();
 });
 
 function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
@@ -62,13 +62,13 @@ function type(text: string): void {
   field.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function select(row: number, col: number, endRow = row, endCol = col): void {
+function select(row: number, col: number, end_row = row, end_col = col): void {
   grid.setSelection(
-    row === endRow && col === endCol
+    row === end_row && col === end_col
       ? { kind: "cell", addr: { sheet: "s1", row, col } }
       : {
           kind: "range",
-          range: { sheet: "s1", start: { row, col }, end: { row: endRow, col: endCol } },
+          range: { sheet: "s1", start: { row, col }, end: { row: end_row, col: end_col } },
         },
   );
 }
@@ -356,11 +356,11 @@ describe("moving the active cell", () => {
     ["End then an arrow jumps to the data edge", gap, [0, 1], [["End"], ["ArrowDown"]], [5, 1]],
     ["End mode ends after one jump", gap, [0, 1], [["End"], ["ArrowDown"], ["ArrowDown"]], [6, 1]],
     ["Ctrl+End goes to the last used cell", gap, [0, 1], [["End", { ctrlKey: true }]], [7, 2]],
-  ] as const)("%s, as in Excel", (_, patches, [row, col], keys, [toRow, toCol]) => {
+  ] as const)("%s, as in Excel", (_, patches, [row, col], keys, [to_row, to_col]) => {
     grid.applyTransaction({ patches: [...patches] });
     select(row, col);
     for (const [key, init] of keys) press(key, init);
-    expect(active()).toEqual({ sheet: "s1", row: toRow, col: toCol });
+    expect(active()).toEqual({ sheet: "s1", row: to_row, col: to_col });
   });
 
   it("clears only the active cell with Backspace and opens it; Escape restores it", () => {
@@ -498,14 +498,14 @@ describe("insert and delete keys", () => {
     select(0, 1, 3, 1);
     press("-", { ctrlKey: true, code: "Minus" });
     const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
-    const removeChoices = [...remove.querySelectorAll<HTMLInputElement>("input[type=radio]")];
-    expect(removeChoices.map((radio) => radio.parentElement?.textContent)).toEqual([
+    const remove_choices = [...remove.querySelectorAll<HTMLInputElement>("input[type=radio]")];
+    expect(remove_choices.map((radio) => radio.parentElement?.textContent)).toEqual([
       "Shift cells left",
       "Shift cells up",
       "Entire row",
       "Entire column",
     ]);
-    expect(removeChoices[0]?.checked).toBe(true);
+    expect(remove_choices[0]?.checked).toBe(true);
   });
 
   // https://support.microsoft.com/en-us/office/insert-or-delete-cells-rows-and-columns-6f40e6e4-85af-45e0-b39d-65dd504a3246

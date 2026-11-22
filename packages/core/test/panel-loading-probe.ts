@@ -12,14 +12,14 @@ import { installCoreStyles } from "./fixtures.js";
 
 let evaluations = 0;
 let insertions = 0;
-let insertedInto: Grid | null = null;
+let inserted_into: Grid | null = null;
 mock.module("../src/panels/panel-controller.js", () => {
   evaluations += 1;
   return {
     attachPanels: () => () => undefined,
     insertChart: (grid: Grid) => {
       insertions += 1;
-      insertedInto = grid;
+      inserted_into = grid;
       return true;
     },
   };
@@ -27,7 +27,7 @@ mock.module("../src/panels/panel-controller.js", () => {
 
 await initSheetwrite();
 const restore = installCanvasTestStubs();
-const removeStyles = installCoreStyles();
+const remove_styles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, {
   clientWidth: { value: 900 },
@@ -56,7 +56,7 @@ const RIBBON_MOUNT_TIMEOUT_MS = 5_000;
  * `import()` of the ribbon module can settle before the grid's own import
  * callback mounts the ribbon, so the probe waits for the mount itself.
  */
-async function ribbonTab(name: string): Promise<HTMLElement> {
+async function ribbon_tab(name: string): Promise<HTMLElement> {
   const deadline = Date.now() + RIBBON_MOUNT_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')].find(
@@ -70,7 +70,7 @@ async function ribbonTab(name: string): Promise<HTMLElement> {
 }
 
 try {
-  const insert = await ribbonTab("Insert");
+  const insert = await ribbon_tab("Insert");
   assert.equal(evaluations, 0, "construction must not import the panels");
   grid.applyTransaction({
     patches: [
@@ -97,9 +97,9 @@ try {
   await Promise.resolve();
   assert.equal(evaluations, 1, "the first Chart click must import the panels once");
   assert.equal(insertions, 1);
-  assert.equal(insertedInto, grid);
+  assert.equal(inserted_into, grid);
 } finally {
   grid.destroy();
-  removeStyles();
+  remove_styles();
   restore();
 }

@@ -48,16 +48,16 @@ export class Scope {
       return child;
     }
 
-    const leaveParent = this.add(() => child.close(this.signal.reason));
-    child.add(leaveParent);
+    const leave_parent = this.add(() => child.close(this.signal.reason));
+    child.add(leave_parent);
     return child;
   }
 
   /** Call `callback` after `delayMs`, unless the scope closes first. */
   setTimeout(callback: () => void, delayMs: number): void {
-    const removeClear = this.add(() => clearTimeout(timer));
+    const remove_clear = this.add(() => clearTimeout(timer));
     const timer = setTimeout(() => {
-      removeClear();
+      remove_clear();
       callback();
     }, delayMs);
   }
@@ -73,12 +73,12 @@ export class Scope {
       return;
     }
 
-    const removeDispose = this.add(() => {
+    const remove_dispose = this.add(() => {
       clearTimeout(timer);
       dispose();
     });
     const timer = setTimeout(() => {
-      removeDispose();
+      remove_dispose();
       dispose();
     }, delayMs);
   }
@@ -184,12 +184,12 @@ export function nextTurn(scope: Scope): Promise<void> {
     return turn.promise;
   }
 
-  const removeStop = scope.add(() => {
+  const remove_stop = scope.add(() => {
     clearTimeout(timer);
     turn.reject(scope.signal.reason);
   });
   const timer = setTimeout(() => {
-    removeStop();
+    remove_stop();
     turn.resolve();
   }, 0);
   return turn.promise;

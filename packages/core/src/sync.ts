@@ -239,11 +239,11 @@ export type SyncConflictRecovery =
 type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" }>;
 
 type SyncListener = (event: SyncCoordinatorEvent) => void;
-function syncFailure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
+function sync_failure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
   return normalizeSheetwriteError(error, "sync-failed", "synchronize", context);
 }
 
-function syncStorageFailure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
+function sync_storage_failure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
   return normalizeSheetwriteError(error, "sync-storage-failed", "synchronize", context);
 }
 
@@ -251,7 +251,7 @@ const MUTATION_ID_RANDOM_BYTES = 16;
 const BYTE_VALUES = 256;
 
 /** Two lowercase hex digits per byte value, made at the first default mutation ID. */
-let hexByteDigits: readonly string[] | undefined;
+let hex_byte_digits: readonly string[] | undefined;
 
 /**
  * Random default mutation ID. Servers deduplicate by this ID, so two clients
@@ -259,15 +259,15 @@ let hexByteDigits: readonly string[] | undefined;
  * `getRandomValues` also works on pages without a secure context. Every commit
  * makes one, so the digits come from a table instead of formatting each byte.
  */
-function createDefaultMutationId(): string {
+function create_default_mutation_id(): string {
   const bytes = new Uint8Array(MUTATION_ID_RANDOM_BYTES);
   globalThis.crypto.getRandomValues(bytes);
-  hexByteDigits ??= Array.from({ length: BYTE_VALUES }, (_, byte) =>
+  hex_byte_digits ??= Array.from({ length: BYTE_VALUES }, (_, byte) =>
     byte.toString(16).padStart(2, "0"),
   );
 
   let id = "sheetwrite-";
-  for (const byte of bytes) id += hexByteDigits[byte] ?? "";
+  for (const byte of bytes) id += hex_byte_digits[byte] ?? "";
   return id;
 }
 
@@ -292,47 +292,47 @@ function createDefaultMutationId(): string {
  */
 export class SyncCoordinator {
   private readonly queue = new PendingRecordQueue();
-  private readonly recordStorageRevisions = new Map<string, bigint>();
-  private readonly recordBytes = new Map<string, number>();
-  private readonly localReservations: LocalPendingReservation[] = [];
+  private readonly record_storage_revisions = new Map<string, bigint>();
+  private readonly record_bytes = new Map<string, number>();
+  private readonly local_reservations: LocalPendingReservation[] = [];
   private readonly acknowledged = new Set<string>();
-  private readonly acknowledgementOrder: string[] = [];
+  private readonly acknowledgement_order: string[] = [];
   private readonly listeners = new Set<SyncListener>();
-  private readonly abortController = new AbortController();
-  private readonly activeSends = new Map<string, AbortController>();
+  private readonly abort_controller = new AbortController();
+  private readonly active_sends = new Map<string, AbortController>();
   private readonly persistence = new Map<string, Promise<void>>();
-  private readonly storageErrors = new Map<string, unknown>();
-  private readonly ambiguousRestores = new Set<string>();
-  private readonly gapBuffer = new Map<number, BufferedVersionedOperation>();
+  private readonly storage_errors = new Map<string, unknown>();
+  private readonly ambiguous_restores = new Set<string>();
+  private readonly gap_buffer = new Map<number, BufferedVersionedOperation>();
   /** Received members of the atomic batch that starts at `serverVersion + 1`. */
-  private batchAssembly?: BatchAssembly;
+  private batch_assembly?: BatchAssembly;
   /**
    * The latest unrecovered base-version conflict, and the server version the
    * Grid had applied when the first one arrived: a conflict moves `version` to
    * the server head without applying the versions in between.
    */
-  private outstandingConflict?: { response: ConflictResponse; appliedVersion: number };
+  private outstanding_conflict?: { response: ConflictResponse; appliedVersion: number };
   private readonly limits: Readonly<SyncCoordinatorLimits>;
-  private readonly disposeGrid: () => void;
-  private readonly readyPromise: Promise<void>;
-  private disposeRemote?: () => void;
+  private readonly dispose_grid: () => void;
+  private readonly ready_promise: Promise<void>;
+  private dispose_remote?: () => void;
   private destroyed = false;
   private hydrating: boolean;
-  private hydrationError: unknown;
-  private recoveryPromise?: Promise<void>;
-  private inboundTail: Promise<void> = Promise.resolve();
-  private persistenceTail: Promise<void> = Promise.resolve();
-  private flushPromise?: Promise<readonly PersistenceCommitResponse[]>;
+  private hydration_error: unknown;
+  private recovery_promise?: Promise<void>;
+  private inbound_tail: Promise<void> = Promise.resolve();
+  private persistence_tail: Promise<void> = Promise.resolve();
+  private flush_promise?: Promise<readonly PersistenceCommitResponse[]>;
   private connection: SyncConnectionState;
   /** The host's last `setOnline` choice; remote subscriptions do not change it. */
-  private hostOnline: boolean;
+  private host_online: boolean;
   private version: number;
-  private bufferedVersions = 0;
-  private bufferedOperations = 0;
-  private bufferedBytes = 0;
-  private pendingCommitTotal = 0;
-  private pendingOperationTotal = 0;
-  private pendingEncodedByteTotal = 0;
+  private buffered_versions = 0;
+  private buffered_operations = 0;
+  private buffered_bytes = 0;
+  private pending_commit_total = 0;
+  private pending_operation_total = 0;
+  private pending_encoded_byte_total = 0;
 
   /**
    * Starts syncing `grid` through `adapter`: from now on, each local change is
@@ -350,28 +350,28 @@ export class SyncCoordinator {
 
     this.version = options.serverVersion;
     this.connection = options.initialConnection ?? "online";
-    this.hostOnline = this.connection === "online";
+    this.host_online = this.connection === "online";
     this.hydrating = options.pendingStorage !== undefined;
 
-    this.disposeGrid = registerGridTransactionAdmission(grid, {
-      reserve: (operations) => this.reserveLocalTransaction(operations),
+    this.dispose_grid = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => this.reserve_local_transaction(operations),
       preservesOperations: true,
     });
-    this.readyPromise = this.hydrating
+    this.ready_promise = this.hydrating
       ? Promise.resolve()
-          .then(() => this.restorePending())
+          .then(() => this.restore_pending())
           .catch((error: unknown) => {
             if (this.destroyed) return;
-            const failure = syncStorageFailure(error, { action: "hydrate" });
-            this.hydrationError = failure;
+            const failure = sync_storage_failure(error, { action: "hydrate" });
+            this.hydration_error = failure;
             this.hydrating = false;
-            this.emitState();
+            this.emit_state();
             this.emit({ type: "storage-error", error: failure });
           })
       : Promise.resolve();
     if (this.hydrating) {
-      void this.readyPromise.then(() => {
-        if (!this.destroyed && this.connection === "online" && this.ambiguousRestores.size > 0) {
+      void this.ready_promise.then(() => {
+        if (!this.destroyed && this.connection === "online" && this.ambiguous_restores.size > 0) {
           void this.flush().catch(() => {});
         }
       });
@@ -385,7 +385,7 @@ export class SyncCoordinator {
 
   /** Number of local changes not yet acknowledged by the server. */
   get pendingCount(): number {
-    return this.pendingCommitTotal;
+    return this.pending_commit_total;
   }
 
   /** The current state, as a new object on each read. */
@@ -393,17 +393,17 @@ export class SyncCoordinator {
     return {
       connection: this.destroyed ? "destroyed" : this.connection,
       activity: this.activity(),
-      pendingCount: this.pendingCommitTotal,
-      pendingOperations: this.pendingOperationTotal,
-      pendingEncodedBytes: this.pendingEncodedByteTotal,
-      pendingCapacity: this.pendingCapacity(),
+      pendingCount: this.pending_commit_total,
+      pendingOperations: this.pending_operation_total,
+      pendingEncodedBytes: this.pending_encoded_byte_total,
+      pendingCapacity: this.pending_capacity(),
       serverVersion: this.version,
     };
   }
 
   /** Copies of the unacknowledged local changes, oldest first, with their status. */
   pendingCommits(): readonly SyncMutationRecord[] {
-    return this.queue.toArray().map(cloneRecord);
+    return this.queue.toArray().map(clone_record);
   }
 
   /** Calls `listener` for every sync event; returns a function that removes it. */
@@ -414,11 +414,11 @@ export class SyncCoordinator {
 
   /** Resolves after durable work is restored and every startup commit is visible locally. */
   async ready(): Promise<void> {
-    await this.readyPromise;
+    await this.ready_promise;
     await Promise.all(this.persistence.values());
-    if (this.hydrationError !== undefined) throw this.hydrationError;
-    const storageError = this.storageErrors.values().next();
-    if (!storageError.done) throw storageError.value;
+    if (this.hydration_error !== undefined) throw this.hydration_error;
+    const storage_error = this.storage_errors.values().next();
+    if (!storage_error.done) throw storage_error.value;
   }
 
   /**
@@ -427,16 +427,16 @@ export class SyncCoordinator {
    */
   setOnline(online: boolean): void {
     if (this.destroyed) return;
-    this.hostOnline = online;
+    this.host_online = online;
     const next: SyncConnectionState = online ? "online" : "offline";
     if (this.connection === next) return;
     this.connection = next;
     if (!online) {
-      for (const controller of this.activeSends.values()) {
+      for (const controller of this.active_sends.values()) {
         controller.abort();
       }
     }
-    this.emitState();
+    this.emit_state();
     if (online) void this.flush().catch(() => {});
   }
 
@@ -445,52 +445,52 @@ export class SyncCoordinator {
    * source; returns a function that stops it.
    */
   subscribe(source: RemoteOperationSource | AsyncIterable<VersionedOperation>): () => void {
-    this.disposeRemote?.();
+    this.dispose_remote?.();
     const controller = new AbortController();
-    let disposeSource: (() => void) | undefined;
+    let dispose_source: (() => void) | undefined;
     let disposed = false;
     this.connection = "connecting";
-    this.emitState();
+    this.emit_state();
 
     const cleanup = () => {
       if (disposed) return;
       disposed = true;
       controller.abort();
-      disposeSource?.();
-      if (this.disposeRemote === cleanup) {
-        this.disposeRemote = undefined;
+      dispose_source?.();
+      if (this.dispose_remote === cleanup) {
+        this.dispose_remote = undefined;
         if (!this.destroyed) {
           this.connection = "offline";
-          this.emitState();
+          this.emit_state();
         }
       }
     };
 
     try {
-      if (isAsyncIterable(source)) {
-        void this.consumeRemote(source, controller.signal);
+      if (is_async_iterable(source)) {
+        void this.consume_remote(source, controller.signal);
       } else {
         const dispose = source.subscribe((operation) => {
           const intake = this.applyVersionedOperation(operation);
           void intake.catch((error: unknown) =>
-            this.handleRemoteIntakeError(error, controller.signal),
+            this.handle_remote_intake_error(error, controller.signal),
           );
           return intake;
         }, controller.signal);
-        disposeSource = typeof dispose === "function" ? dispose : undefined;
+        dispose_source = typeof dispose === "function" ? dispose : undefined;
       }
-      this.disposeRemote = cleanup;
+      this.dispose_remote = cleanup;
       // A subscription delivers remote versions; it does not override the host's
       // offline flag, so queued work waits until the host calls `setOnline(true)`.
-      this.connection = this.hostOnline ? "online" : "offline";
-      this.emitState();
-      if (this.hostOnline) void this.flush().catch(() => {});
+      this.connection = this.host_online ? "online" : "offline";
+      this.emit_state();
+      if (this.host_online) void this.flush().catch(() => {});
       return cleanup;
     } catch (error) {
       cleanup();
       this.connection = "error";
-      this.emitState();
-      const failure = syncFailure(error, { action: "subscribe" });
+      this.emit_state();
+      const failure = sync_failure(error, { action: "subscribe" });
       this.emit({ type: "error", error: failure });
       throw failure;
     }
@@ -501,7 +501,7 @@ export class SyncCoordinator {
    * resolves to the responses received.
    */
   async flush(): Promise<readonly PersistenceCommitResponse[]> {
-    if (this.flushPromise) return this.flushPromise;
+    if (this.flush_promise) return this.flush_promise;
     const run = async (): Promise<readonly PersistenceCommitResponse[]> => {
       await this.ready();
       const responses: PersistenceCommitResponse[] = [];
@@ -514,24 +514,24 @@ export class SyncCoordinator {
       return responses;
     };
     const promise = run().finally(() => {
-      if (this.flushPromise === promise) this.flushPromise = undefined;
+      if (this.flush_promise === promise) this.flush_promise = undefined;
     });
-    this.flushPromise = promise;
+    this.flush_promise = promise;
     return promise;
   }
 
   /** Sends the oldest queued change; resolves to `null` when there is nothing to send. */
   async sendNext(): Promise<PersistenceCommitResponse | null> {
-    if (this.hydrating) await this.readyPromise;
-    if (this.hydrationError !== undefined) throw this.hydrationError;
+    if (this.hydrating) await this.ready_promise;
+    if (this.hydration_error !== undefined) throw this.hydration_error;
     const record = this.queue.head();
     if (!record) return null;
     if (record.status === "persisting") {
       await this.persistence.get(record.clientMutationId);
       return this.sendNext();
     }
-    const storageError = this.storageErrors.get(record.clientMutationId);
-    if (storageError !== undefined) throw storageError;
+    const storage_error = this.storage_errors.get(record.clientMutationId);
+    if (storage_error !== undefined) throw storage_error;
     return record.status === "pending" ? this.send(record.clientMutationId) : null;
   }
 
@@ -545,11 +545,11 @@ export class SyncCoordinator {
    * `true` once it is saved.
    */
   async retryPersistence(clientMutationId: string): Promise<boolean> {
-    await this.readyPromise;
+    await this.ready_promise;
     const record = this.queue.get(clientMutationId);
     if (!record || !this.options.pendingStorage || record.status !== "storage-error") return false;
-    await this.schedulePersistence(record);
-    return !this.storageErrors.has(clientMutationId);
+    await this.schedule_persistence(record);
+    return !this.storage_errors.has(clientMutationId);
   }
 
   /**
@@ -558,7 +558,7 @@ export class SyncCoordinator {
    */
   async send(clientMutationId: string): Promise<PersistenceCommitResponse | null> {
     if (this.destroyed || this.connection !== "online") return null;
-    if (this.hydrating) await this.readyPromise;
+    if (this.hydrating) await this.ready_promise;
     if (this.queue.head()?.clientMutationId !== clientMutationId) return null;
     let record = this.queue.get(clientMutationId);
     if (record?.status === "persisting") {
@@ -566,14 +566,14 @@ export class SyncCoordinator {
       record = this.queue.get(clientMutationId);
     }
 
-    const storageError = this.storageErrors.get(clientMutationId);
-    if (storageError !== undefined) throw storageError;
+    const storage_error = this.storage_errors.get(clientMutationId);
+    if (storage_error !== undefined) throw storage_error;
     if (!record || record.status === "conflicted" || record.status === "sending") return null;
     this.queue.setStatus(record, "sending");
-    this.emitState();
-    this.emitMutation("sending", record);
+    this.emit_state();
+    this.emit_mutation("sending", record);
     const controller = new AbortController();
-    this.activeSends.set(clientMutationId, controller);
+    this.active_sends.set(clientMutationId, controller);
 
     try {
       const request = {
@@ -586,12 +586,15 @@ export class SyncCoordinator {
         signal: controller.signal,
       };
 
-      const versionOperationCounts = record.versionOperationCounts;
+      const version_operation_counts = record.versionOperationCounts;
       let response: PersistenceCommitResponse;
-      if (versionOperationCounts === undefined) {
+      if (version_operation_counts === undefined) {
         response = await this.adapter.commit(request);
       } else if (this.adapter.commitBatch) {
-        response = await this.adapter.commitBatch({ ...request, versionOperationCounts });
+        response = await this.adapter.commitBatch({
+          ...request,
+          versionOperationCounts: version_operation_counts,
+        });
       } else {
         throw new SyncProtocolError(
           "invalid-batch",
@@ -607,19 +610,19 @@ export class SyncCoordinator {
       // An abort (disconnect or destroy) is not a failure: the record stays
       // pending under its mutation ID, and the caller gets the abort reason.
       if (controller.signal.aborted) {
-        if (!this.destroyed) this.emitState();
+        if (!this.destroyed) this.emit_state();
         throw controller.signal.reason;
       }
-      const failure = syncFailure(error, { action: "send", clientMutationId });
+      const failure = sync_failure(error, { action: "send", clientMutationId });
       if (!this.destroyed) {
-        this.emitState();
+        this.emit_state();
         this.emit({ type: "error", error: failure, clientMutationId });
       }
 
       throw failure;
     } finally {
-      if (this.activeSends.get(clientMutationId) === controller) {
-        this.activeSends.delete(clientMutationId);
+      if (this.active_sends.get(clientMutationId) === controller) {
+        this.active_sends.delete(clientMutationId);
       }
     }
   }
@@ -627,32 +630,32 @@ export class SyncCoordinator {
   /** Public for transports that deliver responses independently of send promises. */
   handleResponse(response: PersistenceCommitResponse, requestedMutationId?: string): Promise<void> {
     if (this.destroyed) return Promise.resolve();
-    return this.enqueueInbound(async () => {
-      const previousVersion = this.version;
-      await this.processResponse(response, requestedMutationId);
-      if (response.status !== "conflict" && this.version > previousVersion) {
-        await this.drainGapBuffer();
+    return this.enqueue_inbound(async () => {
+      const previous_version = this.version;
+      await this.process_response(response, requestedMutationId);
+      if (response.status !== "conflict" && this.version > previous_version) {
+        await this.drain_gap_buffer();
       }
     });
   }
 
-  private async processResponse(
+  private async process_response(
     response: PersistenceCommitResponse,
-    requestedMutationId?: string,
+    requested_mutation_id?: string,
   ): Promise<void> {
     if (this.destroyed) return;
     assertPersistenceResponse(response, this.limits);
-    if (requestedMutationId !== undefined) {
-      assertMutationId(requestedMutationId, this.limits);
+    if (requested_mutation_id !== undefined) {
+      assertMutationId(requested_mutation_id, this.limits);
     }
 
     if (response.status === "conflict") {
-      const id = requestedMutationId;
+      const id = requested_mutation_id;
       const record = id ? this.queue.get(id) : undefined;
       if (!record) {
         this.emit({
           type: "error",
-          error: syncFailure(
+          error: sync_failure(
             new Error("Sheetwrite sync conflict did not identify a pending mutation"),
             { action: "process-response", ...(id ? { clientMutationId: id } : {}) },
           ),
@@ -664,22 +667,25 @@ export class SyncCoordinator {
 
       assertConflictRecovery(response, record.baseVersion);
       this.queue.setStatus(record, "conflicted");
-      this.outstandingConflict = {
+      this.outstanding_conflict = {
         response,
-        appliedVersion: this.outstandingConflict?.appliedVersion ?? this.version,
+        appliedVersion: this.outstanding_conflict?.appliedVersion ?? this.version,
       };
 
       this.version = Math.max(this.version, response.currentVersion);
-      this.dropStaleBatchAssembly();
-      this.emitState();
-      this.emit({ type: "conflict", mutation: cloneRecord(record), response });
+      this.drop_stale_batch_assembly();
+      this.emit_state();
+      this.emit({ type: "conflict", mutation: clone_record(record), response });
       return;
     }
 
-    if (requestedMutationId !== undefined && response.clientMutationId !== requestedMutationId) {
+    if (
+      requested_mutation_id !== undefined &&
+      response.clientMutationId !== requested_mutation_id
+    ) {
       throw new SyncProtocolError(
         "response-id-mismatch",
-        `Persistence response for ${response.clientMutationId} does not match requested mutation ${requestedMutationId}`,
+        `Persistence response for ${response.clientMutationId} does not match requested mutation ${requested_mutation_id}`,
       );
     }
 
@@ -689,7 +695,7 @@ export class SyncCoordinator {
       if (!this.acknowledged.has(id)) {
         this.emit({
           type: "error",
-          error: syncFailure(
+          error: sync_failure(
             new Error(`Sheetwrite sync response references unknown mutation ${id}`),
             { action: "process-response", clientMutationId: id },
           ),
@@ -701,7 +707,7 @@ export class SyncCoordinator {
     }
 
     const operations =
-      response.status === "applied" && this.ambiguousRestores.has(id)
+      response.status === "applied" && this.ambiguous_restores.has(id)
         ? record.operations
         : undefined;
     if (operations && operations.length > 0) {
@@ -718,14 +724,14 @@ export class SyncCoordinator {
           "remote-operations-rejected",
           `Sheetwrite sync canonical operations for ${id} were not applied`,
         );
-        this.rejectInbound(error, response.version);
+        this.reject_inbound(error, response.version);
         throw error;
       }
     }
 
     this.grid.store.acknowledgeOperations?.(
       record.operations,
-      this.recordStorageRevisions.get(record.clientMutationId),
+      this.record_storage_revisions.get(record.clientMutationId),
     );
 
     const storage = this.options.pendingStorage;
@@ -733,13 +739,13 @@ export class SyncCoordinator {
       try {
         await storage.remove(record.documentId, id);
       } catch (error) {
-        const failure = syncStorageFailure(error, {
+        const failure = sync_storage_failure(error, {
           action: "remove-pending",
           clientMutationId: id,
         });
 
         if (!this.destroyed) {
-          this.emitState();
+          this.emit_state();
           this.emit({ type: "storage-error", error: failure, clientMutationId: id });
         }
 
@@ -750,24 +756,24 @@ export class SyncCoordinator {
     if (this.queue.get(id) !== record) return;
 
     if (!this.destroyed) this.version = Math.max(this.version, response.version);
-    this.dropStaleBatchAssembly();
-    const encodedBytes = this.recordBytes.get(id);
-    if (encodedBytes === undefined) {
+    this.drop_stale_batch_assembly();
+    const encoded_bytes = this.record_bytes.get(id);
+    if (encoded_bytes === undefined) {
       throw new Error(`Pending mutation ${id} is missing resource accounting`);
     }
 
-    this.pendingCommitTotal -= 1;
-    this.pendingOperationTotal -= record.operations.length;
-    this.pendingEncodedByteTotal -= encodedBytes;
-    this.recordBytes.delete(id);
-    this.recordStorageRevisions.delete(id);
+    this.pending_commit_total -= 1;
+    this.pending_operation_total -= record.operations.length;
+    this.pending_encoded_byte_total -= encoded_bytes;
+    this.record_bytes.delete(id);
+    this.record_storage_revisions.delete(id);
     this.queue.remove(id);
-    this.ambiguousRestores.delete(id);
-    this.storageErrors.delete(id);
+    this.ambiguous_restores.delete(id);
+    this.storage_errors.delete(id);
     this.persistence.delete(id);
     if (this.destroyed) return;
-    this.retainAcknowledgement(id);
-    this.emitState();
+    this.retain_acknowledgement(id);
+    this.emit_state();
     this.emit({
       type: "acknowledged",
       clientMutationId: id,
@@ -786,7 +792,7 @@ export class SyncCoordinator {
     try {
       inspected = inspectVersionedOperation(operation, this.limits);
     } catch (error) {
-      this.rejectInbound(
+      this.reject_inbound(
         asSyncProtocolError(error),
         validReceivedVersion((operation as { version?: unknown } | null)?.version),
       );
@@ -797,8 +803,8 @@ export class SyncCoordinator {
       inspected.version > this.version &&
       inspected.version - this.version > this.limits.maxFutureVersionDistance
     ) {
-      this.clearGapBuffer();
-      this.rejectInbound(
+      this.clear_gap_buffer();
+      this.reject_inbound(
         new SyncProtocolError(
           "future-distance-limit",
           `Remote version ${inspected.version} exceeds the future-version distance limit`,
@@ -808,10 +814,10 @@ export class SyncCoordinator {
       return Promise.resolve();
     }
 
-    const preflightError = this.inboundLimitError(inspected.operations.length, inspected.bytes);
-    if (preflightError) {
-      this.clearGapBuffer();
-      this.rejectInbound(preflightError, inspected.version);
+    const preflight_error = this.inbound_limit_error(inspected.operations.length, inspected.bytes);
+    if (preflight_error) {
+      this.clear_gap_buffer();
+      this.reject_inbound(preflight_error, inspected.version);
       return Promise.resolve();
     }
 
@@ -831,19 +837,19 @@ export class SyncCoordinator {
         bytes: inspected.bytes,
       };
     } catch (error) {
-      this.rejectInbound(asSyncProtocolError(error), inspected.version);
+      this.reject_inbound(asSyncProtocolError(error), inspected.version);
       return Promise.resolve();
     }
 
-    const reservationError = this.reserveInbound(validated);
-    if (reservationError) {
-      this.clearGapBuffer();
-      this.rejectInbound(reservationError, inspected.version);
+    const reservation_error = this.reserve_inbound(validated);
+    if (reservation_error) {
+      this.clear_gap_buffer();
+      this.reject_inbound(reservation_error, inspected.version);
       return Promise.resolve();
     }
 
-    return this.enqueueInbound(() => this.processVersionedOperation(validated)).finally(() => {
-      if (!validated.retained) this.releaseBuffered(validated);
+    return this.enqueue_inbound(() => this.process_versioned_operation(validated)).finally(() => {
+      if (!validated.retained) this.release_buffered(validated);
     });
   }
 
@@ -855,13 +861,13 @@ export class SyncCoordinator {
     if (this.destroyed) return;
     const version = snapshot.version ?? 0;
     assertVersion(version, "snapshot.version");
-    const queue = await this.persistQueueOnto(version);
+    const queue = await this.persist_queue_onto(version);
     if (this.destroyed) return;
     this.version = version;
-    this.outstandingConflict = undefined;
-    this.clearGapBuffer();
-    this.adoptQueueBase(queue);
-    this.emitState();
+    this.outstanding_conflict = undefined;
+    this.clear_gap_buffer();
+    this.adopt_queue_base(queue);
+    this.emit_state();
     this.emit({
       type: "reloaded",
       serverVersion: this.version,
@@ -897,16 +903,16 @@ export class SyncCoordinator {
   async recoverConflict(): Promise<SyncConflictRecovery> {
     await this.ready();
     let result: SyncConflictRecovery = { status: "no-conflict" };
-    await this.enqueueInbound(async () => {
-      result = await this.recoverConflictInPlace();
+    await this.enqueue_inbound(async () => {
+      result = await this.recover_conflict_in_place();
     });
     return result;
   }
 
-  private async recoverConflictInPlace(): Promise<SyncConflictRecovery> {
-    const conflict = this.outstandingConflict;
+  private async recover_conflict_in_place(): Promise<SyncConflictRecovery> {
+    const conflict = this.outstanding_conflict;
     if (!conflict) return { status: "no-conflict" };
-    const { response, appliedVersion } = conflict;
+    const { response, appliedVersion: applied_version } = conflict;
 
     // A restore was planned against the version it conflicted with; the user
     // previews and restores again on the reloaded document.
@@ -915,16 +921,16 @@ export class SyncCoordinator {
     }
     const reload = (
       reason: SyncConflictReloadReason,
-      rebaseConflict?: RebaseConflict,
+      rebase_conflict?: RebaseConflict,
     ): SyncConflictRecovery => ({
       status: "reload-required",
       reason,
-      ...(rebaseConflict ? { conflict: rebaseConflict } : {}),
+      ...(rebase_conflict ? { conflict: rebase_conflict } : {}),
     });
 
     const tail = response.operationsSinceBase;
     if (!tail) return reload("missing-operations");
-    if (this.version !== response.currentVersion || this.batchAssembly) {
+    if (this.version !== response.currentVersion || this.batch_assembly) {
       return reload("version-advanced");
     }
 
@@ -949,7 +955,7 @@ export class SyncCoordinator {
     // see. Work queued after the conflict has the head as its base but saw only
     // what the Grid applied.
     for (const record of records) {
-      const seen = Math.min(record.baseVersion, appliedVersion);
+      const seen = Math.min(record.baseVersion, applied_version);
       const unseen = missed
         .filter((entry) => entry.version > seen)
         .flatMap((entry) => entry.operations);
@@ -962,8 +968,8 @@ export class SyncCoordinator {
       }
     }
 
-    for (const group of groupAtomicBatches(
-      missed.filter((entry) => entry.version > appliedVersion),
+    for (const group of group_atomic_batches(
+      missed.filter((entry) => entry.version > applied_version),
     )) {
       const operations = group.flatMap((entry) => entry.operations as DocumentOp[]);
       if (operations.length === 0) continue;
@@ -972,36 +978,36 @@ export class SyncCoordinator {
       );
       if (outcome.status !== "applied") return reload("rejected");
       for (const entry of group) {
-        this.emit({ type: "remote-applied", operation: cloneVersionedOperation(entry) });
+        this.emit({ type: "remote-applied", operation: clone_versioned_operation(entry) });
       }
     }
 
     // Storage moves only after every missed version applied, so a rejection
     // leaves the durable queue on its old base for the reload.
-    const queue = await this.persistQueueOnto(response.currentVersion);
+    const queue = await this.persist_queue_onto(response.currentVersion);
     if (this.destroyed) return reload("rejected");
-    this.outstandingConflict = undefined;
-    this.adoptQueueBase(queue);
-    for (const [version, input] of this.gapBuffer) {
+    this.outstanding_conflict = undefined;
+    this.adopt_queue_base(queue);
+    for (const [version, input] of this.gap_buffer) {
       if (version > this.version) continue;
-      this.gapBuffer.delete(version);
-      this.releaseBuffered(input);
+      this.gap_buffer.delete(version);
+      this.release_buffered(input);
     }
 
-    this.emitState();
+    this.emit_state();
     this.emit({ type: "recovered", serverVersion: this.version, pending: this.pendingCommits() });
-    await this.drainGapBuffer();
+    await this.drain_gap_buffer();
     return { status: "recovered", serverVersion: this.version };
   }
 
   /** Durably moves every pending commit onto `version`, in queue order. */
-  private async persistQueueOnto(version: number): Promise<QueueBase> {
+  private async persist_queue_onto(version: number): Promise<QueueBase> {
     const records = this.queue.toArray();
-    let baseVersion = version;
+    let base_version = version;
     const replacements = records.map((record) => {
       const replacement: PendingCommit = {
         documentId: record.documentId,
-        baseVersion,
+        baseVersion: base_version,
         clientMutationId: record.clientMutationId,
         operations: record.operations,
         ...(record.versionOperationCounts
@@ -1011,17 +1017,17 @@ export class SyncCoordinator {
         ...(record.restore !== undefined ? { restore: record.restore } : {}),
       };
       const versions = serverVersionsOf(record);
-      for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
+      for (let index = 0; index < versions; index++) base_version = incrementVersion(base_version);
       return replacement;
     });
     if (this.options.pendingStorage) {
       try {
-        await this.scheduleQueueReplacement(
+        await this.schedule_queue_replacement(
           records.map((record) => record.clientMutationId),
           replacements,
         );
       } catch (error) {
-        const failure = syncStorageFailure(error, { action: "replace-pending" });
+        const failure = sync_storage_failure(error, { action: "replace-pending" });
         if (!this.destroyed) this.emit({ type: "storage-error", error: failure });
         throw failure;
       }
@@ -1030,7 +1036,7 @@ export class SyncCoordinator {
   }
 
   /** Adopts durably persisted queue bases; every record becomes sendable again. */
-  private adoptQueueBase({ records, replacements }: QueueBase): void {
+  private adopt_queue_base({ records, replacements }: QueueBase): void {
     for (let index = 0; index < records.length; index++) {
       const record = records[index]!;
       record.baseVersion = replacements[index]!.baseVersion;
@@ -1042,39 +1048,39 @@ export class SyncCoordinator {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.disposeGrid();
-    this.disposeRemote?.();
-    this.disposeRemote = undefined;
-    this.abortController.abort();
-    for (const controller of this.activeSends.values()) {
-      controller.abort(this.abortController.signal.reason);
+    this.dispose_grid();
+    this.dispose_remote?.();
+    this.dispose_remote = undefined;
+    this.abort_controller.abort();
+    for (const controller of this.active_sends.values()) {
+      controller.abort(this.abort_controller.signal.reason);
     }
-    this.activeSends.clear();
-    this.clearGapBuffer();
+    this.active_sends.clear();
+    this.clear_gap_buffer();
     this.queue.clear();
-    this.recordStorageRevisions.clear();
-    this.recordBytes.clear();
-    this.localReservations.length = 0;
-    this.pendingCommitTotal = 0;
-    this.pendingOperationTotal = 0;
-    this.pendingEncodedByteTotal = 0;
+    this.record_storage_revisions.clear();
+    this.record_bytes.clear();
+    this.local_reservations.length = 0;
+    this.pending_commit_total = 0;
+    this.pending_operation_total = 0;
+    this.pending_encoded_byte_total = 0;
     this.acknowledged.clear();
-    this.acknowledgementOrder.length = 0;
+    this.acknowledgement_order.length = 0;
     this.connection = "destroyed";
-    this.emitState();
+    this.emit_state();
     this.listeners.clear();
   }
 
-  private reserveLocalTransaction(
+  private reserve_local_transaction(
     operations: readonly DocumentOp[],
   ): GridTransactionAdmissionDecision {
-    if (this.destroyed || this.hydrating || this.hydrationError !== undefined) {
+    if (this.destroyed || this.hydrating || this.hydration_error !== undefined) {
       const reason = this.destroyed
         ? "destroyed"
         : this.hydrating
           ? "restoring durable records"
           : "unavailable after a restore failure";
-      return this.rejectPendingCapacity(
+      return this.reject_pending_capacity(
         "pending-commits",
         this.limits.maxPendingCommits + 1,
         this.limits.maxPendingCommits,
@@ -1082,20 +1088,20 @@ export class SyncCoordinator {
       );
     }
 
-    if (this.pendingCommitTotal + 1 > this.limits.maxPendingCommits) {
-      return this.rejectPendingCapacity(
+    if (this.pending_commit_total + 1 > this.limits.maxPendingCommits) {
+      return this.reject_pending_capacity(
         "pending-commits",
-        this.pendingCommitTotal + 1,
+        this.pending_commit_total + 1,
         this.limits.maxPendingCommits,
         `Pending sync commits exceed the ${this.limits.maxPendingCommits} commit limit`,
       );
     }
 
-    const operationTotal = this.pendingOperationTotal + operations.length;
-    if (operationTotal > this.limits.maxPendingOperations) {
-      return this.rejectPendingCapacity(
+    const operation_total = this.pending_operation_total + operations.length;
+    if (operation_total > this.limits.maxPendingOperations) {
+      return this.reject_pending_capacity(
         "pending-operations",
-        operationTotal,
+        operation_total,
         this.limits.maxPendingOperations,
         `Pending sync operations exceed the ${this.limits.maxPendingOperations} operation limit`,
       );
@@ -1105,14 +1111,15 @@ export class SyncCoordinator {
     try {
       sizes = measureOperationBytes(
         operations,
-        this.limits.maxPendingEncodedBytes - this.pendingEncodedByteTotal,
+        this.limits.maxPendingEncodedBytes - this.pending_encoded_byte_total,
       );
     } catch (error) {
       if (error instanceof JsonByteLengthError && error.code === "payload-limit") {
-        return this.rejectPendingCapacity(
+        return this.reject_pending_capacity(
           "pending-encoded-bytes",
-          this.pendingEncodedByteTotal +
-            (error.actual ?? this.limits.maxPendingEncodedBytes - this.pendingEncodedByteTotal + 1),
+          this.pending_encoded_byte_total +
+            (error.actual ??
+              this.limits.maxPendingEncodedBytes - this.pending_encoded_byte_total + 1),
           this.limits.maxPendingEncodedBytes,
           `Pending sync operations exceed the ${this.limits.maxPendingEncodedBytes} encoded-byte limit`,
         );
@@ -1121,53 +1128,53 @@ export class SyncCoordinator {
       throw error;
     }
 
-    const encodedBytes = operationArrayBytes(sizes);
-    const versionIssue = this.versionAdmissionIssue(sizes, encodedBytes);
-    if (versionIssue) {
-      this.emitState();
+    const encoded_bytes = operationArrayBytes(sizes);
+    const version_issue = this.version_admission_issue(sizes, encoded_bytes);
+    if (version_issue) {
+      this.emit_state();
       this.emit({
         type: "error",
-        error: new SyncProtocolError("batch-limit", versionIssue.message),
+        error: new SyncProtocolError("batch-limit", version_issue.message),
       });
 
-      return { ok: false, issue: versionIssue };
+      return { ok: false, issue: version_issue };
     }
 
-    const reservedVersions = this.versionOperationCounts(sizes, encodedBytes)?.length ?? 1;
-    assertVersion(this.version + this.queue.versionCount + reservedVersions, "pending version");
+    const reserved_versions = this.version_operation_counts(sizes, encoded_bytes)?.length ?? 1;
+    assertVersion(this.version + this.queue.versionCount + reserved_versions, "pending version");
     const restore = restoreProvenanceOf(operations);
     const reservation: LocalPendingReservation = {
       status: "reserved",
       clientMutationId: "",
       operationCount: operations.length,
-      encodedBytes,
+      encodedBytes: encoded_bytes,
       ...(restore !== undefined ? { restore } : {}),
     };
 
-    this.localReservations.push(reservation);
-    this.pendingCommitTotal += 1;
-    this.pendingOperationTotal += reservation.operationCount;
-    this.pendingEncodedByteTotal += encodedBytes;
+    this.local_reservations.push(reservation);
+    this.pending_commit_total += 1;
+    this.pending_operation_total += reservation.operationCount;
+    this.pending_encoded_byte_total += encoded_bytes;
 
     try {
-      const clientMutationId = this.options.createMutationId?.() ?? createDefaultMutationId();
-      assertMutationId(clientMutationId, this.limits);
+      const client_mutation_id = this.options.createMutationId?.() ?? create_default_mutation_id();
+      assertMutationId(client_mutation_id, this.limits);
       if (
-        this.queue.has(clientMutationId) ||
-        this.acknowledged.has(clientMutationId) ||
-        this.localReservations.some(
+        this.queue.has(client_mutation_id) ||
+        this.acknowledged.has(client_mutation_id) ||
+        this.local_reservations.some(
           (candidate) =>
-            candidate !== reservation && candidate.clientMutationId === clientMutationId,
+            candidate !== reservation && candidate.clientMutationId === client_mutation_id,
         )
       ) {
-        throw new Error(`Duplicate client mutation ID: ${clientMutationId}`);
+        throw new Error(`Duplicate client mutation ID: ${client_mutation_id}`);
       }
 
-      reservation.clientMutationId = clientMutationId;
+      reservation.clientMutationId = client_mutation_id;
     } catch (error) {
       reservation.status = "cancelled";
-      this.drainLocalReservations();
-      const failure = syncFailure(error, { action: "reserve-local" });
+      this.drain_local_reservations();
+      const failure = sync_failure(error, { action: "reserve-local" });
       this.emit({ type: "error", error: failure });
       throw failure;
     }
@@ -1178,7 +1185,7 @@ export class SyncCoordinator {
         cancel: () => {
           if (reservation.status !== "reserved") return;
           reservation.status = "cancelled";
-          this.drainLocalReservations();
+          this.drain_local_reservations();
         },
         finish: (outcome) => {
           if (reservation.status !== "reserved") return;
@@ -1187,47 +1194,47 @@ export class SyncCoordinator {
           } else {
             reservation.status = "applied";
             reservation.storageRevision = transactionStorageRevision(outcome.transaction);
-            const applied = immutableOperations(outcome.transaction.patches);
+            const applied = immutable_operations(outcome.transaction.patches);
             reservation.appliedOperations = applied.operations;
-            const appliedSizes = applied.sizes;
-            reservation.appliedEncodedBytes = operationArrayBytes(appliedSizes);
-            reservation.appliedVersionOperationCounts = this.versionOperationCounts(
-              appliedSizes,
+            const applied_sizes = applied.sizes;
+            reservation.appliedEncodedBytes = operationArrayBytes(applied_sizes);
+            reservation.appliedVersionOperationCounts = this.version_operation_counts(
+              applied_sizes,
               reservation.appliedEncodedBytes,
             );
           }
 
-          this.drainLocalReservations();
+          this.drain_local_reservations();
         },
       },
     };
   }
 
-  private drainLocalReservations(): void {
-    while (this.localReservations[0]?.status !== "reserved") {
-      const reservation = this.localReservations.shift();
+  private drain_local_reservations(): void {
+    while (this.local_reservations[0]?.status !== "reserved") {
+      const reservation = this.local_reservations.shift();
       if (!reservation) return;
       if (reservation.status === "cancelled") {
-        this.pendingCommitTotal -= 1;
-        this.pendingOperationTotal -= reservation.operationCount;
-        this.pendingEncodedByteTotal -= reservation.encodedBytes;
-        if (!this.destroyed) this.emitState();
+        this.pending_commit_total -= 1;
+        this.pending_operation_total -= reservation.operationCount;
+        this.pending_encoded_byte_total -= reservation.encodedBytes;
+        if (!this.destroyed) this.emit_state();
         continue;
       }
 
       const operations = reservation.appliedOperations;
-      const encodedBytes = reservation.appliedEncodedBytes;
-      if (operations === undefined || encodedBytes === undefined)
+      const encoded_bytes = reservation.appliedEncodedBytes;
+      if (operations === undefined || encoded_bytes === undefined)
         throw new Error("An applied sync reservation has no measured operations");
-      const versionOperationCounts = reservation.appliedVersionOperationCounts;
-      this.pendingOperationTotal += operations.length - reservation.operationCount;
-      this.pendingEncodedByteTotal += encodedBytes - reservation.encodedBytes;
+      const version_operation_counts = reservation.appliedVersionOperationCounts;
+      this.pending_operation_total += operations.length - reservation.operationCount;
+      this.pending_encoded_byte_total += encoded_bytes - reservation.encodedBytes;
       const record: SyncMutationRecord = {
         documentId: this.options.documentId,
         baseVersion: this.version + this.queue.versionCount,
         clientMutationId: reservation.clientMutationId,
         operations,
-        ...(versionOperationCounts ? { versionOperationCounts } : {}),
+        ...(version_operation_counts ? { versionOperationCounts: version_operation_counts } : {}),
         ...(this.options.authorId !== undefined ? { authorId: this.options.authorId } : {}),
         ...(reservation.restore !== undefined ? { restore: reservation.restore } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
@@ -1235,19 +1242,19 @@ export class SyncCoordinator {
 
       this.queue.add(record);
       if (reservation.storageRevision !== undefined) {
-        this.recordStorageRevisions.set(record.clientMutationId, reservation.storageRevision);
+        this.record_storage_revisions.set(record.clientMutationId, reservation.storageRevision);
       }
 
-      this.recordBytes.set(record.clientMutationId, encodedBytes);
+      this.record_bytes.set(record.clientMutationId, encoded_bytes);
 
       if (this.options.pendingStorage) {
-        this.emitState();
-        this.emitMutation("persisting", record);
-        const pending = this.schedulePersistence(record);
+        this.emit_state();
+        this.emit_mutation("persisting", record);
+        const pending = this.schedule_persistence(record);
         this.persistence.set(record.clientMutationId, pending);
       } else {
-        this.emitState();
-        this.emitMutation("pending", record);
+        this.emit_state();
+        this.emit_mutation("pending", record);
       }
     }
   }
@@ -1257,15 +1264,15 @@ export class SyncCoordinator {
    * that the adapter can commit it as one atomic batch within the batch limits.
    * `sizes` are the JSON bytes of each operation.
    */
-  private versionAdmissionIssue(
+  private version_admission_issue(
     sizes: readonly number[],
-    encodedBytes: number,
+    encoded_bytes: number,
   ): Extract<MutationIssue, { kind: "resource-limit" }> | undefined {
     const limits = this.limits;
-    const fitsOneVersion =
+    const fits_one_version =
       sizes.length <= limits.maxOperationsPerVersion &&
-      encodedBytes <= limits.maxVersionPayloadBytes;
-    if (fitsOneVersion) return undefined;
+      encoded_bytes <= limits.maxVersionPayloadBytes;
+    if (fits_one_version) return undefined;
     const issue = (
       resource: "operations" | "encoded-bytes" | "batch-versions",
       actual: number,
@@ -1281,10 +1288,10 @@ export class SyncCoordinator {
     });
 
     if (!this.adapter.commitBatch) {
-      return encodedBytes > limits.maxVersionPayloadBytes
+      return encoded_bytes > limits.maxVersionPayloadBytes
         ? issue(
             "encoded-bytes",
-            encodedBytes,
+            encoded_bytes,
             limits.maxVersionPayloadBytes,
             `The commit is larger than one server version (${limits.maxVersionPayloadBytes} bytes), and the persistence adapter cannot commit an atomic batch`,
           )
@@ -1296,10 +1303,10 @@ export class SyncCoordinator {
           );
     }
 
-    if (encodedBytes > limits.maxBatchBytes) {
+    if (encoded_bytes > limits.maxBatchBytes) {
       return issue(
         "encoded-bytes",
-        encodedBytes,
+        encoded_bytes,
         limits.maxBatchBytes,
         `The commit exceeds the ${limits.maxBatchBytes} byte atomic batch limit`,
       );
@@ -1313,7 +1320,7 @@ export class SyncCoordinator {
     if (!counts) {
       return issue(
         "encoded-bytes",
-        encodedBytes,
+        encoded_bytes,
         limits.maxVersionPayloadBytes,
         `One operation of the commit is larger than one server version (${limits.maxVersionPayloadBytes} bytes)`,
       );
@@ -1336,14 +1343,14 @@ export class SyncCoordinator {
    * `undefined` when they fit one version. Admission already checked the
    * requested operations; the applied operations are the same or fewer.
    */
-  private versionOperationCounts(
+  private version_operation_counts(
     sizes: readonly number[],
-    encodedBytes: number,
+    encoded_bytes: number,
   ): readonly number[] | undefined {
     const limits = this.limits;
     if (
       sizes.length <= limits.maxOperationsPerVersion &&
-      encodedBytes <= limits.maxVersionPayloadBytes
+      encoded_bytes <= limits.maxVersionPayloadBytes
     ) {
       return undefined;
     }
@@ -1358,7 +1365,7 @@ export class SyncCoordinator {
     return Object.freeze(counts);
   }
 
-  private rejectPendingCapacity(
+  private reject_pending_capacity(
     resource: Extract<MutationIssue, { kind: "resource-limit" }>["resource"],
     actual: number,
     max: number,
@@ -1372,16 +1379,16 @@ export class SyncCoordinator {
       max,
       message,
     };
-    this.emitState();
+    this.emit_state();
     this.emit({ type: "error", error: new SyncPendingCapacityError(issue) });
     return { ok: false, issue };
   }
 
-  private async restorePending(): Promise<void> {
+  private async restore_pending(): Promise<void> {
     const storage = this.options.pendingStorage;
     if (!storage) return;
     const loaded = await storage.load(this.options.documentId, {
-      signal: this.abortController.signal,
+      signal: this.abort_controller.signal,
       maxRecords: this.limits.maxPendingCommits,
       maxOperations: this.limits.maxPendingOperations,
       maxBytes: this.limits.maxPendingEncodedBytes,
@@ -1397,64 +1404,64 @@ export class SyncCoordinator {
       );
     }
 
-    const restoredBytesByIndex: number[] = [];
-    const mutationIds = new Set<string>();
-    let restoredOperations = 0;
-    let restoredBytes = 0;
+    const restored_bytes_by_index: number[] = [];
+    const mutation_ids = new Set<string>();
+    let restored_operations = 0;
+    let restored_bytes = 0;
     for (const pending of loaded) {
       const bytes = assertPendingCommit(pending, this.options.documentId, this.limits);
-      restoredBytesByIndex.push(bytes);
-      restoredOperations += pending.operations.length;
-      restoredBytes += bytes;
-      if (restoredOperations > this.limits.maxPendingOperations) {
+      restored_bytes_by_index.push(bytes);
+      restored_operations += pending.operations.length;
+      restored_bytes += bytes;
+      if (restored_operations > this.limits.maxPendingOperations) {
         throw new SyncProtocolError(
           "pending-operation-limit",
           "Durable queue operations exceed the aggregate pending limit",
         );
       }
-      if (restoredBytes > this.limits.maxPendingEncodedBytes) {
+      if (restored_bytes > this.limits.maxPendingEncodedBytes) {
         throw new SyncProtocolError(
           "pending-byte-limit",
           "Durable queue bytes exceed the aggregate pending limit",
         );
       }
-      if (mutationIds.has(pending.clientMutationId)) {
+      if (mutation_ids.has(pending.clientMutationId)) {
         throw new SyncProtocolError(
           "invalid-id",
           `Durable queue contains duplicate mutation ID ${pending.clientMutationId}`,
         );
       }
-      mutationIds.add(pending.clientMutationId);
+      mutation_ids.add(pending.clientMutationId);
     }
 
     const prepared = loaded.map((pending, index) => ({
       record: {
-        ...clonePendingCommit(pending),
+        ...clone_pending_commit(pending),
         status: "pending" as const,
       },
-      bytes: restoredBytesByIndex[index]!,
+      bytes: restored_bytes_by_index[index]!,
     }));
-    let firstAmbiguousBase: number | undefined;
-    let ambiguousSequence = false;
-    const ambiguousIds = new Set<string>();
+    let first_ambiguous_base: number | undefined;
+    let ambiguous_sequence = false;
+    const ambiguous_ids = new Set<string>();
     for (const { record } of prepared) {
       incrementVersion(record.baseVersion);
-      if (ambiguousSequence || record.baseVersion < this.version) {
-        ambiguousSequence = true;
-        ambiguousIds.add(record.clientMutationId);
-        firstAmbiguousBase ??= record.baseVersion;
+      if (ambiguous_sequence || record.baseVersion < this.version) {
+        ambiguous_sequence = true;
+        ambiguous_ids.add(record.clientMutationId);
+        first_ambiguous_base ??= record.baseVersion;
       }
     }
 
     const rollbacks: TransactionReplayRollback[] = [];
-    const storageRevisions = new Map<string, bigint>();
+    const storage_revisions = new Map<string, bigint>();
     let restored = false;
-    let restoreFailure: SheetwriteError | undefined;
+    let restore_failure: SheetwriteError | undefined;
 
     try {
       for (const { record } of prepared) {
         if (this.destroyed) break;
-        if (ambiguousIds.has(record.clientMutationId)) continue;
+        if (ambiguous_ids.has(record.clientMutationId)) continue;
 
         const replay = record.versionOperationCounts
           ? markAtomicBatch(record.operations.slice())
@@ -1469,7 +1476,7 @@ export class SyncCoordinator {
           if (rollback) rollbacks.push(rollback);
 
           const revision = transactionStorageRevision(outcome.transaction);
-          if (revision !== undefined) storageRevisions.set(record.clientMutationId, revision);
+          if (revision !== undefined) storage_revisions.set(record.clientMutationId, revision);
         }
 
         if (
@@ -1484,7 +1491,7 @@ export class SyncCoordinator {
 
       restored = !this.destroyed;
     } catch (error) {
-      restoreFailure = syncStorageFailure(error, { action: "hydrate" });
+      restore_failure = sync_storage_failure(error, { action: "hydrate" });
     }
 
     const failures: unknown[] = [];
@@ -1508,88 +1515,91 @@ export class SyncCoordinator {
     }
 
     if (failures.length > 0) {
-      if (restoreFailure?.cause !== undefined) failures.unshift(restoreFailure.cause);
+      if (restore_failure?.cause !== undefined) failures.unshift(restore_failure.cause);
 
       const failure = new AggregateError(failures, "Durable replay finalization failed");
 
-      if (restoreFailure) restoreFailure.cause = failure;
+      if (restore_failure) restore_failure.cause = failure;
       else throw failure;
     }
 
-    if (restoreFailure) throw restoreFailure;
+    if (restore_failure) throw restore_failure;
     if (this.destroyed) return;
 
-    for (const [id, revision] of storageRevisions) this.recordStorageRevisions.set(id, revision);
+    for (const [id, revision] of storage_revisions) this.record_storage_revisions.set(id, revision);
 
     for (const { record, bytes } of prepared) {
       this.queue.add(record);
-      this.recordBytes.set(record.clientMutationId, bytes);
-      if (ambiguousIds.has(record.clientMutationId)) {
-        this.ambiguousRestores.add(record.clientMutationId);
+      this.record_bytes.set(record.clientMutationId, bytes);
+      if (ambiguous_ids.has(record.clientMutationId)) {
+        this.ambiguous_restores.add(record.clientMutationId);
       }
     }
-    this.pendingCommitTotal = prepared.length;
-    this.pendingOperationTotal = restoredOperations;
-    this.pendingEncodedByteTotal = restoredBytes;
+    this.pending_commit_total = prepared.length;
+    this.pending_operation_total = restored_operations;
+    this.pending_encoded_byte_total = restored_bytes;
     this.hydrating = false;
-    this.emitState();
+    this.emit_state();
     this.emit({ type: "restored", pending: this.pendingCommits() });
-    if (firstAmbiguousBase !== undefined && this.connection !== "online") {
+    if (first_ambiguous_base !== undefined && this.connection !== "online") {
       this.emit({
         type: "reload-required",
-        expectedVersion: firstAmbiguousBase + 1,
+        expectedVersion: first_ambiguous_base + 1,
         receivedVersion: this.version,
       });
     }
   }
 
-  private schedulePersistence(record: SyncMutationRecord, waitUntilReady = false): Promise<void> {
-    const scheduled = this.persistenceTail.then(async () => {
-      if (waitUntilReady) await this.readyPromise;
-      await this.persistRecord(record);
+  private schedule_persistence(
+    record: SyncMutationRecord,
+    wait_until_ready = false,
+  ): Promise<void> {
+    const scheduled = this.persistence_tail.then(async () => {
+      if (wait_until_ready) await this.ready_promise;
+      await this.persist_record(record);
     });
-    this.persistenceTail = scheduled.catch(() => {});
+    this.persistence_tail = scheduled.catch(() => {});
     return scheduled;
   }
 
-  private scheduleQueueReplacement(
-    expectedClientMutationIds: readonly string[],
+  private schedule_queue_replacement(
+    expected_client_mutation_ids: readonly string[],
     commits: readonly PendingCommit[],
   ): Promise<void> {
     const storage = this.options.pendingStorage;
     if (!storage) return Promise.resolve();
-    const scheduled = this.persistenceTail.then(() =>
+    const scheduled = this.persistence_tail.then(() =>
       storage.replace(
         this.options.documentId,
-        expectedClientMutationIds,
-        commits.map(clonePendingCommit),
-        this.abortController.signal,
+        expected_client_mutation_ids,
+        commits.map(clone_pending_commit),
+        this.abort_controller.signal,
       ),
     );
-    this.persistenceTail = scheduled.catch(() => {});
+    this.persistence_tail = scheduled.catch(() => {});
     return scheduled;
   }
 
-  private async persistRecord(record: SyncMutationRecord): Promise<void> {
+  private async persist_record(record: SyncMutationRecord): Promise<void> {
     const storage = this.options.pendingStorage;
     if (!storage || this.destroyed) return;
     this.queue.setStatus(record, "persisting");
-    this.storageErrors.delete(record.clientMutationId);
+    this.storage_errors.delete(record.clientMutationId);
     try {
-      await storage.put(clonePendingCommit(record), this.abortController.signal);
+      await storage.put(clone_pending_commit(record), this.abort_controller.signal);
       if (this.destroyed || !this.queue.has(record.clientMutationId)) return;
       this.queue.setStatus(record, "pending");
-      this.emitState();
-      this.emitMutation("pending", record);
+      this.emit_state();
+      this.emit_mutation("pending", record);
     } catch (error) {
       if (this.destroyed) return;
-      const failure = syncStorageFailure(error, {
+      const failure = sync_storage_failure(error, {
         action: "persist-pending",
         clientMutationId: record.clientMutationId,
       });
       this.queue.setStatus(record, "storage-error");
-      this.storageErrors.set(record.clientMutationId, failure);
-      this.emitState();
+      this.storage_errors.set(record.clientMutationId, failure);
+      this.emit_state();
       this.emit({
         type: "storage-error",
         error: failure,
@@ -1598,32 +1608,32 @@ export class SyncCoordinator {
     }
   }
 
-  private enqueueInbound(task: () => void | Promise<void>): Promise<void> {
-    const queued = this.inboundTail.then(async () => {
+  private enqueue_inbound(task: () => void | Promise<void>): Promise<void> {
+    const queued = this.inbound_tail.then(async () => {
       if (!this.destroyed) await task();
     });
-    this.inboundTail = queued.catch(() => {});
+    this.inbound_tail = queued.catch(() => {});
     return queued;
   }
 
-  private async processVersionedOperation(input: BufferedVersionedOperation): Promise<void> {
+  private async process_versioned_operation(input: BufferedVersionedOperation): Promise<void> {
     const { operation } = input;
-    const mutationId = operation.clientMutationId;
+    const mutation_id = operation.clientMutationId;
     if (operation.version <= this.version) {
-      if (mutationId && this.queue.has(mutationId)) {
+      if (mutation_id && this.queue.has(mutation_id)) {
         // Only the last member of an own batch acknowledges the whole batch.
         if (operation.batch === undefined || operation.batch.index === operation.batch.count - 1) {
-          await this.processResponse({
+          await this.process_response({
             status: "applied",
             version: operation.version,
-            clientMutationId: mutationId,
+            clientMutationId: mutation_id,
           });
         }
-      } else if (mutationId && !this.acknowledged.has(mutationId)) {
-        this.rejectInbound(
+      } else if (mutation_id && !this.acknowledged.has(mutation_id)) {
+        this.reject_inbound(
           new SyncProtocolError(
             "late-echo",
-            `Remote mutation ${mutationId} is older than the retained acknowledgement window`,
+            `Remote mutation ${mutation_id} is older than the retained acknowledgement window`,
           ),
           operation.version,
           false,
@@ -1633,13 +1643,13 @@ export class SyncCoordinator {
     }
     // A source that restarts after a reconnect can deliver members of the
     // batch being assembled again; the assembly already holds them.
-    if (operation.version <= this.contiguousHead()) return;
+    if (operation.version <= this.contiguous_head()) return;
 
-    if (mutationId && this.acknowledged.has(mutationId)) {
-      this.rejectInbound(
+    if (mutation_id && this.acknowledged.has(mutation_id)) {
+      this.reject_inbound(
         new SyncProtocolError(
           "late-echo",
-          `Acknowledged mutation ${mutationId} arrived at an unexpected future version`,
+          `Acknowledged mutation ${mutation_id} arrived at an unexpected future version`,
         ),
         operation.version,
         false,
@@ -1647,12 +1657,12 @@ export class SyncCoordinator {
       return;
     }
 
-    const expectedVersion = incrementVersion(this.contiguousHead());
-    if (operation.version !== expectedVersion) {
+    const expected_version = incrementVersion(this.contiguous_head());
+    if (operation.version !== expected_version) {
       const distance = operation.version - this.version;
       if (distance > this.limits.maxFutureVersionDistance) {
-        this.clearGapBuffer();
-        this.rejectInbound(
+        this.clear_gap_buffer();
+        this.reject_inbound(
           new SyncProtocolError(
             "future-distance-limit",
             `Remote version ${operation.version} exceeds the future-version distance limit`,
@@ -1661,31 +1671,31 @@ export class SyncCoordinator {
         );
         return;
       }
-      if (!this.gapBuffer.has(operation.version)) {
+      if (!this.gap_buffer.has(operation.version)) {
         input.retained = true;
-        this.gapBuffer.set(operation.version, input);
+        this.gap_buffer.set(operation.version, input);
       }
-      this.emitReloadRequired(operation.version);
-      this.requestGapRecovery(operation.version);
+      this.emit_reload_required(operation.version);
+      this.request_gap_recovery(operation.version);
       return;
     }
 
-    if (await this.applyContiguousOperation(input)) {
-      await this.drainGapBuffer();
+    if (await this.apply_contiguous_operation(input)) {
+      await this.drain_gap_buffer();
     }
   }
 
-  private async applyContiguousOperation(input: BufferedVersionedOperation): Promise<boolean> {
+  private async apply_contiguous_operation(input: BufferedVersionedOperation): Promise<boolean> {
     const { operation } = input;
-    if (operation.batch !== undefined || this.batchAssembly !== undefined) {
-      return this.assembleBatchMember(input);
+    if (operation.batch !== undefined || this.batch_assembly !== undefined) {
+      return this.assemble_batch_member(input);
     }
-    const mutationId = operation.clientMutationId;
-    if (mutationId && this.queue.has(mutationId)) {
-      await this.processResponse({
+    const mutation_id = operation.clientMutationId;
+    if (mutation_id && this.queue.has(mutation_id)) {
+      await this.process_response({
         status: "applied",
         version: operation.version,
-        clientMutationId: mutationId,
+        clientMutationId: mutation_id,
       });
       return this.version >= operation.version;
     }
@@ -1697,7 +1707,7 @@ export class SyncCoordinator {
         outcome.status === "rejected" ||
         outcome.status === "noop"
       ) {
-        this.rejectInbound(
+        this.reject_inbound(
           new SyncProtocolError(
             "remote-operations-rejected",
             `Remote operation ${operation.version} was not applied by the grid`,
@@ -1709,8 +1719,8 @@ export class SyncCoordinator {
     }
 
     this.version = operation.version;
-    this.emitState();
-    this.emit({ type: "remote-applied", operation: cloneVersionedOperation(operation) });
+    this.emit_state();
+    this.emit({ type: "remote-applied", operation: clone_versioned_operation(operation) });
     return true;
   }
 
@@ -1718,11 +1728,11 @@ export class SyncCoordinator {
    * Hold each contiguous member of an atomic batch without touching the grid
    * or the server version. The complete batch applies as one transaction.
    */
-  private async assembleBatchMember(input: BufferedVersionedOperation): Promise<boolean> {
+  private async assemble_batch_member(input: BufferedVersionedOperation): Promise<boolean> {
     const { operation } = input;
     const member = operation.batch;
-    const assembly = this.batchAssembly;
-    const continuesBatch =
+    const assembly = this.batch_assembly;
+    const continues_batch =
       member !== undefined &&
       (member.index === 0
         ? assembly === undefined
@@ -1731,15 +1741,15 @@ export class SyncCoordinator {
           member.count === assembly.count &&
           operation.clientMutationId === assembly.clientMutationId &&
           operation.authorId === assembly.authorId);
-    if (!continuesBatch) {
-      const startVersion = assembly?.members[0]?.version ?? operation.version;
-      this.batchAssembly = undefined;
-      this.rejectInbound(
+    if (!continues_batch) {
+      const start_version = assembly?.members[0]?.version ?? operation.version;
+      this.batch_assembly = undefined;
+      this.reject_inbound(
         new SyncProtocolError(
           "invalid-batch",
           `Remote version ${operation.version} does not continue an atomic batch`,
         ),
-        startVersion,
+        start_version,
       );
       return false;
     }
@@ -1755,8 +1765,8 @@ export class SyncCoordinator {
     };
 
     if (next.bytes + input.bytes > this.limits.maxBatchBytes) {
-      this.batchAssembly = undefined;
-      this.rejectInbound(
+      this.batch_assembly = undefined;
+      this.reject_inbound(
         new SyncProtocolError(
           "batch-limit",
           `Remote atomic batch exceeds the ${this.limits.maxBatchBytes} byte limit`,
@@ -1769,24 +1779,24 @@ export class SyncCoordinator {
     next.members.push(operation);
     next.bytes += input.bytes;
     if (next.members.length < next.count) {
-      this.batchAssembly = next;
+      this.batch_assembly = next;
       return true;
     }
 
-    this.batchAssembly = undefined;
-    return this.applyCompleteBatch(next);
+    this.batch_assembly = undefined;
+    return this.apply_complete_batch(next);
   }
 
-  private async applyCompleteBatch(assembly: BatchAssembly): Promise<boolean> {
+  private async apply_complete_batch(assembly: BatchAssembly): Promise<boolean> {
     const first = assembly.members[0];
     const last = assembly.members.at(-1);
     if (!first || !last) throw new Error("A complete atomic batch has no members");
-    const mutationId = assembly.clientMutationId;
-    if (mutationId && this.queue.has(mutationId)) {
-      await this.processResponse({
+    const mutation_id = assembly.clientMutationId;
+    if (mutation_id && this.queue.has(mutation_id)) {
+      await this.process_response({
         status: "applied",
         version: last.version,
-        clientMutationId: mutationId,
+        clientMutationId: mutation_id,
       });
       return this.version >= last.version;
     }
@@ -1801,7 +1811,7 @@ export class SyncCoordinator {
         outcome.status === "rejected" ||
         outcome.status === "noop"
       ) {
-        this.rejectInbound(
+        this.reject_inbound(
           new SyncProtocolError(
             "remote-operations-rejected",
             `Remote atomic batch ${first.version}-${last.version} was not applied by the grid`,
@@ -1813,98 +1823,105 @@ export class SyncCoordinator {
     }
 
     this.version = last.version;
-    this.emitState();
+    this.emit_state();
     for (const member of assembly.members) {
-      this.emit({ type: "remote-applied", operation: cloneVersionedOperation(member) });
+      this.emit({ type: "remote-applied", operation: clone_versioned_operation(member) });
     }
     return true;
   }
 
   /** Last contiguous version received: the server version or the last assembled batch member. */
-  private contiguousHead(): number {
-    return this.batchAssembly?.members.at(-1)?.version ?? this.version;
+  private contiguous_head(): number {
+    return this.batch_assembly?.members.at(-1)?.version ?? this.version;
   }
 
   /** Drop an assembly that an acknowledgement or conflict moved the server version past. */
-  private dropStaleBatchAssembly(): void {
-    const start = this.batchAssembly?.members[0]?.version;
-    if (start !== undefined && start <= this.version) this.batchAssembly = undefined;
+  private drop_stale_batch_assembly(): void {
+    const start = this.batch_assembly?.members[0]?.version;
+    if (start !== undefined && start <= this.version) this.batch_assembly = undefined;
   }
 
-  private inboundLimitError(operationCount: number, bytes: number): SyncProtocolError | undefined {
-    if (this.bufferedVersions >= this.limits.maxBufferedVersions) {
+  private inbound_limit_error(
+    operation_count: number,
+    bytes: number,
+  ): SyncProtocolError | undefined {
+    if (this.buffered_versions >= this.limits.maxBufferedVersions) {
       return new SyncProtocolError("buffer-count-limit", "Inbound version count limit exceeded");
     }
-    if (this.bufferedOperations + operationCount > this.limits.maxBufferedOperations) {
+    if (this.buffered_operations + operation_count > this.limits.maxBufferedOperations) {
       return new SyncProtocolError(
         "buffer-operation-limit",
         "Inbound operation count limit exceeded",
       );
     }
-    if (this.bufferedBytes + bytes > this.limits.maxBufferedBytes) {
+    if (this.buffered_bytes + bytes > this.limits.maxBufferedBytes) {
       return new SyncProtocolError("buffer-byte-limit", "Inbound byte limit exceeded");
     }
     return undefined;
   }
 
-  private reserveInbound(input: BufferedVersionedOperation): SyncProtocolError | undefined {
-    const error = this.inboundLimitError(input.operation.operations.length, input.bytes);
+  private reserve_inbound(input: BufferedVersionedOperation): SyncProtocolError | undefined {
+    const error = this.inbound_limit_error(input.operation.operations.length, input.bytes);
     if (error) return error;
-    this.bufferedVersions += 1;
-    this.bufferedOperations += input.operation.operations.length;
-    this.bufferedBytes += input.bytes;
+    this.buffered_versions += 1;
+    this.buffered_operations += input.operation.operations.length;
+    this.buffered_bytes += input.bytes;
     return undefined;
   }
 
-  private releaseBuffered(input: BufferedVersionedOperation): void {
+  private release_buffered(input: BufferedVersionedOperation): void {
     input.retained = false;
-    this.bufferedVersions -= 1;
-    this.bufferedOperations -= input.operation.operations.length;
-    this.bufferedBytes -= input.bytes;
+    this.buffered_versions -= 1;
+    this.buffered_operations -= input.operation.operations.length;
+    this.buffered_bytes -= input.bytes;
   }
 
-  private emitReloadRequired(receivedVersion: number): void {
+  private emit_reload_required(received_version: number): void {
     this.emit({
       type: "reload-required",
-      expectedVersion: incrementVersion(this.contiguousHead()),
-      receivedVersion,
+      expectedVersion: incrementVersion(this.contiguous_head()),
+      receivedVersion: received_version,
     });
   }
 
-  private rejectInbound(error: SyncProtocolError, receivedVersion?: number, recover = true): void {
+  private reject_inbound(
+    error: SyncProtocolError,
+    received_version?: number,
+    recover = true,
+  ): void {
     if (this.destroyed) return;
     this.emit({ type: "error", error });
-    if (receivedVersion === undefined) return;
-    this.emitReloadRequired(receivedVersion);
-    if (recover && receivedVersion >= incrementVersion(this.contiguousHead())) {
-      this.requestGapRecovery(receivedVersion);
+    if (received_version === undefined) return;
+    this.emit_reload_required(received_version);
+    if (recover && received_version >= incrementVersion(this.contiguous_head())) {
+      this.request_gap_recovery(received_version);
     }
   }
 
-  private retainAcknowledgement(clientMutationId: string): void {
-    if (this.acknowledged.has(clientMutationId)) return;
-    this.acknowledged.add(clientMutationId);
-    this.acknowledgementOrder.push(clientMutationId);
-    if (this.acknowledgementOrder.length <= this.limits.maxRecentAcknowledgements) return;
-    const expired = this.acknowledgementOrder.shift();
+  private retain_acknowledgement(client_mutation_id: string): void {
+    if (this.acknowledged.has(client_mutation_id)) return;
+    this.acknowledged.add(client_mutation_id);
+    this.acknowledgement_order.push(client_mutation_id);
+    if (this.acknowledgement_order.length <= this.limits.maxRecentAcknowledgements) return;
+    const expired = this.acknowledgement_order.shift();
     if (expired !== undefined) this.acknowledged.delete(expired);
   }
 
-  private clearGapBuffer(): void {
-    for (const input of this.gapBuffer.values()) this.releaseBuffered(input);
-    this.gapBuffer.clear();
-    this.batchAssembly = undefined;
+  private clear_gap_buffer(): void {
+    for (const input of this.gap_buffer.values()) this.release_buffered(input);
+    this.gap_buffer.clear();
+    this.batch_assembly = undefined;
   }
 
-  private requestGapRecovery(receivedVersion: number): void {
+  private request_gap_recovery(received_version: number): void {
     const recover = this.options.recoverVersionGap;
-    if (!recover || this.recoveryPromise || this.destroyed) return;
-    const expectedVersion = incrementVersion(this.contiguousHead());
-    this.recoveryPromise = recover({
+    if (!recover || this.recovery_promise || this.destroyed) return;
+    const expected_version = incrementVersion(this.contiguous_head());
+    this.recovery_promise = recover({
       documentId: this.options.documentId,
-      expectedVersion,
-      receivedVersion,
-      signal: this.abortController.signal,
+      expectedVersion: expected_version,
+      receivedVersion: received_version,
+      signal: this.abort_controller.signal,
     })
       .then(async (recovery) => {
         if (this.destroyed) return;
@@ -1928,31 +1945,31 @@ export class SyncCoordinator {
         const snapshot = recovery as WorkbookSnapshot;
         this.emit({
           type: "reload-required",
-          expectedVersion: incrementVersion(this.contiguousHead()),
-          receivedVersion,
+          expectedVersion: incrementVersion(this.contiguous_head()),
+          receivedVersion: received_version,
           snapshot: cloneJsonValue(snapshot),
         });
       })
       .catch((error: unknown) => {
-        this.handleRemoteIntakeError(error, this.abortController.signal);
+        this.handle_remote_intake_error(error, this.abort_controller.signal);
       })
       .finally(() => {
-        this.recoveryPromise = undefined;
+        this.recovery_promise = undefined;
       });
   }
 
-  private async drainGapBuffer(): Promise<void> {
+  private async drain_gap_buffer(): Promise<void> {
     while (!this.destroyed) {
-      const expectedVersion = incrementVersion(this.contiguousHead());
-      const next = this.gapBuffer.get(expectedVersion);
+      const expected_version = incrementVersion(this.contiguous_head());
+      const next = this.gap_buffer.get(expected_version);
       if (!next) return;
-      if (!(await this.applyContiguousOperation(next))) return;
-      this.gapBuffer.delete(expectedVersion);
-      this.releaseBuffered(next);
+      if (!(await this.apply_contiguous_operation(next))) return;
+      this.gap_buffer.delete(expected_version);
+      this.release_buffered(next);
     }
   }
 
-  private async consumeRemote(
+  private async consume_remote(
     source: AsyncIterable<VersionedOperation>,
     signal: AbortSignal,
   ): Promise<void> {
@@ -1963,10 +1980,10 @@ export class SyncCoordinator {
       closing = true;
       try {
         void iterator.return().catch((error: unknown) => {
-          this.handleRemoteIntakeError(error, signal);
+          this.handle_remote_intake_error(error, signal);
         });
       } catch (error) {
-        this.handleRemoteIntakeError(error, signal);
+        this.handle_remote_intake_error(error, signal);
       }
     };
     signal.addEventListener("abort", close, { once: true });
@@ -1977,7 +1994,7 @@ export class SyncCoordinator {
         await this.applyVersionedOperation(next.value);
       }
     } catch (error) {
-      this.handleRemoteIntakeError(error, signal);
+      this.handle_remote_intake_error(error, signal);
       close();
     } finally {
       signal.removeEventListener("abort", close);
@@ -1985,41 +2002,41 @@ export class SyncCoordinator {
     }
   }
 
-  private handleRemoteIntakeError(error: unknown, signal: AbortSignal): void {
+  private handle_remote_intake_error(error: unknown, signal: AbortSignal): void {
     if (signal.aborted || this.destroyed) return;
     this.connection = "error";
-    this.emitState();
+    this.emit_state();
     this.emit({
       type: "error",
-      error: syncFailure(error, { action: "receive-remote" }),
+      error: sync_failure(error, { action: "receive-remote" }),
     });
   }
 
   private activity(): SyncActivityState {
     if (this.destroyed) return "destroyed";
     if (this.hydrating) return "hydrating";
-    if (this.hydrationError !== undefined || this.storageErrors.size > 0) return "error";
+    if (this.hydration_error !== undefined || this.storage_errors.size > 0) return "error";
     const busy = this.queue.firstBusyStatus();
     if (busy === "conflicted") return "conflict";
     if (busy !== undefined) return busy;
     return this.queue.count("pending") > 0 ? "pending" : "idle";
   }
 
-  private pendingCapacity(): SyncPendingCapacityState {
+  private pending_capacity(): SyncPendingCapacityState {
     if (this.destroyed) return "destroyed";
     if (this.hydrating) return "hydrating";
-    if (this.hydrationError !== undefined) return "restore-error";
+    if (this.hydration_error !== undefined) return "restore-error";
     if (
-      this.pendingCommitTotal >= this.limits.maxPendingCommits ||
-      this.pendingOperationTotal >= this.limits.maxPendingOperations ||
-      this.pendingEncodedByteTotal >= this.limits.maxPendingEncodedBytes
+      this.pending_commit_total >= this.limits.maxPendingCommits ||
+      this.pending_operation_total >= this.limits.maxPendingOperations ||
+      this.pending_encoded_byte_total >= this.limits.maxPendingEncodedBytes
     ) {
       return "full";
     }
     return "available";
   }
 
-  private emitState(): void {
+  private emit_state(): void {
     if (this.listeners.size === 0) return;
     this.emit({ type: "state", state: this.state });
   }
@@ -2028,12 +2045,12 @@ export class SyncCoordinator {
    * Announce `record` as `type`. Listeners get a copy, made only when someone
    * listens: a queue without listeners copies nothing per commit.
    */
-  private emitMutation(
+  private emit_mutation(
     type: "persisting" | "pending" | "sending",
     record: SyncMutationRecord,
   ): void {
     if (this.listeners.size === 0) return;
-    this.emit({ type, mutation: cloneRecord(record) });
+    this.emit({ type, mutation: clone_record(record) });
   }
 
   private emit(event: SyncCoordinatorEvent): void {
@@ -2072,7 +2089,7 @@ interface QueueBase {
 }
 
 /** Groups consecutive versions so each atomic batch applies as one transaction. */
-function groupAtomicBatches(versions: readonly VersionedOperation[]): VersionedOperation[][] {
+function group_atomic_batches(versions: readonly VersionedOperation[]): VersionedOperation[][] {
   const groups: VersionedOperation[][] = [];
   let open: VersionedOperation[] | undefined;
   for (const version of versions) {
@@ -2097,7 +2114,7 @@ interface BufferedVersionedOperation {
   retained?: boolean;
 }
 
-function clonePendingCommit(commit: PendingCommit): PendingCommit {
+function clone_pending_commit(commit: PendingCommit): PendingCommit {
   return {
     documentId: commit.documentId,
     baseVersion: commit.baseVersion,
@@ -2111,7 +2128,7 @@ function clonePendingCommit(commit: PendingCommit): PendingCommit {
   };
 }
 
-function isAsyncIterable(
+function is_async_iterable(
   source: RemoteOperationSource | AsyncIterable<VersionedOperation>,
 ): source is AsyncIterable<VersionedOperation> {
   return Symbol.asyncIterator in source;
@@ -2121,7 +2138,7 @@ function isAsyncIterable(
  * Deep-frozen JSON copy of applied operations with the exact JSON bytes of
  * each one, taken from the copy's own encoding instead of a second walk.
  */
-function immutableOperations(operations: readonly DocumentOp[]): {
+function immutable_operations(operations: readonly DocumentOp[]): {
   operations: readonly DocumentOp[];
   sizes: number[];
 } {
@@ -2132,17 +2149,17 @@ function immutableOperations(operations: readonly DocumentOp[]): {
     sizes[index] = utf8ByteLength(json, Number.POSITIVE_INFINITY);
     copies[index] = JSON.parse(json) as DocumentOp;
   }
-  return { operations: deepFreeze(copies), sizes };
+  return { operations: deep_freeze(copies), sizes };
 }
 
-function cloneRecord(record: SyncMutationRecord): SyncMutationRecord {
+function clone_record(record: SyncMutationRecord): SyncMutationRecord {
   return {
-    ...clonePendingCommit(record),
+    ...clone_pending_commit(record),
     status: record.status,
   };
 }
 
-function cloneVersionedOperation(operation: VersionedOperation): VersionedOperation {
+function clone_versioned_operation(operation: VersionedOperation): VersionedOperation {
   return {
     version: operation.version,
     operations: cloneJsonValue(operation.operations),
@@ -2153,12 +2170,12 @@ function cloneVersionedOperation(operation: VersionedOperation): VersionedOperat
   };
 }
 
-function deepFreeze<T>(value: T): T {
+function deep_freeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     // Iterate arrays in place: `Object.values` copies a million-cell block.
     const children = Array.isArray(value) ? value : Object.values(value);
     for (const child of children) {
-      if (child && typeof child === "object") deepFreeze(child);
+      if (child && typeof child === "object") deep_freeze(child);
     }
     Object.freeze(value);
   }

@@ -6,7 +6,7 @@ import type { Grid, GridPanel } from "../types/grid.js";
 import { selectionRange } from "./chart-model.js";
 import { panelField, panelSection, rejectionMessage, selectOf } from "./panel-dom.js";
 
-function absoluteFormula(grid: Grid, range: Range): string {
+function absolute_formula(grid: Grid, range: Range): string {
   const sheet = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === range.sheet);
   if (sheet === undefined) return "=#REF!";
   const start = `$${colToA1(range.start.col)}$${range.start.row + 1}`;
@@ -14,7 +14,7 @@ function absoluteFormula(grid: Grid, range: Range): string {
   return `='${sheet.name.replaceAll("'", "''")}'!${start}:${end}`;
 }
 
-function textInput(): HTMLInputElement {
+function text_input(): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "text";
   input.autocomplete = "off";
@@ -41,9 +41,9 @@ export function namePanel(grid: Grid, define = false): GridPanel {
       list.append(entries);
       const editor = panelSection("Define name");
       const form = document.createElement("form");
-      const name = panelField("Name", textInput(), "defined-name");
+      const name = panelField("Name", text_input(), "defined-name");
       const scope = panelField("Scope", selectOf([], ""), "name-scope");
-      const formula = panelField("Refers to", textInput(), "name-formula");
+      const formula = panelField("Refers to", text_input(), "name-formula");
       let editing: NamedRangeSnapshot | undefined;
 
       const reset = (): void => {
@@ -69,37 +69,37 @@ export function namePanel(grid: Grid, define = false): GridPanel {
 
       const draw = (): void => {
         const workbook = grid.store.getWorkbook();
-        const selectedScope = scope.control.value;
+        const selected_scope = scope.control.value;
         const options = selectOf(
           [
             ["", "Workbook"],
             ...workbook.sheets.map((sheet): [string, string] => [sheet.id, sheet.name]),
           ],
-          selectedScope,
+          selected_scope,
         );
         scope.control.replaceChildren(...options.childNodes);
-        scope.control.value = selectedScope;
+        scope.control.value = selected_scope;
         entries.replaceChildren();
         for (const definition of workbook.namedRanges ?? []) {
-          const scopeLabel =
+          const scope_label =
             definition.scope === undefined
               ? "Workbook"
               : (workbook.sheets.find((sheet) => sheet.id === definition.scope)?.name ??
                 definition.scope);
-          const label = `${definition.name} (${scopeLabel})`;
-          const definitionSource =
+          const label = `${definition.name} (${scope_label})`;
+          const definition_source =
             definition.range === undefined
               ? definition.formula
-              : absoluteFormula(grid, definition.range);
+              : absolute_formula(grid, definition.range);
           const row = panelSection(label);
           const source = document.createElement("code");
           source.className = "sheetwrite-explain-formula";
-          source.textContent = definitionSource;
+          source.textContent = definition_source;
           const edit = button("Edit", () => {
             editing = definition;
             name.control.value = definition.name;
             scope.control.value = definition.scope ?? "";
-            formula.control.value = definitionSource;
+            formula.control.value = definition_source;
             formula.setError(null);
             name.control.focus();
           });
@@ -123,28 +123,28 @@ export function namePanel(grid: Grid, define = false): GridPanel {
       };
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const nextName = name.control.value.trim();
-        const nextScope = scope.control.value || undefined;
+        const next_name = name.control.value.trim();
+        const next_scope = scope.control.value || undefined;
         const source = formula.control.value.trim();
-        if (nextName === "" || source === "" || source === "=") {
+        if (next_name === "" || source === "" || source === "=") {
           formula.setError("Enter a name and a formula or reference.");
           return;
         }
-        const sameIdentity = (definition: NamedRangeSnapshot): boolean =>
-          formulaNameKey(definition.name) === formulaNameKey(nextName) &&
-          definition.scope === nextScope;
-        const collision = grid.store.getWorkbook().namedRanges?.find(sameIdentity);
-        if (collision !== undefined && (editing === undefined || !sameIdentity(editing))) {
+        const same_identity = (definition: NamedRangeSnapshot): boolean =>
+          formulaNameKey(definition.name) === formulaNameKey(next_name) &&
+          definition.scope === next_scope;
+        const collision = grid.store.getWorkbook().namedRanges?.find(same_identity);
+        if (collision !== undefined && (editing === undefined || !same_identity(editing))) {
           formula.setError("A name already exists in this scope. Edit that name instead.");
           return;
         }
         const definition: NamedRangeSnapshot = {
-          name: nextName,
-          ...(nextScope === undefined ? {} : { scope: nextScope }),
+          name: next_name,
+          ...(next_scope === undefined ? {} : { scope: next_scope }),
           formula: source.startsWith("=") ? source : `=${source}`,
         };
         const patches: DocumentOp[] = [];
-        if (editing !== undefined && !sameIdentity(editing)) {
+        if (editing !== undefined && !same_identity(editing)) {
           patches.push({
             op: "removeNamedRange",
             name: editing.name,
@@ -160,7 +160,7 @@ export function namePanel(grid: Grid, define = false): GridPanel {
       const range = define
         ? selectionRange(grid.getSelection(), grid.store.getWorkbook().sheets)
         : null;
-      formula.control.value = range === null ? "=" : absoluteFormula(grid, range);
+      formula.control.value = range === null ? "=" : absolute_formula(grid, range);
       return grid.on("change", draw);
     },
   };

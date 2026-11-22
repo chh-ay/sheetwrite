@@ -47,11 +47,11 @@ test("formatting controls change the live budget and XLSX preserves the edited s
   await expect(page.getByTestId("formatting-roundtrip")).toContainText("0 differences");
   await expect(page.locator(".sw-formatting-imported canvas")).toBeAttached();
 
-  for (const colorTheme of ["light", "dark"]) {
+  for (const color_theme of ["light", "dark"]) {
     await page.evaluate((value) => {
       document.documentElement.dataset.theme = value;
-    }, colorTheme);
-    await expect(page.locator("html")).toHaveAttribute("data-theme", colorTheme);
+    }, color_theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", color_theme);
     expect(
       await page
         .locator(".sw-showcase")

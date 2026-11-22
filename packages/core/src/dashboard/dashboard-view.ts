@@ -122,66 +122,66 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   checkStylePart(root, "dashboard", "The dashboard");
 
   let sheet: SheetId | null = null;
-  let readOnly = false;
+  let read_only = false;
   let mode: KeyboardMode | null = null;
   let message: string | null = null;
   let rendered = "";
   // A read-only viewer's slicer selections: they filter this view only, not the document.
   const overrides = slicerOverridesOf(grid.store);
   // Slicers filter the dashboard pivots that the engine computes; the saved definitions keep theirs.
-  const filterPivots = (dashboards: readonly SheetId[]): void => {
+  const filter_pivots = (dashboards: readonly SheetId[]): void => {
     applyPivotViews(grid.store, dashboards);
     setPivotChartViews(grid.store, pivotChartViewOf);
   };
-  const hiddenIndex = (owner: SheetId, itemId: string): number =>
-    hiddenPivotIndex(grid.store, owner, itemId);
+  const hidden_index = (owner: SheetId, item_id: string): number =>
+    hiddenPivotIndex(grid.store, owner, item_id);
 
   // Charts mount after each build, when their boxes have a size; a rebuild mounts them again.
-  let mountedCharts = new Map<Element, MountedChart>();
-  let chartRenderer: ChartRenderer | null = null;
+  let mounted_charts = new Map<Element, MountedChart>();
+  let chart_renderer: ChartRenderer | null = null;
   // The grid columns stretch with the viewport, so a chart follows its box size.
-  const chartSizes =
+  const chart_sizes =
     typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver((entries) => {
           for (const entry of entries) {
             const { width, height } = entry.contentRect;
-            mountedCharts.get(entry.target)?.resize(width, height);
+            mounted_charts.get(entry.target)?.resize(width, height);
           }
         });
-  const unmountCharts = (): void => {
-    chartSizes?.disconnect();
-    for (const mounted of mountedCharts.values()) mounted.dispose();
-    mountedCharts = new Map();
-    chartRenderer?.dispose();
-    chartRenderer = null;
+  const unmount_charts = (): void => {
+    chart_sizes?.disconnect();
+    for (const mounted of mounted_charts.values()) mounted.dispose();
+    mounted_charts = new Map();
+    chart_renderer?.dispose();
+    chart_renderer = null;
   };
-  const mountCharts = (): void => {
-    unmountCharts();
+  const mount_charts = (): void => {
+    unmount_charts();
     if (sheet === null) return;
     const hosts = root.querySelectorAll<HTMLElement>("[data-chart-id]");
     if (hosts.length === 0) return;
-    chartRenderer = createChartRenderer(grid.store);
-    if (chartRenderer !== null) checkStylePart(root, "charts", "The dashboard's charts");
+    chart_renderer = createChartRenderer(grid.store);
+    if (chart_renderer !== null) checkStylePart(root, "charts", "The dashboard's charts");
     for (const host of hosts) {
       const id = host.dataset.chartId ?? "";
-      if (chartRenderer === null) {
+      if (chart_renderer === null) {
         host.appendChild(note(NEEDS_CHARTS));
         continue;
       }
       const size = { width: host.clientWidth, height: host.clientHeight };
-      mountedCharts.set(host, chartRenderer.mount(host, { sheet, id }, size));
-      chartSizes?.observe(host);
+      mounted_charts.set(host, chart_renderer.mount(host, { sheet, id }, size));
+      chart_sizes?.observe(host);
     }
   };
-  filterPivots(dashboardsOf(grid.store));
+  filter_pivots(dashboardsOf(grid.store));
 
   /**
    * A slicer's new selection: a saved, synced change in an editable grid,
    * as Excel saves slicer state, or this view's own filter when read-only.
    */
-  const chooseSlicer = (item: DashboardSlicerItem, next: CellScalar[] | undefined): void => {
-    if (!readOnly) {
+  const choose_slicer = (item: DashboardSlicerItem, next: CellScalar[] | undefined): void => {
+    if (!read_only) {
       const changed: DashboardSlicerItem = { ...item };
       if (next === undefined) delete changed.selected;
       else changed.selected = next;
@@ -189,7 +189,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       return;
     }
     overrides.set(item.id, next ?? null);
-    if (sheet !== null) filterPivots([sheet]);
+    if (sheet !== null) filter_pivots([sheet]);
     refresh(true);
   };
 
@@ -223,25 +223,25 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
     if (!boxIsFree(items(), box, item.id)) {
       message = TAKEN;
       refresh(true);
-      focusItem(item.id);
+      focus_item(item.id);
       return;
     }
     commit({ ...item, box });
-    focusItem(item.id);
+    focus_item(item.id);
   };
 
-  const focusItem = (id: string): void => {
+  const focus_item = (id: string): void => {
     root.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(id)}"]`)?.focus();
   };
 
-  const startMode = (item: DashboardItem, kind: KeyboardMode["kind"]): void => {
+  const start_mode = (item: DashboardItem, kind: KeyboardMode["kind"]): void => {
     mode = { id: item.id, kind };
     message = kind === "move" ? MOVE_HINT : RESIZE_HINT;
     refresh(true);
-    focusItem(item.id);
+    focus_item(item.id);
   };
 
-  const onItemKey = (event: KeyboardEvent, item: DashboardItem): void => {
+  const on_item_key = (event: KeyboardEvent, item: DashboardItem): void => {
     if (mode?.id !== item.id) return;
     const arrows: Record<string, readonly [number, number]> = {
       ArrowLeft: [-1, 0],
@@ -258,56 +258,56 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       mode = null;
       message = null;
       refresh(true);
-      focusItem(item.id);
+      focus_item(item.id);
     }
   };
 
   /** Cell size of the grid in pixels, read when a drag starts; columns stretch with the view. */
-  const cellSize = (container: HTMLElement): { width: number; height: number } => ({
+  const cell_size = (container: HTMLElement): { width: number; height: number } => ({
     // A view that is not laid out has no width; one pixel a column keeps the arithmetic finite.
     width: Math.max(container.clientWidth / DASHBOARD_COLUMNS, 1),
     height: DASHBOARD_ROW_HEIGHT,
   });
 
-  const startDrag = (event: PointerEvent, item: DashboardItem, kind: Drag["kind"]): void => {
-    if (event.button !== 0 || readOnly) return;
+  const start_drag = (event: PointerEvent, item: DashboardItem, kind: Drag["kind"]): void => {
+    if (event.button !== 0 || read_only) return;
     event.preventDefault();
     const container = root.querySelector<HTMLElement>(".sheetwrite-dashboard-grid");
     const element = event.currentTarget;
     if (container === null || !(element instanceof HTMLElement)) return;
 
-    const size = cellSize(container);
+    const size = cell_size(container);
     const drag: Drag = { item, kind, startX: event.clientX, startY: event.clientY, box: item.box };
     const preview = document.createElement("div");
     preview.className = "sheetwrite-dashboard-preview";
-    placeBox(preview, item.box);
+    place_box(preview, item.box);
     container.appendChild(preview);
     element.setPointerCapture(event.pointerId);
 
-    const onMove = (move: PointerEvent): void => {
+    const on_move = (move: PointerEvent): void => {
       const dx = Math.round((move.clientX - drag.startX) / size.width);
       const dy = Math.round((move.clientY - drag.startY) / size.height);
       drag.box = kind === "move" ? movedBox(item.box, dx, dy) : resizedBox(item.box, dx, dy);
-      placeBox(preview, drag.box);
+      place_box(preview, drag.box);
       preview.dataset.taken = boxIsFree(items(), drag.box, item.id) ? "false" : "true";
     };
-    const onUp = (): void => {
-      element.removeEventListener("pointermove", onMove);
-      element.removeEventListener("pointerup", onUp);
-      element.removeEventListener("pointercancel", onUp);
+    const on_up = (): void => {
+      element.removeEventListener("pointermove", on_move);
+      element.removeEventListener("pointerup", on_up);
+      element.removeEventListener("pointercancel", on_up);
       preview.remove();
       const box = drag.box;
       const moved = box.x !== item.box.x || box.y !== item.box.y;
       const resized = box.w !== item.box.w || box.h !== item.box.h;
       if (moved || resized) commit({ ...item, box });
     };
-    element.addEventListener("pointermove", onMove);
-    element.addEventListener("pointerup", onUp);
-    element.addEventListener("pointercancel", onUp);
+    element.addEventListener("pointermove", on_move);
+    element.addEventListener("pointerup", on_up);
+    element.addEventListener("pointercancel", on_up);
   };
 
   /** Excel's slicer settings for values with no data, one saved change each. */
-  const noDataSettings = (item: DashboardSlicerItem): PanelMenuItem[] =>
+  const no_data_settings = (item: DashboardSlicerItem): PanelMenuItem[] =>
     NO_DATA_SETTINGS.map(([setting, label]) => ({
       label,
       disabled: (item.itemsWithNoData ?? "dim") === setting,
@@ -319,66 +319,66 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       },
     }));
 
-  const itemMenu = (item: DashboardItem): HTMLElement =>
+  const item_menu = (item: DashboardItem): HTMLElement =>
     menuButton(
-      `${itemTitle(grid, item)} item actions`,
+      `${item_title(grid, item)} item actions`,
       `item-${item.id}-menu`,
       (): readonly PanelMenuItem[] => [
-        { label: "Move", run: () => startMode(item, "move") },
-        { label: "Resize", run: () => startMode(item, "resize") },
-        ...(item.kind === "slicer" ? noDataSettings(item) : []),
+        { label: "Move", run: () => start_mode(item, "move") },
+        { label: "Resize", run: () => start_mode(item, "resize") },
+        ...(item.kind === "slicer" ? no_data_settings(item) : []),
         { label: "Remove", run: () => remove(item) },
       ],
       lifetime.signal,
     );
 
-  const renderItem = (view: ItemView): HTMLElement => {
+  const render_item = (view: ItemView): HTMLElement => {
     const { item } = view;
     const element = document.createElement("section");
     element.className = "sheetwrite-dashboard-item";
     element.tabIndex = 0;
     element.dataset.itemId = item.id;
-    element.setAttribute("aria-label", itemTitle(grid, item));
+    element.setAttribute("aria-label", item_title(grid, item));
     if (mode?.id === item.id) element.dataset.mode = mode.kind;
-    placeBox(element, item.box);
-    element.addEventListener("keydown", (event) => onItemKey(event, item));
+    place_box(element, item.box);
+    element.addEventListener("keydown", (event) => on_item_key(event, item));
 
     const header = document.createElement("header");
     header.className = "sheetwrite-dashboard-item-header";
     const title = document.createElement("span");
     title.className = "sheetwrite-dashboard-item-title";
-    title.textContent = itemTitle(grid, item);
+    title.textContent = item_title(grid, item);
     header.appendChild(title);
     element.appendChild(header);
 
     const body = document.createElement("div");
     body.className = "sheetwrite-dashboard-item-body";
     const owner = sheet ?? grid.getActiveSheet();
-    if (view.kind === "pivot") renderPivot(body, grid, owner, view);
+    if (view.kind === "pivot") render_pivot(body, grid, owner, view);
     else if (view.kind === "chart") {
       // The chart renderer draws into this box once the build is in the page.
       body.dataset.chartId = view.item.chart;
       body.classList.add("sheetwrite-dashboard-chart");
     } else if (view.kind === "kpi") {
       body.appendChild(
-        view.output === null ? note(NEEDS_FULL_ENGINE) : kpiValue(view.item, view.output),
+        view.output === null ? note(NEEDS_FULL_ENGINE) : kpi_value(view.item, view.output),
       );
     } else {
-      const kept = readOnly ? slicerSelection(view.item, overrides) : view.item.selected;
-      renderSlicer(body, grid, view, kept, (next) => chooseSlicer(view.item, next));
+      const kept = read_only ? slicerSelection(view.item, overrides) : view.item.selected;
+      render_slicer(body, grid, view, kept, (next) => choose_slicer(view.item, next));
     }
     element.appendChild(body);
 
-    if (!readOnly) {
-      header.appendChild(itemMenu(item));
+    if (!read_only) {
+      header.appendChild(item_menu(item));
       header.addEventListener("pointerdown", (event) => {
         if (event.target instanceof Element && event.target.closest("button")) return;
-        startDrag(event, item, "move");
+        start_drag(event, item, "move");
       });
       const handle = document.createElement("div");
       handle.className = "sheetwrite-dashboard-resize";
       handle.setAttribute("aria-hidden", "true");
-      handle.addEventListener("pointerdown", (event) => startDrag(event, item, "resize"));
+      handle.addEventListener("pointerdown", (event) => start_drag(event, item, "resize"));
       element.appendChild(handle);
     }
     return element;
@@ -401,16 +401,16 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
       empty.textContent = "This dashboard is empty. Use Insert › PivotTable to add a pivot.";
       root.appendChild(empty);
     }
-    for (const view of views) container.appendChild(renderItem(view));
+    for (const view of views) container.appendChild(render_item(view));
     root.appendChild(container);
   };
 
   /** The item with what it shows now; each item reads its pivot output once. */
-  const viewOf = (owner: SheetId, item: DashboardItem): ItemView => {
+  const view_of = (owner: SheetId, item: DashboardItem): ItemView => {
     if (item.kind === "pivot") {
       return { kind: "pivot", item, result: dashboardPivotResult(grid, owner, item.pivot) };
     }
-    const output = pivotOutputOf(grid.store, owner, hiddenIndex(owner, item.id));
+    const output = pivotOutputOf(grid.store, owner, hidden_index(owner, item.id));
     if (item.kind === "chart") {
       return { kind: "chart", item, chart: chartOf(grid.store, owner, item.chart), output };
     }
@@ -422,48 +422,48 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   const refresh = (force = false): void => {
     const owner = sheet;
     if (owner === null) return;
-    const views = items().map((item) => viewOf(owner, item));
-    const signature = JSON.stringify([views, readOnly, mode, message, [...overrides]]);
+    const views = items().map((item) => view_of(owner, item));
+    const signature = JSON.stringify([views, read_only, mode, message, [...overrides]]);
     if (!force && signature === rendered) return;
     rendered = signature;
 
     // Keep the focus on the same item through the rebuild.
     const focused = document.activeElement?.closest<HTMLElement>("[data-item-id]")?.dataset.itemId;
     build(views);
-    mountCharts();
+    mount_charts();
     if (focused !== undefined && root.contains(document.activeElement) === false)
-      focusItem(focused);
+      focus_item(focused);
   };
 
   lifetime.add(grid.on("change", () => refresh()));
   lifetime.add(() => root.remove());
 
   return {
-    show(next, nextReadOnly) {
+    show(next, next_read_only) {
       if (next !== sheet) {
         mode = null;
         message = null;
       }
       sheet = next;
-      readOnly = nextReadOnly;
+      read_only = next_read_only;
       root.hidden = next === null;
       if (next !== null) refresh();
     },
     dispose() {
-      unmountCharts();
+      unmount_charts();
       lifetime.close();
     },
   };
 }
 
 /** Grid placement of a box: CSS grid lines are 1-based. */
-function placeBox(element: HTMLElement, box: DashboardBox): void {
+function place_box(element: HTMLElement, box: DashboardBox): void {
   element.style.gridColumn = `${box.x + 1} / span ${box.w}`;
   element.style.gridRow = `${box.y + 1} / span ${box.h}`;
 }
 
 /** The caption of an item on the active sheet. */
-function itemTitle(grid: Grid, item: DashboardItem): string {
+function item_title(grid: Grid, item: DashboardItem): string {
   return dashboardItemTitle(grid.store, grid.getActiveSheet(), item);
 }
 
@@ -475,7 +475,7 @@ function note(text: string): HTMLElement {
 }
 
 /** The pivot's result as a table: header rows and label columns are header cells. */
-function renderPivot(
+function render_pivot(
   body: HTMLElement,
   grid: Grid,
   sheet: SheetId,
@@ -494,7 +494,7 @@ function renderPivot(
     .getPivots(sheet)
     .find((pivot) => pivot.id === item.pivot)
     ?.values.map((value) => value.numberFormat);
-  body.appendChild(pivotTable(result, formats ?? []));
+  body.appendChild(pivot_table(result, formats ?? []));
 }
 
 /**
@@ -517,7 +517,7 @@ export function dashboardPivotResult(
  * The result as a table. A value cell shows its value field's number
  * format; value fields repeat across each column group, as on a sheet.
  */
-function pivotTable(
+function pivot_table(
   result: PivotResultView,
   formats: readonly (string | undefined)[],
 ): HTMLTableElement {
@@ -546,7 +546,7 @@ function pivotTable(
  * The value of a KPI card, large, in its number format. The hidden pivot has
  * no rows or columns, so its last cell is the measure's value.
  */
-function kpiValue(item: DashboardKpiItem, output: PivotOutputRead): HTMLElement {
+function kpi_value(item: DashboardKpiItem, output: PivotOutputRead): HTMLElement {
   const value = output.cells.at(-1) ?? null;
   const element = document.createElement("p");
   element.className = "sheetwrite-dashboard-kpi";
@@ -562,7 +562,7 @@ function kpiValue(item: DashboardKpiItem, output: PivotOutputRead): HTMLElement 
  * Ctrl or Cmd with a click adds or removes one; Clear keeps every value.
  * `choose` receives the new selection: undefined keeps every value.
  */
-function renderSlicer(
+function render_slicer(
   body: HTMLElement,
   grid: Grid,
   { item, values, output }: ItemView & { kind: "slicer" },
@@ -573,7 +573,7 @@ function renderSlicer(
     body.appendChild(note("#REF!"));
     return;
   }
-  const withData = slicerValuesWithData(item, output);
+  const with_data = slicer_values_with_data(item, output);
 
   // Every value kept is no selection; a slicer always keeps at least one value, as in Excel.
   const select = (next: CellScalar[] | undefined): void => {
@@ -592,13 +592,13 @@ function renderSlicer(
   const list = document.createElement("div");
   list.className = "sheetwrite-dashboard-slicer";
   list.setAttribute("role", "group");
-  list.setAttribute("aria-label", `${itemTitle(grid, item)} values`);
+  list.setAttribute("aria-label", `${item_title(grid, item)} values`);
   for (const value of values) {
-    const noData = withData !== null && !withData.some((entry) => sameScalar(entry, value));
-    if (noData && item.itemsWithNoData === "hide") continue;
+    const no_data = with_data !== null && !with_data.some((entry) => same_scalar(entry, value));
+    if (no_data && item.itemsWithNoData === "hide") continue;
     const button = document.createElement("button");
     // Excel dims a value that no row has under the other slicers; it stays selectable.
-    if (noData) button.dataset.noData = "";
+    if (no_data) button.dataset.noData = "";
     button.type = "button";
     button.className = "sheetwrite-dashboard-slicer-value";
     button.textContent = scalarLabel(value);
@@ -618,7 +618,7 @@ function renderSlicer(
 }
 
 /** Blank labels are null or empty text, depending on where they come from. */
-function sameScalar(left: CellScalar, right: CellScalar): boolean {
+function same_scalar(left: CellScalar, right: CellScalar): boolean {
   const blank = (value: CellScalar) => value === null || value === "";
   return blank(left) ? blank(right) : left === right;
 }
@@ -628,7 +628,7 @@ function sameScalar(left: CellScalar, right: CellScalar): boolean {
  * hidden pivot: one header cell, then one label per value with data. Null when
  * the item shows every value or the engine has no output for it.
  */
-function slicerValuesWithData(
+function slicer_values_with_data(
   item: DashboardSlicerItem,
   output: PivotOutputRead | null,
 ): CellScalar[] | null {

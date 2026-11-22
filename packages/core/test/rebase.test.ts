@@ -72,13 +72,13 @@ function snapshot(id = "new-sheet", values: CellValue[] = [literal()]): SheetSna
         startCol: 0,
         rowCount: values.length,
         colCount: 1,
-        cells: values.map((value, rowOffset) => ({ rowOffset, colOffset: 0, value })),
+        cells: values.map((value, row_offset) => ({ rowOffset: row_offset, colOffset: 0, value })),
       },
     ],
   };
 }
 
-function expectRebased(
+function expect_rebased(
   local: readonly DocumentOp[],
   remote: readonly DocumentOp[],
   expected: readonly DocumentOp[],
@@ -90,33 +90,33 @@ function expectRebased(
 }
 
 /** The rebase returns the local operations unchanged. */
-function expectKept(local: readonly DocumentOp[], remote: readonly DocumentOp[]): void {
-  expectRebased(local, remote, local);
+function expect_kept(local: readonly DocumentOp[], remote: readonly DocumentOp[]): void {
+  expect_rebased(local, remote, local);
 }
 
-function expectConflict(
+function expect_conflict(
   local: readonly DocumentOp[],
   remote: readonly DocumentOp[],
   code: RebaseConflictCode,
-  localOperationIndex = 0,
-  remoteOperationIndex = 0,
+  local_operation_index = 0,
+  remote_operation_index = 0,
 ): void {
   const result = rebaseDocumentOperations(local, remote);
   expect(result.status).toBe("conflict");
   if (result.status !== "conflict") throw new Error("Expected a rebase conflict");
   expect(result.conflict).toEqual({
     code,
-    localOperationIndex,
-    remoteOperationIndex,
+    localOperationIndex: local_operation_index,
+    remoteOperationIndex: remote_operation_index,
     message: expect.any(String),
   });
 }
 
 /** Freezes every object reachable from `value`; a write to it throws in strict mode. */
-function deepFreeze<T>(value: T): T {
+function deep_freeze<T>(value: T): T {
   if (value !== null && typeof value === "object") {
     Object.freeze(value);
-    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+    for (const nested of Object.values(value as Record<string, unknown>)) deep_freeze(nested);
   }
   return value;
 }
@@ -126,12 +126,12 @@ interface PointFactory {
   make(axis: Axis, index: number, sheet?: string): DocumentOp;
 }
 
-function pointFactories(axis: Axis): PointFactory[] {
+function point_factories(axis: Axis): PointFactory[] {
   return [
     axis === "row"
       ? {
           name: "setRowMeta",
-          make: (_targetAxis, index, sheet = SHEET) => ({
+          make: (_target_axis, index, sheet = SHEET) => ({
             op: "setRowMeta",
             sheet,
             row: index,
@@ -140,7 +140,7 @@ function pointFactories(axis: Axis): PointFactory[] {
         }
       : {
           name: "setColumn",
-          make: (_targetAxis, index, sheet = SHEET) => ({
+          make: (_target_axis, index, sheet = SHEET) => ({
             op: "setColumn",
             sheet,
             col: index,
@@ -230,43 +230,43 @@ const SPAN_FACTORIES: SpanFactory[] = [
 
 for (const axis of AXES) {
   describe(`${axis} structural target matrix`, () => {
-    for (const factory of pointFactories(axis)) {
+    for (const factory of point_factories(axis)) {
       it(`${factory.name} handles insert/delete positions and sheet identity`, () => {
         const insert = structure(axis, "insert");
-        expectKept([factory.make(axis, 2)], [insert]);
-        expectRebased([factory.make(axis, 4)], [insert], [factory.make(axis, 6)]);
-        expectRebased([factory.make(axis, 7)], [insert], [factory.make(axis, 9)]);
-        expectKept([factory.make(axis, 4, OTHER_SHEET)], [insert]);
+        expect_kept([factory.make(axis, 2)], [insert]);
+        expect_rebased([factory.make(axis, 4)], [insert], [factory.make(axis, 6)]);
+        expect_rebased([factory.make(axis, 7)], [insert], [factory.make(axis, 9)]);
+        expect_kept([factory.make(axis, 4, OTHER_SHEET)], [insert]);
 
         const deletion = structure(axis, "delete");
-        expectKept([factory.make(axis, 2)], [deletion]);
-        expectConflict([factory.make(axis, 4)], [deletion], "structural-overlap");
-        expectRebased([factory.make(axis, 7)], [deletion], [factory.make(axis, 5)]);
-        expectKept([factory.make(axis, 3)], [deletion]);
-        expectRebased([factory.make(axis, 6)], [deletion], [factory.make(axis, 4)]);
-        expectKept([factory.make(axis, 4, OTHER_SHEET)], [deletion]);
+        expect_kept([factory.make(axis, 2)], [deletion]);
+        expect_conflict([factory.make(axis, 4)], [deletion], "structural-overlap");
+        expect_rebased([factory.make(axis, 7)], [deletion], [factory.make(axis, 5)]);
+        expect_kept([factory.make(axis, 3)], [deletion]);
+        expect_rebased([factory.make(axis, 6)], [deletion], [factory.make(axis, 4)]);
+        expect_kept([factory.make(axis, 4, OTHER_SHEET)], [deletion]);
       });
     }
 
     for (const factory of RANGE_FACTORIES) {
       it(`${factory.name} handles the complete range relation matrix`, () => {
         const insert = structure(axis, "insert");
-        expectKept([factory.make(axis, 1, 2)], [insert]);
-        expectRebased([factory.make(axis, 4, 5)], [insert], [factory.make(axis, 6, 7)]);
-        expectRebased([factory.make(axis, 7, 8)], [insert], [factory.make(axis, 9, 10)]);
-        expectConflict([factory.make(axis, 3, 6)], [insert], "structural-overlap");
-        expectKept([factory.make(axis, 2, 3)], [insert]);
-        expectKept([factory.make(axis, 3, 6, OTHER_SHEET)], [insert]);
+        expect_kept([factory.make(axis, 1, 2)], [insert]);
+        expect_rebased([factory.make(axis, 4, 5)], [insert], [factory.make(axis, 6, 7)]);
+        expect_rebased([factory.make(axis, 7, 8)], [insert], [factory.make(axis, 9, 10)]);
+        expect_conflict([factory.make(axis, 3, 6)], [insert], "structural-overlap");
+        expect_kept([factory.make(axis, 2, 3)], [insert]);
+        expect_kept([factory.make(axis, 3, 6, OTHER_SHEET)], [insert]);
 
         const deletion = structure(axis, "delete");
-        expectKept([factory.make(axis, 1, 2)], [deletion]);
-        expectRebased([factory.make(axis, 7, 8)], [deletion], [factory.make(axis, 5, 6)]);
-        expectConflict([factory.make(axis, 4, 5)], [deletion], "structural-overlap");
-        expectConflict([factory.make(axis, 3, 4)], [deletion], "structural-overlap");
-        expectConflict([factory.make(axis, 3, 6)], [deletion], "structural-overlap");
-        expectKept([factory.make(axis, 2, 3)], [deletion]);
-        expectRebased([factory.make(axis, 6, 7)], [deletion], [factory.make(axis, 4, 5)]);
-        expectKept([factory.make(axis, 3, 6, OTHER_SHEET)], [deletion]);
+        expect_kept([factory.make(axis, 1, 2)], [deletion]);
+        expect_rebased([factory.make(axis, 7, 8)], [deletion], [factory.make(axis, 5, 6)]);
+        expect_conflict([factory.make(axis, 4, 5)], [deletion], "structural-overlap");
+        expect_conflict([factory.make(axis, 3, 4)], [deletion], "structural-overlap");
+        expect_conflict([factory.make(axis, 3, 6)], [deletion], "structural-overlap");
+        expect_kept([factory.make(axis, 2, 3)], [deletion]);
+        expect_rebased([factory.make(axis, 6, 7)], [deletion], [factory.make(axis, 4, 5)]);
+        expect_kept([factory.make(axis, 3, 6, OTHER_SHEET)], [deletion]);
       });
     }
 
@@ -276,37 +276,37 @@ for (const axis of AXES) {
           ? { op: "addRows", sheet, at, count: 2 }
           : { op: "addColumns", sheet, at, columns: columns(2) };
       const insert = structure(axis, "insert");
-      expectKept([make(2)], [insert]);
-      expectRebased([make(4)], [insert], [make(6)]);
-      expectRebased([make(7)], [insert], [make(9)]);
-      expectKept([make(4, OTHER_SHEET)], [insert]);
+      expect_kept([make(2)], [insert]);
+      expect_rebased([make(4)], [insert], [make(6)]);
+      expect_rebased([make(7)], [insert], [make(9)]);
+      expect_kept([make(4, OTHER_SHEET)], [insert]);
 
       const deletion = structure(axis, "delete");
-      expectKept([make(2)], [deletion]);
-      expectKept([make(4)], [deletion]);
-      expectRebased([make(5)], [deletion], [make(4)]);
-      expectRebased([make(7)], [deletion], [make(5)]);
-      expectKept([make(4, OTHER_SHEET)], [deletion]);
+      expect_kept([make(2)], [deletion]);
+      expect_kept([make(4)], [deletion]);
+      expect_rebased([make(5)], [deletion], [make(4)]);
+      expect_rebased([make(7)], [deletion], [make(5)]);
+      expect_kept([make(4, OTHER_SHEET)], [deletion]);
     });
 
     for (const factory of SPAN_FACTORIES) {
       it(`${factory.name} ${axis} operations handle the complete span relation matrix`, () => {
         const insert = structure(axis, "insert");
-        expectKept([factory.make(axis, 1, 2)], [insert]);
-        expectRebased([factory.make(axis, 4, 2)], [insert], [factory.make(axis, 6, 2)]);
-        expectRebased([factory.make(axis, 7, 2)], [insert], [factory.make(axis, 9, 2)]);
-        expectConflict([factory.make(axis, 3, 4)], [insert], "structural-overlap");
-        expectKept([factory.make(axis, 3, 4, OTHER_SHEET)], [insert]);
+        expect_kept([factory.make(axis, 1, 2)], [insert]);
+        expect_rebased([factory.make(axis, 4, 2)], [insert], [factory.make(axis, 6, 2)]);
+        expect_rebased([factory.make(axis, 7, 2)], [insert], [factory.make(axis, 9, 2)]);
+        expect_conflict([factory.make(axis, 3, 4)], [insert], "structural-overlap");
+        expect_kept([factory.make(axis, 3, 4, OTHER_SHEET)], [insert]);
 
         const deletion = structure(axis, "delete");
-        expectKept([factory.make(axis, 1, 2)], [deletion]);
-        expectRebased([factory.make(axis, 7, 2)], [deletion], [factory.make(axis, 5, 2)]);
-        expectConflict([factory.make(axis, 4, 2)], [deletion], "structural-overlap");
-        expectConflict([factory.make(axis, 3, 2)], [deletion], "structural-overlap");
-        expectConflict([factory.make(axis, 3, 4)], [deletion], "structural-overlap");
-        expectKept([factory.make(axis, 2, 2)], [deletion]);
-        expectRebased([factory.make(axis, 6, 2)], [deletion], [factory.make(axis, 4, 2)]);
-        expectKept([factory.make(axis, 3, 4, OTHER_SHEET)], [deletion]);
+        expect_kept([factory.make(axis, 1, 2)], [deletion]);
+        expect_rebased([factory.make(axis, 7, 2)], [deletion], [factory.make(axis, 5, 2)]);
+        expect_conflict([factory.make(axis, 4, 2)], [deletion], "structural-overlap");
+        expect_conflict([factory.make(axis, 3, 2)], [deletion], "structural-overlap");
+        expect_conflict([factory.make(axis, 3, 4)], [deletion], "structural-overlap");
+        expect_kept([factory.make(axis, 2, 2)], [deletion]);
+        expect_rebased([factory.make(axis, 6, 2)], [deletion], [factory.make(axis, 4, 2)]);
+        expect_kept([factory.make(axis, 3, 4, OTHER_SHEET)], [deletion]);
       });
     }
 
@@ -323,8 +323,8 @@ for (const axis of AXES) {
         axis === "row"
           ? { op: "moveRows", sheet: SHEET, from: 0, count: 1, to: 5 }
           : { op: "moveColumns", sheet: SHEET, from: 0, count: 1, to: 5 };
-      expectRebased([local], [structure(axis, "insert")], [inserted]);
-      expectRebased([local], [structure(axis, "delete")], [deleted]);
+      expect_rebased([local], [structure(axis, "insert")], [inserted]);
+      expect_rebased([local], [structure(axis, "delete")], [deleted]);
     });
   });
 }
@@ -359,13 +359,13 @@ describe("embedded references and formulas", () => {
       range: range("row", 0, 0, OTHER_SHEET),
       block: { rowCount: 1, colCount: 1, values: [null], refs: [[0, target]] },
     });
-    expectRebased(
+    expect_rebased(
       [make(address("column", 7))],
       [structure("column", "delete")],
       [make(address("column", 5))],
     );
-    expectKept([make(address("column", 4, OTHER_SHEET))], [structure("column", "delete")]);
-    expectConflict(
+    expect_kept([make(address("column", 4, OTHER_SHEET))], [structure("column", "delete")]);
+    expect_conflict(
       [make(address("column", 4))],
       [structure("column", "delete")],
       "structural-overlap",
@@ -373,7 +373,7 @@ describe("embedded references and formulas", () => {
   });
 
   it("setBlock rejects packed formulas across structural edits", () => {
-    expectConflict(
+    expect_conflict(
       [
         {
           op: "setBlock",
@@ -402,8 +402,8 @@ describe("embedded references and formulas", () => {
       },
     ];
     for (const operation of referencing) {
-      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
-      expectConflict(
+      expect_conflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+      expect_conflict(
         [operation],
         [{ op: "moveRows", sheet: SHEET, from: 1, count: 2, to: 5 }],
         "unsupported-structural",
@@ -424,8 +424,8 @@ describe("metadata, identity, and sheet lifecycle", () => {
       sheet: OTHER_SHEET,
       patch: { frozenRows: 2 },
     };
-    expectConflict([same], [structure("row", "insert")], "unsupported-structural");
-    expectKept([other], [structure("row", "insert")]);
+    expect_conflict([same], [structure("row", "insert")], "unsupported-structural");
+    expect_kept([other], [structure("row", "insert")]);
   });
 
   it("rewrites a conditional-format formula with the engine's reference rules", () => {
@@ -443,7 +443,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     });
 
-    expectRebased(
+    expect_rebased(
       [rule(2, "=SUM(B:B)+A3")],
       [structure("column", "delete", 0, 1)],
       [rule(1, "=SUM(A:A)+#REF!")],
@@ -462,13 +462,21 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     });
 
-    expectRebased([meta(1, 3, 1, 3, 2)], [structure("row", "insert", 0, 2)], [meta(3, 5, 1, 3, 2)]);
-    expectRebased(
+    expect_rebased(
+      [meta(1, 3, 1, 3, 2)],
+      [structure("row", "insert", 0, 2)],
+      [meta(3, 5, 1, 3, 2)],
+    );
+    expect_rebased(
       [meta(1, 3, 1, 3, 2)],
       [structure("column", "insert", 0, 1)],
       [meta(1, 3, 2, 4, 3)],
     );
-    expectConflict([meta(1, 3, 1, 3, 2)], [structure("row", "insert", 2, 1)], "structural-overlap");
+    expect_conflict(
+      [meta(1, 3, 1, 3, 2)],
+      [structure("row", "insert", 2, 1)],
+      "structural-overlap",
+    );
   });
 
   it("keeps sheet lifecycle and stable remove-by-ID operations across structural edits", () => {
@@ -481,7 +489,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       { op: "removeProtectedRange", sheet: SHEET, id: "protection-1" },
       { op: "removeNamedRange", name: "Sales", scope: SHEET },
     ];
-    expectKept(local, [structure("row", "insert")]);
+    expect_kept(local, [structure("row", "insert")]);
   });
 
   it("treats remote row and column moves as conservative conflicts on their sheet", () => {
@@ -490,51 +498,51 @@ describe("metadata, identity, and sheet lifecycle", () => {
       addr: { sheet: SHEET, row: 8, col: 8 },
       value: literal(),
     };
-    expectConflict(
+    expect_conflict(
       [local],
       [{ op: "moveRows", sheet: SHEET, from: 1, count: 2, to: 5 }],
       "unsupported-structural",
     );
-    expectConflict(
+    expect_conflict(
       [local],
       [{ op: "moveColumns", sheet: SHEET, from: 1, count: 2, to: 5 }],
       "unsupported-structural",
     );
-    expectKept(
+    expect_kept(
       [{ ...local, addr: { ...local.addr, sheet: OTHER_SHEET } }],
       [{ op: "moveRows", sheet: SHEET, from: 1, count: 2, to: 5 }],
     );
   });
 
   it("detects duplicate sheet IDs and same-sheet rename/move lifecycle ambiguity", () => {
-    expectConflict(
+    expect_conflict(
       [{ op: "addSheet", sheet: snapshot("stable-id") }],
       [{ op: "addSheet", sheet: snapshot("stable-id") }],
       "sheet-lifecycle",
     );
-    expectConflict(
+    expect_conflict(
       [{ op: "renameSheet", sheet: SHEET, name: "Offline" }],
       [{ op: "renameSheet", sheet: SHEET, name: "Server" }],
       "sheet-lifecycle",
     );
-    expectConflict(
+    expect_conflict(
       [{ op: "moveSheet", sheet: SHEET, to: 2 }],
       [{ op: "moveSheet", sheet: SHEET, to: 3 }],
       "sheet-lifecycle",
     );
-    expectKept(
+    expect_kept(
       [{ op: "renameSheet", sheet: OTHER_SHEET, name: "Offline" }],
       [{ op: "renameSheet", sheet: SHEET, name: "Server" }],
     );
   });
 
   it("conflicts direct, scoped named-range, and formula work with sheet removal", () => {
-    expectConflict(
+    expect_conflict(
       [{ op: "setNote", addr: address("row", 1), text: "note" }],
       [{ op: "removeSheet", sheet: SHEET }],
       "sheet-removed",
     );
-    expectConflict(
+    expect_conflict(
       [
         {
           op: "setNamedRange",
@@ -548,7 +556,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       [{ op: "removeSheet", sheet: SHEET }],
       "sheet-removed",
     );
-    expectConflict(
+    expect_conflict(
       [
         {
           op: "set",
@@ -559,24 +567,24 @@ describe("metadata, identity, and sheet lifecycle", () => {
       [{ op: "removeSheet", sheet: SHEET }],
       "sheet-removed",
     );
-    const sheetScoped: DocumentOp[] = [
+    const sheet_scoped: DocumentOp[] = [
       { op: "setRangeStyle", range: range("row", 0, 2), style: { bold: true } },
       { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
       { op: "removeNamedRange", name: "Local", scope: SHEET },
     ];
-    for (const operation of sheetScoped) {
-      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    for (const operation of sheet_scoped) {
+      expect_conflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
     }
     const unrelated: DocumentOp = {
       op: "set",
       addr: address("row", 1, OTHER_SHEET),
       value: literal("unrelated"),
     };
-    expectKept([unrelated], [{ op: "removeSheet", sheet: SHEET }]);
+    expect_kept([unrelated], [{ op: "removeSheet", sheet: SHEET }]);
   });
 
   it("moves an addSheet snapshot pivot's range source and conflicts when an edit crosses it", () => {
-    const withPivot = (start: number, end: number): DocumentOp => {
+    const with_pivot = (start: number, end: number): DocumentOp => {
       const pivot: PivotDefinition = {
         id: "pivot-1",
         name: "Pivot",
@@ -589,17 +597,17 @@ describe("metadata, identity, and sheet lifecycle", () => {
       return { op: "addSheet", sheet: { ...snapshot("new"), pivots: [pivot] } };
     };
 
-    expectRebased([withPivot(6, 9)], [structure("row", "insert", 4, 2)], [withPivot(8, 11)]);
-    expectConflict([withPivot(6, 9)], [structure("row", "delete", 7, 2)], "structural-overlap");
-    expectConflict([withPivot(6, 9)], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    expect_rebased([with_pivot(6, 9)], [structure("row", "insert", 4, 2)], [with_pivot(8, 11)]);
+    expect_conflict([with_pivot(6, 9)], [structure("row", "delete", 7, 2)], "structural-overlap");
+    expect_conflict([with_pivot(6, 9)], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
   });
 
   it("keeps an addSheet snapshot pivot on its own table across a column edit on another sheet", () => {
-    const tableSheet = snapshot("new");
+    const table_sheet = snapshot("new");
     const local: DocumentOp = {
       op: "addSheet",
       sheet: {
-        ...tableSheet,
+        ...table_sheet,
         tables: [
           {
             id: "own-table",
@@ -627,7 +635,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     };
 
-    expectKept([local], [structure("column", "insert", 1, 2)]);
+    expect_kept([local], [structure("column", "insert", 1, 2)]);
   });
 
   it("detects overlapping edits for each conflict family, with or without a cell range", () => {
@@ -685,7 +693,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       ],
     ];
     for (const [local, remote] of pairs) {
-      expectConflict([local], [remote], "overlapping-edit");
+      expect_conflict([local], [remote], "overlapping-edit");
     }
   });
 
@@ -702,7 +710,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       { op: "removeNamedRange", name: "Remote", scope: SHEET },
       { op: "setSheetMeta", sheet: SHEET, patch: { frozenRows: 1 } },
     ];
-    expectKept(local, remote);
+    expect_kept(local, remote);
   });
 });
 
@@ -711,8 +719,8 @@ describe("server ordering, immutability, and determinism", () => {
     const local: DocumentOp[] = [{ op: "set", addr: address("row", 4), value: literal("offline") }];
     const insert = structure("row", "insert", 2, 2);
     const deletion = structure("row", "delete", 5, 2);
-    expectConflict(local, [insert, deletion], "structural-overlap", 0, 1);
-    expectRebased(
+    expect_conflict(local, [insert, deletion], "structural-overlap", 0, 1);
+    expect_rebased(
       local,
       [deletion, insert],
       [{ op: "set", addr: address("row", 6), value: literal("offline") }],
@@ -729,7 +737,7 @@ describe("server ordering, immutability, and determinism", () => {
       { op: "set", addr: address("row", 10), value: literal("server") },
       structure("row", "delete"),
     ];
-    expectConflict(local, remote, "formula-structural", 1, 1);
+    expect_conflict(local, remote, "formula-structural", 1, 1);
   });
 
   it("does not mutate local or remote arrays or their nested objects", () => {
@@ -760,14 +768,14 @@ describe("server ordering, immutability, and determinism", () => {
       },
     ];
     const remote: DocumentOp[] = [structure("row", "insert"), structure("column", "insert")];
-    const localBefore = structuredClone(local);
-    const remoteBefore = structuredClone(remote);
+    const local_before = structuredClone(local);
+    const remote_before = structuredClone(remote);
 
     const result = rebaseDocumentOperations(local, remote);
 
     expect(result.status).toBe("rebased");
-    expect(local).toEqual(localBefore);
-    expect(remote).toEqual(remoteBefore);
+    expect(local).toEqual(local_before);
+    expect(remote).toEqual(remote_before);
     if (result.status !== "rebased") throw new Error("Expected successful rebase");
     expect(result.operations[0]).not.toBe(local[0]);
     expect(result.operations[1]).not.toBe(local[1]);
@@ -817,8 +825,8 @@ describe("server ordering, immutability, and determinism", () => {
       },
     ];
     const remote: DocumentOp[] = [structure("row", "insert", 2, 2)];
-    deepFreeze(local);
-    deepFreeze(remote);
+    deep_freeze(local);
+    deep_freeze(remote);
 
     const result = rebaseDocumentOperations(local, remote);
 
@@ -872,17 +880,17 @@ describe("server ordering, immutability, and determinism", () => {
         },
       ],
     };
-    const local = deepFreeze([plain, referenced, cells]);
+    const local = deep_freeze([plain, referenced, cells]);
     const before = JSON.stringify(local);
 
     const result = rebaseDocumentOperations(local, [structure("row", "insert", 4, 2)]);
     if (result.status !== "rebased") throw new Error("Expected a safe structural rebase");
     expect(JSON.stringify(local)).toBe(before);
-    const [movedPlain, movedReferenced, movedCells] = result.operations;
+    const [moved_plain, moved_referenced, moved_cells] = result.operations;
     if (
-      movedPlain?.op !== "setBlock" ||
-      movedReferenced?.op !== "setBlock" ||
-      movedCells?.op !== "setRange" ||
+      moved_plain?.op !== "setBlock" ||
+      moved_referenced?.op !== "setBlock" ||
+      moved_cells?.op !== "setRange" ||
       plain.op !== "setBlock" ||
       referenced.op !== "setBlock" ||
       cells.op !== "setRange"
@@ -890,13 +898,13 @@ describe("server ordering, immutability, and determinism", () => {
       throw new Error("Expected the rebased operations in order");
     }
 
-    expect(movedPlain).not.toBe(plain);
-    expect(movedPlain.range).toEqual(range("row", 8, 9));
-    expect(movedPlain.block).toBe(plain.block);
-    expect(movedReferenced.block.values).toBe(referenced.block.values);
-    expect(movedReferenced.block.refs).toEqual([[0, { sheet: SHEET, row: 11, col: 1 }]]);
-    expect(movedCells.cells[0]?.value).toBe(cells.cells[0]?.value);
-    expect(movedCells.cells[1]?.value).toEqual({
+    expect(moved_plain).not.toBe(plain);
+    expect(moved_plain.range).toEqual(range("row", 8, 9));
+    expect(moved_plain.block).toBe(plain.block);
+    expect(moved_referenced.block.values).toBe(referenced.block.values);
+    expect(moved_referenced.block.refs).toEqual([[0, { sheet: SHEET, row: 11, col: 1 }]]);
+    expect(moved_cells.cells[0]?.value).toBe(cells.cells[0]?.value);
+    expect(moved_cells.cells[1]?.value).toEqual({
       kind: "ref",
       target: { sheet: SHEET, row: 14, col: 1 },
     });
@@ -934,10 +942,10 @@ describe("compressed restore rebasing", () => {
       { op: "renameSheet", sheet: OTHER_SHEET, name: "Renamed" },
       { op: "removeSheet", sheet: "unrelated" },
     ];
-    const localBefore = JSON.stringify(local);
-    const remoteBefore = JSON.stringify(remote);
-    deepFreeze(local);
-    deepFreeze(remote);
+    const local_before = JSON.stringify(local);
+    const remote_before = JSON.stringify(remote);
+    deep_freeze(local);
+    deep_freeze(remote);
 
     const result = rebaseDocumentOperations(local, remote);
     if (result.status !== "rebased") throw new Error("Expected safe multitransform rebase");
@@ -963,23 +971,23 @@ describe("compressed restore rebasing", () => {
     }
 
     // Row 10 only contains the reference after all preceding transforms.
-    expectConflict(
+    expect_conflict(
       local,
       [...remote, structure("row", "delete", 10, 1)],
       "structural-overlap",
       0,
       remote.length,
     );
-    expect(JSON.stringify(local)).toBe(localBefore);
-    expect(JSON.stringify(remote)).toBe(remoteBefore);
+    expect(JSON.stringify(local)).toBe(local_before);
+    expect(JSON.stringify(remote)).toBe(remote_before);
     // A lifecycle check that decodes the caller's frozen restore before a structural
     // transform must leave re-encoding to the private copy.
-    const decodedFirst = rebaseDocumentOperations(local, [
+    const decoded_first = rebaseDocumentOperations(local, [
       { op: "removeSheet", sheet: "unrelated" },
       structure("row", "insert", 4, 2),
     ]);
-    if (decodedFirst.status !== "rebased") throw new Error("Expected a safe restore rebase");
-    expect(JSON.stringify(local)).toBe(localBefore);
+    if (decoded_first.status !== "rebased") throw new Error("Expected a safe restore rebase");
+    expect(JSON.stringify(local)).toBe(local_before);
   });
 
   it("keeps conservative formula conflicts and detects restore overlap from either side", () => {
@@ -989,17 +997,17 @@ describe("compressed restore rebasing", () => {
       values: [null],
       formulas: [[0, "=A1"]],
     });
-    expectConflict([formula], [structure("row", "insert")], "formula-structural");
+    expect_conflict([formula], [structure("row", "insert")], "formula-structural");
     const restored = encodeRestoreBlock(target, block);
     const edit: DocumentOp = {
       op: "set",
       addr: { sheet: SHEET, row: 8, col: 1 },
       value: literal(),
     };
-    expectConflict([restored], [edit], "overlapping-edit");
-    expectConflict([edit], [restored], "overlapping-edit");
-    expectConflict([restored], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
-    expectConflict([restored], [structure("row", "delete", 8, 1)], "structural-overlap");
+    expect_conflict([restored], [edit], "overlapping-edit");
+    expect_conflict([edit], [restored], "overlapping-edit");
+    expect_conflict([restored], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    expect_conflict([restored], [structure("row", "delete", 8, 1)], "structural-overlap");
   });
 });
 
@@ -1009,13 +1017,13 @@ describe("operation sequences", () => {
     addr: { sheet: SHEET, row, col },
     value: { kind: "literal", value },
   });
-  const addRows = (at: number, count: number): DocumentOp => ({
+  const add_rows = (at: number, count: number): DocumentOp => ({
     op: "addRows",
     sheet: SHEET,
     at,
     count,
   });
-  const removeRows = (at: number, count = 1): DocumentOp => ({
+  const remove_rows = (at: number, count = 1): DocumentOp => ({
     op: "removeRows",
     sheet: SHEET,
     at,
@@ -1024,9 +1032,9 @@ describe("operation sequences", () => {
 
   it("reports an edit to a row the server deleted after an earlier local insert", () => {
     // The local insert at 3 moves the original row 3 to index 4; the server deleted that row.
-    expectConflict(
-      [addRows(3, 1), set(8, 0, 1), set(4, 0, 2)],
-      [removeRows(3), removeRows(0)],
+    expect_conflict(
+      [add_rows(3, 1), set(8, 0, 1), set(4, 0, 2)],
+      [remove_rows(3), remove_rows(0)],
       "structural-overlap",
       2,
       0,
@@ -1037,9 +1045,15 @@ describe("operation sequences", () => {
     // The server deleted rows 4-5; the local rows inserted between them survive
     // at row 4, but the deletion no longer maps to one span for the later edit.
     // The rebaser is conservative here and leaves the merge to the host.
-    expectConflict([addRows(5, 2), set(5, 0, 1)], [removeRows(4, 2)], "structural-overlap", 1, 0);
+    expect_conflict(
+      [add_rows(5, 2), set(5, 0, 1)],
+      [remove_rows(4, 2)],
+      "structural-overlap",
+      1,
+      0,
+    );
     // Without a later operation, the insert alone rebases to the deletion point.
-    expectRebased([addRows(5, 2)], [removeRows(4, 2)], [addRows(4, 2)]);
+    expect_rebased([add_rows(5, 2)], [remove_rows(4, 2)], [add_rows(4, 2)]);
   });
 
   it("keeps every rebased edit on the row it targeted", () => {
@@ -1058,8 +1072,8 @@ describe("operation sequences", () => {
       Array.from({ length: 1 + random(3) }, () => {
         const roll = random(10);
         if (roll < 6) return set(random(ROWS - 3), random(3), tag * 1000 + random(1000));
-        if (roll < 8) return addRows(random(ROWS - 3), 1 + random(2));
-        return removeRows(random(ROWS - 4));
+        if (roll < 8) return add_rows(random(ROWS - 3), 1 + random(2));
+        return remove_rows(random(ROWS - 4));
       });
 
     type Rows = { ids: string[]; cells: Map<string, number> };
@@ -1067,9 +1081,9 @@ describe("operation sequences", () => {
       | { kind: "insert"; before: string | null; ids: string[] }
       | { kind: "remove"; id: string }
       | { kind: "set"; id: string; col: number; value: number };
-    const literalOf = (operation: DocumentOp) =>
+    const literal_of = (operation: DocumentOp) =>
       (operation as { value: { value: number } }).value.value;
-    const intentsOf = (ops: readonly DocumentOp[], tag: string): Intent[] => {
+    const intents_of = (ops: readonly DocumentOp[], tag: string): Intent[] => {
       const ids = Array.from({ length: ROWS }, (_, row) => `b${row}`);
       let next = 0;
       return ops.map((operation): Intent => {
@@ -1086,7 +1100,7 @@ describe("operation sequences", () => {
           kind: "set",
           id: ids[operation.addr.row]!,
           col: operation.addr.col,
-          value: literalOf(operation),
+          value: literal_of(operation),
         };
       });
     };
@@ -1128,7 +1142,7 @@ describe("operation sequences", () => {
         } else if (operation.op === "set") {
           rows.cells.set(
             `${rows.ids[operation.addr.row]}:${operation.addr.col}`,
-            literalOf(operation),
+            literal_of(operation),
           );
         }
       }
@@ -1145,16 +1159,20 @@ describe("operation sequences", () => {
     for (let trial = 0; trial < 2000; trial++) {
       const local = sequence(1);
       const remote = sequence(2);
-      const remoteBefore = JSON.stringify(remote);
+      const remote_before = JSON.stringify(remote);
       const result = rebaseDocumentOperations(local, remote);
       // Carrying a remote operation through the local list never edits the caller's copy.
-      expect(JSON.stringify(remote)).toBe(remoteBefore);
+      expect(JSON.stringify(remote)).toBe(remote_before);
       const expected = base();
-      expect(replay(expected, intentsOf(remote, "r"))).toBe(true);
-      const intentKept = replay(expected, intentsOf(local, "l"));
+      expect(replay(expected, intents_of(remote, "r"))).toBe(true);
+      const intent_kept = replay(expected, intents_of(local, "l"));
       if (result.status === "conflict") continue;
       // A rebase that succeeds must never drop or redirect a local edit.
-      expect({ local, remote, intentKept }).toEqual({ local, remote, intentKept: true });
+      expect({ local, remote, intentKept: intent_kept }).toEqual({
+        local,
+        remote,
+        intentKept: true,
+      });
       const server = base();
       apply(server, remote, "r");
       apply(server, result.operations, "l");

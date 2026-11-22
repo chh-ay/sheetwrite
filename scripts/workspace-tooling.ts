@@ -46,17 +46,17 @@ interface WorkspaceManifest {
   readonly peerDependencies?: Readonly<Record<string, string>>;
 }
 
-const packageNode = (name: string, operation: "build" | "typecheck"): CommandNode => ({
+const package_node = (name: string, operation: "build" | "typecheck"): CommandNode => ({
   id: `${operation}:${name}`,
   command: ["bun", "run", "--filter", name, operation],
 });
 
 export const PACKAGE_BUILD_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_ORDER.map((name) =>
-  packageNode(name, "build"),
+  package_node(name, "build"),
 );
 
 /** Builds a Rust crate the way `wasm-pack build` does. */
-const cargoReleaseNode = (id: string, cwd: string, ...extra: string[]): CommandNode => ({
+const cargo_release_node = (id: string, cwd: string, ...extra: string[]): CommandNode => ({
   id,
   command: ["cargo", "build", "--lib", "--release", "--target", WASM_TARGET, ...extra],
   cwd,
@@ -72,9 +72,9 @@ const cargoReleaseNode = (id: string, cwd: string, ...extra: string[]): CommandN
  * wait for the lock of the default engine's.
  */
 export const RUST_BUILD_NODES: readonly CommandNode[] = [
-  cargoReleaseNode("cargo:@sheetwrite/wasm", "packages/wasm"),
-  cargoReleaseNode("cargo:@sheetwrite/wasm/history", "packages/wasm/history"),
-  cargoReleaseNode(
+  cargo_release_node("cargo:@sheetwrite/wasm", "packages/wasm"),
+  cargo_release_node("cargo:@sheetwrite/wasm/history", "packages/wasm/history"),
+  cargo_release_node(
     "cargo:@sheetwrite/formulas",
     "packages/wasm",
     "--features",
@@ -82,7 +82,7 @@ export const RUST_BUILD_NODES: readonly CommandNode[] = [
     "--target-dir",
     "target/analysis",
   ),
-  cargoReleaseNode("cargo:@sheetwrite/queries", "packages/queries/engine"),
+  cargo_release_node("cargo:@sheetwrite/queries", "packages/queries/engine"),
 ];
 
 const RUST_BUILD_NODE: CommandNode = {
@@ -94,7 +94,7 @@ const RUST_BUILD_NODE: CommandNode = {
 export const BUILD_NODES: readonly CommandNode[] = [RUST_BUILD_NODE, ...PACKAGE_BUILD_NODES];
 
 export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_ORDER.map(
-  (name) => packageNode(name, "typecheck"),
+  (name) => package_node(name, "typecheck"),
 );
 
 /**
@@ -253,15 +253,15 @@ const UNIT_TEST_NODES: readonly CommandNode[] = [
  * The unit suites outside the coverage run: `UNIT_TEST_PATHS` with `packages`
  * narrowed to the package test directories that coverage does not run.
  */
-function uncoveredUnitTestNodes(root: string): readonly CommandNode[] {
-  const uncoveredPackageTests = readdirSync(resolve(root, "packages"), { withFileTypes: true })
+function uncovered_unit_test_nodes(root: string): readonly CommandNode[] {
+  const uncovered_package_tests = readdirSync(resolve(root, "packages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => `packages/${entry.name}/test`)
     .filter((path) => existsSync(resolve(root, path)))
     .filter((path) => !(COVERED_PACKAGE_TEST_ROOTS as readonly string[]).includes(path))
     .sort();
   const paths = UNIT_TEST_PATHS.flatMap((path) =>
-    path === "packages" ? uncoveredPackageTests : [path],
+    path === "packages" ? uncovered_package_tests : [path],
   );
   return [
     ...GENERATED_SOURCE_NODES,
@@ -354,6 +354,10 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
   ...BUILD_NODES,
   ...POST_BUILD_QUALITY_NODES,
   {
+    id: "verify:naming",
+    command: ["bun", "run", "naming:check"],
+  },
+  {
     id: "verify:packed",
     command: ["bun", "run", "verify:packed"],
   },
@@ -368,11 +372,11 @@ export const VERIFY_CI_NODES: readonly CommandNode[] = [
   },
 ];
 
-function readManifest(path: string): WorkspaceManifest {
+function read_manifest(path: string): WorkspaceManifest {
   return JSON.parse(readFileSync(path, "utf8")) as WorkspaceManifest;
 }
 
-function internalDependencies(manifest: WorkspaceManifest): readonly string[] {
+function internal_dependencies(manifest: WorkspaceManifest): readonly string[] {
   return [
     ...Object.keys(manifest.dependencies ?? {}),
     ...Object.keys(manifest.devDependencies ?? {}),
@@ -384,15 +388,15 @@ export function validateWorkspaceGraph(
   root: string,
   packageOrder: readonly string[] = PUBLISHABLE_PACKAGE_ORDER,
 ): void {
-  const packagesRoot = resolve(root, "packages");
-  const manifests = readdirSync(packagesRoot, { withFileTypes: true })
+  const packages_root = resolve(root, "packages");
+  const manifests = readdirSync(packages_root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => readManifest(resolve(packagesRoot, entry.name, "package.json")));
-  const packageManifests = new Map(
+    .map((entry) => read_manifest(resolve(packages_root, entry.name, "package.json")));
+  const package_manifests = new Map(
     manifests.flatMap((manifest) => (manifest.name ? [[manifest.name, manifest] as const] : [])),
   );
-  const graphSet = new Set(packageOrder);
-  if (graphSet.size !== packageOrder.length) {
+  const graph_set = new Set(packageOrder);
+  if (graph_set.size !== packageOrder.length) {
     throw new Error("The publishable package graph contains a duplicate package");
   }
 
@@ -403,8 +407,8 @@ export function validateWorkspaceGraph(
     .map((manifest) => manifest.name)
     .filter((name): name is string => name !== undefined)
     .sort();
-  const missing = required.filter((name) => !graphSet.has(name));
-  const unknown = packageOrder.filter((name) => !packageManifests.has(name));
+  const missing = required.filter((name) => !graph_set.has(name));
+  const unknown = packageOrder.filter((name) => !package_manifests.has(name));
   if (missing.length > 0 || unknown.length > 0) {
     throw new Error(
       `Canonical package graph mismatch (missing: ${missing.join(", ") || "none"}; unknown: ${unknown.join(", ") || "none"})`,
@@ -412,25 +416,25 @@ export function validateWorkspaceGraph(
   }
 
   for (const [index, name] of packageOrder.entries()) {
-    const manifest = packageManifests.get(name);
+    const manifest = package_manifests.get(name);
     if (!manifest?.scripts?.build) {
       throw new Error(`${name} must declare a build script`);
     }
     if (!manifest.scripts.typecheck) {
       throw new Error(`${name} must declare a typecheck script`);
     }
-    for (const dependency of internalDependencies(manifest)) {
-      const dependencyIndex = packageOrder.indexOf(dependency);
-      if (dependencyIndex >= 0 && dependencyIndex >= index) {
+    for (const dependency of internal_dependencies(manifest)) {
+      const dependency_index = packageOrder.indexOf(dependency);
+      if (dependency_index >= 0 && dependency_index >= index) {
         throw new Error(`${name} must run after its dependency ${dependency}`);
       }
     }
   }
 
-  for (const relativePath of ["bench/package.json", "docs/package.json"]) {
-    const manifest = readManifest(resolve(root, relativePath));
+  for (const relative_path of ["bench/package.json", "docs/package.json"]) {
+    const manifest = read_manifest(resolve(root, relative_path));
     if (!manifest.scripts?.typecheck) {
-      throw new Error(`${manifest.name ?? relativePath} must declare a typecheck script`);
+      throw new Error(`${manifest.name ?? relative_path} must declare a typecheck script`);
     }
   }
 }
@@ -440,10 +444,10 @@ export function assertUniqueOrderedNodes(nodes: readonly CommandNode[]): void {
   if (new Set(ids).size !== ids.length) {
     throw new Error("The command graph contains a duplicate node");
   }
-  const buildIds = PACKAGE_BUILD_NODES.map((node) => node.id);
-  const positions = buildIds.map((id) => ids.indexOf(id));
-  const presentBuilds = positions.filter((position) => position >= 0);
-  if (presentBuilds.length > 0 && presentBuilds.length !== buildIds.length) {
+  const build_ids = PACKAGE_BUILD_NODES.map((node) => node.id);
+  const positions = build_ids.map((id) => ids.indexOf(id));
+  const present_builds = positions.filter((position) => position >= 0);
+  if (present_builds.length > 0 && present_builds.length !== build_ids.length) {
     throw new Error("The command graph omits a package build node");
   }
   if (
@@ -455,7 +459,7 @@ export function assertUniqueOrderedNodes(nodes: readonly CommandNode[]): void {
   }
 }
 
-async function executeNode(root: string, node: CommandNode): Promise<void> {
+async function execute_node(root: string, node: CommandNode): Promise<void> {
   console.log(`::workspace-node::${node.id}`);
   const child = Bun.spawn([...node.command], {
     cwd: resolve(root, node.cwd ?? "."),
@@ -464,25 +468,25 @@ async function executeNode(root: string, node: CommandNode): Promise<void> {
     stdout: "inherit",
     stderr: "inherit",
   });
-  const exitCode = await child.exited;
-  if (exitCode !== 0) throw new Error(`${node.id} failed with exit code ${exitCode}`);
+  const exit_code = await child.exited;
+  if (exit_code !== 0) throw new Error(`${node.id} failed with exit code ${exit_code}`);
 }
 
 export async function runNodes(root: string, nodes: readonly CommandNode[]): Promise<void> {
   assertUniqueOrderedNodes(nodes);
-  for (const node of nodes) await executeNode(root, node);
+  for (const node of nodes) await execute_node(root, node);
 }
 
 /** Runs independent nodes at once and fails after all of them finish. */
-async function runConcurrentNodes(root: string, nodes: readonly CommandNode[]): Promise<void> {
-  const results = await Promise.allSettled(nodes.map((node) => executeNode(root, node)));
+async function run_concurrent_nodes(root: string, nodes: readonly CommandNode[]): Promise<void> {
+  const results = await Promise.allSettled(nodes.map((node) => execute_node(root, node)));
   const failures = results.flatMap((result) =>
     result.status === "rejected" ? [String(result.reason)] : [],
   );
   if (failures.length > 0) throw new Error(failures.join("\n"));
 }
 
-function nodesForMode(mode: string, root: string): readonly CommandNode[] {
+function nodes_for_mode(mode: string, root: string): readonly CommandNode[] {
   switch (mode) {
     case "build":
       return BUILD_NODES;
@@ -495,7 +499,7 @@ function nodesForMode(mode: string, root: string): readonly CommandNode[] {
     case "test-unit":
       return UNIT_TEST_NODES;
     case "test-unit-uncovered":
-      return uncoveredUnitTestNodes(root);
+      return uncovered_unit_test_nodes(root);
     case "generate":
       return GENERATED_SOURCE_NODES;
     case "typecheck-packages":
@@ -518,7 +522,7 @@ export async function main(
   const mode = args.find((argument) => !argument.startsWith("--"));
   if (!mode) throw new Error("A workspace tooling mode is required");
   validateWorkspaceGraph(root);
-  const nodes = nodesForMode(mode, root);
+  const nodes = nodes_for_mode(mode, root);
   if (args.includes("--dry-run")) {
     for (const node of nodes) {
       console.log(
@@ -527,7 +531,7 @@ export async function main(
     }
     return;
   }
-  if (mode === "build-rust") await runConcurrentNodes(root, nodes);
+  if (mode === "build-rust") await run_concurrent_nodes(root, nodes);
   else await runNodes(root, nodes);
 }
 

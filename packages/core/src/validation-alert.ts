@@ -48,7 +48,7 @@ const ANSWERS: Readonly<Record<string, ValidationAlertAnswer>> = {
   cancel: "cancel",
 };
 
-let alertCount = 0;
+let alert_count = 0;
 
 /** Show the error alert of `rule` over the grid behind `grid`. */
 export function validationAlert(
@@ -67,7 +67,7 @@ export function validationAlert(
   message.className = "sheetwrite-dialog-message";
   message.textContent = rule.helpText || DEFAULT_VALIDATION_ERROR;
   const text = document.createElement("div");
-  text.id = `sheetwrite-validation-alert-${++alertCount}`;
+  text.id = `sheetwrite-validation-alert-${++alert_count}`;
   text.append(message);
   if (style === "warning") {
     const question = document.createElement("p");

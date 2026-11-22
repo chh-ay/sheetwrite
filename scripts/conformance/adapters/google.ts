@@ -45,13 +45,13 @@ const GOOGLE_ERROR: Record<string, string> = {
   LOADING: "#N/A",
 };
 
-function sheetTitle(index: number): string {
+function sheet_title(index: number): string {
   return `Case${String(index + 1).padStart(4, "0")}`;
 }
 
-function rangeFor(entry: ConformanceCase, index: number): string {
+function range_for(entry: ConformanceCase, index: number): string {
   const target = /^([A-Z]+)([1-9][0-9]*)$/.exec(entry.target!);
-  if (!target || entry.expected.type !== "array") return `'${sheetTitle(index)}'!${entry.target}`;
+  if (!target || entry.expected.type !== "array") return `'${sheet_title(index)}'!${entry.target}`;
   const rows = entry.expected.rows!;
   const columns = entry.expected.columns!;
   if (
@@ -72,11 +72,11 @@ function rangeFor(entry: ConformanceCase, index: number): string {
     label = String.fromCharCode(65 + (column % 26)) + label;
     column = Math.floor(column / 26);
   }
-  const endRow = Number(target[2]) + rows;
-  return `'${sheetTitle(index)}'!${entry.target}:${label}${endRow}`;
+  const end_row = Number(target[2]) + rows;
+  return `'${sheet_title(index)}'!${entry.target}:${label}${end_row}`;
 }
 
-async function googleRequest(
+async function google_request(
   token: string,
   url: string,
   init: RequestInit = {},
@@ -99,18 +99,18 @@ async function googleRequest(
   return response;
 }
 
-function scalarResult(cell: unknown, expected: ConformanceResult): CellResult {
+function scalar_result(cell: unknown, expected: ConformanceResult): CellResult {
   if (!isObject(cell)) return { type: "blank" };
   const effective = isObject(cell.effectiveValue) ? cell.effectiveValue : {};
   const formula = isObject(cell.userEnteredValue)
     ? (cell.userEnteredValue.formulaValue as string | undefined)
     : undefined;
-  const displayedText = typeof cell.formattedValue === "string" ? cell.formattedValue : undefined;
+  const displayed_text = typeof cell.formattedValue === "string" ? cell.formattedValue : undefined;
   const display =
     "displayedText" in expected &&
     expected.displayedText !== undefined &&
-    displayedText !== undefined
-      ? { displayedText }
+    displayed_text !== undefined
+      ? { displayedText: displayed_text }
       : {};
   const source = formula !== undefined ? { formula } : {};
   if (typeof effective.numberValue === "number") {
@@ -129,27 +129,27 @@ function scalarResult(cell: unknown, expected: ConformanceResult): CellResult {
   return { type: "blank", ...source };
 }
 
-function observedResult(sheet: unknown, entry: ConformanceCase): ConformanceResult {
+function observed_result(sheet: unknown, entry: ConformanceCase): ConformanceResult {
   if (!isObject(sheet) || !Array.isArray(sheet.data)) return { type: "blank" };
   const grid = sheet.data[0];
   if (!isObject(grid) || !Array.isArray(grid.rowData)) return { type: "blank" };
-  const firstCell =
+  const first_cell =
     isObject(grid.rowData[0]) && Array.isArray(grid.rowData[0].values)
       ? grid.rowData[0].values[0]
       : undefined;
-  const anchor = scalarResult(firstCell, entry.expected);
+  const anchor = scalar_result(first_cell, entry.expected);
   if (entry.expected.type !== "array" || anchor.type === "error") return anchor;
   const rows = entry.expected.rows!;
   const columns = entry.expected.columns!;
   const values: unknown[][] = [];
   for (let row = 0; row < rows; row++) {
-    const rowData =
+    const row_data =
       isObject(grid.rowData[row]) && Array.isArray(grid.rowData[row].values)
         ? grid.rowData[row].values
         : [];
     const line: unknown[] = [];
     for (let column = 0; column < columns; column++) {
-      const result = scalarResult(rowData[column], { type: "blank" });
+      const result = scalar_result(row_data[column], { type: "blank" });
       line.push(
         result.type === "blank" ? null : result.type === "error" ? result.error : result.value,
       );
@@ -159,45 +159,45 @@ function observedResult(sheet: unknown, entry: ConformanceCase): ConformanceResu
   return { type: "array", value: values, rows, columns, formula: entry.formula };
 }
 
-function assertArrayEnvelope(sheet: unknown, entry: ConformanceCase, batchIndex: number): void {
+function assert_array_envelope(sheet: unknown, entry: ConformanceCase, batch_index: number): void {
   if (entry.expected.type !== "array") return;
   const grid = isObject(sheet) && Array.isArray(sheet.data) ? sheet.data[0] : undefined;
-  const rowData = isObject(grid) && Array.isArray(grid.rowData) ? grid.rowData : [];
-  let lastRow = -1;
-  let lastColumn = -1;
-  rowData.forEach((row, rowIndex) => {
+  const row_data = isObject(grid) && Array.isArray(grid.rowData) ? grid.rowData : [];
+  let last_row = -1;
+  let last_column = -1;
+  row_data.forEach((row, row_index) => {
     const cells = isObject(row) && Array.isArray(row.values) ? row.values : [];
-    cells.forEach((cell, columnIndex) => {
+    cells.forEach((cell, column_index) => {
       if (
         isObject(cell) &&
         ((isObject(cell.effectiveValue) && Object.keys(cell.effectiveValue).length > 0) ||
           (typeof cell.formattedValue === "string" && cell.formattedValue.length > 0))
       ) {
-        lastRow = Math.max(lastRow, rowIndex);
-        lastColumn = Math.max(lastColumn, columnIndex);
+        last_row = Math.max(last_row, row_index);
+        last_column = Math.max(last_column, column_index);
       }
     });
   });
-  const expectedValues = Array.isArray(entry.expected.value) ? entry.expected.value : [];
-  let expectedLastRow = -1;
-  let expectedLastColumn = -1;
-  expectedValues.forEach((row, rowIndex) => {
+  const expected_values = Array.isArray(entry.expected.value) ? entry.expected.value : [];
+  let expected_last_row = -1;
+  let expected_last_column = -1;
+  expected_values.forEach((row, row_index) => {
     if (!Array.isArray(row)) return;
-    row.forEach((value, columnIndex) => {
+    row.forEach((value, column_index) => {
       if (value !== null && value !== undefined) {
-        expectedLastRow = Math.max(expectedLastRow, rowIndex);
-        expectedLastColumn = Math.max(expectedLastColumn, columnIndex);
+        expected_last_row = Math.max(expected_last_row, row_index);
+        expected_last_column = Math.max(expected_last_column, column_index);
       }
     });
   });
-  if (lastRow >= entry.expected.rows! || lastColumn >= entry.expected.columns!) {
+  if (last_row >= entry.expected.rows! || last_column >= entry.expected.columns!) {
     throw new Error(
-      `Google Sheets batch ${batchIndex}: array result exceeds expected shape for ${entry.id}`,
+      `Google Sheets batch ${batch_index}: array result exceeds expected shape for ${entry.id}`,
     );
   }
-  if (lastRow < expectedLastRow || lastColumn < expectedLastColumn) {
+  if (last_row < expected_last_row || last_column < expected_last_column) {
     throw new Error(
-      `Google Sheets batch ${batchIndex}: array result is smaller than expected for ${entry.id}`,
+      `Google Sheets batch ${batch_index}: array result is smaller than expected for ${entry.id}`,
     );
   }
 }
@@ -206,18 +206,18 @@ export async function captureGoogleWithDependencies(
   corpus: ConformanceCorpus,
   dependencies: GoogleCaptureDependencies,
 ): Promise<string> {
-  const formulaCases = corpus.cases.filter((entry) => entry.kind === "formula");
+  const formula_cases = corpus.cases.filter((entry) => entry.kind === "formula");
   const observations: CaptureArtifact["observations"] = [];
   const workbooks: GoogleWorkbookManifest[] = [];
-  const capturedAt = dependencies.now().toISOString();
+  const captured_at = dependencies.now().toISOString();
   for (
-    let observationStart = 0, batchIndex = 0;
-    observationStart < formulaCases.length;
-    observationStart += MAX_GOOGLE_CASES_PER_WORKBOOK, batchIndex += 1
+    let observation_start = 0, batch_index = 0;
+    observation_start < formula_cases.length;
+    observation_start += MAX_GOOGLE_CASES_PER_WORKBOOK, batch_index += 1
   ) {
-    const batch = formulaCases.slice(
-      observationStart,
-      observationStart + MAX_GOOGLE_CASES_PER_WORKBOOK,
+    const batch = formula_cases.slice(
+      observation_start,
+      observation_start + MAX_GOOGLE_CASES_PER_WORKBOOK,
     );
     // The corpus validator keeps one calculation setting for every case, and
     // iteration leaves formulas without a circular reference unchanged.
@@ -226,7 +226,7 @@ export async function captureGoogleWithDependencies(
       method: "POST",
       body: canonicalJson({
         properties: {
-          title: `sheetwrite-conformance-${capturedAt}-batch-${String(batchIndex + 1).padStart(3, "0")}`,
+          title: `sheetwrite-conformance-${captured_at}-batch-${String(batch_index + 1).padStart(3, "0")}`,
           locale: "en_US",
           timeZone: "UTC",
           ...(calculation
@@ -238,12 +238,12 @@ export async function captureGoogleWithDependencies(
               }
             : {}),
         },
-        sheets: batch.map((_entry, index) => ({ properties: { title: sheetTitle(index) } })),
+        sheets: batch.map((_entry, index) => ({ properties: { title: sheet_title(index) } })),
       }),
     });
-    const createdBytes = await readBoundedResponse(created);
+    const created_bytes = await readBoundedResponse(created);
     const spreadsheet = JSON.parse(
-      new TextDecoder("utf-8", { fatal: true }).decode(createdBytes),
+      new TextDecoder("utf-8", { fatal: true }).decode(created_bytes),
     ) as {
       spreadsheetId?: string;
       properties?: { locale?: string; timeZone?: string };
@@ -255,10 +255,10 @@ export async function captureGoogleWithDependencies(
     try {
       const data = batch.flatMap((entry, index) => [
         ...(entry.inputs ?? []).map((input) => ({
-          range: `'${sheetTitle(index)}'!${input.cell}`,
+          range: `'${sheet_title(index)}'!${input.cell}`,
           values: [[input.value]],
         })),
-        { range: `'${sheetTitle(index)}'!${entry.target}`, values: [[entry.formula]] },
+        { range: `'${sheet_title(index)}'!${entry.target}`, values: [[entry.formula]] },
       ]);
       await readBoundedResponse(
         await dependencies.request(
@@ -274,30 +274,30 @@ export async function captureGoogleWithDependencies(
         ),
       );
       const ranges = batch
-        .map((entry, index) => `ranges=${encodeURIComponent(rangeFor(entry, index))}`)
+        .map((entry, index) => `ranges=${encodeURIComponent(range_for(entry, index))}`)
         .join("&");
-      const payloadBytes = await readBoundedResponse(
+      const payload_bytes = await readBoundedResponse(
         await dependencies.request(
           `https://sheets.googleapis.com/v4/spreadsheets/${id}?includeGridData=true&${ranges}`,
         ),
       );
       const payload = JSON.parse(
-        new TextDecoder("utf-8", { fatal: true }).decode(payloadBytes),
+        new TextDecoder("utf-8", { fatal: true }).decode(payload_bytes),
       ) as { sheets?: unknown[] };
       if (!Array.isArray(payload.sheets) || payload.sheets.length !== batch.length) {
-        throw new Error(`Google Sheets batch ${batchIndex}: missing or extra result sheets`);
+        throw new Error(`Google Sheets batch ${batch_index}: missing or extra result sheets`);
       }
       payload.sheets.forEach((sheet, index) => {
         const title =
           isObject(sheet) && isObject(sheet.properties) ? sheet.properties.title : undefined;
-        if (title !== sheetTitle(index)) {
-          throw new Error(`Google Sheets batch ${batchIndex}: reordered result sheets`);
+        if (title !== sheet_title(index)) {
+          throw new Error(`Google Sheets batch ${batch_index}: reordered result sheets`);
         }
-        assertArrayEnvelope(sheet, batch[index]!, batchIndex);
+        assert_array_envelope(sheet, batch[index]!, batch_index);
       });
-      const batchObservations = batch.map((entry, index) => ({
+      const batch_observations = batch.map((entry, index) => ({
         caseId: entry.id,
-        result: observedResult(payload.sheets![index], entry),
+        result: observed_result(payload.sheets![index], entry),
       }));
       const xlsx = await readBoundedResponse(
         await dependencies.request(
@@ -305,32 +305,32 @@ export async function captureGoogleWithDependencies(
         ),
         128 * 1024 * 1024,
       );
-      const caseIds = batch.map((entry) => entry.id);
-      const observationsSha256 = sha256(batchObservations);
-      const workbookSha256 = sha256Bytes(xlsx);
+      const case_ids = batch.map((entry) => entry.id);
+      const observations_sha256 = sha256(batch_observations);
+      const workbook_sha256 = sha256Bytes(xlsx);
       const binding = {
-        batchIndex,
-        observationStart,
-        caseIds,
-        observationsSha256,
-        workbookSha256,
+        batchIndex: batch_index,
+        observationStart: observation_start,
+        caseIds: case_ids,
+        observationsSha256: observations_sha256,
+        workbookSha256: workbook_sha256,
         workbookBytes: xlsx.byteLength,
       };
       workbooks.push({
-        batchIndex,
-        observationStart,
+        batchIndex: batch_index,
+        observationStart: observation_start,
         caseCount: batch.length,
-        firstCaseId: caseIds[0]!,
-        lastCaseId: caseIds.at(-1)!,
-        caseIdsSha256: sha256(caseIds),
-        observationsSha256,
-        workbookSha256,
+        firstCaseId: case_ids[0]!,
+        lastCaseId: case_ids.at(-1)!,
+        caseIdsSha256: sha256(case_ids),
+        observationsSha256: observations_sha256,
+        workbookSha256: workbook_sha256,
         workbookBytes: xlsx.byteLength,
         bindingSha256: sha256(binding),
         ...(spreadsheet.properties?.locale ? { locale: spreadsheet.properties.locale } : {}),
         ...(spreadsheet.properties?.timeZone ? { timeZone: spreadsheet.properties.timeZone } : {}),
       });
-      observations.push(...batchObservations);
+      observations.push(...batch_observations);
     } finally {
       await readBoundedResponse(
         await dependencies.request(`https://www.googleapis.com/drive/v3/files/${id}`, {
@@ -343,7 +343,7 @@ export async function captureGoogleWithDependencies(
     protocol: 1,
     producer: "google-sheets",
     producerVersion: dependencies.producerVersion,
-    capturedAt,
+    capturedAt: captured_at,
     observations,
     calculation: "automatic",
     batchSize: MAX_GOOGLE_CASES_PER_WORKBOOK,
@@ -351,7 +351,7 @@ export async function captureGoogleWithDependencies(
     bindingSha256: sha256({
       producer: "google-sheets",
       producerVersion: dependencies.producerVersion,
-      capturedAt,
+      capturedAt: captured_at,
       observationsSha256: sha256(observations),
       workbooks,
     }),
@@ -361,15 +361,15 @@ export async function captureGoogleWithDependencies(
 
 export async function captureGoogle(corpus: ConformanceCorpus): Promise<string> {
   const token = process.env.SHEETWRITE_GOOGLE_ORACLE_TOKEN;
-  const producerVersion = process.env.SHEETWRITE_GOOGLE_PRODUCER_VERSION;
-  if (!token || !producerVersion) {
+  const producer_version = process.env.SHEETWRITE_GOOGLE_PRODUCER_VERSION;
+  if (!token || !producer_version) {
     throw new Error(
       "Compatibility check BLOCKED: Google Sheets needs a protected OAuth token and exact app version",
     );
   }
   return captureGoogleWithDependencies(corpus, {
-    producerVersion,
-    request: (url, init) => googleRequest(token, url, init),
+    producerVersion: producer_version,
+    request: (url, init) => google_request(token, url, init),
     persist: persistCapture,
     now: () => new Date(),
   });

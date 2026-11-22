@@ -69,7 +69,7 @@ const LAYERS: readonly Layer[] = [
   },
 ];
 
-const layerX = (id: Layer["id"]) => LAYERS.find((layer) => layer.id === id)?.x ?? 0;
+const layer_x = (id: Layer["id"]) => LAYERS.find((layer) => layer.id === id)?.x ?? 0;
 
 /* Lanes between the boxes. */
 const LANE = {
@@ -88,8 +88,8 @@ const CELLS = Array.from({ length: GRID_CELLS.cols * GRID_CELLS.rows }, (_, inde
   col: index % GRID_CELLS.cols,
   row: Math.floor(index / GRID_CELLS.cols),
 }));
-const cellX = (col: number) => layerX("grid") + 20 + col * (GRID_CELLS.size + GRID_CELLS.gap);
-const cellY = (row: number) => VISUAL_Y + row * (GRID_CELLS.size + GRID_CELLS.gap) - 8;
+const cell_x = (col: number) => layer_x("grid") + 20 + col * (GRID_CELLS.size + GRID_CELLS.gap);
+const cell_y = (row: number) => VISUAL_Y + row * (GRID_CELLS.size + GRID_CELLS.gap) - 8;
 
 /* The engine's column store: 7 columns that fill one after another. */
 const COLUMNS = Array.from({ length: 7 }, (_, index) => index);
@@ -110,20 +110,20 @@ function all<T extends Element>(root: Element, selector: string): T[] {
   return [...root.querySelectorAll<T>(selector)];
 }
 
-function createDraw(root: HTMLElement): (t: number) => void {
+function create_draw(root: HTMLElement): (t: number) => void {
   const cells = all<SVGRectElement>(root, "[data-part=cell]");
   const edits = all<SVGCircleElement>(root, "[data-part=edit]");
   const columns = all<SVGRectElement>(root, "[data-part=column]");
-  const byData = <T extends SVGElement>(selector: string, key: string) =>
+  const by_data = <T extends SVGElement>(selector: string, key: string) =>
     new Map(all<T>(root, selector).map((el) => [el.dataset[key] ?? "", el]));
-  const glows = byData<SVGRectElement>("[data-part=glow]", "layer");
-  const lanes = byData<SVGLineElement>("[data-lane]", "lane");
-  const packets = byData<SVGGElement>("[data-packet]", "packet");
+  const glows = by_data<SVGRectElement>("[data-part=glow]", "layer");
+  const lanes = by_data<SVGLineElement>("[data-lane]", "lane");
+  const packets = by_data<SVGGElement>("[data-packet]", "packet");
   const pasted = query<SVGTextElement>(root, "[data-part=pasted]");
   const formulas = query<SVGTextElement>(root, "[data-part=formulas]");
-  const logLines = all<SVGTextElement>(root, "[data-part=log]");
+  const log_lines = all<SVGTextElement>(root, "[data-part=log]");
   const version = query<SVGTextElement>(root, "[data-part=version]");
-  const versionChip = query<SVGGElement>(root, "[data-part=version-chip]");
+  const version_chip = query<SVGGElement>(root, "[data-part=version-chip]");
   const steps = all<HTMLElement>(root, "[data-step]");
 
   const opacity = (el: Element | undefined, value: number) => {
@@ -151,8 +151,8 @@ function createDraw(root: HTMLElement): (t: number) => void {
       const at = (col + row * 2) / (GRID_CELLS.cols + GRID_CELLS.rows * 2);
       cell.dataset.filled = String(paste > at && reset > 0.5);
 
-      const inWindow = col < WINDOW_CELLS.cols && row < WINDOW_CELLS.rows;
-      const repaint = inWindow ? fadeWindow(t, 6.3, 7.0, 0.1) : 0;
+      const in_window = col < WINDOW_CELLS.cols && row < WINDOW_CELLS.rows;
+      const repaint = in_window ? fadeWindow(t, 6.3, 7.0, 0.1) : 0;
       cell.dataset.painted = String(repaint > 0.5);
     }
     pasted.textContent = `${count(20_000 * paste * reset)} cells pasted`;
@@ -163,11 +163,11 @@ function createDraw(root: HTMLElement): (t: number) => void {
     for (const [index, edit] of edits.entries()) {
       const cell = EDITS[index];
       if (!cell) continue;
-      const fromX = cellX(cell.col) + GRID_CELLS.size / 2;
-      const fromY = cellY(cell.row) + GRID_CELLS.size / 2;
+      const from_x = cell_x(cell.col) + GRID_CELLS.size / 2;
+      const from_y = cell_y(cell.row) + GRID_CELLS.size / 2;
       // A small stagger so the dots arrive one after another.
       const k = clamp(gather * 1.4 - index * 0.03);
-      move(edit, lerp(fromX, LANE.tx.from, ease(k)), lerp(fromY, LANE.tx.y, ease(k)));
+      move(edit, lerp(from_x, LANE.tx.from, ease(k)), lerp(from_y, LANE.tx.y, ease(k)));
       opacity(edit, t > 1.6 && k < 1 ? 1 : 0);
     }
     const tx = span(t, 2.35, 3.0);
@@ -194,8 +194,8 @@ function createDraw(root: HTMLElement): (t: number) => void {
     const change = span(t, 7.3, 8.1);
     move(packets.get("change"), lerp(LANE.change.from, LANE.change.to, change), LANE.change.y);
     opacity(packets.get("change"), fadeWindow(t, 7.2, 8.15, 0.1));
-    opacity(logLines[0], clamp((t - 8.1) / 0.3) * reset);
-    opacity(logLines[1], clamp((t - 9.0) / 0.3) * reset);
+    opacity(log_lines[0], clamp((t - 8.1) / 0.3) * reset);
+    opacity(log_lines[1], clamp((t - 9.0) / 0.3) * reset);
 
     const save = span(t, 9.1, 9.9);
     move(packets.get("save"), LANE.save.x, lerp(LANE.save.from, LANE.save.to, save));
@@ -203,7 +203,7 @@ function createDraw(root: HTMLElement): (t: number) => void {
     const landed = t >= 9.9 && reset > 0.5;
     version.textContent = landed ? "v43" : "v42";
     const pop = landed ? 1 + 0.25 * (1 - span(t, 9.9, 10.3)) : 1;
-    move(versionChip, 0, 0, pop);
+    move(version_chip, 0, 0, pop);
 
     // Lanes flow while something crosses them.
     const flowing = {
@@ -243,10 +243,10 @@ export function ArchitectureScene() {
   const { ref, seek } = createTimeline<HTMLDivElement>({
     loopSeconds: LOOP_SECONDS,
     stillSeconds: STILL_SECONDS,
-    create: createDraw,
+    create: create_draw,
   });
-  const appX = layerX("app");
-  const engineX = layerX("engine");
+  const app_x = layer_x("app");
+  const engine_x = layer_x("engine");
   return (
     <div class="sw-arch" data-landing-running="false" ref={ref}>
       <svg aria-hidden="true" class="as" viewBox="0 0 960 362">
@@ -298,12 +298,12 @@ export function ArchitectureScene() {
               height={GRID_CELLS.size}
               rx={3}
               width={GRID_CELLS.size}
-              x={cellX(cell.col)}
-              y={cellY(cell.row)}
+              x={cell_x(cell.col)}
+              y={cell_y(cell.row)}
             />
           )}
         </For>
-        <text class="as-caption" data-part="pasted" x={layerX("grid") + 20} y={CAPTION_Y}>
+        <text class="as-caption" data-part="pasted" x={layer_x("grid") + 20} y={CAPTION_Y}>
           20,000 cells pasted
         </text>
 
@@ -316,23 +316,23 @@ export function ArchitectureScene() {
               height={COLUMN.h}
               rx={3}
               width={COLUMN.w}
-              x={engineX + 20 + index * (COLUMN.w + COLUMN.gap)}
+              x={engine_x + 20 + index * (COLUMN.w + COLUMN.gap)}
               y={VISUAL_Y - 14}
             />
           )}
         </For>
-        <text class="as-caption" data-part="formulas" x={engineX + 20} y={CAPTION_Y}>
+        <text class="as-caption" data-part="formulas" x={engine_x + 20} y={CAPTION_Y}>
           312 formulas recalculated
         </text>
 
         {/* Application: the event log. */}
-        <text class="as-log" data-part="log" x={appX + 20} y={VISUAL_Y}>
-          <tspan x={appX + 20}>onChange</tspan>
-          <tspan class="as-log-detail" dy={22} x={appX + 20}>
+        <text class="as-log" data-part="log" x={app_x + 20} y={VISUAL_Y}>
+          <tspan x={app_x + 20}>onChange</tspan>
+          <tspan class="as-log-detail" dy={22} x={app_x + 20}>
             20,000 operations
           </tspan>
         </text>
-        <text class="as-log" data-part="log" x={appX + 20} y={CAPTION_Y}>
+        <text class="as-log" data-part="log" x={app_x + 20} y={CAPTION_Y}>
           save → your server
         </text>
 

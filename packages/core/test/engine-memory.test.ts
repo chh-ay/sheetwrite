@@ -14,22 +14,22 @@ const address = (row: number, col: number) => ({ sheet: "s1", row, col });
 // A datasource request in flight keeps its store reachable until it settles. A test
 // that only counts a request holds its store here instead; otherwise a collection
 // while the release instantiates can free the store before the release asks it.
-const storesWithOpenRequests = new Set<SheetwriteStore>();
+const stores_with_open_requests = new Set<SheetwriteStore>();
 
 /** Runs a probe in a fresh bun process and returns its JSON report. */
-async function runProbe(name: string, args: string[] = [], env?: Record<string, string>) {
+async function run_probe(name: string, args: string[] = [], env?: Record<string, string>) {
   const probe = new URL(name, import.meta.url).pathname;
   const child = Bun.spawn(["bun", probe, ...args], {
     env: { ...Bun.env, ...env },
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  expect(exitCode, `${name} failed:\n${stderr}`).toBe(0);
+  expect(exit_code, `${name} failed:\n${stderr}`).toBe(0);
   return JSON.parse(stdout) as unknown;
 }
 
@@ -103,7 +103,7 @@ describe("explicit engine memory release", () => {
     // Concurrent JIT compilations keep the values they profiled alive until they
     // finish, and sibling suites keep starting them, so the probe runs alone and
     // compiles on the main thread: only the product's own references remain.
-    const report = await runProbe("./engine-release-lifetime-probe.ts", [], {
+    const report = await run_probe("./engine-release-lifetime-probe.ts", [], {
       BUN_JSC_useConcurrentJIT: "0",
     });
     expect(report).toEqual({ stores: 1, freed: true });
@@ -116,11 +116,11 @@ describe("explicit engine memory release", () => {
 
     // A datasource request that never ends; disposing the store must end the wait.
     engine.beginPageRequest();
-    storesWithOpenRequests.add(store);
+    stores_with_open_requests.add(store);
     const asked = Promise.withResolvers<void>();
-    const waitForPageLoads = engine.waitForPageLoads.bind(engine);
+    const wait_for_page_loads = engine.waitForPageLoads.bind(engine);
     spyOn(engine, "waitForPageLoads").mockImplementation(() => {
-      const wait = waitForPageLoads();
+      const wait = wait_for_page_loads();
       asked.resolve();
       return wait;
     });
@@ -130,14 +130,14 @@ describe("explicit engine memory release", () => {
 
     // Without the fix this await never settles and the test runner times out.
     store.dispose();
-    storesWithOpenRequests.delete(store);
+    stores_with_open_requests.delete(store);
 
     await expect(release).resolves.toMatchObject({ wasmBytesAfter: expect.any(Number) });
   });
 
   for (const engine of ["wasm", "formulas"]) {
     it(`keeps ${engine} stores and history atomic on failure and waits for datasource loads`, async () => {
-      const report = await runProbe("./engine-memory-probe.ts", [engine]);
+      const report = await run_probe("./engine-memory-probe.ts", [engine]);
       expect(report).toEqual({ engine, atomic: true, waitedForPage: true });
     });
   }

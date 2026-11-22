@@ -23,20 +23,20 @@ const MAX_SLICER_VALUES = 1_000;
  * Slicer selections of read-only viewers, by item ID; null keeps every value.
  * They belong to the store because its engine computes one result per pivot.
  */
-const viewSelections = new WeakMap<Store, Map<string, CellScalar[] | null>>();
+const view_selections = new WeakMap<Store, Map<string, CellScalar[] | null>>();
 
 /** The read-only slicer selections of `store`, which a read-only view changes in place. */
 export function slicerOverridesOf(store: Store): Map<string, CellScalar[] | null> {
-  let overrides = viewSelections.get(store);
+  let overrides = view_selections.get(store);
   if (overrides === undefined) {
     overrides = new Map();
-    viewSelections.set(store, overrides);
+    view_selections.set(store, overrides);
   }
   return overrides;
 }
 
 /** What the engine computes for `sheet`: a dashboard's slicers and items, or a worksheet's chart copies. */
-function payloadOf(store: Store, sheet: Sheet): PivotViewPayload | undefined {
+function payload_of(store: Store, sheet: Sheet): PivotViewPayload | undefined {
   if (!isDashboard(sheet)) return worksheetPayload(sheet);
   const workbook = store.getWorkbook();
   return dashboardPayload(sheet, workbook.sheets, workbook.dataModel, slicerOverridesOf(store));
@@ -49,7 +49,7 @@ function payloadOf(store: Store, sheet: Sheet): PivotViewPayload | undefined {
 export function hiddenPivotIndex(store: Store, owner: SheetId, id: string): number {
   const sheet = store.getWorkbook().sheets.find((candidate) => candidate.id === owner);
   if (sheet === undefined) return -1;
-  return payloadOf(store, sheet)?.hidden.get(id) ?? -1;
+  return payload_of(store, sheet)?.hidden.get(id) ?? -1;
 }
 
 /** The output of the pivot at `index` in a sheet's payload, or null without one. */
@@ -60,7 +60,7 @@ export function pivotOutputOf(store: Store, sheet: SheetId, index: number): Pivo
     const kinds = output.takeKinds();
     const numbers = output.takeNumbers();
     const texts = output.takeTexts();
-    const [rows = 0, cols = 0, headerRows = 0, labelCols = 0] = output.layout();
+    const [rows = 0, cols = 0, header_rows = 0, label_cols = 0] = output.layout();
     let text = 0;
     const cells = Array.from(kinds, (kind, cell): CellScalar => {
       const number = numbers[cell] ?? 0;
@@ -70,7 +70,7 @@ export function pivotOutputOf(store: Store, sheet: SheetId, index: number): Pivo
       if (kind === 4) return PIVOT_ERRORS[number] ?? "#VALUE!";
       return null;
     });
-    return { cells, rows, cols, headerRows, labelCols };
+    return { cells, rows, cols, headerRows: header_rows, labelCols: label_cols };
   } finally {
     output.free();
   }
@@ -104,7 +104,7 @@ export function applyPivotViews(store: Store, dashboards: readonly SheetId[]): v
   for (const sheet of store.getWorkbook().sheets) {
     if (sheet.charts?.some((chart) => chart.pivot !== undefined)) sheets.add(sheet.id);
   }
-  storeEngine(store)?.setPivotView((owner) => payloadOf(store, owner)?.pivots, [...sheets]);
+  storeEngine(store)?.setPivotView((owner) => payload_of(store, owner)?.pivots, [...sheets]);
 }
 
 /** The IDs of the dashboard sheets of `store`. */
