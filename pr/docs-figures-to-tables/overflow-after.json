@@ -6,7 +6,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -26,7 +26,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -46,7 +46,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -66,7 +66,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -78,7 +78,7 @@
           "width": 771
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -162,7 +162,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 771
@@ -174,7 +174,7 @@
           "width": 771
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 771
@@ -214,7 +214,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -254,7 +254,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -274,7 +274,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -294,7 +294,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -314,7 +314,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -326,7 +326,7 @@
           "width": 771
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -410,7 +410,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 771
@@ -422,7 +422,7 @@
           "width": 771
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 771
@@ -462,7 +462,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 771
@@ -502,7 +502,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -522,7 +522,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -542,7 +542,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -562,7 +562,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -574,7 +574,7 @@
           "width": 372
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -658,7 +658,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 372
@@ -670,16 +670,16 @@
           "width": 372
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
-          "scroll": 60,
+          "scroll": 0,
           "width": 372
         },
         {
           "cls": "",
           "cols": 3,
           "scroll": 0,
-          "width": 432
+          "width": 372
         }
       ],
       "pageScroll": -10
@@ -710,7 +710,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -750,7 +750,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -770,7 +770,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -790,7 +790,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -810,7 +810,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -822,7 +822,7 @@
           "width": 372
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -906,7 +906,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 372
@@ -918,16 +918,16 @@
           "width": 372
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
-          "scroll": 60,
+          "scroll": 0,
           "width": 372
         },
         {
           "cls": "",
           "cols": 3,
           "scroll": 0,
-          "width": 432
+          "width": 372
         }
       ],
       "pageScroll": -10
@@ -958,7 +958,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 372
@@ -1000,7 +1000,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1020,7 +1020,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1040,7 +1040,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1060,7 +1060,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1072,7 +1072,7 @@
           "width": 781
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1156,7 +1156,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 781
@@ -1168,7 +1168,7 @@
           "width": 781
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 781
@@ -1208,7 +1208,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1248,7 +1248,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1268,7 +1268,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1288,7 +1288,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1308,7 +1308,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1320,7 +1320,7 @@
           "width": 781
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1404,7 +1404,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 781
@@ -1416,7 +1416,7 @@
           "width": 781
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 781
@@ -1456,7 +1456,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 781
@@ -1496,7 +1496,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1516,7 +1516,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1536,7 +1536,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1556,7 +1556,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1568,7 +1568,7 @@
           "width": 382
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1652,7 +1652,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 382
@@ -1664,16 +1664,16 @@
           "width": 382
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
-          "scroll": 43,
+          "scroll": 0,
           "width": 382
         },
         {
           "cls": "",
           "cols": 3,
           "scroll": 0,
-          "width": 425
+          "width": 382
         }
       ],
       "pageScroll": 0
@@ -1704,7 +1704,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1744,7 +1744,7 @@
       "name": "grid-methods-lead",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1764,7 +1764,7 @@
       "name": "grid-methods-views",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1784,7 +1784,7 @@
       "name": "lifecycle",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1804,7 +1804,7 @@
       "name": "error-handling",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1816,7 +1816,7 @@
           "width": 382
         },
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382
@@ -1900,7 +1900,7 @@
       "name": "compatibility-limits",
       "frames": [
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
           "scroll": 0,
           "width": 382
@@ -1912,16 +1912,16 @@
           "width": 382
         },
         {
-          "cls": "sw-table-frame",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 3,
-          "scroll": 43,
+          "scroll": 0,
           "width": 382
         },
         {
           "cls": "",
           "cols": 3,
           "scroll": 0,
-          "width": 425
+          "width": 382
         }
       ],
       "pageScroll": 0
@@ -1952,7 +1952,7 @@
       "name": "upgrade-sort",
       "frames": [
         {
-          "cls": "sw-table-frame sw-table-frame--pairs",
+          "cls": "sw-table-frame sw-table-frame--stack",
           "cols": 2,
           "scroll": 0,
           "width": 382

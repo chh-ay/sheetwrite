@@ -1,0 +1,364 @@
+
+Running 3 tests using 1 worker
+
+[1/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 1440 px
+  1) [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 1440 px 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 96
+
+    - Array []
+    + Array [
+    +   "/docs/concepts/error-handling/: \"IndexedDbPendingCommitStorageError\" breaks inside a word, before \"r\"",
+    +   "/docs/features/accessibility/: \"aria-activedescendant=\"sheetwrite-grid-1-0-0\"\" breaks inside a word, before \"activedescendant=\"sheetwrite-grid-1-0-0\"\"",
+    +   "/docs/features/accessibility/: \"div.sheetwrite-aria#sheetwrite-grid-1\" breaks inside a word, before \"aria#sheetwrite-grid-1\"",
+    +   "/docs/features/data/persistence/: \"grid.applyRemoteOperations(operations)\" breaks inside a word, before \"tions)\"",
+    +   "/docs/features/formatting/styles/: \"--sheetwrite-menu-disabled-opacity\" breaks inside a word, before \"opacity\"",
+    +   "/docs/features/grid/options-and-presentation/: \"\"event-only\" | \"internal-navigation\" | \"disabled\"\" breaks inside a word, before \"navigation\" | \"disabled\"\"",
+    +   "/docs/features/grid/options-and-presentation/: \"Partial<TransactionResourceLimits>\" breaks inside a word, before \"imits>\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/core-paths-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/chart-tracking-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-matched-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/release-comparison.json\" breaks inside a word, before \"comparison.json\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.chunkRows\" breaks inside a word, before \"Storage.chunkRows\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.chunkRows\" breaks inside a word, before \".chunkRows\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.cacheBytes\" breaks inside a word, before \"Storage.cacheBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.cacheBytes\" breaks inside a word, before \".cacheBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.dirtyCellLimit\" breaks inside a word, before \"Storage.dirtyCellLimit\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.dirtyCellLimit\" breaks inside a word, before \".dirtyCellLimit\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.transactionResourceLimits\" breaks inside a word, before \"nResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.transactionResourceLimits\" breaks inside a word, before \".transactionResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.transactionResourceLimits\" breaks inside a word, before \"its\"",
+    +   "/docs/reference/compatibility-limits/: \"validateTransactionResources\" breaks inside a word, before \"ources\"",
+    +   "/docs/reference/compatibility-limits/: \"maxOperations\" breaks inside a word, before \"ions\"",
+    +   "/docs/reference/compatibility-limits/: \"SnapshotValidationOptions.resourceLimits\" breaks inside a word, before \"ons.resourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.snapshotResourceLimits\" breaks inside a word, before \".snapshotResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.snapshotResourceLimits\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"SnapshotGridOptions.snapshotResourceLimits\" breaks inside a word, before \"apshotResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"sheet-columns\" breaks inside a word, before \"columns\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxInputBytes\" breaks inside a word, before \"esourceLimits.maxInputBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxInputBytes\" breaks inside a word, before \"ytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxOutputBytes\" breaks inside a word, before \"esourceLimits.maxOutputBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxOutputBytes\" breaks inside a word, before \"Bytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxRows\" breaks inside a word, before \"esourceLimits.maxRows\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxColumns\" breaks inside a word, before \"esourceLimits.maxColumns\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxColumns\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxCells\" breaks inside a word, before \"esourceLimits.maxCells\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxFieldBytes\" breaks inside a word, before \"esourceLimits.maxFieldBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxFieldBytes\" breaks inside a word, before \"ytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxWriterWindowRows\" breaks inside a word, before \"esourceLimits.maxWriterWindowRows\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxWriterWindowRows\" breaks inside a word, before \"WindowRows\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxMutationIdBytes\" breaks inside a word, before \"tes\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxOperationsPerVersion\" breaks inside a word, before \"rVersion\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxVersionPayloadBytes\" breaks inside a word, before \"adBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBatchVersions\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxFutureVersionDistance\" breaks inside a word, before \"nDistance\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedVersions\" breaks inside a word, before \"ions\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedOperations\" breaks inside a word, before \"ations\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedBytes\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxRecentAcknowledgements\" breaks inside a word, before \"ledgements\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingCommits\" breaks inside a word, before \"ts\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingOperations\" breaks inside a word, before \"tions\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingEncodedBytes\" breaks inside a word, before \"edBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.heartbeatMs\" breaks inside a word, before \"ions.heartbeatMs\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.timeoutMs\" breaks inside a word, before \"ions.timeoutMs\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.maxActors\" breaks inside a word, before \"ions.maxActors\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.maxRangesPerActor\" breaks inside a word, before \"ions.maxRangesPerActor\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxInputBytes\" breaks inside a word, before \"tBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxOutputBytes\" breaks inside a word, before \"utBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxArchiveEntries\" breaks inside a word, before \"iveEntries\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxEntryUncompressedBytes\" breaks inside a word, before \"yUncompressedBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxTotalUncompressedBytes\" breaks inside a word, before \"lUncompressedBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxCompressionRatio\" breaks inside a word, before \"ressionRatio\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxSheets\" breaks inside a word, before \"ts\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxRowsPerSheet\" breaks inside a word, before \"PerSheet\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxColumnsPerSheet\" breaks inside a word, before \"mnsPerSheet\"",
+    +   "/docs/reference/compatibility-limits/: \"XlsxWorkbookOptions.maxCells\" breaks inside a word, before \"xCells\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxMerges\" breaks inside a word, before \"es\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxSharedStrings\" breaks inside a word, before \"edStrings\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxStyles\" breaks inside a word, before \"es\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlElements\" breaks inside a word, before \"lements\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlDepth\" breaks inside a word, before \"epth\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlAttributesPerElement\" breaks inside a word, before \"ttributesPerElement\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlTextBytes\" breaks inside a word, before \"extBytes\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/dashboard.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/charts.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/dashboard.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/panels.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/ribbon.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/charts.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/dashboard.css\" breaks inside a word, before \"d.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/icons.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/panels.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/ribbon.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/dashboard.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"./pkg-history/sheetwrite_history_bg.wasm\" breaks inside a word, before \"history/sheetwrite_history_bg.wasm\"",
+    +   "/docs/releases/0.6.0/: \"--sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\" breaks inside a word, before \"sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\"",
+    + ]
+
+      68 |     }
+      69 |     await context.close();
+    > 70 |     expect(found).toEqual([]);
+         |                   ^
+      71 |   });
+      72 | }
+      73 |
+        at /home/vvin/checkouts/tables-1054/test/browser/docs-table-code.spec.ts:70:19
+
+    Error Context: ../../learn/scratch/dfigs/tmp/pw-t54tc/docs-table-code-table-code-34276-arrow-tables-fit-at-1440-px-chromium/error-context.md
+
+
+[2/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 834 px
+  2) [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 834 px 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 90
+
+    - Array []
+    + Array [
+    +   "/docs/concepts/error-handling/: \"IndexedDbPendingCommitStorageError\" breaks inside a word, before \"r\"",
+    +   "/docs/features/accessibility/: \"aria-activedescendant=\"sheetwrite-grid-1-0-0\"\" breaks inside a word, before \"activedescendant=\"sheetwrite-grid-1-0-0\"\"",
+    +   "/docs/features/accessibility/: \"div.sheetwrite-aria#sheetwrite-grid-1\" breaks inside a word, before \"aria#sheetwrite-grid-1\"",
+    +   "/docs/features/data/persistence/: \"grid.applyRemoteOperations(operations)\" breaks inside a word, before \"ions)\"",
+    +   "/docs/features/formatting/styles/: \"--sheetwrite-menu-disabled-opacity\" breaks inside a word, before \"opacity\"",
+    +   "/docs/features/grid/options-and-presentation/: \"\"event-only\" | \"internal-navigation\" | \"disabled\"\" breaks inside a word, before \"navigation\" | \"disabled\"\"",
+    +   "/docs/features/grid/options-and-presentation/: \"Partial<TransactionResourceLimits>\" breaks inside a word, before \"imits>\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/core-paths-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/chart-tracking-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-matched-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/release-comparison.json\" breaks inside a word, before \"comparison.json\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.chunkRows\" breaks inside a word, before \"torage.chunkRows\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.chunkRows\" breaks inside a word, before \"chunkRows\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.cacheBytes\" breaks inside a word, before \"torage.cacheBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.cacheBytes\" breaks inside a word, before \"cacheBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.datasourceStorage.dirtyCellLimit\" breaks inside a word, before \"torage.dirtyCellLimit\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.dirtyCellLimit\" breaks inside a word, before \"dirtyCellLimit\"",
+    +   "/docs/reference/compatibility-limits/: \"GridOptions.transactionResourceLimits\" breaks inside a word, before \"ResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.transactionResourceLimits\" breaks inside a word, before \"transactionResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.transactionResourceLimits\" breaks inside a word, before \"ts\"",
+    +   "/docs/reference/compatibility-limits/: \"validateTransactionResources\" breaks inside a word, before \"urces\"",
+    +   "/docs/reference/compatibility-limits/: \"maxOperations\" breaks inside a word, before \"ons\"",
+    +   "/docs/reference/compatibility-limits/: \"SnapshotValidationOptions.resourceLimits\" breaks inside a word, before \"ns.resourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SheetwriteStoreOptions.snapshotResourceLimits\" breaks inside a word, before \"snapshotResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"SnapshotGridOptions.snapshotResourceLimits\" breaks inside a word, before \"pshotResourceLimits\"",
+    +   "/docs/reference/compatibility-limits/: \"sheet-columns\" breaks inside a word, before \"columns\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxInputBytes\" breaks inside a word, before \"sourceLimits.maxInputBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxInputBytes\" breaks inside a word, before \"tes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxOutputBytes\" breaks inside a word, before \"sourceLimits.maxOutputBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxOutputBytes\" breaks inside a word, before \"ytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxRows\" breaks inside a word, before \"sourceLimits.maxRows\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxColumns\" breaks inside a word, before \"sourceLimits.maxColumns\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxCells\" breaks inside a word, before \"sourceLimits.maxCells\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxFieldBytes\" breaks inside a word, before \"sourceLimits.maxFieldBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxFieldBytes\" breaks inside a word, before \"tes\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxWriterWindowRows\" breaks inside a word, before \"sourceLimits.maxWriterWindowRows\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxWriterWindowRows\" breaks inside a word, before \"indowRows\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxMutationIdBytes\" breaks inside a word, before \"es\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxOperationsPerVersion\" breaks inside a word, before \"Version\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxVersionPayloadBytes\" breaks inside a word, before \"dBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBatchVersions\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxFutureVersionDistance\" breaks inside a word, before \"Distance\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedVersions\" breaks inside a word, before \"ons\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedOperations\" breaks inside a word, before \"tions\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxBufferedBytes\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxRecentAcknowledgements\" breaks inside a word, before \"edgements\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingCommits\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingOperations\" breaks inside a word, before \"ions\"",
+    +   "/docs/reference/compatibility-limits/: \"limits.maxPendingEncodedBytes\" breaks inside a word, before \"dBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.heartbeatMs\" breaks inside a word, before \"ons.heartbeatMs\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.timeoutMs\" breaks inside a word, before \"ons.timeoutMs\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.maxActors\" breaks inside a word, before \"ons.maxActors\"",
+    +   "/docs/reference/compatibility-limits/: \"PresenceCoordinatorOptions.maxRangesPerActor\" breaks inside a word, before \"ons.maxRangesPerActor\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxInputBytes\" breaks inside a word, before \"Bytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxOutputBytes\" breaks inside a word, before \"tBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxArchiveEntries\" breaks inside a word, before \"veEntries\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxEntryUncompressedBytes\" breaks inside a word, before \"UncompressedBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxTotalUncompressedBytes\" breaks inside a word, before \"UncompressedBytes\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxCompressionRatio\" breaks inside a word, before \"essionRatio\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxSheets\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxRowsPerSheet\" breaks inside a word, before \"erSheet\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxColumnsPerSheet\" breaks inside a word, before \"nsPerSheet\"",
+    +   "/docs/reference/compatibility-limits/: \"XlsxWorkbookOptions.maxCells\" breaks inside a word, before \"Cells\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxMerges\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxSharedStrings\" breaks inside a word, before \"dStrings\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxStyles\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlElements\" breaks inside a word, before \"ements\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlDepth\" breaks inside a word, before \"pth\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlAttributesPerElement\" breaks inside a word, before \"tributesPerElement\"",
+    +   "/docs/reference/compatibility-limits/: \"resourceLimits.maxXmlTextBytes\" breaks inside a word, before \"xtBytes\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/dashboard.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/dashboard.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/charts.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/dashboard.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/panels.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/ribbon.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/dashboard.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"./pkg-history/sheetwrite_history_bg.wasm\" breaks inside a word, before \"history/sheetwrite_history_bg.wasm\"",
+    +   "/docs/releases/0.6.0/: \"--sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\" breaks inside a word, before \"sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\"",
+    + ]
+
+      68 |     }
+      69 |     await context.close();
+    > 70 |     expect(found).toEqual([]);
+         |                   ^
+      71 |   });
+      72 | }
+      73 |
+        at /home/vvin/checkouts/tables-1054/test/browser/docs-table-code.spec.ts:70:19
+
+    Error Context: ../../learn/scratch/dfigs/tmp/pw-t54tc/docs-table-code-table-code-78055-narrow-tables-fit-at-834-px-chromium/error-context.md
+
+
+[3/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 390 px
+  3) [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 390 px 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  -   1
+    + Received  + 105
+
+    - Array []
+    + Array [
+    +   "/docs/features/accessibility/: \"aria-activedescendant=\"sheetwrite-grid-1-0-0\"\" breaks inside a word, before \"activedescendant=\"sheetwrite-grid-1-0-0\"\"",
+    +   "/docs/features/accessibility/: \"aria-activedescendant=\"sheetwrite-grid-1-0-0\"\" breaks inside a word, before \"grid-1-0-0\"\"",
+    +   "/docs/features/accessibility/: \"div.sheetwrite-aria#sheetwrite-grid-1\" breaks inside a word, before \"aria#sheetwrite-grid-1\"",
+    +   "/docs/features/collaboration/: the 3-column table \"Momentsync.pendingCommits()acknowledged events\" scrolls 127 px sideways",
+    +   "/docs/features/data/autofilter/: the 3-column table \"ConditionopMatches\" scrolls 91 px sideways",
+    +   "/docs/features/data/data-operations/: the 3-column table \"MethodSignatureEffect\" scrolls 278 px sideways",
+    +   "/docs/features/data/data-operations/: the 3-column table \"CommandRibbon placeWhat it does\" scrolls 133 px sideways",
+    +   "/docs/features/data/datasources/: the 3-column table \"FieldWhereMeaning\" scrolls 52 px sideways",
+    +   "/docs/features/data/datasources/: the 3-column table \"datasourceStorage fieldDefaultEffect\" scrolls 55 px sideways",
+    +   "/docs/features/data/persistence/: the 3-column table \"PartYou provideSheetwrite provides\" scrolls 212 px sideways",
+    +   "/docs/features/data/persistence/: the 3-column table \"ScopeRestoresKeeps current\" scrolls 75 px sideways",
+    +   "/docs/features/data/validation-protection-and-notes/: \"DataValidationRule.condition.kind\" breaks inside a word, before \"ind\"",
+    +   "/docs/features/data/validation-protection-and-notes/: \"DataValidationRule.inCellDropdown\" breaks inside a word, before \"own\"",
+    +   "/docs/features/data/validation-protection-and-notes/: \"DataValidationRule.showInputMessage\" breaks inside a word, before \"ssage\"",
+    +   "/docs/features/data/validation-protection-and-notes/: \"grid.setProtectionResolver(resolver, mode?)\" breaks inside a word, before \"olver, mode?)\"",
+    +   "/docs/features/data/validation-protection-and-notes/: the 3-column table \"Field or APIValuesEffect\" scrolls 246 px sideways",
+    +   "/docs/features/formatting/conditional-formats/: the 3-column table \"FieldTypeEffect\" scrolls 59 px sideways",
+    +   "/docs/features/formatting/conditional-formats/: the 3-column table \"kindFieldsMatches when\" scrolls 125 px sideways",
+    +   "/docs/features/formatting/fonts-and-alignment/: the 3-column table \"FieldTypeEffect\" scrolls 146 px sideways",
+    +   "/docs/features/formatting/number-formats/: the 3-column table \"You typeThe cell holdsFormat\" scrolls 155 px sideways",
+    +   "/docs/features/formatting/number-formats/: the 3-column table \"KeyFormatCode\" scrolls 157 px sideways",
+    +   "/docs/features/formatting/styles/: \"--sheetwrite-menu-disabled-opacity\" breaks inside a word, before \"opacity\"",
+    +   "/docs/features/formatting/styles/: the 3-column table \"PartWhat it stylesNeeded when\" scrolls 145 px sideways",
+    +   "/docs/features/formatting/styles/: the 3-column table \"CSS custom propertyWidget useDefault\" scrolls 235 px sideways",
+    +   "/docs/features/formulas/analysis-formulas/: \"=REGEXREPLACE(G4, \"[0-9]{3}-[0-9]{4}\", \"***-****\")\" breaks inside a word, before \"****\")\"",
+    +   "/docs/features/formulas/analysis-formulas/: \"=DSUM({\"Region\",\"Units\";\"North\",4;\"South\",10;\"North\",6}, \"Units\", {\"Region\";\"North\"})\" breaks inside a word, before \"th\",6}, \"Units\", {\"Region\";\"North\"})\"",
+    +   "/docs/features/formulas/analysis-formulas/: \"=DAVERAGE({\"Region\",\"Units\";\"North\",4;\"South\",10;\"North\",6}, \"Units\", {\"Region\";\"North\"})\" breaks inside a word, before \"\"North\",6}, \"Units\", {\"Region\";\"North\"})\"",
+    +   "/docs/features/formulas/analysis-formulas/: the 3-column table \"FormulaResultMeaning\" scrolls 144 px sideways",
+    +   "/docs/features/formulas/analysis-formulas/: the 3-column table \"FormulaResultMeaning\" scrolls 35 px sideways",
+    +   "/docs/features/formulas/analysis-formulas/: the 3-column table \"FormulaResultMeaning\" scrolls 8 px sideways",
+    +   "/docs/features/formulas/formula-assist/: the 3-column table \"KeyWith a suggestionWithout a suggestion\" scrolls 238 px sideways",
+    +   "/docs/features/formulas/operators/: the 3-column table \"Precedence, high to lowOperatorsAssociativity\" scrolls 153 px sideways",
+    +   "/docs/features/grid/keyboard-shortcuts/: the 3-column table \"WhereKeysSource\" scrolls 117 px sideways",
+    +   "/docs/features/grid/options-and-presentation/: \"\"event-only\" | \"internal-navigation\" | \"disabled\"\" breaks inside a word, before \"navigation\" | \"disabled\"\"",
+    +   "/docs/features/grid/options-and-presentation/: \"Partial<TransactionResourceLimits>\" breaks inside a word, before \"imits>\"",
+    +   "/docs/features/grid/resize-merge-and-fill/: the 3-column table \"Source formulaFill directionFilled formula\" scrolls 55 px sideways",
+    +   "/docs/features/grid/search/: the 3-column table \"OptionChoicesField\" scrolls 91 px sideways",
+    +   "/docs/features/grid/status-bar/: the 3-column table \"FieldTypeMeaning\" scrolls 55 px sideways",
+    +   "/docs/features/grid/toolbar-and-ribbon/: the 3-column table \"TabGroup order, left to rightFolds first to last\" scrolls 118 px sideways",
+    +   "/docs/features/grid/toolbar-and-ribbon/: the 3-column table \"Before 0.7NowUse instead\" scrolls 297 px sideways",
+    +   "/docs/import-export/large-files-and-streaming/: \"toCsvStream(sheet, store, options?)\" breaks inside a word, before \"am(sheet, store, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toTsvStream(range, store, options?)\" breaks inside a word, before \"am(range, store, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toXlsxTableStream(workbook, store, options?)\" breaks inside a word, before \"leStream(workbook, store, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toXlsxTableStream(workbook, store, options?)\" breaks inside a word, before \"workbook, store, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toXlsxWorkbookStream(snapshot, options?)\" breaks inside a word, before \"kbookStream(snapshot, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toXlsxWorkbookStream(snapshot, options?)\" breaks inside a word, before \"am(snapshot, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"toXlsxWorkbookStream(snapshot, options?)\" breaks inside a word, before \"ot, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"fromXlsxWorkbookFile(file, options?)\" breaks inside a word, before \"orkbookFile(file, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: \"fromXlsxWorkbookFile(file, options?)\" breaks inside a word, before \"le(file, options?)\"",
+    +   "/docs/import-export/large-files-and-streaming/: the 3-column table \"FunctionInputResult\" scrolls 138 px sideways",
+    +   "/docs/import-export/large-files-and-streaming/: the 3-column table \"Generated workbookImport pathPeak memory\" scrolls 109 px sideways",
+    +   "/docs/import-export/libreoffice-compatibility/: the 3-column table \"ChainUnexpected differencesKnown producer difference\" scrolls 184 px sideways",
+    +   "/docs/import-export/xlsx-import/: the 3-column table \"FunctionInputResult\" scrolls 305 px sideways",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/core-paths-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/chart-tracking-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/formula-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-results.json\" breaks inside a word, before \"results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/full-engine-matched-results.json\" breaks inside a word, before \"matched-results.json\"",
+    +   "/docs/performance/benchmark-protocol/: \"bench/results/release-comparison.json\" breaks inside a word, before \"comparison.json\"",
+    +   "/docs/performance/core-write-path/: the 3-column table \"ScenarioCounterValue\" scrolls 166 px sideways",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxInputBytes\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxOutputBytes\" breaks inside a word, before \"es\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxFieldBytes\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/compatibility-limits/: \"DelimitedTextOptions.resourceLimits.maxWriterWindowRows\" breaks inside a word, before \"dowRows\"",
+    +   "/docs/reference/compatibility-limits/: the 3-column table \"AreaSupported contractBoundary\" scrolls 60 px sideways",
+    +   "/docs/reference/compatibility-results/: the 3-column table \"FeatureWarning codeMeaning\" scrolls 150 px sideways",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/charts.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/dashboard.css\" breaks inside a word, before \"d.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/icons.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/icons.svg\" breaks inside a word, before \"g\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/panels.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/core/styles/ribbon.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/charts.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/context-menu.css\" breaks inside a word, before \"-menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/dashboard.css\" breaks inside a word, before \"rd.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/find.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/formula-help.css\" breaks inside a word, before \"-help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/grid.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/icons.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/panels.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/ribbon.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/react/styles/tabs.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/charts.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/context-menu.css\" breaks inside a word, before \"t-menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/dashboard.css\" breaks inside a word, before \"ard.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/find.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/formula-help.css\" breaks inside a word, before \"a-help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/grid.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/icons.css\" breaks inside a word, before \"css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/panels.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/ribbon.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/svelte/styles/tabs.css\" breaks inside a word, before \"ss\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/charts.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/context-menu.css\" breaks inside a word, before \"menu.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/dashboard.css\" breaks inside a word, before \".css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/formula-help.css\" breaks inside a word, before \"help.css\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/panels.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"@sheetwrite/vue/styles/ribbon.css\" breaks inside a word, before \"s\"",
+    +   "/docs/reference/package-entry-points/: \"./pkg-history/sheetwrite_history_bg.wasm\" breaks inside a word, before \"history/sheetwrite_history_bg.wasm\"",
+    +   "/docs/reference/package-entry-points/: \"./pkg-history/sheetwrite_history_bg.wasm\" breaks inside a word, before \"m\"",
+    +   "/docs/releases/0.6.0/: \"--sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\" breaks inside a word, before \"sheetwrite-icon-sheet: url(\"/path/to/icons.svg\")\"",
+    + ]
+
+      68 |     }
+      69 |     await context.close();
+    > 70 |     expect(found).toEqual([]);
+         |                   ^
+      71 |   });
+      72 | }
+      73 |
+        at /home/vvin/checkouts/tables-1054/test/browser/docs-table-code.spec.ts:70:19
+
+    Error Context: ../../learn/scratch/dfigs/tmp/pw-t54tc/docs-table-code-table-code-95407-narrow-tables-fit-at-390-px-chromium/error-context.md
+
+
+  3 failed
+    [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 1440 px 
+    [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 834 px 
+    [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 390 px 

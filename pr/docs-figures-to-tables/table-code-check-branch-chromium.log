@@ -1,0 +1,7 @@
+
+Running 3 tests using 1 worker
+
+[1/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 1440 px @portability
+[2/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 834 px @portability
+[3/3] [chromium] › test/browser/docs-table-code.spec.ts:52:3 › table code breaks only between words, and narrow tables fit, at 390 px @portability
+  3 passed (1.2m)
