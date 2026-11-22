@@ -44,6 +44,7 @@ interface LockedPackage {
   readonly integrity?: string;
   readonly dependencies?: Readonly<Record<string, string>>;
   readonly devDependencies?: Readonly<Record<string, string>>;
+  readonly peerDependencies?: Readonly<Record<string, string>>;
 }
 
 interface FixtureLock {
@@ -133,6 +134,11 @@ describe("immutable release consumer locks", () => {
               integrity: "sha512-stale",
             },
             "node_modules/react": registry_entry,
+            "node_modules/@sheetwrite/formula-assist": {
+              version: "0.2.0",
+              resolved: "file:artifacts/sheetwrite-formula-assist-0.2.0.tgz",
+              peerDependencies: { "@sheetwrite/core": "0.1.0" },
+            },
           },
         })}\n`,
       );
@@ -157,6 +163,9 @@ describe("immutable release consumer locks", () => {
         integrity: `sha512-${createHash("sha512").update("canonical bytes").digest("base64")}`,
       });
       expect(rebound.packages?.["node_modules/react"]).toEqual(registry_entry);
+      expect(
+        rebound.packages?.["node_modules/@sheetwrite/formula-assist"]?.peerDependencies,
+      ).toEqual({ "@sheetwrite/core": "0.2.0" });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

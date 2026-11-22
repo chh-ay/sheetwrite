@@ -100,7 +100,9 @@ export async function bindCanonicalTarballIntegrities(lockPath, tarballs) {
 
   for (const [packagePath, locked] of Object.entries(lock.packages)) {
     if (packagePath === "" || locked === null || typeof locked !== "object") continue;
-    for (const field of ["dependencies", "optionalDependencies"]) {
+    // A peer range on a canonical package is its exact version too, and npm ci
+    // rejects a lock whose peer range no longer matches the installed version.
+    for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
       const dependencies = locked[field];
       if (dependencies === null || typeof dependencies !== "object") continue;
       for (const [packageName, canonical] of canonicalPackages) {
