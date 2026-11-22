@@ -40,10 +40,12 @@ codegen-units = 1
 # tier (see `eval_func` in src/eval/mod.rs). `--no-inline` must come before
 # `-O3`: wasm-opt runs passes in order. It takes one pattern, matched against
 # the demangled names wasm-bindgen writes.
+# `--converge` repeats the passes until the module stops shrinking: in
+# 0.7.0, 751 Brotli bytes off the default engine and 1,646 off the full one.
 [package.metadata.wasm-pack.profile.release]
 # Keep names for the function-size guard in wasm-factory; it removes the name
 # section before either engine is packaged.
-wasm-opt = ["--no-inline=*_family", "-O3", "-g"]
+wasm-opt = ["--no-inline=*_family", "-O3", "--converge", "-g"]
 
 # The three crates share this lint set; `bun scripts/rust-lint.ts` fails when
 # their `[lints]` tables differ. Policy and examples: docs/contributing/rust.md.
