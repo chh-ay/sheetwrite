@@ -746,6 +746,29 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   await cell_editor.press("Escape");
   expect(await formula_in_g3()).toBe(source);
 
+  // F2 on a cell holding a line wider than the cell opens with the caret at
+  // the end in view, in every engine. G4 is this test's scratch cell.
+  const long_entry = "A stored line far wider than its cell ".repeat(6).trim();
+  await select(page, "G4");
+  await page.keyboard.press("F2");
+  await cell_editor.fill(long_entry);
+  await cell_editor.press("Enter");
+  await expect(cell_editor).toHaveCount(0);
+  await select(page, "G4");
+  await page.keyboard.press("F2");
+  await expect(cell_editor).toHaveValue(long_entry);
+  const opened = await cell_editor.evaluate((field) => {
+    if (!(field instanceof HTMLTextAreaElement))
+      throw new Error("The cell editor is not a textarea");
+    return {
+      caretAtEnd: field.selectionStart === field.value.length,
+      endInView: field.scrollLeft >= field.scrollWidth - field.clientWidth - 2,
+      scrolled: field.scrollLeft > 0,
+    };
+  });
+  expect(opened).toEqual({ caretAtEnd: true, endInView: true, scrolled: true });
+  await cell_editor.press("Escape");
+
   // Pick From Drop-down List under the Region column, with the real Alt (Option
   // on a Mac) and arrow keys; the header is a text entry too, as in Excel.
   await select(page, "B50");

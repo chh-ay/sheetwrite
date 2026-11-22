@@ -17,6 +17,9 @@ import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
 
+/** Room the caret takes past a line's last glyph, in CSS pixels. */
+const CARET_WIDTH = 2;
+
 /**
  * Where the active cell goes after a commit. Enter (`down`, `up`) and Tab
  * (`right`, `left`) move within a selection of several cells; an arrow key
@@ -200,6 +203,8 @@ export class EditController {
   private reported_mode: EditorMode | null = null;
   /** A refused formula's message is open: commits and blur wait for it. */
   private refusing = false;
+  /** Measures the edited line's width without laying the page out; see {@link reveal_line_end}. */
+  private measure_context: CanvasRenderingContext2D | null | undefined;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -276,11 +281,32 @@ export class EditController {
     } else {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
+      this.reveal_line_end(ta, opts);
     }
     // The key that opened the editor is the first typed character.
     if (opts.focus && opts.entering) this.auto_complete(ta);
     if (opts.focus) this.attach_assist();
     this.report_mode();
+  }
+
+  /**
+   * Scroll the editor so the caret at the end of a last line wider than the
+   * editor shows. Chromium scrolls to the caret when the selection is set;
+   * Firefox and WebKit do not. The line is measured on a canvas, so a line that
+   * fits, the usual case, reads no layout; only a wider one costs the layout
+   * that setting the scroll needs.
+   */
+  private reveal_line_end(ta: HTMLTextAreaElement, opts: BeginEditOptions): void {
+    const line = ta.value.slice(ta.value.lastIndexOf("\n") + 1);
+    if (line === "") return;
+    this.measure_context ??= document.createElement("canvas").getContext("2d");
+    const context = this.measure_context;
+    if (context === null) return;
+    context.font = opts.look?.font ?? opts.theme.font;
+    // The text box: the cell less the editor's padding and border on each side (grid.css).
+    const room = opts.rect.w - 2 * (opts.look?.pad ?? cellPadding(1));
+    const overflow = context.measureText(line).width + CARET_WIDTH - room;
+    if (overflow > 0) ta.scrollLeft = overflow;
   }
 
   /**
