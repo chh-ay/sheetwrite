@@ -155,8 +155,8 @@ impl<'a> Parser<'a, '_> {
             let right = Box::new(self.binary_at(level + 1, depth)?);
             let left_operand = Box::new(left);
             left = match operator {
-                BinaryOperator::Cmp(op) => Ast::Cmp(op, left_operand, right),
-                BinaryOperator::Op(op) => Ast::Bin(op, left_operand, right),
+                BinaryOperator::Cmp(op) => Ast::cmp(op, left_operand, right),
+                BinaryOperator::Op(op) => Ast::bin(op, left_operand, right),
             };
 
             if level == COMPARISON {
@@ -195,7 +195,7 @@ impl<'a> Parser<'a, '_> {
         }
         while matches!(self.peek(), Some(Tok::Op('%'))) {
             let _ = self.next();
-            value = Ast::Percent(Box::new(value));
+            value = Ast::percent(Box::new(value));
         }
         Ok(value)
     }
@@ -208,9 +208,9 @@ impl<'a> Parser<'a, '_> {
             let _ = self.next();
             let inner = Box::new(self.unary_at(depth + 1)?);
             return Ok(if sign == '-' {
-                Ast::Neg(inner)
+                Ast::neg(inner)
             } else {
-                Ast::Pos(inner)
+                Ast::pos(inner)
             });
         }
         // Intersection binds tighter than every operator except `:`.

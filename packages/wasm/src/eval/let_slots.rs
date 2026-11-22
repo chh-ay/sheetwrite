@@ -100,8 +100,8 @@ fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
             let args = &call.args;
             args.iter().all(nested)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => nested(left) && nested(right),
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => nested(inner),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => nested(left) && nested(right),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => nested(inner),
         _ => true,
     }
 }
@@ -113,7 +113,7 @@ fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {
 pub(crate) fn scalar_binding(expression: &Ast, names: NameScope<'_>) -> bool {
     match expression {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Name(_) => true,
-        Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_) => {
+        Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..) => {
             scalar_operand(expression, names)
         }
         Ast::Func(..) => call_has_scalar_result(expression, names),
@@ -147,10 +147,12 @@ fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
         | Ast::Cell(..)
         | Ast::AbsCell(..)
         | Ast::SheetCell(..) => true,
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             scalar_operand(left, names) && scalar_operand(right, names)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner, names),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
+            scalar_operand(inner, names)
+        }
         Ast::Func(..) => call_has_scalar_result(ast, names),
         Ast::Missing
         | Ast::DefinedName(..)

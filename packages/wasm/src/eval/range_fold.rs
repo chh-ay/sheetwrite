@@ -334,9 +334,9 @@ fn sum_scalar_or_range(arg: &Ast, names: NameScope<'_>, shapes: Shapes<'_>) -> O
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => Some(SumArg::Scalar { reference: false }),

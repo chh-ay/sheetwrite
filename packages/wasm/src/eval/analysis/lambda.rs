@@ -442,9 +442,9 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
         | Ast::Func(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array(_) => {
@@ -1475,10 +1475,10 @@ impl Context<'_, '_> {
                 .formula()
                 .and_then(|formula| self.written_shape(formula, depth + 1));
         }
-        if let Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) = expression {
+        if let Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) = expression {
             return self.written_shape(inner, depth + 1);
         }
-        if let Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) = expression {
+        if let Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) = expression {
             let (left_rows, left_cols) = self.written_shape(left, depth + 1)?;
             let (right_rows, right_cols) = self.written_shape(right, depth + 1)?;
             // Sizes that do not broadcast are left to the evaluation.

@@ -335,11 +335,13 @@ impl ReadSet {
                     collect(self, arg);
                 }
             }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
                 collect(self, left);
                 collect(self, right);
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => collect(self, inner),
+            Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
+                collect(self, inner)
+            }
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
             | Ast::InvalidRef
@@ -415,10 +417,10 @@ fn ast_is_plain(ast: &Ast) -> bool {
         | Ast::SheetCell(..)
         | Ast::AbsCell(..)
         | Ast::InvalidRef => true,
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
             ast_is_plain(left) && ast_is_plain(right)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_plain(inner),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => ast_is_plain(inner),
         _ => false,
     }
 }

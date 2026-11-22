@@ -205,9 +205,9 @@ pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
@@ -261,9 +261,9 @@ pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRang
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
@@ -359,9 +359,9 @@ fn node_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
         | Ast::UnknownFunc(..)
         | Ast::Bin(..)
         | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
@@ -405,9 +405,9 @@ pub(crate) fn intersection_range(
                 | Ast::UnknownFunc(..)
                 | Ast::Bin(..)
                 | Ast::Cmp(..)
-                | Ast::Neg(_)
-                | Ast::Pos(_)
-                | Ast::Percent(_)
+                | Ast::Neg(..)
+                | Ast::Pos(..)
+                | Ast::Percent(..)
                 | Ast::LetSlot { .. }
                 | Ast::LetName { .. }
                 | Ast::Array { .. } => FormulaError::Value,

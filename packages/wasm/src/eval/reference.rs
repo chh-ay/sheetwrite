@@ -97,8 +97,10 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
             let args = &call.args;
             args.iter().any(contains)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => contains(left) || contains(right),
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains(inner),
+        Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
+            contains(left) || contains(right)
+        }
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => contains(inner),
         Ast::LetSlot { expression, .. } => contains(expression),
         Ast::DefinedName(id, _) => names.formula_satisfies_family(*id, ast_contains_runtime_ref),
         Ast::Num(_)
@@ -364,9 +366,9 @@ impl CellStore {
             Ast::Func(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::Num(_)
             | Ast::Str(_)
@@ -564,9 +566,9 @@ impl CellStore {
             | Ast::UnknownFunc(..)
             | Ast::Bin(..)
             | Ast::Cmp(..)
-            | Ast::Neg(_)
-            | Ast::Pos(_)
-            | Ast::Percent(_)
+            | Ast::Neg(..)
+            | Ast::Pos(..)
+            | Ast::Percent(..)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
             | Ast::Array { .. } => None,

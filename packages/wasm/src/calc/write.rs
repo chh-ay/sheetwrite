@@ -270,7 +270,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
                 }
                 // A signed operand needs its own parentheses, or the sign
                 // would apply to the whole intersection when parsed again.
-                let signed = matches!(operand, Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_));
+                let signed = matches!(operand, Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..));
                 if signed {
                     out.push('(');
                 }
@@ -320,7 +320,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             }
             out.push(')');
         }
-        Ast::Bin(op, left, right) => {
+        Ast::Bin(op, left, right, _) => {
             out.push('(');
             write_ast_with_names(left, out, names);
             out.push(match op {
@@ -334,7 +334,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             write_ast_with_names(right, out, names);
             out.push(')');
         }
-        Ast::Cmp(op, left, right) => {
+        Ast::Cmp(op, left, right, _) => {
             out.push('(');
             write_ast_with_names(left, out, names);
             out.push_str(match op {
@@ -348,17 +348,17 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             write_ast_with_names(right, out, names);
             out.push(')');
         }
-        Ast::Neg(inner) => {
+        Ast::Neg(inner, _) => {
             out.push_str("-(");
             write_ast_with_names(inner, out, names);
             out.push(')');
         }
-        Ast::Pos(inner) => {
+        Ast::Pos(inner, _) => {
             out.push_str("+(");
             write_ast_with_names(inner, out, names);
             out.push(')');
         }
-        Ast::Percent(inner) => {
+        Ast::Percent(inner, _) => {
             out.push('(');
             write_ast_with_names(inner, out, names);
             out.push_str(")%");
