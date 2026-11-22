@@ -77,11 +77,30 @@ class JsonWalkStop {
   constructor(readonly issue: JsonIssue) {}
 }
 
+/**
+ * Thrown by a built walk that does not track ancestors when it nests deeper
+ * than `UNTRACKED_DEPTH_LIMIT`; `measureJson` then walks again with tracking.
+ */
+class JsonWalkTooDeep {}
+
+/**
+ * Nesting a built walk allows before it looks for cycles. A workbook snapshot
+ * nests about ten levels (a border colour of a cell style); a cycle nests
+ * without end and passes this limit.
+ */
+const UNTRACKED_DEPTH_LIMIT = 64;
+
 interface JsonWalk {
   readonly limit: number;
   readonly options: JsonMeasureOptions;
   readonly segments: JsonPathSegments;
+  /**
+   * The objects and arrays above the current value, kept when `trackAncestors`
+   * is set. A built walk first runs without them: a Set entry added and
+   * removed per object cost about a fifth of measuring an imported workbook.
+   */
   readonly ancestors: Set<object>;
+  readonly trackAncestors: boolean;
   bytes: number;
 }
 
@@ -98,7 +117,32 @@ export function measureJson(
   limit: number,
   options: JsonMeasureOptions = {},
 ): JsonMeasure {
-  const walk: JsonWalk = { limit, options, segments: [], ancestors: new Set(), bytes: 0 };
+  if (!options.builtByCaller) return run_walk(value, limit, options, true);
+  try {
+    const untracked = run_walk(value, limit, options, false);
+    if (untracked.issue === undefined) return untracked;
+  } catch (deep) {
+    if (!(deep instanceof JsonWalkTooDeep)) throw deep;
+  }
+  // Deep, cyclic or refused: the tracked walk reports what it always did, so
+  // a cycle is reported as a cycle even when going round it passed the limit.
+  return run_walk(value, limit, options, true);
+}
+
+function run_walk(
+  value: unknown,
+  limit: number,
+  options: JsonMeasureOptions,
+  track_ancestors: boolean,
+): JsonMeasure {
+  const walk: JsonWalk = {
+    limit,
+    options,
+    segments: [],
+    ancestors: new Set(),
+    trackAncestors: track_ancestors,
+    bytes: 0,
+  };
   try {
     if (options.builtByCaller) visit_built_json(walk, value);
     else visit_json(walk, value);
@@ -293,8 +337,12 @@ function visit_json_array(walk: JsonWalk, array: unknown[]): void {
 function visit_built_json(walk: JsonWalk, value: unknown): void {
   if (add_json_scalar(walk, value)) return;
   const record = value as object;
-  if (walk.ancestors.has(record)) stop_invalid(walk, "JSON values cannot contain cycles");
-  walk.ancestors.add(record);
+  if (walk.trackAncestors) {
+    if (walk.ancestors.has(record)) stop_invalid(walk, "JSON values cannot contain cycles");
+    walk.ancestors.add(record);
+  } else if (walk.segments.length > UNTRACKED_DEPTH_LIMIT) {
+    throw new JsonWalkTooDeep();
+  }
   if (Array.isArray(record)) {
     if (Object.getPrototypeOf(record) !== Array.prototype) {
       stop_invalid(walk, "Arrays with custom prototypes are not JSON-safe");
@@ -326,7 +374,7 @@ function visit_built_json(walk: JsonWalk, value: unknown): void {
       walk.segments.pop();
     }
   }
-  walk.ancestors.delete(record);
+  if (walk.trackAncestors) walk.ancestors.delete(record);
 }
 
 /** Arrays Sheetwrite built itself from values it read once, by the generation they were built in. */
