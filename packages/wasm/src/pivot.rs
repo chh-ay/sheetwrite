@@ -485,9 +485,22 @@ impl Axis {
                 continue;
             }
             let depth = entry.depth;
-            let donor = (old_donor as usize + 1..leaves.len())
-                .find(|&row| leaves[row] != NO_GROUP && self.ancestor(leaves[row], depth) == group)
-                .expect("a surviving group has a member after its old label row");
+            let start = old_donor as usize + 1;
+            let next = if depth as usize == self.width {
+                // A leaf group's members are the rows whose leaf it is: one
+                // comparison per row, where walking each row's ancestors
+                // costs a parent chain. Leaf groups have the most rows
+                // between members, so this is the longest scan.
+                leaves
+                    .get(start..)
+                    .and_then(|rest| rest.iter().position(|&leaf| leaf == group))
+                    .map(|offset| start + offset)
+            } else {
+                (start..leaves.len()).find(|&row| {
+                    leaves[row] != NO_GROUP && self.ancestor(leaves[row], depth) == group
+                })
+            };
+            let donor = next.expect("a surviving group has a member after its old label row");
 
             // The donor is a member, so its key equals the group's and the
             // group keeps its hash chain.
