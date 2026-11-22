@@ -4,6 +4,8 @@
  * them; the showcase code aside describes the calls a snippet makes.
  */
 
+import { apiAnchor, apiPageSlugs } from "./api-page-slugs.js";
+
 export interface ApiManifestShape {
   packages: readonly {
     name: string;
@@ -12,6 +14,7 @@ export interface ApiManifestShape {
       classification: string;
       exports?: readonly {
         name: string;
+        kind?: string;
         signature?: string;
         documentation?: string;
         memberDocs?: readonly { name: string; documentation: string }[];
@@ -74,14 +77,6 @@ export interface MemberReference {
   route: string;
 }
 
-function referenceAnchor(value: string): string {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 /**
  * Symbol name -> generated reference route, so every hover on a public API
  * symbol can link straight to its documentation page. Root entry points win
@@ -93,9 +88,10 @@ export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<stri
     for (const entry of rootFirst(pkg.entryPoints)) {
       if (entry.classification !== "supported") continue;
       const slug = entrySlug(pkg.name, entry.subpath);
+      const pages = apiPageSlugs(entry.exports ?? []);
       for (const item of entry.exports ?? []) {
         if (!routes.has(item.name)) {
-          routes.set(item.name, `/docs/api/${slug}/${referenceAnchor(item.name)}/`);
+          routes.set(item.name, `/docs/api/${slug}/${pages.get(item.name)}/`);
         }
       }
     }
@@ -144,6 +140,7 @@ export function apiMemberReferences(
     for (const entry of pkg.entryPoints) {
       if (entry.classification !== "supported") continue;
       const slug = entrySlug(pkg.name, entry.subpath);
+      const pages = apiPageSlugs(entry.exports ?? []);
       for (const item of entry.exports ?? []) {
         for (const member of item.memberDocs ?? []) {
           const { docs, tags } = splitDocumentation(member.documentation);
@@ -151,7 +148,7 @@ export function apiMemberReferences(
           members.set(member.name, {
             docs,
             tags,
-            route: `/docs/api/${slug}/${referenceAnchor(item.name)}/#${referenceAnchor(item.name)}-${referenceAnchor(member.name)}`,
+            route: `/docs/api/${slug}/${pages.get(item.name)}/#${apiAnchor(item.name)}-${apiAnchor(member.name)}`,
           });
         }
       }

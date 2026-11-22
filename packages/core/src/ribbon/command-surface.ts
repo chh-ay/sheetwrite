@@ -36,10 +36,20 @@ export function createCommandContext(options: CommandContextOptions): RibbonCont
     focus: () => readFocus(grid),
     focusGrid: options.focusGrid,
     ...(icons === undefined ? {} : { icons }),
+    // A command run from a dropdown closes it first, as in Excel: a collapsed
+    // group's, More's or the toolbar's. Focus goes where the command leaves
+    // it, such as a panel it opens; if it leaves focus on the closed
+    // dropdown, the grid takes it.
     run: (key, command, control) => {
+      const before = document.activeElement;
+      const fromPopup = options.popup.contains(before);
+      options.popup.closeAll(false);
       const feedback = actionFeedbackFor(grid);
       if (feedback) void feedback.run(`${options.feedbackScope}:${key}`, command, control);
       else command();
+      const after = document.activeElement;
+      if (fromPopup && (after === null || after === before || after === document.body))
+        options.focusGrid();
     },
   };
 }

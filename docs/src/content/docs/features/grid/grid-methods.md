@@ -5,6 +5,16 @@ description: "The imperative Grid handle that createGrid returns, grouped by tas
 
 `createGrid` returns an imperative `Grid` handle. Use it to read and change the document, the selection, the view and the layout.
 
+The methods most code uses, by task. Each section below lists every method of its task.
+
+| Task | Methods |
+| --- | --- |
+| [Document and sheets](#document-and-sheets) | `applyTransaction`, `insertRows`, `styleRange`, `undo`, `redo` |
+| [Selection, editing and search](#selection-editing-and-search) | `setSelection`, `beginEdit`, `search`, `findNext` |
+| [Views](#views-sort-filter-hide-and-group) | `sortBy`, `setViewSort`, `filterBy`, `hideRows`, `groupRows` |
+| [Layout and appearance](#layout-and-appearance) | `setFrozen`, `setZoom`, `setColumnWidth`, `setTheme` |
+| [Lifecycle](#lifecycle) | `on`, `refresh`, `destroy` |
+
 ```ts prelude="core" partial="requires an initialized grid with the item and cost rows described below" title="Drive the grid from code"
 const sheet = grid.getActiveSheet();
 grid.setSelection({ kind: "cell", addr: { sheet, row: 0, col: 1 } });

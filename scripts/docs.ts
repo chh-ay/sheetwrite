@@ -21,7 +21,6 @@ import {
   COMPATIBILITY_INVENTORY,
 } from "../docs/src/showcases/compatibility.js";
 import {
-  anchor,
   consumerIndex,
   documentationLinkRoutes,
   movedPageIssues,
@@ -32,6 +31,7 @@ import {
   renderEntryPointInventory,
   renderMovedGuides,
   renderSymbolPage,
+  symbolPagePath,
   undocumentedApi,
   unresolvedDocumentationLinks,
 } from "./docs-api.js";
@@ -297,16 +297,18 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         content: renderEntryPage(pkg, entry, linkRoutes),
       });
       for (const item of entry.exports) {
-        const symbolPath = join(
-          contentRoot,
-          `api/${entrySlug(pkg.name, entry.subpath)}/${anchor(item.name)}.md`,
-        );
+        const symbolPath = join(contentRoot, `${symbolPagePath(pkg, entry, item)}.md`);
         const owner = `${pkg.name}|${entry.subpath}|${item.name}`;
-        const existingOwner = symbolOwners.get(symbolPath);
+        // Hosts and file systems that ignore letter case serve one page for two
+        // paths that differ only in case, so owners are keyed case-folded.
+        const foldedPath = symbolPath.toLowerCase();
+        const existingOwner = symbolOwners.get(foldedPath);
         if (existingOwner !== undefined) {
-          throw new Error(`API symbol route collision: ${existingOwner} and ${owner}`);
+          throw new Error(
+            `API pages of ${existingOwner} and ${owner} fold to the same path ${symbolPath}`,
+          );
         }
-        symbolOwners.set(symbolPath, owner);
+        symbolOwners.set(foldedPath, owner);
         apiFiles.push({
           path: symbolPath,
           content: await renderSymbolPage(pkg, entry, item, linkRoutes, consumers),
@@ -595,9 +597,7 @@ async function checkDocs(
   const symbolPageKeys = new Set(
     manifest.packages.flatMap((pkg) =>
       pkg.entryPoints.flatMap((entry) =>
-        entry.exports.map((item) =>
-          join(contentRoot, `api/${entrySlug(pkg.name, entry.subpath)}/${anchor(item.name)}.md`),
-        ),
+        entry.exports.map((item) => join(contentRoot, `${symbolPagePath(pkg, entry, item)}.md`)),
       ),
     ),
   );

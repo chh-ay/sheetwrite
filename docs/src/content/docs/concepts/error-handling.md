@@ -121,15 +121,20 @@ snapshots, synchronization and IndexedDB loads.
 
 ## Recovery by boundary
 
-- `SnapshotValidationError` rejects malformed workbooks before partial hydration. Inspect its path-qualified `errors`; fix or reject the source instead of retrying unchanged bytes.
-- `SnapshotResourceError` reports bounded workbook construction. Reduce the document or explicitly raise the named host-controlled ceiling.
-- `DelimitedTextOptionsError` rejects an invalid CSV/TSV ceiling before work starts. Correct the option; retrying the same configuration cannot succeed.
-- `DelimitedTextResourceError` and `XlsxResourceError` retain `resource`, `limit`, and `actual`. Reduce the input/output or explicitly change the applicable limit.
-- `IncompleteDataError` identifies datasource pages required by the operation. Load those pages or use a visible-window operation; do not treat unloaded cells as empty.
-- `PersistenceError` retains the host load/commit `cause`; its code distinguishes aborted work, invalid snapshots, resource limits, missing state, and rejected commits.
-- `IndexedDbPendingCommitStorageError` distinguishes unavailable, blocked, aborted, corrupt, and quota-limited browser storage.
-- `SyncProtocolError` rejects malformed or resource-violating remote input. Fix the producer; do not replay the same payload.
-- `SyncPendingCapacityError` rejects a new local transaction before it can exceed the durable queue ceiling. Drain or reconcile pending work before retrying.
+Each error asks for one kind of fix:
+
+| Error | What to do |
+| --- | --- |
+| `SnapshotValidationError` | Fix the input. It rejects a malformed workbook before partial hydration: inspect its path-qualified `errors`, and fix or reject the source instead of retrying unchanged bytes. |
+| `SyncProtocolError` | Fix the input. It rejects malformed or resource-violating remote input: fix the producer, and do not replay the same payload. |
+| `DelimitedTextOptionsError` | Fix the option. It rejects an invalid CSV/TSV ceiling before work starts, so retrying the same configuration cannot succeed. |
+| `SnapshotResourceError` | Reduce the document, or explicitly raise the named host-controlled ceiling. It reports bounded workbook construction. |
+| `DelimitedTextResourceError`, `XlsxResourceError` | Reduce the input or output, or explicitly change the applicable limit. Both keep `resource`, `limit` and `actual`. |
+| `IncompleteDataError` | Load the datasource pages it names, or use a visible-window operation. Do not treat unloaded cells as empty. |
+| `SyncPendingCapacityError` | Drain or reconcile pending work, then retry. It rejects a new local transaction before it can exceed the durable queue ceiling. |
+| `PersistenceError` | Read its `cause` and code. It keeps the host load or commit `cause`, and its code tells aborted work, invalid snapshots, resource limits, missing state and rejected commits apart. |
+| `IndexedDbPendingCommitStorageError` | Read its code: browser storage that is unavailable, blocked, aborted, corrupt or out of quota. |
+| A worker failure | Nothing to fix: the grid keeps working on the canvas renderer and emits `renderer-fallback`, as described below. |
 
 Worker failures switch to the canvas renderer and emit `renderer-fallback`. Call `grid.rendererKind()` to report the active renderer, not the requested option. `error.context.failure` tells why the worker stopped:
 

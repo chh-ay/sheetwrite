@@ -62,6 +62,21 @@ grid.store.applyTransaction({
 
 ## Criteria semantics and shapes
 
+A criteria function checks each row against every criteria pair, and uses only the rows that meet all of them:
+
+```formula partial="formula examples" title="Sum the East rows above 10"
+=SUMIFS(C1:C4,A1:A4,"East",B1:B4,">10")
+```
+
+| Row | A | B | C |
+| --- | --- | ---: | ---: |
+| 1 | East | 12 | 100 |
+| 2 | West | 40 | 200 |
+| 3 | East | 8 | 300 |
+| 4 | East | 30 | 400 |
+
+Rows 1 and 4 meet both criteria, so the result is C1 + C4: 100 + 400 = 500. Row 2 is West and row 3 has 8, so both are skipped. The two criteria ranges and the sum range have the same shape, four rows by one column.
+
 Criteria strings may begin with `=`, `<>`, `<`, `<=`, `>`, or `>=`. Plain numeric and boolean operands (`5`, `1e3`, `TRUE`) are parsed before text comparison; other text, such as `1,000`, compares as text. Plain text comparisons are case-insensitive. `*` matches zero or more characters, `?` matches one character, and `~` escapes the next `*`, `?` or `~`. Wildcards apply to equality/inequality text criteria. Criteria, `XLOOKUP` and `XMATCH` match mode 2, and `SEARCH` use the same wildcard rule: case folds one character at a time, so `?` matches `İ` and `CAFÉ` matches `café`. Criteria are parsed once per formula evaluation, not once per cell.
 
 Shapes are exact row-by-column dimensions; equal cell counts with different dimensions do not match:

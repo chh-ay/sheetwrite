@@ -418,13 +418,16 @@ a {
 /* Markdown tables sit in a scroll frame (added at build time), so short cells
    keep values and identifiers on one line without widening the page. An edge
    shadow shows only while more columns sit out of view on that side: the
-   covers scroll with the content, the shadows stay with the frame. */
+   covers scroll with the content, the shadows stay with the frame. The covers
+   take the colour behind the table, `--sw-table-cover`, the docs column's by default. */
 .sw-prose .sw-table-frame {
   margin: var(--sw-space-8) calc(var(--sw-space-3) * -1) var(--sw-space-10);
   overflow-x: auto;
   background:
-    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
-    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
+    linear-gradient(to right, var(--sw-table-cover, var(--sw-surface-1)) 40%, transparent) left /
+      2rem 100% no-repeat local,
+    linear-gradient(to left, var(--sw-table-cover, var(--sw-surface-1)) 40%, transparent) right /
+      2rem 100% no-repeat local,
     radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
       no-repeat scroll,
     radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
@@ -495,6 +498,19 @@ a {
    (signatures, sentences) wrap at spaces so the prose column stays readable. */
 .sw-prose .sw-table-frame .sw-cell-short,
 .sw-prose .sw-code-token {
+  white-space: nowrap;
+}
+
+/* Inline code in a table breaks only at its spaces and between the words of a
+   name, where the build puts a <wbr> between unbreakable words
+   (`Storage|Error`), never inside a word. It follows its cell: a short cell
+   keeps it on one line. */
+.sw-prose .sw-table-frame :not(pre) > code {
+  overflow-wrap: normal;
+  white-space: inherit;
+}
+
+.sw-prose .sw-table-frame .sw-code-word {
   white-space: nowrap;
 }
 
@@ -694,18 +710,18 @@ a {
   }
 }
 
-/* On a phone, a two-column table stacks each row: the first cell, then the
-   second, each under its column's heading. Side by side, the second column
-   (the replacement, the step to take) would scroll out of view. */
+/* On a phone, a two-column table, or a three-column one too wide for a phone
+   row, stacks each row: each cell under its column's heading. Side by side,
+   the last column (the replacement, the step to take) would scroll out of view. */
 @media (max-width: 36rem) {
-  .sw-prose .sw-table-frame--pairs > table,
-  .sw-prose .sw-table-frame--pairs tbody,
-  .sw-prose .sw-table-frame--pairs tr,
-  .sw-prose .sw-table-frame--pairs td {
+  .sw-prose .sw-table-frame--stack > table,
+  .sw-prose .sw-table-frame--stack tbody,
+  .sw-prose .sw-table-frame--stack tr,
+  .sw-prose .sw-table-frame--stack td {
     display: block;
   }
 
-  .sw-prose .sw-table-frame--pairs thead {
+  .sw-prose .sw-table-frame--stack thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -714,21 +730,21 @@ a {
     white-space: nowrap;
   }
 
-  .sw-prose .sw-table-frame--pairs tr {
+  .sw-prose .sw-table-frame--stack tr {
     padding-block: var(--sw-space-3);
     border-bottom: 1px solid var(--sw-border);
   }
 
-  .sw-prose .sw-table-frame--pairs td {
+  .sw-prose .sw-table-frame--stack td {
     padding: 0 var(--sw-space-3);
     border-bottom: 0;
   }
 
-  .sw-prose .sw-table-frame--pairs td + td {
+  .sw-prose .sw-table-frame--stack td + td {
     margin-top: var(--sw-space-2);
   }
 
-  .sw-prose .sw-table-frame--pairs td::before {
+  .sw-prose .sw-table-frame--stack td::before {
     content: attr(data-label);
     display: block;
     color: var(--sw-fg-muted);

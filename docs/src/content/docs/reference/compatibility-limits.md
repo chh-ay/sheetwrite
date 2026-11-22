@@ -3,14 +3,24 @@ title: Compatibility and limits
 description: Explicit compatibility boundaries, resource ceilings, tuning defaults, limit behavior, and override paths.
 ---
 
+One ceiling from each area, and what happens above it. The sections below list every ceiling.
+
+| Area | Ceiling | Above it |
+| --- | --- | --- |
+| Formulas | 1,000,000 cells | A formula range resolves to `#NUM!`. |
+| Transactions | 10,000 operations | The transaction is rejected. |
+| Snapshots | 256 sheets | Loading the snapshot is rejected. |
+| Delimited text | 32 MiB of input | Parsing the text throws an error. |
+| Sync | 10,000 operations in a remote version | A protocol error, and the client must reload. |
+
 | Area | Supported contract | Boundary |
 | --- | --- | --- |
 | Data | Eager columnar data or cancellable datasource pages; dense and allocation-lazy paged storage | Full-sheet queries and exports are incomplete until required pages load |
-| Formulas | Persisted formula source, A1/range references, spill references, named ranges, references to other workbooks (their saved values), host functions from `functionsAddon`, the inventory-derived supported function contract in two engine builds, bounded lexical `LET` and `LAMBDA`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external-data, network, cube, and live-data functions and automatic volatility beyond the clock barrier are unsupported |
+| Formulas | Persisted formula source, A1/range references, spill references, named ranges, references to other workbooks (their saved values), host functions from `functionsAddon`, the inventory-derived supported function contract in two engine builds, bounded lexical `LET` and `LAMBDA`, and bounded dynamic-array spills | No blanket Excel, Google Sheets or OpenFormula claim; external-data, network, cube, and live-data functions and automatic volatility beyond the clock barrier are unsupported |
 | Protection | Serializable client interaction policy with atomic/partial local mutation behavior | Never server authorization; remote operations bypass local UX policy |
-| Collaboration | Host sequencing, stable mutation IDs, durable optimistic edits, ordered remote operations, presence/comments/version history, conservative rebase | No bundled server, CRDT (conflict-free replicated data type), or general OT (operational transformation); ambiguous structural/formula conflicts require host UX |
-| Worker | OffscreenCanvas rendering, with fallback to the main thread when the worker cannot start or stops | Custom function renderers cannot transfer to the worker |
-| XLSX | Table interchange plus supported workbook formulas/styles/merges/dimensions/frozen panes/names and Sheetwrite metadata | Unsupported workbook features are warned, flattened, or dropped; not full Excel fidelity |
+| Collaboration | Host sequencing, stable mutation IDs, durable optimistic edits, ordered remote operations, presence, comments and version history, conservative rebase | No bundled server, CRDT (conflict-free replicated data type), or general OT (operational transformation); ambiguous structural/formula conflicts require host UX |
+| Worker | `OffscreenCanvas` rendering, with fallback to the main thread when the worker cannot start or stops | Custom function renderers cannot transfer to the worker |
+| XLSX | Table interchange plus supported workbook formulas, styles, merges, dimensions, frozen panes, names and Sheetwrite metadata | Unsupported workbook features are warned, flattened, or dropped; not full Excel fidelity |
 | Accessibility | ARIA grid mirror for the visible virtualized window with keyboard-driven updates | The full document is not duplicated into hidden DOM |
 
 Compatibility statements are feature contracts, not claims of Excel or Google Sheets parity.

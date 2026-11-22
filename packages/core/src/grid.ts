@@ -2045,7 +2045,13 @@ export class GridImpl implements Grid {
       this.lastDevicePixelRatio = devicePixelRatio;
       this.maxElementHeight = measureMaxElementHeight();
     }
-    const size = this.geometry.layoutSize(this.viewportH());
+    // The scroller's client area leaves out classic scrollbars; the room a
+    // scroll into view needs past the last column and row depends on it.
+    const size = this.geometry.layoutSize(
+      this.viewportH(),
+      this.scroller.clientWidth,
+      this.scroller.clientHeight,
+    );
     this.sizer.style.width = `${size.width}px`;
     this.sizer.style.height = `${size.height}px`;
   }
@@ -3070,19 +3076,25 @@ export class GridImpl implements Grid {
   scrollToCell(addr: CellAddress): void {
     if (addr.sheet !== this.activeSheet) this.setActiveSheet(addr.sheet);
 
+    // A scroll into view moves by whole rows and columns, as in Excel: going
+    // down or right it stops at the first row or column boundary that shows
+    // the target whole, so the first row and column on screen start at their
+    // gridlines. A target larger than the body aligns its own top or left edge.
     // Cells inside the frozen bands are always visible on their pinned axis.
     const fr = this.frozenRowCount();
     const frozenH = this.frozenHeight();
     if (addr.row >= fr) {
       const top = this.geometry.rowOffset(addr.row);
       const bottom = top + this.geometry.rowHeight(addr.row);
-      const bodyHeight = Math.max(0, this.viewportH() - this.theme.headerHeight);
+      const bodyHeight = Math.max(0, this.scroller.clientHeight - this.theme.headerHeight);
       const contentTop = this.geometry.toContent(this.scroller.scrollTop);
 
       // Visible body band in content space: [contentTop + frozenH, contentTop + bodyHeight).
       let target = contentTop;
       if (top < contentTop + frozenH) target = top - frozenH;
-      else if (bottom > contentTop + bodyHeight) target = bottom - bodyHeight;
+      else if (bottom > contentTop + bodyHeight) {
+        target = Math.min(top, this.geometry.rowStartFrom(bottom - bodyHeight + frozenH)) - frozenH;
+      }
       if (target !== contentTop) {
         this.scroller.scrollTop = this.geometry.toScroll(Math.max(0, target));
       }
@@ -3099,14 +3111,13 @@ export class GridImpl implements Grid {
     const width = (this.sheet().columns[col]?.width ?? 0) * this.zoom;
     const frozenW = this.frozenWidth();
     const viewLeft = this.scroller.scrollLeft + frozenW;
-    const cellWidth = Math.max(
-      0,
-      this.viewportEl.clientWidth - this.theme.rowHeaderWidth - frozenW,
-    );
+    const cellWidth = Math.max(0, this.scroller.clientWidth - this.theme.rowHeaderWidth - frozenW);
     const viewRight = viewLeft + cellWidth;
     if (left < viewLeft) this.scroller.scrollLeft = Math.max(0, left - frozenW);
-    else if (left + width > viewRight)
-      this.scroller.scrollLeft = Math.max(0, left + width - cellWidth - frozenW);
+    else if (left + width > viewRight) {
+      const start = Math.min(left, this.geometry.columnStartFrom(left + width - cellWidth));
+      this.scroller.scrollLeft = Math.max(0, start - frozenW);
+    }
   }
 
   getSelection(): Selection | null {
