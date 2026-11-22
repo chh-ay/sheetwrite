@@ -1,3 +1,4 @@
+import { cellPadding } from "./canvas-paint.js";
 import {
   EDIT_SURFACE_ATTRIBUTE,
   type EditorFieldMetrics,
@@ -84,6 +85,19 @@ export interface EditorLook {
   readonly decoration: string;
   /** Space between the text and the cell's left and right gridlines, as the cell paints it at the zoom. */
   readonly pad: number;
+}
+
+/**
+ * Put on the declarations of `look` that differ from what `.sheetwrite-editor`
+ * (grid.css) already gives the editor: the theme's font and colour, left
+ * alignment, no decoration and the cell padding at zoom 1.
+ */
+function write_look(style: CSSStyleDeclaration, look: EditorLook, theme: Theme): void {
+  if (look.font !== theme.font) style.font = look.font;
+  if (look.color !== theme.fg) style.color = look.color;
+  if (look.align !== "left") style.textAlign = look.align;
+  if (look.decoration !== "none") style.textDecoration = look.decoration;
+  if (look.pad !== cellPadding(1)) style.setProperty("--sheetwrite-cell-pad", `${look.pad}px`);
 }
 
 export interface BeginEditOptions {
@@ -238,16 +252,10 @@ export class EditController {
     ta.style.setProperty("--sheetwrite-fg", opts.theme.fg);
     ta.style.setProperty("--sheetwrite-bg", opts.theme.bg);
     // The cell's own formatting is content, not theme: it goes on inline, as
-    // the canvas paints it, so the text does not jump when the edit starts or ends.
-    const look = opts.look;
-    if (look !== undefined) {
-      const { style } = ta;
-      style.font = look.font;
-      style.color = look.color;
-      style.textAlign = look.align;
-      style.textDecoration = look.decoration;
-      style.setProperty("--sheetwrite-cell-pad", `${look.pad}px`);
-    }
+    // the canvas paints it, so the text does not jump when the edit starts or
+    // ends. Only what differs from the stylesheet goes on: inline declarations
+    // make the style recalculation that focusing the editor forces slower.
+    if (opts.look !== undefined) write_look(ta.style, opts.look, opts.theme);
 
     this.host.appendChild(ta);
     this.textarea = ta;
