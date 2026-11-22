@@ -164,17 +164,6 @@ const EXACT_POWERS_OF_TEN: [f64; 23] = [
 ];
 /// Integers below this are exact doubles.
 const EXACT_INTEGER_LIMIT: u64 = 1 << f64::MANTISSA_DIGITS;
-/// Powers of ten that fit 64 bits. A table read, because `checked_pow` is a
-/// 128-bit library call per step in WebAssembly.
-const U64_POWERS_OF_TEN: [u64; 20] = {
-    let mut powers = [1; 20];
-    let mut index = 1;
-    while index < powers.len() {
-        powers[index] = powers[index - 1] * 10;
-        index += 1;
-    }
-    powers
-};
 
 /// `number` rounded at a decimal place the way ROUND, ROUNDUP and ROUNDDOWN
 /// do. `places` may be negative.
@@ -232,12 +221,11 @@ fn round_digit_integer(
     }
     // `digits` has at most 15 digits: a unit above ten times them (or past
     // 64 bits) leaves every digit below the kept place, and only a round-up
-    // keeps a unit there. Every unit is a multiple of ten, so `unit / 10` is
-    // exact.
-    let dropped_unit = usize::try_from(dropped)
+    // keeps a unit there.
+    let dropped_unit = u32::try_from(dropped)
         .ok()
-        .and_then(|count| U64_POWERS_OF_TEN.get(count).copied());
-    let Some(unit) = dropped_unit.filter(|&unit| unit / 10 <= digits) else {
+        .and_then(|count| 10u64.checked_pow(count));
+    let Some(unit) = dropped_unit.filter(|&unit| unit <= digits.saturating_mul(10)) else {
         return (u64::from(rounding == Rounding::Away), kept_place);
     };
     let kept = digits / unit;
