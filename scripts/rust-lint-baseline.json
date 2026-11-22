@@ -2,7 +2,7 @@
   "wasm": {
     "clippy::allow_attributes_without_reason": 1,
     "clippy::clone_on_ref_ptr": 2,
-    "clippy::cognitive_complexity": 24,
+    "clippy::cognitive_complexity": 23,
     "clippy::default_trait_access": 1,
     "clippy::disallowed_methods": 15,
     "clippy::expect_used": 26,
@@ -25,7 +25,7 @@
     "clippy::str_to_string": 1,
     "clippy::suspicious_operation_groupings": 3,
     "clippy::too_many_arguments": 102,
-    "clippy::too_many_lines": 48,
+    "clippy::too_many_lines": 47,
     "clippy::tuple_array_conversions": 2,
     "clippy::type_complexity": 114,
     "clippy::undocumented_unsafe_blocks": 2,

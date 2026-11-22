@@ -1,10 +1,10 @@
 //! Whole-column queries: sort, filter, search, aggregate — cache-local scans.
 
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::cmp::Ordering;
 use std::ops::Range;
 
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -64,6 +64,15 @@ impl PoolIdStamps {
         let fresh = *bits & mask == 0;
         *bits |= mask;
         fresh
+    }
+
+    /// Whether `id` is marked.
+    #[inline]
+    fn contains(&self, id: u32) -> bool {
+        let index = id as usize;
+        self.words
+            .get(index / STAMP_WORD_BITS)
+            .is_some_and(|bits| bits & (1u64 << (index % STAMP_WORD_BITS)) != 0)
     }
 
     /// Grows the marks to hold `word`. Out of line, so the scan loops that
@@ -143,7 +152,10 @@ const VALUE_SET_TRUE_BIT: u8 = 2;
 ///
 /// The row loop then answers membership without comparing the cell with every
 /// picked value: numeric picks use binary search and text picks use a hash set.
-/// `Linear` keeps the scan for lists short enough that a lookup costs more than it saves.
+/// A literal text cell is answered by its pool id alone: the pool holds each
+/// text once, so the cell holds a picked text exactly when its id is one of
+/// the picked texts' ids. `Linear` keeps the scan for lists short enough that
+/// a lookup costs more than it saves.
 enum ValueSet<'a> {
     Linear,
     Lookup {
@@ -151,14 +163,18 @@ enum ValueSet<'a> {
         /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
         /// equality can match.
         numbers: Vec<u64>,
-        texts: FxHashSet<&'a str>,
+        /// The picked texts, built on the first cell that needs them: only
+        /// formula results and paged cells are compared as text.
+        texts: OnceCell<FxHashSet<&'a str>>,
+        /// Pool ids of the picked texts that the string pool holds.
+        ids: PoolIdStamps,
         /// Picked booleans, as the two bits above.
         bools: u8,
     },
 }
 
 impl<'a> ValueSet<'a> {
-    fn build(picked_numbers: &[f64], picked_texts: &'a [String]) -> Self {
+    fn build(picked_numbers: &[f64], picked_texts: &[String], strings: &StringStorage) -> Self {
         if picked_numbers.len() + picked_texts.len() <= VALUE_SET_LINEAR_MAX {
             return ValueSet::Linear;
         }
@@ -172,7 +188,7 @@ impl<'a> ValueSet<'a> {
         numbers.sort_unstable();
         numbers.dedup();
 
-        let mut texts = FxHashSet::with_capacity_and_hasher(picked_texts.len(), FxBuildHasher);
+        let mut ids = PoolIdStamps::new();
         let mut bools = 0u8;
 
         for picked in picked_texts {
@@ -182,13 +198,371 @@ impl<'a> ValueSet<'a> {
                 _ => {}
             }
 
-            texts.insert(picked.as_str());
+            if let Some(id) = strings.find(picked) {
+                ids.insert(id);
+            }
         }
 
         ValueSet::Lookup {
             numbers,
-            texts,
+            texts: OnceCell::new(),
+            ids,
             bools,
+        }
+    }
+
+    /// Whether the cell at `index`, of resolved `kind` (1 number, 2 text,
+    /// 3 logical), holds a picked value. `numbers` and `texts` are the picks
+    /// the set was built from.
+    fn holds(&self, cell: FilterCell<'_>, kind: u8, numbers: &[f64], texts: &'a [String]) -> bool {
+        let FilterCell { data, store, index } = cell;
+        let slots = &store.formula_slots;
+        match self {
+            ValueSet::Linear => match kind {
+                1 => numeric_cell_value(data, index, slots)
+                    .is_some_and(|value| numbers.contains(&value)),
+                2 => resolved_text(data, &store.strings, index, slots)
+                    .is_some_and(|text| texts.iter().any(|picked| picked == text)),
+                3 => boolean_cell_value(data, index, slots).is_some_and(|value| {
+                    let expected = if value {
+                        VALUE_SET_TRUE
+                    } else {
+                        VALUE_SET_FALSE
+                    };
+                    texts.iter().any(|picked| picked == expected)
+                }),
+                _ => false,
+            },
+            ValueSet::Lookup {
+                numbers: picked_numbers,
+                texts: picked_texts,
+                bools,
+                ..
+            } => match kind {
+                1 => numeric_cell_value(data, index, slots).is_some_and(|value| {
+                    let normalized = if value == 0.0 { 0.0 } else { value };
+                    picked_numbers.binary_search(&normalized.to_bits()).is_ok()
+                }),
+                2 => resolved_text(data, &store.strings, index, slots).is_some_and(|text| {
+                    picked_texts
+                        .get_or_init(|| texts.iter().map(String::as_str).collect())
+                        .contains(text)
+                }),
+                3 => boolean_cell_value(data, index, slots)
+                    .is_some_and(|value| bools & boolean_bit(value) != 0),
+                _ => false,
+            },
+        }
+    }
+}
+
+/// The bit of a picked boolean in [`ValueSet::Lookup`].
+const fn boolean_bit(value: bool) -> u8 {
+    if value {
+        VALUE_SET_TRUE_BIT
+    } else {
+        VALUE_SET_FALSE_BIT
+    }
+}
+
+/// Filter kinds of [`CellStore::filter_rows_multi`]; its doc says what each keeps.
+const FILTER_VALUES: u8 = 0;
+const FILTER_CONTAINS: u8 = 1;
+const FILTER_COMPARE: u8 = 2;
+const FILTER_EMPTY: u8 = 3;
+const FILTER_NON_EMPTY: u8 = 4;
+const FILTER_CUSTOM: u8 = 5;
+const FILTER_MONTHS: u8 = 6;
+
+/// The flat filter arguments of [`CellStore::filter_rows_multi`], as
+/// JavaScript passes them.
+struct FilterInput<'a> {
+    kinds: &'a [u8],
+    flags: &'a [u8],
+    nums: &'a [f64],
+    num_counts: &'a [u32],
+    text_counts: &'a [u32],
+    value_nums: &'a [f64],
+    value_texts: &'a [String],
+}
+
+impl<'a> FilterInput<'a> {
+    /// One rule per filter, or `None` when a custom filter's criterion does
+    /// not parse.
+    fn rules(&self, strings: &StringStorage) -> Option<Vec<FilterRule<'a>>> {
+        let mut rules = Vec::with_capacity(self.kinds.len());
+        let (mut num_offset, mut text_offset) = (0usize, 0usize);
+        for (i, &kind) in self.kinds.iter().enumerate() {
+            let num_count = self.num_counts.get(i).copied().unwrap_or_default() as usize;
+            let text_count = self.text_counts.get(i).copied().unwrap_or_default() as usize;
+            let numbers = self
+                .value_nums
+                .get(num_offset..num_offset.saturating_add(num_count))
+                .unwrap_or_default();
+            let texts = self
+                .value_texts
+                .get(text_offset..text_offset.saturating_add(text_count))
+                .unwrap_or_default();
+            let flag = self.flags.get(i).copied().unwrap_or_default();
+            rules.push(match kind {
+                FILTER_VALUES => FilterRule::Values {
+                    keeps_blank: flag & 1 != 0,
+                    set: ValueSet::build(numbers, texts, strings),
+                    numbers,
+                    texts,
+                },
+                FILTER_CONTAINS => FilterRule::Contains {
+                    needle: self
+                        .value_texts
+                        .get(text_offset)
+                        .map(String::as_str)
+                        .unwrap_or_default(),
+                    case_insensitive: flag == 0,
+                    cache: Box::new(MatchCache::new()),
+                },
+                FILTER_COMPARE => FilterRule::Compare {
+                    op: flag,
+                    value: self.nums.get(i).copied().unwrap_or_default(),
+                },
+                FILTER_EMPTY => FilterRule::Empty,
+                FILTER_NON_EMPTY => FilterRule::NonEmpty,
+                // Custom filters match as COUNTIF criteria do: one or two per filter.
+                FILTER_CUSTOM => FilterRule::Custom {
+                    any: flag & 1 != 0,
+                    criteria: texts
+                        .iter()
+                        .map(|text| Criterion::parse(Value::text(text.as_str())).ok())
+                        .collect::<Option<Vec<_>>>()?,
+                },
+                FILTER_MONTHS => FilterRule::Months(numbers),
+                _ => FilterRule::Never,
+            });
+            num_offset = num_offset.saturating_add(num_count);
+            text_offset = text_offset.saturating_add(text_count);
+        }
+        Some(rules)
+    }
+}
+
+/// What one column filter of [`CellStore::filter_rows_multi`] keeps, parsed
+/// once per scan.
+enum FilterRule<'a> {
+    /// The picked values, from `numbers` and `texts`; `keeps_blank` also
+    /// keeps empty cells.
+    Values {
+        keeps_blank: bool,
+        set: ValueSet<'a>,
+        numbers: &'a [f64],
+        texts: &'a [String],
+    },
+    /// Text that contains `needle`. The cache is boxed: it is large and the
+    /// other rules are small.
+    Contains {
+        needle: &'a str,
+        case_insensitive: bool,
+        cache: Box<MatchCache>,
+    },
+    /// Numbers compared with `value`; `op` is 0 `>`, 1 `>=`, 2 `<`, 3 `<=`,
+    /// 4 `=` and anything else `<>`.
+    Compare {
+        op: u8,
+        value: f64,
+    },
+    Empty,
+    NonEmpty,
+    /// COUNTIF criteria; with `any` a row meets one of them, else all.
+    Custom {
+        any: bool,
+        criteria: Vec<Criterion>,
+    },
+    /// Dates in these months (1 to 12) of any year.
+    Months(&'a [f64]),
+    /// An unknown kind keeps no row.
+    Never,
+}
+
+/// One cell that a filter reads: the sheet, the store that owns it and the
+/// cell's index in the sheet's column-major storage.
+#[derive(Clone, Copy)]
+struct FilterCell<'a> {
+    data: &'a SheetData,
+    store: &'a CellStore,
+    index: usize,
+}
+
+impl FilterRule<'_> {
+    /// Whether the cell passes, read through the general cell accessors, so
+    /// formulas, errors and paged storage resolve as everywhere else.
+    fn keeps(&mut self, cell: FilterCell<'_>) -> bool {
+        let FilterCell { data, store, index } = cell;
+        let slots = &store.formula_slots;
+        match self {
+            FilterRule::Values {
+                keeps_blank,
+                set,
+                numbers,
+                texts,
+            } => {
+                let kind = resolved_kind(data, index, slots);
+                (kind == 0 && *keeps_blank) || set.holds(cell, kind, numbers, texts)
+            }
+            FilterRule::Contains {
+                needle,
+                case_insensitive,
+                cache,
+            } => cell_matches_text(data, store, index, needle, *case_insensitive, false, cache),
+            FilterRule::Compare { op, value } => numeric_cell_value(data, index, slots)
+                .is_some_and(|number| compare_number(*op, number, *value)),
+            FilterRule::Empty => resolved_kind(data, index, slots) == 0,
+            FilterRule::NonEmpty => resolved_kind(data, index, slots) != 0,
+            FilterRule::Custom { any, criteria } => {
+                let kind = resolved_kind(data, index, slots);
+                let test = |criterion: &Criterion| {
+                    criterion_matches_cell(data, store, index, kind, criterion)
+                };
+                if *any {
+                    criteria.iter().any(test)
+                } else {
+                    criteria.iter().all(test)
+                }
+            }
+            FilterRule::Months(months) => numeric_cell_value(data, index, slots)
+                .and_then(excel_date_parts)
+                .and_then(|(_, month, _)| i32::try_from(month).ok())
+                .is_some_and(|month| months.contains(&f64::from(month))),
+            FilterRule::Never => false,
+        }
+    }
+
+    /// The answer for a literal cell of a dense column, from its raw kind byte
+    /// and payload alone; the same answer [`Self::keeps`] gives. `None` for a
+    /// formula or calculated cell, and for rules that always read the cell.
+    #[inline]
+    fn keeps_literal(&mut self, strings: &StringStorage, raw: u8, payload: u64) -> Option<bool> {
+        match self {
+            FilterRule::Contains {
+                needle,
+                case_insensitive,
+                cache,
+            } => match raw {
+                KIND_STRING => Some(cache.matches(
+                    strings,
+                    payload_str_id(payload),
+                    needle,
+                    *case_insensitive,
+                    false,
+                )),
+                KIND_NUMBER => Some(number_matches_text(
+                    payload_num(payload),
+                    needle,
+                    *case_insensitive,
+                    false,
+                )),
+                KIND_BOOL => Some(matches_needle(
+                    boolean_text(payload_num(payload) != 0.0),
+                    needle,
+                    *case_insensitive,
+                    false,
+                )),
+                KIND_EMPTY => Some(false),
+                _ => None,
+            },
+            FilterRule::Values {
+                keeps_blank,
+                set:
+                    ValueSet::Lookup {
+                        numbers,
+                        ids,
+                        bools,
+                        ..
+                    },
+                ..
+            } => match raw {
+                KIND_STRING => Some(ids.contains(payload_str_id(payload))),
+                KIND_NUMBER => {
+                    let value = payload_num(payload);
+                    let normalized = if value == 0.0 { 0.0 } else { value };
+                    Some(numbers.binary_search(&normalized.to_bits()).is_ok())
+                }
+                KIND_BOOL => Some(*bools & boolean_bit(payload_num(payload) != 0.0) != 0),
+                KIND_EMPTY => Some(*keeps_blank),
+                _ => None,
+            },
+            FilterRule::Values {
+                set: ValueSet::Linear,
+                ..
+            }
+            | FilterRule::Compare { .. }
+            | FilterRule::Empty
+            | FilterRule::NonEmpty
+            | FilterRule::Custom { .. }
+            | FilterRule::Months(_)
+            | FilterRule::Never => None,
+        }
+    }
+}
+
+/// `cell op value` for the [`FilterRule::Compare`] op codes.
+fn compare_number(op: u8, cell: f64, value: f64) -> bool {
+    match op {
+        0 => cell > value,
+        1 => cell >= value,
+        2 => cell < value,
+        3 => cell <= value,
+        4 => cell == value,
+        _ => cell != value,
+    }
+}
+
+/// The rows of `rows`, or of the whole sheet when `None`, whose cell in `col`
+/// passes `rule`, in their order. A dense column answers literal cells from
+/// their raw slots; every other cell goes through [`FilterRule::keeps`].
+fn filter_column(
+    store: &CellStore,
+    data: &SheetData,
+    col: usize,
+    rule: &mut FilterRule<'_>,
+    rows: Option<Vec<u32>>,
+) -> Vec<u32> {
+    let row_count = data.cells.row_count();
+    let base = col * row_count;
+    let cell = |row: usize| FilterCell {
+        data,
+        store,
+        index: base + row,
+    };
+    let Some(column) = data.cells.dense_column(col) else {
+        return keep_rows(row_count, rows, |row| rule.keeps(cell(row)));
+    };
+
+    let (kinds, payloads) = column.raw_slices();
+    keep_rows(row_count, rows, |row| {
+        let literal = match (kinds.get(row), payloads.get(row)) {
+            (Some(&raw), Some(&payload)) => rule.keeps_literal(&store.strings, raw, payload),
+            _ => None,
+        };
+        match literal {
+            Some(kept) => kept,
+            None => rule.keeps(cell(row)),
+        }
+    })
+}
+
+/// The rows that `keeps` accepts: of `0..row_count` when `rows` is `None`,
+/// else of `rows`, in their order.
+fn keep_rows(
+    row_count: usize,
+    rows: Option<Vec<u32>>,
+    mut keeps: impl FnMut(usize) -> bool,
+) -> Vec<u32> {
+    match rows {
+        None => (0..row_count)
+            .filter(|&row| keeps(row))
+            .map(|row| row as u32)
+            .collect(),
+        Some(mut kept) => {
+            kept.retain(|&row| keeps(row as usize));
+            kept
         }
     }
 }
@@ -819,212 +1193,40 @@ impl CellStore {
         {
             return Vec::new();
         }
-        let mut num_offsets = Vec::with_capacity(cols.len());
-        let mut text_offsets = Vec::with_capacity(cols.len());
-        let (mut no, mut to) = (0usize, 0usize);
-        for i in 0..cols.len() {
-            num_offsets.push(no);
-            text_offsets.push(to);
-            no = no.saturating_add(num_counts.get(i).copied().unwrap_or_default() as usize);
-            to = to.saturating_add(text_counts.get(i).copied().unwrap_or_default() as usize);
-        }
-        let mut cache_index = vec![usize::MAX; kinds.len()];
-        let mut match_caches = Vec::with_capacity(kinds.iter().filter(|&&kind| kind == 1).count());
-        for (index, &kind) in kinds.iter().enumerate() {
-            if kind != 1 {
-                continue;
-            }
-            cache_index[index] = match_caches.len();
-            match_caches.push(MatchCache::new());
-        }
         QUERY_STATS.with(|stats| {
             let mut current = stats.get();
-            current[0] = current[0].saturating_add(match_caches.len() as u64);
+            let caches = kinds
+                .iter()
+                .filter(|&&kind| kind == FILTER_CONTAINS)
+                .count();
+            current[0] = current[0].saturating_add(caches as u64);
             stats.set(current);
         });
-        let mut value_sets: Vec<ValueSet<'_>> = Vec::with_capacity(kinds.len());
-        for (i, &kind) in kinds.iter().enumerate() {
-            if kind != 0 {
-                value_sets.push(ValueSet::Linear);
-                continue;
+        let input = FilterInput {
+            kinds,
+            flags,
+            nums,
+            num_counts,
+            text_counts,
+            value_nums,
+            value_texts: &value_texts,
+        };
+        let Some(mut rules) = input.rules(&self.strings) else {
+            return Vec::new();
+        };
+
+        // Each filter reads its own column, down the rows that every earlier
+        // filter kept: one column at a time, in the store's column-major order.
+        let mut kept: Option<Vec<u32>> = None;
+        for (rule, &col) in rules.iter_mut().zip(cols) {
+            let rows = filter_column(self, data, col as usize, rule, kept.take());
+            let is_done = rows.is_empty();
+            kept = Some(rows);
+            if is_done {
+                break;
             }
-            let num_count = num_counts.get(i).copied().unwrap_or_default() as usize;
-            let text_count = text_counts.get(i).copied().unwrap_or_default() as usize;
-            let picked_numbers = value_nums
-                .get(num_offsets[i]..num_offsets[i] + num_count)
-                .unwrap_or_default();
-            let picked_texts = value_texts
-                .get(text_offsets[i]..text_offsets[i] + text_count)
-                .unwrap_or_default();
-            value_sets.push(ValueSet::build(picked_numbers, picked_texts));
         }
-        // Custom filters (kind 5) match as COUNTIF criteria do: one or two per filter.
-        let mut custom: Vec<Vec<Criterion>> = Vec::with_capacity(kinds.len());
-        for (i, &kind) in kinds.iter().enumerate() {
-            if kind != 5 {
-                custom.push(Vec::new());
-                continue;
-            }
-            let count = text_counts.get(i).copied().unwrap_or_default() as usize;
-            let start = text_offsets.get(i).copied().unwrap_or_default();
-            let texts = value_texts.get(start..start + count).unwrap_or_default();
-            let mut parsed = Vec::with_capacity(texts.len());
-            for text in texts {
-                let Ok(criterion) = Criterion::parse(Value::text(text.as_str())) else {
-                    return Vec::new();
-                };
-                parsed.push(criterion);
-            }
-            custom.push(parsed);
-        }
-        let mut out = Vec::new();
-        'rows: for row in 0..data.cells.row_count() {
-            for i in 0..cols.len() {
-                let index = cols[i] as usize * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index, &self.formula_slots);
-                let matches = match kinds[i] {
-                    0 => {
-                        let mut hit =
-                            kind == 0 && flags.get(i).copied().unwrap_or_default() & 1 != 0;
-                        let nc = num_counts.get(i).copied().unwrap_or_default() as usize;
-                        let tc = text_counts.get(i).copied().unwrap_or_default() as usize;
-                        match &value_sets[i] {
-                            ValueSet::Linear => {
-                                if kind == 1 {
-                                    if let Some(value) =
-                                        numeric_cell_value(data, index, &self.formula_slots)
-                                    {
-                                        hit |= value_nums
-                                            .get(num_offsets[i]..num_offsets[i] + nc)
-                                            .unwrap_or_default()
-                                            .contains(&value);
-                                    }
-                                } else if kind == 2 {
-                                    if let Some(text) = resolved_text(
-                                        data,
-                                        &self.strings,
-                                        index,
-                                        &self.formula_slots,
-                                    ) {
-                                        hit |= value_texts
-                                            .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or_default()
-                                            .iter()
-                                            .any(|picked| picked == text);
-                                    }
-                                } else if kind == 3 {
-                                    if let Some(value) =
-                                        boolean_cell_value(data, index, &self.formula_slots)
-                                    {
-                                        let expected = if value {
-                                            VALUE_SET_TRUE
-                                        } else {
-                                            VALUE_SET_FALSE
-                                        };
-                                        hit |= value_texts
-                                            .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or_default()
-                                            .iter()
-                                            .any(|picked| picked == expected);
-                                    }
-                                }
-                            }
-                            ValueSet::Lookup {
-                                numbers,
-                                texts,
-                                bools,
-                            } => {
-                                if kind == 1 {
-                                    if let Some(value) =
-                                        numeric_cell_value(data, index, &self.formula_slots)
-                                    {
-                                        let normalized = if value == 0.0 { 0.0 } else { value };
-                                        hit |= numbers.binary_search(&normalized.to_bits()).is_ok();
-                                    }
-                                } else if kind == 2 {
-                                    if let Some(text) = resolved_text(
-                                        data,
-                                        &self.strings,
-                                        index,
-                                        &self.formula_slots,
-                                    ) {
-                                        hit |= texts.contains(text);
-                                    }
-                                } else if kind == 3 {
-                                    if let Some(value) =
-                                        boolean_cell_value(data, index, &self.formula_slots)
-                                    {
-                                        let picked_bit = if value {
-                                            VALUE_SET_TRUE_BIT
-                                        } else {
-                                            VALUE_SET_FALSE_BIT
-                                        };
-                                        hit |= bools & picked_bit != 0;
-                                    }
-                                }
-                            }
-                        }
-                        hit
-                    }
-                    1 => {
-                        let needle = value_texts
-                            .get(text_offsets[i])
-                            .map(String::as_str)
-                            .unwrap_or_default();
-                        cell_matches_text(
-                            data,
-                            self,
-                            index,
-                            needle,
-                            flags.get(i).copied().unwrap_or_default() == 0,
-                            false,
-                            &mut match_caches[cache_index[i]],
-                        )
-                    }
-                    2 => {
-                        numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
-                            match flags.get(i).copied().unwrap_or_default() {
-                                0 => value > nums.get(i).copied().unwrap_or_default(),
-                                1 => value >= nums.get(i).copied().unwrap_or_default(),
-                                2 => value < nums.get(i).copied().unwrap_or_default(),
-                                3 => value <= nums.get(i).copied().unwrap_or_default(),
-                                4 => value == nums.get(i).copied().unwrap_or_default(),
-                                _ => value != nums.get(i).copied().unwrap_or_default(),
-                            }
-                        })
-                    }
-                    5 => {
-                        let test = |criterion: &Criterion| {
-                            criterion_matches_cell(data, self, index, kind, criterion)
-                        };
-                        let conditions = custom.get(i).map(Vec::as_slice).unwrap_or_default();
-                        if flags.get(i).copied().unwrap_or_default() & 1 != 0 {
-                            conditions.iter().any(test)
-                        } else {
-                            conditions.iter().all(test)
-                        }
-                    }
-                    3 => kind == 0,
-                    4 => kind != 0,
-                    6 => numeric_cell_value(data, index, &self.formula_slots)
-                        .and_then(excel_date_parts)
-                        .and_then(|(_, month, _)| i32::try_from(month).ok())
-                        .is_some_and(|month| {
-                            let count = num_counts.get(i).copied().unwrap_or_default() as usize;
-                            value_nums
-                                .get(num_offsets[i]..num_offsets[i] + count)
-                                .unwrap_or_default()
-                                .contains(&f64::from(month))
-                        }),
-                    _ => false,
-                };
-                if !matches {
-                    continue 'rows;
-                }
-            }
-            out.push(row as u32);
-        }
-        out
+        kept.unwrap_or_else(|| (0..data.cells.row_count() as u32).collect())
     }
 
     /// Distinct resolved values of a whole column, in first-seen order.
@@ -1838,6 +2040,9 @@ impl MatchCache {
 
     /// Match the interned string `id`, reusing a cached result when the slot
     /// still holds this id. `needle`/flags are constant for a given scan.
+    /// Inlined so a scan pays only the tag check for a cached id; the text
+    /// match stays out of line.
+    #[inline]
     pub(crate) fn matches(
         &mut self,
         strings: &StringStorage,
@@ -1850,12 +2055,24 @@ impl MatchCache {
         if self.tag[slot] == id {
             return self.hit[slot];
         }
-        let matched = string_from_pool_ref(strings, id)
-            .is_some_and(|text| matches_needle(text, needle, case_insensitive, whole_cell));
+        let matched = pool_text_matches(strings, id, needle, case_insensitive, whole_cell);
         self.tag[slot] = id;
         self.hit[slot] = matched;
         matched
     }
+}
+
+/// Whether the pool text `id` matches `needle`, as [`matches_needle`] decides.
+#[inline(never)]
+fn pool_text_matches(
+    strings: &StringStorage,
+    id: u32,
+    needle: &str,
+    case_insensitive: bool,
+    whole_cell: bool,
+) -> bool {
+    string_from_pool_ref(strings, id)
+        .is_some_and(|text| matches_needle(text, needle, case_insensitive, whole_cell))
 }
 
 /// What a Find query compares: plain text, or an Excel wildcard pattern.

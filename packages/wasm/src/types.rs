@@ -1242,21 +1242,25 @@ impl StringStorage {
         id
     }
 
+    /// The pool id of `text`, without adding it; `None` when the pool does
+    /// not hold it. The pool holds each text once, so two cells hold the same
+    /// text exactly when they hold the same id.
+    pub(crate) fn find(&self, text: &str) -> Option<u32> {
+        self.find_hashed(string_hash(text), text)
+    }
+
+    #[inline]
+    fn find_hashed(&self, hash: u64, text: &str) -> Option<u32> {
+        match self.lookup.get(&hash)? {
+            InternSlot::One(id) => (self.get(*id) == Some(text)).then_some(*id),
+            InternSlot::Many(ids) => ids.iter().copied().find(|&id| self.get(id) == Some(text)),
+        }
+    }
+
     pub(crate) fn intern(&mut self, text: &str) -> u32 {
         let hash = string_hash(text);
-
-        if let Some(slot) = self.lookup.get(&hash) {
-            match slot {
-                InternSlot::One(id) if self.get(*id) == Some(text) => return *id,
-                InternSlot::Many(ids) => {
-                    for &id in ids {
-                        if self.get(id) == Some(text) {
-                            return id;
-                        }
-                    }
-                }
-                _ => {}
-            }
+        if let Some(id) = self.find_hashed(hash, text) {
+            return id;
         }
 
         let id = self.push(text);
