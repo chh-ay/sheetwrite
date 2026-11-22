@@ -157,16 +157,24 @@ async function measure_operation(
 
 /**
  * Collect garbage and read memory from a timer callback. The collector scans the native stack
- * conservatively, so old values in the frame of `main` can keep dead codec objects alive. A timer
- * callback starts on a new stack after this frame is suspended.
+ * conservatively, so old values in the frame of `main` can keep dead objects alive: the export
+ * corpus before the operation, codec objects after it. A timer callback starts on a new stack
+ * after this frame is suspended.
  */
-function retained_usage(): Promise<NodeJS.MemoryUsage> {
+function collected_usage(): Promise<NodeJS.MemoryUsage> {
   const { promise, resolve } = Promise.withResolvers<NodeJS.MemoryUsage>();
   setTimeout(() => {
     Bun.gc(true);
     resolve(process.memoryUsage());
   }, 0);
   return promise;
+}
+
+/** The export scenario's snapshot. The rest of the corpus is garbage when this returns. */
+function export_snapshot(mode: XlsxCorpusMode, scenario: string): WorkbookSnapshot {
+  const snapshot = createXlsxCorpus(mode).scenarios[scenario as XlsxCorpusScenario];
+  if (!snapshot) throw new Error(`unknown export scenario ${scenario}`);
+  return snapshot;
 }
 
 async function main(): Promise<WorkerResult> {
@@ -187,18 +195,14 @@ async function main(): Promise<WorkerResult> {
   let input_bytes = 0;
   let input: Uint8Array | WorkbookSnapshot;
   if (operation === "export") {
-    const corpus = createXlsxCorpus(mode);
-    const snapshot = corpus.scenarios[scenario as XlsxCorpusScenario];
-    if (!snapshot) throw new Error(`unknown export scenario ${scenario}`);
-    input = snapshot;
-    input_bytes = Buffer.byteLength(JSON.stringify(snapshot));
+    input = export_snapshot(mode, scenario);
+    input_bytes = Buffer.byteLength(JSON.stringify(input));
   } else {
     input = new Uint8Array(await Bun.file(fixture).arrayBuffer());
     input_bytes = input.byteLength;
   }
 
-  Bun.gc(true);
-  const before = process.memoryUsage();
+  const before = await collected_usage();
   const {
     durationMs: duration_ms,
     outputBytes: output_bytes,
@@ -206,7 +210,7 @@ async function main(): Promise<WorkerResult> {
     rejection,
     after,
   } = await measure_operation(implementation, operation, scenario, input);
-  const retained = await retained_usage();
+  const retained = await collected_usage();
   return {
     engine,
     operation,
