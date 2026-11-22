@@ -31,7 +31,7 @@ export class EngineHiddenRows {
     private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
-  ) { }
+  ) {}
 
   replaceEngine(wasm: RecomputingCellStore): void {
     this.wasm = wasm;
