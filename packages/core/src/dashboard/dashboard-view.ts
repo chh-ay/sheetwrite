@@ -127,6 +127,7 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   let message: string | null = null;
   let rendered = "";
   const overrides = slicerOverridesOf(grid.store);
+  // Slicers filter the dashboard pivots that the engine computes; the saved definitions keep theirs.
   const filter_pivots = (dashboards: readonly SheetId[]): void => {
     applyPivotViews(grid.store, dashboards);
     setPivotChartViews(grid.store, pivotChartViewOf);
