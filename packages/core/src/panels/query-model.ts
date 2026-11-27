@@ -192,7 +192,7 @@ function name_key(name: string): string {
   return name.toLowerCase();
 }
 
-/** Exact name first, then ASCII letter case ignored, as table headers match. */
+/** Exact name first, then letter case ignored, as table headers match. */
 function find_column(columns: readonly ModelColumn[], name: string): ModelColumn | undefined {
   return (
     columns.find((column) => column.name === name) ??
