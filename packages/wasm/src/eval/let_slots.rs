@@ -406,7 +406,7 @@ impl LetFrame {
     /// is being evaluated; see the type's safety notes.
     #[allow(
         unsafe_code,
-        reason = "LET bindings point into the formula's own tree; a safe version is not yet measured on both machines"
+        reason = "the pass-wide LET frame outlives each formula's borrow of its tree, so it keeps raw pointers to binding expressions, not references; see the type's safety notes"
     )]
     pub(crate) unsafe fn binding<'tree>(&self, slot: u32) -> Option<&'tree Ast> {
         let index = self.resolved_base? + slot as usize;
