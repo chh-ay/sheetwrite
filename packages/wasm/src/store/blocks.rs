@@ -534,9 +534,8 @@ impl CellStore {
         })
     }
 
-    /// Shared body of the two packed writes. `block.order` says how the flat
-    /// input arrays of a `rows` × `cols` block are laid out; the store itself is
-    /// always written column-major.
+    /// Shared body of [`Self::set_block_packed`] and
+    /// [`Self::set_column_block_packed`].
     fn write_packed_block(&mut self, block: PackedBlock<'_>) -> u32 {
         let PackedBlock {
             order,

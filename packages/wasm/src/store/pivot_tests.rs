@@ -176,7 +176,6 @@ fn install(store: &mut CellStore, source: usize, output: usize, rows: usize, agg
     assert!(status[STATUS_ROWS] > 0, "the pivot installed output");
 }
 
-/// The status of a pivot that shows `#SPILL!`.
 fn spill_status() -> u32 {
     FormulaError::Spill.slot() as u32 + 1
 }
