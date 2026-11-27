@@ -79,6 +79,9 @@ struct Templates {
     kept: Vec<Template>,
     /// The template the next new shape replaces once `kept` is full.
     next: usize,
+    /// The template the last lookup found or kept. A filled column repeats
+    /// it, so it is compared first, without the text's shape hash.
+    last: usize,
     /// The sites [`scan_sites`] lists for the formula being kept.
     sites: Vec<RefSite>,
     /// The sheet names [`scan_sites`] lists for the formula being kept.
@@ -91,6 +94,7 @@ thread_local! {
         std::cell::Cell::new(Templates {
             kept: Vec::new(),
             next: 0,
+            last: 0,
             sites: Vec::new(),
             sheet_names: Vec::new(),
             values: Vec::new(),
@@ -409,24 +413,34 @@ fn shape_hash(body: &str) -> u64 {
 }
 
 impl Templates {
-    /// The kept formula of `body`'s shape. `hash` caches `body`'s
-    /// [`shape_hash`], which only a lookup among kept formulas needs. A kept
-    /// formula whose sheet names `resolve` binds to other sheets has the
-    /// shape but no usable tree.
+    /// The kept formula of `body`'s shape: the last one found when `body`
+    /// repeats it, or else one with `body`'s [`shape_hash`], which `hash`
+    /// caches. A kept formula whose sheet names `resolve` binds to other
+    /// sheets has the shape but no usable tree.
     fn lookup(
         &mut self,
         body: &str,
         hash: &mut Option<u64>,
         resolve: &SheetResolver<'_>,
     ) -> Lookup {
-        if self.kept.is_empty() {
-            return Lookup::Miss;
-        }
-        let body_hash = *hash.get_or_insert_with(|| shape_hash(body));
-        let Some(index) = self.kept.iter().position(|template| {
-            template.hash == body_hash && template.values_in(body, &mut self.values)
-        }) else {
-            return Lookup::Miss;
+        let repeated = self
+            .kept
+            .get(self.last)
+            .is_some_and(|template| template.values_in(body, &mut self.values));
+        let index = if repeated {
+            self.last
+        } else {
+            if self.kept.is_empty() {
+                return Lookup::Miss;
+            }
+            let body_hash = *hash.get_or_insert_with(|| shape_hash(body));
+            let Some(index) = self.kept.iter().position(|template| {
+                template.hash == body_hash && template.values_in(body, &mut self.values)
+            }) else {
+                return Lookup::Miss;
+            };
+            self.last = index;
+            index
         };
         let template = &self.kept[index];
         let (Some(tree), true) = (&template.tree, template.binds_same_sheets(resolve)) else {
@@ -463,6 +477,7 @@ impl Templates {
                 index
             }
         };
+        self.last = index;
         let Some(template) = self.kept.get_mut(index) else {
             return;
         };
