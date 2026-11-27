@@ -38,9 +38,8 @@ const ONE_DATE_LIMIT = 50;
 /**
  * One page of each kind, with what its static HTML must hold inside `<main>`:
  * text length, h2/h3 headings, internal links, and whether it has code
- * samples. The numbers are about half of what each page held when this list
- * was written, so content edits pass and content that renders only in the
- * browser fails.
+ * samples. Each number is about half of what the page holds, so content edits
+ * pass and content that renders only in the browser fails.
  */
 const CONTENT_SAMPLE: readonly {
   path: string;

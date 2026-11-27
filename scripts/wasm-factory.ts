@@ -31,7 +31,8 @@ export async function copyEngineLoaders(packageDirectory: string): Promise<void>
 
 /**
  * The Rust documentation wasm-bindgen copies into the glue as JSDoc blocks. It
- * stays in the `.d.ts`; in the shipped JavaScript it was 63% of the Brotli bytes.
+ * stays in the `.d.ts`. The shipped JavaScript drops it: it would be about 63%
+ * of the Brotli bytes.
  */
 const DOC_COMMENT = /^[ \t]*\/\*\*[\s\S]*?\*\/[ \t]*\n/gm;
 

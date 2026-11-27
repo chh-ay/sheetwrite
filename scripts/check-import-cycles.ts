@@ -87,7 +87,7 @@ export interface PublicTypeDomain {
   readonly exports: readonly string[];
 }
 
-/** Canonical source ownership consumed by the import checker and future API documentation. */
+/** Canonical source ownership of the public types, checked by the import checker and the public API manifest. */
 export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   coordinates: {
     source: "packages/core/src/types/coordinates.ts",
