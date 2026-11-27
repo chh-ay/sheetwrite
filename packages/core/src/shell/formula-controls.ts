@@ -255,7 +255,6 @@ export function createFormulaBar(
   const draft = editDraftFor(grid);
   /** A cell edit is open and the bar shows its draft. */
   let editing = false;
-  /** Lines the bar was last sized for. */
   let sized_lines = -1;
 
   const size = (): void => {

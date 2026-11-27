@@ -21,8 +21,7 @@ export interface RibbonOptions extends RibbonConfig {
  * Mount an Excel-style ribbon (Home, Insert, Data, View) bound to
  * `grid.actions`, in normal document flow. It renders the same commands as
  * the toolbar, in a full or a compact layout. Groups shrink, then collapse into
- * dropdowns, as the host narrows. Returns the piece with an idempotent
- * `destroy`.
+ * dropdowns, as the host narrows.
  *
  * @param host - Element the ribbon is appended to.
  * @param grid - The grid whose commands the ribbon runs.

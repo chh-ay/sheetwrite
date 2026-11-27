@@ -164,7 +164,6 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   const count_part = part();
   const sum_part = part();
   const geometry_part = part();
-  // Sum, the total people read most, stays longest.
   const drop_order = [
     geometry_part,
     records_part,
