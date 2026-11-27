@@ -77,9 +77,9 @@ export interface HistoryDiffCells {
   readonly row: Uint32Array;
   /** Zero-based column of each changed cell. */
   readonly col: Uint32Array;
-  /** Position in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column. */
+  /** Row in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column. */
   readonly beforeRow: Uint32Array;
-  /** Column in the earlier version, or `HISTORY_DIFF_NONE` on an added column. */
+  /** Column in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column. */
   readonly beforeCol: Uint32Array;
   /** `HistoryDiffFlag` bits. */
   readonly flags: Uint8Array;
@@ -324,7 +324,7 @@ function track(state: Tracking, operation: DocumentOp, author: number): void {
   }
 }
 
-/** Plain value of a sheet field, so maps and sets compare by content. */
+/** JSON text of a field value. Map entries and set items are sorted, so they compare by content. */
 function plain(value: unknown): string {
   if (value instanceof Map) {
     return JSON.stringify([...value.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
@@ -449,7 +449,7 @@ function sheet_changes(before: Workbook, after: Workbook, state: Tracking): Hist
   return changes;
 }
 
-/** Rectangle pieces of one window: each lies inside one row and one column segment. */
+/** A rectangle piece of one window. It lies inside one row segment and one column segment. */
 export interface Piece {
   /** Offsets inside the window. */
   row: number;
