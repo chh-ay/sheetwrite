@@ -150,6 +150,18 @@ describe("pivot definitions in snapshots", () => {
     }
   });
 
+  it("keeps the 255-character pivot ID bound that 0.6 documents were saved under", () => {
+    expect(validateWorkbookSnapshot(snapshot([range_pivot({ id: "p".repeat(255) })])).ok).toBe(
+      true,
+    );
+
+    const checked = validateWorkbookSnapshot(snapshot([range_pivot({ id: "p".repeat(256) })]));
+    if (checked.ok) throw new Error("expected a rejection");
+    expect(checked.errors).toContainEqual(
+      expect.objectContaining({ path: "sheets[0].pivots[0].id", code: "invalid-value" }),
+    );
+  });
+
   it.each([
     [
       "a pivot ID used on two sheets",
