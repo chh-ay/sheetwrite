@@ -185,7 +185,7 @@ describe("in-place sort", () => {
     expect(column(store, 0, 2)).toEqual([2, 1]);
   });
 
-  /** Microsoft Learn: identically sized merged cells sort as whole records. */
+  /** As Excel does (Microsoft Learn). */
   it("sorts records of identically sized merged cells as units", () => {
     const { store } = setup([
       literal(0, 0, "b"),
@@ -201,7 +201,7 @@ describe("in-place sort", () => {
     expect(column(store, 1, 4)).toEqual([null, "a second", null, "b second"]);
   });
 
-  /** Microsoft Learn: merged cells that are not all the same size block a sort. */
+  /** As Excel does (Microsoft Learn). */
   it("refuses merged cells that are not all the same size", () => {
     const { store } = setup([literal(0, 0, 2), literal(1, 0, 1), literal(2, 0, 3)]);
     merge(store, [0, 1, 1, 1]);

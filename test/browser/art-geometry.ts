@@ -391,7 +391,6 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       targets
         .map(({ box }) => ({ box, gap: to_edge(point, box) }))
         .sort((a, b) => a.gap - b.gap)[0];
-    /** Whether a point lies on a line drawn by any other path. */
     const touches_other_line = (point: Point, index: number) =>
       lines.some(
         (other, other_index) =>

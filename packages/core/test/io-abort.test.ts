@@ -16,7 +16,6 @@ import {
 } from "../src/xlsx-slots.js";
 import { keepXlsxSlots } from "./fixtures.js";
 
-/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
 let restore_xlsx_slots = keepXlsxSlots();
 beforeEach(() => {
   restore_xlsx_slots = keepXlsxSlots();

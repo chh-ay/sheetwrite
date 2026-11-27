@@ -193,7 +193,6 @@ describe("row heights under views", () => {
 
     grid.setRowHeight(1, 60);
 
-    // Persisted keyed by DATA row 3, never by the view row 1 (the pre-fix bug).
     expect(workbook.sheets[0]!.rowHeights?.get(data_row)).toBe(60);
     expect(workbook.sheets[0]!.rowHeights?.has(1)).toBe(false);
 

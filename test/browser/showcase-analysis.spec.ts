@@ -162,7 +162,6 @@ test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page })
   });
 });
 
-// #727: a chart over the cells painted the stylesheet's background, not the grid's theme.
 test("a chart and a PivotChart sit on the grid's themed background", async ({ page }) => {
   await open(page);
   await page.evaluate(
