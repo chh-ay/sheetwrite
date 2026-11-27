@@ -365,17 +365,21 @@ impl DiffKernel {
 }
 
 impl DiffKernel {
+    /// Apply `op` to the rows of the sheet in `slot`, and to its writers'
+    /// rectangles only when the rows took it: an ignored operation moves no cells.
     fn rows(&mut self, slot: u32, op: AxisOp) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
-            sheet.rows.apply(op);
-            sheet.touches.apply_rows(op);
+            if sheet.rows.apply(op) {
+                sheet.touches.apply_rows(op);
+            }
         }
     }
 
     fn cols(&mut self, slot: u32, op: AxisOp) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
-            sheet.cols.apply(op);
-            sheet.touches.apply_cols(op);
+            if sheet.cols.apply(op) {
+                sheet.touches.apply_cols(op);
+            }
         }
     }
 
@@ -484,5 +488,25 @@ mod tests {
         );
         assert_eq!(kernel.page_cols(), vec![2]);
         assert_eq!(kernel.page_authors(), vec![NONE]);
+    }
+
+    #[test]
+    fn an_operation_outside_the_sheet_changes_nothing() {
+        let mut kernel = DiffKernel::new(1);
+        let sheet = kernel.add_sheet(3, 1, true);
+        kernel.touch(sheet, 0, 0, 2, 0, 7);
+
+        kernel.remove_rows(sheet, 2, 2);
+        kernel.insert_rows(sheet, 4, 1);
+        kernel.move_rows(sheet, 0, 2, 2);
+        kernel.move_rows(sheet, 0, 0, 0);
+
+        assert_eq!(kernel.row_segments(sheet), vec![0, 3, 0]);
+        assert_eq!(
+            (0..3)
+                .map(|row| kernel.cell_authors(sheet, row, 0))
+                .collect::<Vec<_>>(),
+            vec![vec![7]; 3]
+        );
     }
 }
