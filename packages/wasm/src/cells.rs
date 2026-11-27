@@ -1787,9 +1787,7 @@ mod local_paged_tests {
                 }
                 random_edit(&mut seed, &mut dense, &mut local);
             }
-            if convert_at < STEPS {
-                assert_same(&dense, &local, &format!("sheet {sheet}"));
-            }
+            assert_same(&dense, &local, &format!("sheet {sheet}"));
             local.acknowledge_revision(7);
             assert_same(
                 &dense,
