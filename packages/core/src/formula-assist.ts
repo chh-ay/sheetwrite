@@ -1,14 +1,14 @@
 // The part of formula help that every editor carries: it waits for the first
 // formula and only then loads formula-help.ts, which holds the analysis, the
-// function table and the DOM. Until the chunk arrives, keys go to the editor.
+// function table and the DOM, so a grid that never edits a formula never
+// downloads them. Until the chunk arrives, keys go to the editor.
 
 import type { AssistDeps, FormulaEditorElement, FormulaHelp } from "./formula-help.js";
 import type { Theme } from "./types/render.js";
 
 /**
- * Formula help for one editor. Attached to a field while it is edited and
- * detached on teardown; the help chunk loads when the field first holds a
- * formula (text that starts with `=`).
+ * Formula help for one editor: attached to a field while it is edited, and
+ * detached on teardown.
  */
 export class FormulaAssist {
   private readonly deps: AssistDeps;

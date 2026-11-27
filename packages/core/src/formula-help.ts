@@ -1,8 +1,7 @@
 // Formula help in a formula editor: the function list as you type, the
 // argument guide, live errors with their fixes and coloured references. This
-// module is a chunk of its own: formula-assist.ts loads it on the first
-// formula edit, so a grid that never edits a formula never downloads it or
-// the function table. Every feature reads one `analyzeFormula` result.
+// module is a chunk of its own, which formula-assist.ts loads. Every feature
+// reads one `analyzeFormula` result.
 
 import {
   analyzeFormula,

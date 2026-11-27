@@ -148,7 +148,6 @@ export class FormulaGhost {
 
   constructor(private readonly deps: GhostDeps) {}
 
-  /** The ghost on screen, or null. */
   current(): ShownSuggestion | null {
     return this.shown;
   }
@@ -211,7 +210,6 @@ export class FormulaGhost {
     this.shown = null;
   }
 
-  /** End the edit's session. */
   close(): void {
     this.session?.close();
     this.session = null;

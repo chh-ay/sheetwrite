@@ -130,7 +130,6 @@ function parse_operand(text: string, allow: Allow): DataValidationOperand | unde
   return number;
 }
 
-/** The Allow choice of `condition`. */
 function allow_of(condition: DataValidationCondition | undefined): Allow {
   if (!condition) return "any";
   switch (condition.kind) {

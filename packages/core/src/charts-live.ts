@@ -107,7 +107,6 @@ function read_rect(sheets: SheetLookup, range: ChartRange, all_rows = false): Re
   return { sheet, r0, r1, c0, c1, truncated };
 }
 
-/** Sheet metadata by ID. */
 type SheetLookup = (id: SheetId) => Sheet | undefined;
 
 /**
@@ -321,7 +320,7 @@ function request_pivot_views(store: Store): void {
  *
  * @param store - The store that holds the workbook, such as `grid.store`.
  * @param sheet - Stable ID of the sheet that holds the chart.
- * @param id - The chart's ID.
+ * @param id - The chart's `id`, unique on its sheet.
  * @returns The chart's resolved series, labels and settings, or `null`.
  */
 export function resolveChartView(store: Store, sheet: SheetId, id: string): ChartView | null {
