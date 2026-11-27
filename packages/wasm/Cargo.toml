@@ -26,8 +26,9 @@ rustc-hash = "2"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "=0.3.102"
 
-# v0.4.0 interleaved captures keep `3`: `"s"` saves 14,218 Brotli bytes
-# but slows the resolved 100k formula paths by 8.60–11.71%.
+# Optimize for speed, not size. In interleaved captures at v0.4.0, `"s"`
+# saved 14,218 Brotli bytes but made the resolved 100k formula paths
+# 8.60–11.71% slower.
 [profile.release]
 opt-level = 3
 lto = "fat"

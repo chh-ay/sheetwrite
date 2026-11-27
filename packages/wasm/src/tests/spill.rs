@@ -318,7 +318,7 @@ fn a_spill_that_reads_a_later_one_cell_spill_sees_it() {
 
 /// Array formulas whose size comes from a cell all spill in one pass: each is
 /// charged against the pass budget for what it produces, not for the largest
-/// possible spill (#569).
+/// possible spill.
 #[test]
 fn array_sizes_read_from_cells_spill_in_every_formula_of_a_pass() {
     let mut sources = vec![
@@ -369,7 +369,7 @@ fn array_sizes_read_from_cells_spill_in_every_formula_of_a_pass() {
 
 /// The pass budget still stops a pass whose arrays really pass it: three
 /// arrays of 900,000 cells sized from a cell, each obstructed so that none
-/// installs, spend it with the third (#569).
+/// installs, spend it with the third.
 #[test]
 fn array_sizes_read_from_cells_still_spend_the_pass_budget() {
     let mut store = CellStore::new();
