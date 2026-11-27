@@ -111,7 +111,6 @@ export class FirstFailure {
   private failure: unknown;
   private failed = false;
 
-  /** Whether a step has failed. */
   get hasFailed(): boolean {
     return this.failed;
   }

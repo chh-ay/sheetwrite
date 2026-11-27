@@ -125,8 +125,6 @@ function unpack_packed_view(msg: PackedPaintData, state: WorkerRuntimeState): Vi
     state.stringCache.clear();
     state.stringPoolEpoch = msg.stringPoolEpoch;
   }
-  // Cap the pool-id→string cache before this frame's updates are folded in; the
-  // just-swept window re-warms from the update payload below.
   if (state.stringCache.size >= STRING_CACHE_CAP) state.stringCache.clear();
   if (update_ids && update_values) {
     for (let i = 0; i < update_ids.length; i++) {
