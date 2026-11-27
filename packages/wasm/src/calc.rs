@@ -7,13 +7,20 @@
 //!   term       := power (('*' | '/') power)*
 //!   power      := postfix ('^' postfix)*
 //!   postfix    := unary ('%')*
-//!   unary      := ('+' | '-') unary | primary
-//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | `structured_ref`
+//!   unary      := ('+' | '-') unary | primary (' ' primary)*
+//!   primary    := number | string | array | '(' expr (',' expr)* ')' | func '(' args ')'
+//!                 | range | cell '#'? | name | `structured_ref`
 //!   range      := cell ':' cell | letters ':' letters | digits ':' digits
 //!   array      := '{' row (';' row)* '}'
 //!   row        := constant (',' constant)*
 //!   constant   := ('+' | '-')? number | string | TRUE | FALSE | error
-//!   number     := digits ('.' digits?)? (('E' | 'e') ('+' | '-')? digits)?
+//!   number     := (digits ('.' digits?)? | '.' digits) (('E' | 'e') ('+' | '-')? digits)?
+//!
+//! A space between two references is the intersection operator. It binds
+//! tighter than every other operator except `:`. A comma inside parentheses
+//! that do not belong to a call joins areas into a union. With the
+//! `analysis` feature, `(args)` after a unary calls its value as a LAMBDA,
+//! as in `LAMBDA(x, x + 1)(2)`.
 //!
 //! Every row of an array constant must have the same number of columns.
 //!
@@ -25,8 +32,10 @@
 //! Sheet-qualified references keep the sheet name until `CellStore` resolves it
 //! to a sheet handle at formula-ingest time.
 //!
-//! The evaluator lives on `CellStore` (it needs cell access); this module is the
-//! pure parse layer plus reference shifting for row/column insert/delete rewriting.
+//! The evaluator lives on `CellStore` (it needs cell access). This module
+//! parses formula text, writes trees back as text, binds sheet, table and
+//! name references, and rewrites references after row, column, sheet and
+//! table edits.
 
 use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;

@@ -2,7 +2,8 @@
 
 use super::*;
 
-/// Serialize the authoritative AST into parseable formula source.
+/// The formula text of `ast`, with its `=`, written without workbook names
+/// ([`WrittenNames::NONE`]).
 #[cfg(test)]
 pub(crate) fn serialize(ast: &Ast) -> String {
     let mut out = String::from("=");
@@ -80,7 +81,8 @@ pub(crate) struct WrittenNames<'a> {
 }
 
 impl WrittenNames<'_> {
-    /// For text written with no workbook: every bound reference is `#REF!`.
+    /// For text written with no workbook: every bound sheet or table
+    /// reference writes `#REF!`, and a defined name writes nothing.
     pub(crate) const NONE: WrittenNames<'static> = WrittenNames {
         sheets: &[],
         tables: None,
@@ -268,8 +270,9 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
                 if index > 0 {
                     out.push(' ');
                 }
-                // A signed operand needs its own parentheses, or the sign
-                // would apply to the whole intersection when parsed again.
+                // A signed or percent operand needs its own parentheses, or
+                // the sign or `%` would apply to the whole intersection when
+                // parsed again.
                 let signed = matches!(operand, Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..));
                 if signed {
                     out.push('(');

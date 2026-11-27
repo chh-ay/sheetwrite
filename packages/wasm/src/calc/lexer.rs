@@ -380,9 +380,10 @@ pub(super) fn structured_parts(raw: &str) -> Result<StructuredParts<'_>, String>
     Ok((section, column_name))
 }
 
-/// Most tokens the parser looks ahead of the next one: `Sheet1:Sheet3!`
-/// is recognized from its first name. A power of two, so the ring wraps
-/// with a mask.
+/// The size of the look-ahead ring. The parser peeks at most three tokens:
+/// after the name `Sheet1`, it reads `:`, `Sheet3` and `!` to recognize
+/// `Sheet1:Sheet3!`. Four is the next power of two, so the ring wraps with
+/// a mask.
 const LOOKAHEAD: usize = 4;
 
 /// The parser's tokens, lexed on demand from the formula text, or read from

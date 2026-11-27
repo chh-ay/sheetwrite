@@ -259,8 +259,8 @@ struct Lexeme<'a> {
 /// One reference in the source text, as the parser reads it: a cell, range
 /// or 3-D reference, a table reference, or `#REF!`.
 struct Reference {
-    /// The cell or range of a cell, range or 3-D reference, without its sheet
-    /// qualifier. A table reference and `#REF!` have none.
+    /// The cell, spill (`A1#`) or range of a cell, range or 3-D reference,
+    /// without its sheet qualifier. A table reference and `#REF!` have none.
     ast: Option<Ast>,
     /// Whether a sheet name qualifies the reference.
     qualified: bool,

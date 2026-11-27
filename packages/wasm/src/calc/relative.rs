@@ -2,13 +2,16 @@
 
 use super::*;
 
-/// Translate relative A1 references from one formula origin to another.
+/// Move the relative parts of the A1 references in `ast` by `row_delta` rows
+/// and `col_delta` columns, as a copy of the formula does. Absolute row and
+/// column markers stay fixed. A reference moved off the sheet becomes
+/// `#REF!`.
 ///
-/// Conditional-format expressions store one parsed AST at the rule range's
+/// Copied and filled formula text is moved here one reference at a time.
+/// Conditional-format expressions store one parsed tree at the rule range's
 /// top-left. A window read evaluates it in place with a reference shift; it
 /// translates a copy here only at a cell where [`relative_reach`] says the
-/// shift could not keep every reference in the sheet. Absolute row/column
-/// markers remain fixed.
+/// shift could not keep every reference in the sheet.
 pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
@@ -269,7 +272,8 @@ fn translate_relative_refs_inner(
             ast.fold_children_mut(&mut translate_child);
             true
         }
-        // A defined name's formula is placed for its formula when it is read.
+        // A defined name's formula is moved to the cell that uses it when the
+        // name is read (`translate_name_refs`).
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
