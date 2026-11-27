@@ -92,7 +92,6 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
 
   let drag: DragState | null = null;
   let message: string | null = null;
-  // The value field whose number format form is open.
   let formatting: number | null = null;
   /** Definition, data model and message the panel was built from, as JSON. */
   let rendered_structure = "";
@@ -565,7 +564,7 @@ interface AreaActions {
   formatting(): number | null;
   /** Open the number format form of value field `index`, or close it with null. */
   editFormat(index: number | null): void;
-  /** The panel's signal; an open menu stops listening on the document when it aborts. */
+  /** The panel's signal, for {@link menuButton}. */
   signal: AbortSignal;
 }
 

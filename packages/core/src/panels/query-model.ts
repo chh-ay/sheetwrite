@@ -75,8 +75,6 @@ const COMPARE_OPS: Readonly<Record<string, Extract<QueryPredicate, { kind: "comp
 /** Saved joins can chain; the panel stops following them past this depth. */
 const MAX_JOIN_DEPTH = 32;
 
-// --- Tokens ------------------------------------------------------------------
-
 type Token =
   | { readonly kind: "name"; readonly text: string; readonly quoted: boolean }
   | { readonly kind: "symbol"; readonly text: string };
@@ -186,8 +184,6 @@ class Reader {
   }
 }
 
-// --- Names -------------------------------------------------------------------
-
 function name_key(name: string): string {
   return name.toLowerCase();
 }
@@ -238,8 +234,6 @@ function name_of(columns: readonly ModelColumn[], id: string): string {
   return quote(columns.find((column) => column.id === id)?.name ?? id);
 }
 
-// --- Source columns ----------------------------------------------------------
-
 /** One `Name: type` per line; the order is the source schema order. */
 export function parseSourceColumns(
   text: string,
@@ -274,8 +268,6 @@ export function parseSourceColumns(
 export function sourceColumnsText(columns: readonly QueryColumnSpec[]): string {
   return columns.map((column) => `${column.name}: ${column.type}`).join("\n");
 }
-
-// --- Schema ------------------------------------------------------------------
 
 /** The columns after `steps`, as the engine names them; joins follow saved queries. */
 export function columnsAfter(
@@ -328,8 +320,6 @@ export function columnsAfterStep(
       ];
   }
 }
-
-// --- Step text ---------------------------------------------------------------
 
 function literal_text(value: string | number | boolean | null): string {
   if (typeof value === "string") return `"${value.replaceAll('"', '""')}"`;
@@ -395,8 +385,6 @@ export function stepText(
       return `${step.columns.map((id) => name_of(columns, id)).join(", ")} -> ${quote(step.attribute.name)}, ${quote(step.value.name)}`;
   }
 }
-
-// --- Step parsing ------------------------------------------------------------
 
 function literal(token: Token): string | number | boolean | null {
   if (token.kind === "name" && token.quoted) return token.text;

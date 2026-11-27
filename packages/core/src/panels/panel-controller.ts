@@ -79,7 +79,7 @@ const NEW_SHEET_ANCHOR = { row: 2, col: 0 };
 const PIVOT_LOCATION_ERROR = "Enter a cell for the pivot table, for example Sheet1!H2.";
 const NO_SELECTION = "Select the source data first.";
 
-/** Show the Chart panel for `ref`. */
+/** Show the Chart panel for `ref`; with `focus` false the panel does not take the focus. */
 export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "chart", sheet: ref.sheet, id: ref.id };
@@ -91,7 +91,7 @@ export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
   });
 }
 
-/** Show the field list of the pivot `id` on `sheet`. */
+/** Show the field list of pivot `id`; with `focus` false the panel does not take the focus. */
 export function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "pivot", sheet, id };
@@ -123,7 +123,7 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
-/** Data › Measures opens the measures panel. */
+/** Data › Measures. */
 export function openMeasurePanel(grid: Grid): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "measures" };
@@ -161,7 +161,7 @@ export function openKpiPanel(grid: Grid): void {
   grid.openPanel({ ...panel, render: (body) => track_open(state, open, panel.render(body)) });
 }
 
-/** Show the Sort panel for the selection or the current region. */
+/** Data › Custom Sort. */
 export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
   // loads on first open instead of with every grid.
@@ -170,14 +170,14 @@ export function openSortPanel(grid: Grid): void {
 
 /** Data › Queries & Connections, or Get Data with the new-query form open. */
 export function openQueryPanel(grid: Grid, create: boolean): void {
-  // Its own chunk, like Sort: only grids with a query session load it.
+  // Only grids with a query session load this chunk.
   open_lazy_panel(grid, { kind: "queries" }, async () => {
     const { queryPanel: query_panel } = await import("./query-panel.js");
     return (target) => query_panel(target, create);
   });
 }
 
-/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+/** Data › Queries & Connections › Edit Links. */
 export function openEditLinksPanel(grid: Grid): void {
   open_lazy_panel(grid, { kind: "links" }, async () => {
     const { editLinksPanel: edit_links_panel } = await import("./edit-links-panel.js");
@@ -185,7 +185,7 @@ export function openEditLinksPanel(grid: Grid): void {
   });
 }
 
-/** Open an opted-in history panel in its own lazy chunk. */
+/** Open the opted-in history panel; `load` imports its chunk and returns its builder. */
 export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) => GridPanel>): void {
   open_lazy_panel(grid, { kind: "history" }, load);
 }
@@ -332,7 +332,7 @@ export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolea
   return result.status === "applied";
 }
 
-/** Insert › Charts › PivotChart on a worksheet: a chart over the pivot that holds the active cell. */
+/** {@link insertPivotChart} on a worksheet. */
 function insert_worksheet_pivot_chart(grid: Grid, kind: ChartKind): boolean {
   const hit = selectedPivot(grid);
   const sheet = hit?.range.sheet;
