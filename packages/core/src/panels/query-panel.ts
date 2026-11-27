@@ -1,4 +1,4 @@
-// Data › Queries & Connections and Data › Get Data (#227). The panel lists the
+// Data › Queries & Connections and Data › Get Data. The panel lists the
 // saved queries and edits one at a time. It never runs a query itself: saving
 // goes through the session's `define`, which checks the plan in the query
 // engine first, and refresh goes through the session's host fetch callback.
@@ -92,7 +92,7 @@ function output_text(grid: Grid, query: SavedQuery): string {
   return `Table ${output.tableName} at ${anchor}`;
 }
 
-/** The panel; `create` opens it with an empty new-query form focused. */
+/** The Queries & Connections panel; `create` opens it with an empty new-query form focused. */
 export function queryPanel(grid: Grid, create: boolean): GridPanel {
   return {
     title: "Queries & Connections",

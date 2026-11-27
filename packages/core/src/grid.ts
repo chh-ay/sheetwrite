@@ -3187,7 +3187,7 @@ export class GridImpl implements Grid {
   }
 
   replaceTheme(theme: Partial<Theme> | undefined): void {
-    // Re-run construction-time resolution (grid.ts constructor): defaults,
+    // Resolve the theme as the constructor does: defaults,
     // then host CSS custom properties, then the new option value.
     this.base_theme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
     this.apply_zoomed_theme();
@@ -4687,48 +4687,66 @@ export class GridImpl implements Grid {
     // A stopped engine cannot answer style reads; a read-only grid needs none.
     if (this.selection.isEmpty || this.engine_failure) return summary;
 
-    const coordinates: Array<{ row: number; col: number }> = [];
-    let complete = true;
+    const columns = this.sheet().columns;
+    const rects: SelRect[] = [];
+    let cell_count = 0;
     this.selection.forEachRect((rect) => {
-      if (!complete) return;
-
-      for (let row = rect.r0; row <= rect.r1; row++) {
-        const data_row = this.to_data_row(row);
-        for (let col = rect.c0; col <= rect.c1; col++) {
-          if (coordinates.length >= COMMAND_STATE_CELL_LIMIT) {
-            complete = false;
-            return;
-          }
-
-          const column = this.sheet().columns[col];
-          if (!column) continue;
-          coordinates.push({ row: data_row, col });
-        }
-      }
+      const last_col = Math.min(rect.c1, columns.length - 1);
+      if (last_col < rect.c0) return;
+      cell_count += (rect.r1 - rect.r0 + 1) * (last_col - rect.c0 + 1);
+      rects.push(rect);
     });
 
-    if (!complete) {
+    if (cell_count > COMMAND_STATE_CELL_LIMIT) {
       for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
       return summary;
     }
 
+    const add = (style: CellStyle, column: Column): void => {
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
+        const bit = formatting_command_active(command, style, column.cellStyle) ? 1 : 2;
+        summary[command] = (summary[command] ?? 0) | bit;
+      }
+    };
     const engine = storeEngine(this.store);
+    const sheet = this.active_sheet;
+
+    // Without a view, a selected row is its data row, and a sheet that is not
+    // paged has every cell loaded: each rectangle reads only its distinct
+    // styles, once per run of columns that share a column style.
+    if (engine && !engine.hasView(sheet) && !engine.isPaged(sheet)) {
+      for (const rect of rects) {
+        const last_col = Math.min(rect.c1, columns.length - 1);
+        for (let first = rect.c0; first <= last_col;) {
+          const column = columns[first]!;
+          let end = first;
+          while (end < last_col && columns[end + 1]!.cellStyle === column.cellStyle) end++;
+          for (const style of engine.rangeStyles(sheet, rect.r0, first, rect.r1, end)) {
+            add(style, column);
+          }
+          first = end + 1;
+        }
+      }
+      return summary;
+    }
+
+    const coordinates: Array<{ row: number; col: number }> = [];
+    for (const rect of rects) {
+      const last_col = Math.min(rect.c1, columns.length - 1);
+      for (let row = rect.r0; row <= rect.r1; row++) {
+        const data_row = this.to_data_row(row);
+        for (let col = rect.c0; col <= last_col; col++) coordinates.push({ row: data_row, col });
+      }
+    }
     // Custom stores without an engine retain their single-cell read contract.
     const cells = engine
-      ? engine.captureResolvedCells(this.active_sheet, coordinates)
-      : coordinates.map(({ row, col }) =>
-          this.store.getCell({ sheet: this.active_sheet, row, col }),
-        );
+      ? engine.captureResolvedCells(sheet, coordinates)
+      : coordinates.map(({ row, col }) => this.store.getCell({ sheet, row, col }));
 
     for (const [index, coordinate] of coordinates.entries()) {
       const cell = cells[index];
-      const column = this.sheet().columns[coordinate.col];
-      if (!cell || !column) continue;
-
-      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
-        const bit = formatting_command_active(command, cell.style, column.cellStyle) ? 1 : 2;
-        summary[command] = (summary[command] ?? 0) | bit;
-      }
+      const column = columns[coordinate.col];
+      if (cell && column) add(cell.style, column);
     }
 
     return summary;

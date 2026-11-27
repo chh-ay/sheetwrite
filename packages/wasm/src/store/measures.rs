@@ -319,7 +319,7 @@ impl CellStore {
             .collect();
         // A CALCULATE over the base table that only removes inner axis
         // levels sees the rows of the cell's ancestor group pair at the kept
-        // depths, which the pivot cache groups already (C2).
+        // depths, which the pivot cache already groups.
         let kept: Vec<KeptDepths> = slots
             .iter()
             .map(|(table, context)| {

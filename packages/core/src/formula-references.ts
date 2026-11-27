@@ -42,7 +42,7 @@ export interface FormulaReference {
   readonly colorIndex: number;
 }
 
-/** One end of a reference, or null when `token` is not one. */
+/** One end of a reference: a cell, a whole column or a whole row. */
 type ReferenceEnd =
   | { readonly kind: "cell"; readonly row: number; readonly col: number }
   | { readonly kind: "column"; readonly col: number }

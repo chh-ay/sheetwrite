@@ -78,7 +78,7 @@ function own_data_field(value: unknown, key: string): unknown {
  * private copies, or `operation` itself when it is not a `setBlock`, its
  * arrays are already private copies that no caller has reached yet, or any
  * field it is made of is not plain data (validation then judges the original
- * exactly as before).
+ * unchanged).
  */
 function with_owned_block_arrays(operation: DocumentOp): DocumentOp {
   if (own_data_field(operation, "op") !== "setBlock") return operation;

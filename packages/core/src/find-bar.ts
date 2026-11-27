@@ -125,7 +125,7 @@ class CellList {
     this.el.append(head, list, this.status);
   }
 
-  /** List `row_count` rows, with row `active` (or none, -1) highlighted and scrolled into view. */
+  /** List `rowCount` rows, with row `active` (or none, -1) highlighted and scrolled into view. */
   show(
     rowCount: number,
     active: number,
@@ -733,7 +733,7 @@ export class FindBar {
   }
 
   /**
-   * A flat button that keeps grid focus (mousedown is suppressed). `type_class`
+   * A flat button that does not take the focus (mousedown is suppressed). `type_class`
    * selects the icon (square nav/close) vs. text (Replace / Replace all)
    * sizing rule; `class_name` is the per-button hook. `title` is also the
    * accessible name, so ↑, ↓ and ✕ are announced as Previous, Next and Close.
@@ -753,7 +753,7 @@ export class FindBar {
     btn.title = title;
     btn.setAttribute("aria-label", title);
 
-    // Keep grid focus so buttons act without observing focus oddly.
+    // A press does not take the focus, so it stays where the user was typing.
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.addEventListener("click", () => {
       const feedback =

@@ -1,9 +1,8 @@
 // The quality gate of formula assist. The replay is deterministic, so a change
-// that moves a number moves it on every run; floors only go up. The bar set in
-// the design note on #801 is at least 40% of keystrokes saved and under 2%
-// wrong on the held-out set. The committed held-out set measured below it at
-// first, so its gate holds the measured values instead, raised as the
-// predictor improves (#801).
+// that moves a number moves it on every run; floors only go up. The design bar
+// is at least 40% of keystrokes saved and under 2% wrong on the held-out set.
+// The committed held-out set does not meet that bar, so its gate holds the
+// measured values instead. Raise them when the predictor improves.
 
 import type { ReplaySetName } from "./corpora.js";
 import type { ReplayMetrics } from "./replay.js";
@@ -16,10 +15,9 @@ export interface SetBar {
 
 /** The bar of each set the gate runs. The development half is tuned on, so the gate does not use it. */
 export const QUALITY_BAR: Readonly<Partial<Record<ReplaySetName, SetBar>>> = {
-  // Seed-803 draw: 38.5% saved, 2.6% wrong (15 of 587 shown) with the neighbour and syntax
-  // signals; 48.3% saved, 2.2% wrong (16 of 715) with the column and workbook signals added;
-  // 48.4% saved, 2.0% wrong (14 of 713) once the ghost stays while the user types it.
-  // The gate sits a little outside those values, so it holds them without tripping on them.
+  // The seed-803 draw measures 48.4% saved and 2.0% wrong (14 of 713 shown) with all signals,
+  // when the ghost stays while the user types it (see enron/README.md). The gate sits a little
+  // outside those values, so it holds them without tripping on them.
   "enron-heldout": { minSaved: 0.48, maxWrong: 0.025 },
   // A regression floor a little under the measured 16.1%. The corpus follows the engine's formula
   // inventory, so its cases change; the margin keeps a changed case from tripping it.

@@ -1,4 +1,4 @@
-// Where a chart over a pivot finds its points in the written workbook (#501).
+// Where a chart over a pivot finds its points in the written workbook.
 // A PivotChart in Excel reads ranges of its PivotTable's cells, so the export
 // points the chart's references at the cells that hold the pivot's values:
 // the output of a worksheet pivot at its anchor, or a dashboard pivot item's

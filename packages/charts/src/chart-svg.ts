@@ -583,9 +583,10 @@ function draw_category_labels(
     ? LINE_HEIGHT
     : Math.max(...labels.map((label) => text_width(label))) + AXIS_LABEL_GAP;
   const fit_stride = Math.max(1, Math.ceil(label_extent / band));
-  // A horizontal label wider than its band moves right, by up to half the
-  // difference, to stay over the plot (below). The stride leaves room for
-  // that move, so the labels keep one spacing along the axis.
+  // A horizontal label wider than its band is clamped inside the plot (see
+  // below), so the first label moves right by up to half the difference. The
+  // stride leaves room for that move, so the labels keep one spacing along
+  // the axis.
   const widest = label_extent - AXIS_LABEL_GAP;
   const stride =
     vertical || widest <= band
@@ -610,9 +611,10 @@ function draw_category_labels(
       );
     } else {
       const text = fit_text(label, band * stride - AXIS_LABEL_GAP);
-      // A label wider than its band stays over the plot: past the plot's left
-      // edge, the first one ran into the value axis's lowest label ($0). A
-      // label that would still reach the one before it is left out.
+      // A label wider than its band is clamped inside the plot's left and
+      // right edges. Past the left edge, the first label would run into the
+      // lowest label of the value axis. A label that would still reach the
+      // label drawn before it is left out.
       const half = text_width(text) / 2;
       const x = Math.min(Math.max(plot.left + center, plot.left + half), plot.right - half);
       if (x - half < drawn_right + AXIS_LABEL_GAP) continue;
@@ -1252,7 +1254,10 @@ function polar(
   return [center_x + radius * Math.cos(angle), center_y + radius * Math.sin(angle)];
 }
 
-/** Path of one slice from `start` to `end` (radians, clockwise from 12 o'clock); `inner > 0` cuts a doughnut hole. */
+/**
+ * Path of one slice from `start` to `end`, in radians clockwise from
+ * 3 o'clock, as `polar` measures them. `inner > 0` cuts a doughnut hole.
+ */
 function slice_path(
   center_x: number,
   center_y: number,

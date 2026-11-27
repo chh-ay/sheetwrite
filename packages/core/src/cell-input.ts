@@ -377,8 +377,8 @@ export function parsePlainDecimal(
  * Parse a currency-formatted string into a plain number, or `null` when the
  * remaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands
  * grouping (`,`), and whitespace, and reads accounting-style parentheses
- * (`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the
- * renderer uses.
+ * (`(1,234.50)`) as a negative amount. Grouping and decimals follow US English:
+ * `,` groups digits and `.` is the decimal point.
  *
  * @param raw - Text such as `$1,234.50` or `(1,234.50)`.
  * @returns The amount, such as `1234.5` or `-1234.5`, or `null`.

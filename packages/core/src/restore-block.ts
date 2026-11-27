@@ -39,7 +39,12 @@ export function encodeRestoreBlock(range: Range, block: PackedCellBlock): Restor
   return encodeMeasuredRestoreBlock(range, block, undefined);
 }
 
-/** Internal engine path: the snapshot builder already measured its plain scalar arrays. */
+/**
+ * Encode a block from the engine's snapshot builder. The builder made the
+ * block from plain scalar arrays and measured it, so the JSON-safety walk of
+ * `encodeRestoreBlock` is skipped. A `decodedBytes` above the limit rejects
+ * the block before it is stringified.
+ */
 export function encodeMeasuredRestoreBlock(
   range: Range,
   block: PackedCellBlock,

@@ -94,8 +94,9 @@ impl Complex {
         self.re == 0.0 && self.im == 0.0
     }
 
-    /// sqrt(re^2 + im^2). The engine already carries `sqrt`, while `hypot`
-    /// would add its own routine for parts above 1E154.
+    /// sqrt(re^2 + im^2), computed directly to avoid `hypot`, which would add
+    /// its own routine to the binary. The squares overflow when a part is
+    /// above about 1E154, so the result is then infinite.
     fn modulus(self) -> f64 {
         (self.re * self.re + self.im * self.im).sqrt()
     }

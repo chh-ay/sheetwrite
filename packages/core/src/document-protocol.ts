@@ -2076,8 +2076,8 @@ function walked_field(record: PlainRecord, key: string): unknown {
  * (`builtByCaller`), whose own fields are all enumerable data properties. A
  * direct read then gives the value `walked_field` gives, as long as
  * `Object.prototype` has only its standard properties, none of them a
- * snapshot field. It skips the property check that took a fifth of
- * validating an imported workbook.
+ * snapshot field. It skips the property check, which takes about a fifth of
+ * the time to validate an imported workbook.
  */
 function built_field(record: PlainRecord, key: string): unknown {
   return record[key];
@@ -2168,7 +2168,8 @@ function validate_conditional_format_shape(
   validate_range_shape(ownValue(format, "range"), `${path}.range`, errors);
   validate_conditional_predicate(ownValue(format, "when"), `${path}.when`, errors);
   validate_cell_style(ownValue(format, "style"), `${path}.style`, errors);
-  // Snapshot validation checks this field; operation validation historically does not.
+  // Only snapshot validation checks `stopIfTrue`. Operation validation does not,
+  // so a `setSheetMeta` format with a non-boolean `stopIfTrue` passes.
   if (validate_stop_if_true) optional_boolean(format, "stopIfTrue", path, errors);
 }
 
@@ -3284,9 +3285,9 @@ function cell_block_in_sheet(block: SheetSnapshot["cells"][number], sheet: Sheet
 // The checks that visit every cell live in small functions of their own, out of
 // `validate_json_safe_snapshot`. JavaScriptCore optimizes a long loop in a
 // background compilation, and until that compilation is used or dropped it keeps
-// every value the function's variables held when it started. The large function
-// runs once per snapshot, so its loops ended before their compilation was ready,
-// and the compilation kept the whole imported workbook alive for dozens of
+// every value the function's variables held when it started. A large function
+// that runs once per snapshot ends its loops before their compilation is ready,
+// and the compilation then keeps the whole imported workbook alive for dozens of
 // collections (35 MB after importing the XLSX benchmark corpus). A small
 // function compiles in time to be used, and its variables reach one block.
 
@@ -3361,9 +3362,9 @@ function validate_block_references(
 }
 
 /**
- * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
- * replaces a Set entry per cell, which cost about 100 bytes each and made
- * validating a large snapshot allocate as much as the snapshot itself.
+ * Whether two in-bounds cells share an address. Each cell gets a sorted 8-byte
+ * key instead of a Set entry: a Set entry costs about 100 bytes, so a Set
+ * would make validating a large snapshot allocate as much as the snapshot.
  * In-bounds cells have col < columns.length, so row * width + col is unique
  * and, under the logical-cell limit, exact as a double.
  */

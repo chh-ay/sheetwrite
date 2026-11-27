@@ -86,7 +86,7 @@ export function parseSharedStrings(
     parent: "sst",
     parentIsRoot: true,
     shouldStream: (root_element) => xmlRootMatches(root_element, "sst", MAIN_NAMESPACES),
-    // The tree path reads only `si` children; other children are skipped alike.
+    // Only `si` children hold strings; other children are skipped.
     child: (item) => {
       if (xmlLocalName(item.name) === "si") process_item(item);
     },

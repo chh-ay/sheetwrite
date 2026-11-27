@@ -59,6 +59,8 @@ fn set_anchor_value(
 
 /// Whether the dirty cells of a finished pass cut `attempt`: a write inside
 /// it that the output does not own, so the output must be placed again.
+/// A dirty rectangle that meets `attempt`, or a whole-sheet dirty state,
+/// always counts as a cut.
 pub(super) fn attempt_cut(data: &SheetData, attempt: SpillRange, installed: bool) -> bool {
     let cut = |cell: CellKey| {
         attempt.contains(cell) && (!installed || data.spill.owner(cell) != Some(attempt.anchor))
@@ -154,9 +156,9 @@ impl CellStore {
             return (changed, Err(FormulaError::Num));
         }
 
-        // The anchor is the range's first cell. Listing it before the
-        // row-major body keeps `changed` ascending, so the dirty list takes
-        // the cells without sorting them.
+        // The anchor is the range's first cell. Listing it just before the
+        // row-major body keeps the output cells in ascending order, so the
+        // dirty list can take them without sorting.
         let strings = &mut self.strings;
         if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
             changed.push(anchor);

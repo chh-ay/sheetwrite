@@ -101,7 +101,8 @@ interface JsonWalk {
   /**
    * The objects and arrays above the current value, kept when `trackAncestors`
    * is set. A built walk first runs without them: a Set entry added and
-   * removed per object cost about a fifth of measuring an imported workbook.
+   * removed per object costs about a fifth of the time to measure an imported
+   * workbook.
    */
   readonly ancestors: Set<object>;
   readonly trackAncestors: boolean;
@@ -132,8 +133,8 @@ export function measureJson(
   } catch (retry) {
     if (!(retry instanceof JsonWalkRetry)) throw retry;
   }
-  // Deep, cyclic or refused: the tracked walk reports what it always did, so
-  // a cycle is reported as a cycle even when going round it passed the limit.
+  // A deep, cyclic or refused value: the tracked walk reports the issue with
+  // its path, and a cycle as a cycle even when going round it passed the limit.
   return run_walk(value, limit, options, true);
 }
 
@@ -491,7 +492,7 @@ function visit_json_object(walk: JsonWalk, record: object): void {
  * The exact walk's checks without the path and ancestors it keeps for its
  * report: bytes of `value`, or `RETRY_WITH_TRACKING` at the first issue, past
  * `budget` or nested past `UNTRACKED_DEPTH_LIMIT` (a cycle nests without end).
- * Most values pass, and the bookkeeping cost more than the checks on the
+ * Most values pass, and the bookkeeping costs more than the checks on the
  * small operations of an edit.
  */
 function quick_exact_json_bytes(

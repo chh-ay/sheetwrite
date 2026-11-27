@@ -181,9 +181,8 @@ pub(super) struct Definition {
     /// that uses a name some sheet defines in its own scope, directly or
     /// through other names. Such a formula is read in a copy whose name
     /// shapes are marked for the reading sheet ([`shapes`]), and this holds
-    /// its facts as each sheet with names of its own reads it. One thin
-    /// pointer, so a formula that reads alike everywhere pays no more than
-    /// the flag it replaces.
+    /// its facts as each sheet with names of its own reads it. A formula
+    /// that reads alike everywhere pays only this one pointer.
     sheet_shapes: Option<Box<SheetFacts>>,
     /// What the formula does that the formulas using the name inherit,
     /// worked out when the names are bound, as the workbook reads it.
@@ -841,8 +840,8 @@ impl NameTable {
     }
 
     /// Keep only the definitions `keep` accepts; it gets each one's scope and
-    /// folded name, and may change it. Takes a `dyn` closure so each caller
-    /// shares one copy of the walk.
+    /// its name's spelling, and may change it. Takes a `dyn` closure so each
+    /// caller shares one copy of the walk.
     pub(super) fn retain(&mut self, keep: &mut KeepDefinition<'_>) {
         for entry in self.entries_mut() {
             let spelling = &entry.spelling;
@@ -1125,9 +1124,8 @@ impl CellStore {
     /// and flags again from their trees, which hold only the names' ids; the
     /// dependency index patches their reads and they recalculate. A formula
     /// whose tree a change does alter is parsed again from its text: one
-    /// that calls a changed name that no longer holds a formula, or that
-    /// holds a changed name unbound, and one with a LET, whose tree is
-    /// resolved in place.
+    /// that calls a changed name or holds one unbound, and one that reads a
+    /// changed name and has a LET, whose tree is resolved in place.
     pub(super) fn rebind_name_users(&mut self, mut changed: Vec<String>) {
         if changed.is_empty() {
             return;
@@ -1505,8 +1503,8 @@ enum NameUse {
 /// The formulas of a sheet whose tree uses a defined name. A name change
 /// scans every formula for them and usually finds few, so the scan has a
 /// loop of its own, out of line; the `_family` suffix keeps wasm-opt from
-/// inlining it back. Under JavaScriptCore this list made the scan of
-/// `name-define-unused` 7% faster than a callback per user.
+/// inlining it back. Under JavaScriptCore, a list makes the scan of the
+/// `name-define-unused` benchmark about 7% faster than a callback per user.
 #[inline(never)]
 fn name_users_family(formulas: &SheetFormulas, slots: &FormulaStore) -> Vec<FormulaId> {
     formulas
@@ -1604,7 +1602,7 @@ fn reference_target(ast: &Ast, formula_sheet: u32, shift: (u32, u32)) -> Option<
     })
 }
 
-/// The names that `ast` uses, as a name or as a function it calls.
+/// The names that `ast` writes: bare names, LET names and unknown functions.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node uses no name"
