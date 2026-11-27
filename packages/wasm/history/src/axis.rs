@@ -228,10 +228,12 @@ pub(crate) fn transform(op: AxisOp, first: u32, last: u32, out: &mut Vec<(u32, u
             if last < at {
                 out.push((first, last));
             } else if first >= at {
-                out.push((first + count, last + count));
+                // A writer's rectangle can reach past the sheet; lines past the
+                // u32 range do not exist, so the range stops at the last one.
+                out.push((first.saturating_add(count), last.saturating_add(count)));
             } else {
                 out.push((first, at - 1));
-                out.push((at + count, last + count));
+                out.push((at + count, last.saturating_add(count)));
             }
         }
         AxisOp::Remove { at, count } => {
@@ -329,6 +331,20 @@ mod tests {
 
         transform(AxisOp::Insert { at: 3, count: 2 }, 1, 4, &mut out);
         assert_eq!(out, vec![(1, 2), (5, 6)]);
+
+        // Lines past the u32 range do not exist: the range stops at the last one.
+        out.clear();
+        transform(AxisOp::Insert { at: 3, count: 2 }, 1, u32::MAX, &mut out);
+        assert_eq!(out, vec![(1, 2), (5, u32::MAX)]);
+
+        out.clear();
+        transform(
+            AxisOp::Insert { at: 0, count: 2 },
+            u32::MAX - 1,
+            u32::MAX,
+            &mut out,
+        );
+        assert_eq!(out, vec![(u32::MAX, u32::MAX)]);
 
         out.clear();
         transform(AxisOp::Remove { at: 2, count: 3 }, 1, 6, &mut out);
