@@ -220,7 +220,8 @@ export class UndoManager {
       rebase_addr(addr, sheet, axis, remap);
     rebase_entries(this.undo_stack, map_addr, map_pivot);
     rebase_entries(this.redo_stack, map_addr, map_pivot);
-    // Rebasing drops snapshots that left the sheet, and the entries left empty.
+    // Rebasing can drop snapshots that left the sheet and entries left empty,
+    // so the bytes are counted again.
     this.undo_snapshot_bytes = 0;
     for (const entry of this.undo_stack) this.undo_snapshot_bytes += entry_snapshot_bytes(entry);
   }

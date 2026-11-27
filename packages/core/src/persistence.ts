@@ -188,8 +188,8 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 
   /**
    * Validate every member version against the default sync limits, apply the
-   * members in order to one scratch store, and publish all of them only when
-   * every member applied.
+   * members in order to the document's store, and publish all of them only
+   * when every member applied. A failure rebuilds the committed store state.
    */
   async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
     return this.commit_versions(request, split_batch_versions(request));
