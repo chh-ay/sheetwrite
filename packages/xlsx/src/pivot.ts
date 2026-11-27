@@ -1218,8 +1218,8 @@ export interface PivotWrite {
   pivotCaches(ids: readonly string[]): string[];
   /**
    * The output written as cells for each pivot kept in Sheetwrite metadata,
-   * by pivot ID. Metadata keeps it as the pivot's saved output, so the reader
-   * knows which cells are the pivot's and not user values.
+   * by pivot ID. Metadata keeps it as the pivot's saved output (see
+   * `metadata_snapshot` in writer.ts).
    */
   readonly keptOutputs: ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
   readonly overrides: readonly ContentTypeOverride[];

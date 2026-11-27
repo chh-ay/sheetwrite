@@ -20,7 +20,7 @@ export interface XlsxCodecContext {
   warningCount: number;
   /** OOXML spellings of cell and defined-name formulas, computed in one batch. */
   formulas?: ReadonlyMap<string, string>;
-  /** On export, the formula sources whose result is an array; Excel needs them marked as dynamic arrays. */
+  /** On export, `ExportFormulas.arrayFormulas`. */
   arrayFormulas?: ReadonlySet<string>;
   /** On import, the book name of each `[n]` link index of file formulas. */
   externalBooks?: readonly (string | undefined)[];
@@ -35,7 +35,6 @@ const MAX_WARNINGS = 64;
 /** UTF-8 bytes of file or host text that one error message keeps. */
 const MAX_ERROR_TEXT_BYTES = 8 * 1024;
 const ELLIPSIS = "…";
-/** UTF-8 bytes of `ELLIPSIS`. */
 const ELLIPSIS_BYTES = 3;
 /** UTF-8 bytes kept from each end of a cut text. */
 const KEPT_END_BYTES = Math.floor((MAX_ERROR_TEXT_BYTES - ELLIPSIS_BYTES) / 2);

@@ -21,7 +21,6 @@ import type { PivotCells } from "./chart-cells.js";
 import type { PivotChartData } from "./chart-write.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
-/** Columns of the dashboard grid; Sheetwrite's layout has 12. */
 const GRID_COLUMNS = 12;
 /** Width of one worksheet column that stands for a grid column, in pixels. */
 const COLUMN_WIDTH = 100;

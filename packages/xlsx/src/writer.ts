@@ -131,7 +131,7 @@ function has_exact_border_width(style: CellStyle | undefined): boolean {
   );
 }
 
-/** The output written as cells for each pivot kept in metadata, by pivot ID. */
+/** See `PivotWrite.keptOutputs`. */
 type KeptOutputs = ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
 
 /**

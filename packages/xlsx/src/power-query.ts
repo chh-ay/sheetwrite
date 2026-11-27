@@ -237,7 +237,7 @@ export async function readPowerQuery(
   sidecarQueries: readonly SavedQuery[] | undefined,
   context: XlsxCodecContext,
 ): Promise<void> {
-  // Excel links the item from the workbook part; other writers may link it from the package root.
+  // The same two sources as `has_custom_xml` in reader.ts.
   const relationships = [
     ...packageFile.relationships(packageFile.officeDocumentPart()),
     ...packageFile.relationships(""),
