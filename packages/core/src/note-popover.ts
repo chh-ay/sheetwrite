@@ -9,8 +9,6 @@ export const NOTE_HOVER_DELAY_MS = 400;
 /** Space between the cell edge and the card. */
 const CARD_GAP = 4;
 
-/** Closest the card comes to a window edge. */
-
 /** One cell in both coordinate spaces: view for geometry, data for the note. */
 export interface NoteCell {
   readonly row: number;
