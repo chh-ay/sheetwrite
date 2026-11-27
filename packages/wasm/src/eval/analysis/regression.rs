@@ -11,7 +11,7 @@ use super::descriptive;
 use crate::calc::{Ast, Func};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 use std::cmp::Ordering;
 
 family_functions! {
@@ -52,7 +52,6 @@ const QR_DEPENDENCE_FACTOR: f64 = 64.0;
 const QR_WORK_PER_CELL: usize = 4;
 const LINEST_MAX_ARGS: usize = 4;
 const FREQUENCY_ARGS: usize = 2;
-const MODE_MAX_ARGS: usize = 255;
 
 /// The legacy names use the same rules as their current names. The array
 /// functions evaluate through the array hooks only.
@@ -175,7 +174,7 @@ pub(crate) fn shape(
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
     } else if function == Function::MODE_MULT {
-        if args.is_empty() || args.len() > MODE_MAX_ARGS {
+        if args.is_empty() || args.len() > MAX_FUNCTION_ARGS {
             return Err(FormulaError::Value);
         }
         let mut cells = 0usize;

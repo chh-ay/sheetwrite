@@ -164,6 +164,13 @@ fn reports_the_span_and_message_of_a_syntax_error() {
             "{src}"
         );
     }
+
+    // Excel refuses a call with more than 255 arguments when it is entered.
+    let too_many = format!("=SUM({})", vec!["1"; 256].join(","));
+    let last = too_many.len() as u32 - 2;
+    let message = "A function takes at most 255 arguments.".to_owned();
+    assert_eq!(error(&too_many), Some((last, last + 1, false, message)));
+    assert!(error(&format!("=SUM({})", vec!["1"; 255].join(","))).is_none());
 }
 
 #[test]

@@ -41,6 +41,10 @@ pub(crate) const NO_STRING: u32 = u32::MAX;
 pub(crate) const FORMULA_RECURSION_LIMIT: usize = 256;
 /// Bounds one materialized formula range; larger ranges resolve to `#NUM!`.
 pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
+/// The most arguments one function call takes. Excel's specifications and
+/// limits give 255; Excel refuses a formula with more, and so does the
+/// parser.
+pub(crate) const MAX_FUNCTION_ARGS: usize = 255;
 
 pub(crate) type CellKey = (u32, u32);
 

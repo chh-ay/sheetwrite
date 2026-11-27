@@ -62,6 +62,31 @@ fn assert_spills(cases: &[SpillCase<'_>]) {
     assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
 }
 
+/// Excel's specifications and limits give 255 arguments per function: a
+/// call with 255 is evaluated. The parser refuses a 256-argument call, as
+/// Excel does when the formula is entered, so the cell shows `#VALUE!`.
+#[test]
+fn functions_take_at_most_255_arguments() {
+    let call = |name: &str, count: usize, argument: &str| {
+        format!("{name}({})", vec![argument; count].join(","))
+    };
+    let mut cases = vec![
+        (format!("={}", call("SUM", 255, "1")), "255"),
+        (format!("={}", call("SUM", 256, "1")), "#VALUE!"),
+        (format!("=NPV(0,{})", vec!["1"; 254].join(",")), "254"),
+        (format!("={}", call("AVERAGEA", 255, "1")), "1"),
+    ];
+    #[cfg(feature = "analysis")]
+    cases.extend([
+        (format!("={}", call("IMSUM", 255, "\"1+i\"")), "255+255i"),
+        (format!("={}", call("IMSUM", 256, "\"1+i\"")), "#VALUE!"),
+        (format!("=ROWS({})", call("VSTACK", 255, "1")), "255"),
+        (format!("=ROWS({})", call("VSTACK", 256, "1")), "#VALUE!"),
+    ]);
+    let (mut store, report) = data_workbook(2, cases.len());
+    assert_formulas(&mut store, report, 0, &cases);
+}
+
 #[cfg(feature = "analysis")]
 #[test]
 fn lambda_arguments_can_be_errors_that_the_body_handles() {
