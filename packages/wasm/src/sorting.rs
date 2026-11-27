@@ -12,19 +12,16 @@ use std::cmp::Ordering;
 use crate::formula_slots::FormulaId;
 use crate::types::AbsCellKey;
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u64(keys: &mut [u64]) {
     keys.sort_unstable();
 }
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u128(keys: &mut [u128]) {
     keys.sort_unstable();
 }
 
-/// The sign bit of a 64-bit value.
 const SIGN_BIT: u64 = 1 << 63;
 
 /// Sorts `values` ascending through [`sort_u64`], reusing their allocation:
