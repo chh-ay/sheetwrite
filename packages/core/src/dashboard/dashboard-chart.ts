@@ -13,7 +13,11 @@ import type {
   ChartView,
 } from "../types/chart.js";
 
-/** One pivot output from the engine, decoded: cells in row-major order and the layout counts. */
+/**
+ * One pivot output: cells in row-major order and the layout counts.
+ * `pivotOutputOf` decodes it from the engine, and a `PivotResultView` has the
+ * same shape.
+ */
 export interface PivotOutputRead {
   readonly cells: CellScalar[];
   readonly rows: number;

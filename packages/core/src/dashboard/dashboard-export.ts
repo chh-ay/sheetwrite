@@ -15,6 +15,7 @@ import type { ChartView } from "../types/chart.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { DashboardExport, DashboardItem, DashboardItemExport } from "../types/dashboard.js";
 import type { Store } from "../types/store.js";
+import type { PivotOutputRead } from "./dashboard-chart.js";
 import {
   applyPivotViews,
   dashboardItemTitle,
@@ -126,22 +127,13 @@ export function pivotViewExports(store: Store): PivotViewExports {
   };
 }
 
-/** A computed pivot output: cells in row-major order and its layout counts. */
-interface PivotOutputCells {
-  readonly cells: readonly CellScalar[];
-  readonly rows: number;
-  readonly cols: number;
-  readonly headerRows: number;
-  readonly labelCols: number;
-}
-
 /**
  * The rows of `output` and the number format of each cell: value cells take
  * their value field's format (data columns cycle through the value fields),
  * labels and headers use General.
  */
 function pivot_output_content(
-  output: PivotOutputCells,
+  output: PivotOutputRead,
   formats: readonly (string | null)[],
 ): Pick<DashboardItemExport, "cells" | "numberFormats"> {
   const cells: CellScalar[][] = [];
