@@ -39,6 +39,14 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
 
     /** Full engine only: `[code, firstRow, secondRow, unmatched]`, empty for an unknown ID. */
     relationshipStatus?(id: string): Uint32Array;
+
+    /** Full engine only: the `relationshipStatus` record of a relationship that is not saved. */
+    relationshipKeyStatus?(
+      from_table: string,
+      from_column: string,
+      to_table: string,
+      to_column: string,
+    ): Uint32Array;
   };
 
 /** Dashboard pivot output in row-major order; take each buffer once, then free it. */
