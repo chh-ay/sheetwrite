@@ -13,7 +13,7 @@ export const CODE_TAB_FRAMEWORKS = [
 
 type FrameworkId = (typeof CODE_TAB_FRAMEWORKS)[number]["id"];
 
-/** Props of {@link CodeTabs}: each framework's snippet, as finished markup in tab order. */
+/** Each framework's snippet, as finished markup in tab order. */
 export interface CodeTabsProps {
   readonly panels: readonly string[];
 }

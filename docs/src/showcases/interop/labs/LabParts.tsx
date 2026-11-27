@@ -8,7 +8,6 @@ import { Icon, type IconName } from "../../../components/Icon.js";
  * figure. Styles: styles/showcases/interoperability.css (`sw-lab-*`).
  */
 
-/** Props of {@link LabAnswer}. */
 export interface LabAnswerProps {
   readonly icon: IconName;
   readonly name: string;
@@ -44,7 +43,6 @@ export function LabAnswer(props: LabAnswerProps) {
   );
 }
 
-/** Props of {@link LabFigure}. */
 export interface LabFigureProps {
   readonly value: string;
   /** The denominator, shown smaller after the value, such as "/ 2,280". */

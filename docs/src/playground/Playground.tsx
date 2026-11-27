@@ -28,7 +28,6 @@ import { HighlightedCode } from "../components/HighlightedCode.js";
  * grid, console output and errors show under the code.
  */
 
-/** Props of {@link Playground}. */
 interface PlaygroundProps {
   /** The example as the page shows it; Reset returns to it. */
   readonly source: string;
@@ -183,7 +182,6 @@ export function Playground(props: PlaygroundProps) {
   );
 }
 
-/** Props of {@link CodeEditor}. */
 interface CodeEditorProps {
   readonly value: string;
   readonly label: string;
@@ -286,7 +284,6 @@ function CodeEditor(props: CodeEditorProps) {
   );
 }
 
-/** Props of {@link ExampleFrame}. */
 interface ExampleFrameProps {
   readonly code: string;
   onConsole(entry: ConsoleEntry): void;

@@ -144,7 +144,6 @@ export async function runExample(
   }
 }
 
-/** Repaints the example's grids after the page theme changes. */
 /** Calls `observe` when the frame's body changes size, with the frame's own observer. */
 export function watchFrameHeight(
   frame: HTMLIFrameElement,

@@ -19,7 +19,6 @@ interface ImportedDocument {
   readonly label: string;
 }
 
-/** Props of {@link VanillaWorkbench}. */
 export interface VanillaWorkbenchProps {
   /** Rows of the revenue pipeline, from the scenario. */
   readonly rows: number;

@@ -30,8 +30,6 @@ export const ACTS = [
   { start: 16, text: "Summarize it with a pivot table." },
 ] as const;
 
-/* ---- Workbook -------------------------------------------------------------- */
-
 interface SalesRow {
   region: string;
   units: number;
@@ -76,8 +74,6 @@ export const ROWS = 16;
 /** Columns the sales table and the pivot fill: Region, Units, Rate, Revenue; Region and two values. */
 export const SALES_COLUMNS = 4;
 export const PIVOT_COLUMNS = 3;
-
-/* ---- Frame ------------------------------------------------------------------- */
 
 /** Elements the pointer travels to, by `data-target`. */
 export type Target =

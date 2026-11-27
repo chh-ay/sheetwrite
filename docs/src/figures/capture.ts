@@ -809,7 +809,6 @@ async function items_box(page: Page, titles?: readonly string[]) {
   return { x: left, y: top, width: Math.round(right - left), height: Math.round(bottom - top) };
 }
 
-/** Hides every dashboard item but the named ones. */
 async function hide_other_items(page: Page, titles: readonly string[]) {
   await page.locator(".sheetwrite-dashboard-item").evaluateAll((items, kept) => {
     for (const item of items) {
