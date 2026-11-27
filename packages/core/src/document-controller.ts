@@ -309,7 +309,7 @@ export class DocumentController {
     return this.history.canUndo;
   }
 
-  /** The newest undo entry, by identity: the edit the next {@link undo} reverts. */
+  /** See `UndoManager.lastUndo`. */
   get lastUndo(): object | null {
     return this.history.lastUndo;
   }
@@ -608,7 +608,6 @@ export class DocumentController {
             to: patch.from,
           },
           ...this.move_losses(patch),
-          // A partly moved source range does not map back exactly.
           ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 
@@ -674,7 +673,6 @@ export class DocumentController {
             to: patch.from,
           },
           ...this.move_losses(patch),
-          // A partly moved source range does not map back exactly.
           ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 

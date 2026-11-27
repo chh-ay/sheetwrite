@@ -40,7 +40,6 @@ export interface JsonMeasureOptions {
 
 /** Bytes of `null` and `true`. */
 const FOUR_LETTER_LITERAL_BYTES = 4;
-/** Bytes of `false`. */
 const FALSE_BYTES = 5;
 /** Bytes of a pair of quotes, brackets or braces. */
 const DELIMITER_PAIR_BYTES = 2;
