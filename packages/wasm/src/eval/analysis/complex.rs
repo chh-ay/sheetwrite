@@ -94,11 +94,27 @@ impl Complex {
         self.re == 0.0 && self.im == 0.0
     }
 
-    /// sqrt(re^2 + im^2), computed directly to avoid `hypot`, which would add
-    /// its own routine to the binary. The squares overflow when a part is
-    /// above about 1E154, so the result is then infinite.
+    /// sqrt(re^2 + im^2). The engine already carries `sqrt`, while `hypot`
+    /// would add its own routine. A sum of squares that overflows (a part
+    /// above about 1E154) or leaves the normal doubles (parts below about
+    /// 1E-154) is computed again from the parts divided by the larger one.
     fn modulus(self) -> f64 {
-        (self.re * self.re + self.im * self.im).sqrt()
+        let squares = self.re * self.re + self.im * self.im;
+        if squares.is_finite() && (squares >= f64::MIN_POSITIVE || self.is_zero()) {
+            return squares.sqrt();
+        }
+        self.scaled_modulus()
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn scaled_modulus(self) -> f64 {
+        let scale = self.re.abs().max(self.im.abs());
+        if !scale.is_finite() {
+            return scale;
+        }
+        let (re, im) = (self.re / scale, self.im / scale);
+        scale * (re * re + im * im).sqrt()
     }
 
     fn argument(self) -> f64 {

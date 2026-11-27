@@ -177,6 +177,9 @@ fn complex_functions() {
         ("=COMPLEX(0,1)", "i"),
         ("=COMPLEX(1,0)", "1"),
         ("=IMABS(\"5+12i\")", "13"),
+        // Squaring parts past 1E154 overflows; the modulus does not.
+        ("=IMABS(\"3E+200+4E+200i\")", "~5.00000000000000E+200"),
+        ("=IMABS(\"3E-200+4E-200i\")", "~5.00000000000000E-200"),
         ("=IMAGINARY(\"3+4i\")", "4"),
         ("=IMAGINARY(\"0-j\")", "-1"),
         ("=IMAGINARY(4)", "0"),
@@ -618,6 +621,13 @@ fn discrete_distribution_functions() {
         ("=BINOM.DIST.RANGE(60,0.75,48)", "0.084±0.0005"),
         ("=BINOM.DIST.RANGE(60,0.75,45,50)", "0.524±0.0005"),
         ("=BINOM.INV(6,0.5,0.75)", "4"),
+        // Past 2^53 not every whole number is a double; the search for the
+        // smallest count still ends.
+        (
+            "=BINOM.INV(2^60,0.9999999999999999,0.5)",
+            "~1.15292150460685E+18",
+        ),
+        ("=CRITBINOM(2^60,1,0.5)", "~1.15292150460685E+18"),
         ("=HYPGEOM.DIST(1,4,8,20,TRUE)", "0.4654±0.00005"),
         ("=HYPGEOM.DIST(1,4,8,20,FALSE)", "0.3633±0.00005"),
         ("=NEGBINOM.DIST(10,5,0.25,TRUE)", "0.3135141±0.00000005"),
@@ -1462,6 +1472,12 @@ fn analysis_text_functions() {
             (r#"=TEXTBEFORE("","x")"#, ""),
             (r#"=TEXTBEFORE("a","x",,,, "missing")"#, "missing"),
             (r#"=TEXTAFTER("a-b","-",,,,1/0)"#, "b"),
+            // An array of delimiters: the first match of any of them counts.
+            (r#"=TEXTBEFORE("Jones, Bob",{", ",","})"#, "Jones"),
+            (r#"=TEXTAFTER("Jones,Bob",{", ",","})"#, "Bob"),
+            (r#"=TEXTBEFORE("a-b c",{" ","-"},2)"#, "a-b"),
+            (r#"=TEXTAFTER("a-b c",{" ","-"},-1)"#, "c"),
+            (r#"=TEXTAFTER("a-b c",{"x","y"},,,,"none")"#, "none"),
             ("=FIXED(1234.567,1)", "1,234.6"),
             ("=FIXED(1234.567,-1,TRUE)", "1230"),
             ("=DOLLAR(-1234.567,2)", "($1,234.57)"),
