@@ -9,6 +9,7 @@ import { buildOnEngineInstance, prepareEngineInstance } from "./engine.js";
 import { commitRestore } from "./restore-commit.js";
 import { SheetwriteStore } from "./store.js";
 import { forgetLiveStoreEngine } from "./store/engine-registry.js";
+import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync-protocol.js";
 import type { SyncCoordinator } from "./sync.js";
 import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -17,6 +18,7 @@ import type {
   CommittedTransaction,
   RestoreProvenance,
 } from "./types/transaction.js";
+import { utf8ByteLength } from "./utf8.js";
 import {
   type CheckpointLog,
   type CheckpointManifest,
@@ -146,8 +148,11 @@ const REPLAY_BATCH_BYTES = DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes;
 /** Working-set bytes per encoded operation byte: the JSON bytes, the string and the parsed operations. */
 const TRANSACTION_RESERVATION_MULTIPLIER = 4;
 
-/** Longest document ID, mutation ID or author ID, in UTF-16 code units. */
-const MAX_ID_LENGTH = 256;
+/**
+ * UTF-8 bytes in a document ID, mutation ID or author ID. Sync counts
+ * mutation and author IDs the same way, with this as its default limit.
+ */
+const MAX_ID_BYTES = DEFAULT_SYNC_COORDINATOR_LIMITS.maxMutationIdBytes;
 
 interface ListVersionsOptions {
   maxEntries?: number;
@@ -167,7 +172,11 @@ function is_operation(value: unknown): value is DocumentOp {
 }
 
 function valid_id(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_ID_LENGTH;
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    utf8ByteLength(value, MAX_ID_BYTES) <= MAX_ID_BYTES
+  );
 }
 
 function restore_value(value: unknown): RestoreProvenance | undefined {
