@@ -218,7 +218,11 @@ export function cellAlign(
     : "left";
 }
 
-/** Resolve the canvas font from the theme and cell style. */
+/**
+ * The canvas font of a cell style: the theme font with the style's weight,
+ * slant, size (times `zoom`) and family. A style that sets none of them gets
+ * `theme.font` itself. `cache` keeps one result per distinct style.
+ */
 export function fontFor(
   theme: Theme,
   style: Pick<CellStyle, "bold" | "italic" | "fontSize" | "fontFamily">,
