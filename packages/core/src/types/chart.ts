@@ -145,7 +145,7 @@ export interface ChartView {
 export interface ChartRef {
   /** Stable ID of the sheet that holds the chart. */
   readonly sheet: SheetId;
-  /** The chart's ID on that sheet. */
+  /** The chart's `ChartDefinition.id`, unique only on that sheet. */
   readonly id: string;
 }
 

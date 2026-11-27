@@ -50,9 +50,7 @@ export interface XlsxResourceLimits {
   maxXmlTextBytes: number;
 }
 
-/**
- * Pluggable first-row-header, first-sheet table export backend.
- */
+/** Pluggable XLSX table export backend. */
 export interface XlsxTableExportBackend {
   /** Short backend name; failures carry it in their `context.backend`. */
   name: string;
