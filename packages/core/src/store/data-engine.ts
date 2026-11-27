@@ -2835,6 +2835,17 @@ export class StoreDataEngine {
   }
 
   /**
+   * The distinct styles of a rectangle of data rows and columns, collected
+   * inside the engine. A paged sheet leaves its unloaded cells out.
+   */
+  rangeStyles(sheet: SheetId, r0: number, c0: number, r1: number, c1: number): CellStyle[] {
+    return Array.from(
+      this.wasm.rangeStyleIds(this.sheets.handleOf(sheet), r0, c0, r1, c1),
+      (style_id) => this.styles.get(style_id),
+    );
+  }
+
+  /**
    * Previous values of a sparse cell list, read in one batched call.
    *
    * Entry `n` belongs to cell `n` of `cells` and matches what `getCell` reports

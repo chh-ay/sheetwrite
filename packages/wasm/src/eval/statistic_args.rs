@@ -1,6 +1,6 @@
 //! The arguments of the statistics that read numbers: MEDIAN, MODE.SNGL,
-//! LARGE, SMALL, RANK.EQ, PERCENTILE.INC, QUARTILE.INC, STDEV, VAR,
-//! GEOMEAN, CORREL and COVARIANCE.
+//! LARGE, SMALL, RANK.EQ, PERCENTILE.INC, QUARTILE.INC, STDEV.S, STDEV.P,
+//! VAR.S, VAR.P, GEOMEAN, CORREL, COVARIANCE.S and COVARIANCE.P.
 //!
 //! A range argument is read in place through its [`RangeView`]: only its
 //! numbers are kept, not a value per cell. Every other argument reads as the
@@ -131,7 +131,7 @@ impl StatisticArgs {
         });
     }
 
-    /// One more cell, against the accumulator's limit of cells per call.
+    /// Counts `cells` more cells against the accumulator's limit per call.
     const fn count_cells(&mut self, cells: usize) -> Result<(), FormulaError> {
         let total = self.total_cells.saturating_add(cells);
         if total > RANGE_CELL_LIMIT as usize {

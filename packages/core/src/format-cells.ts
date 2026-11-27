@@ -1,6 +1,6 @@
 /**
  * Excel's Format Cells dialog (Ctrl+1): Number, Alignment, Font, Border and
- * Fill tabs over the existing style operations. It loads on first use, with
+ * Fill tabs over the grid's style actions. It loads on first use, with
  * the dialog shell it uses.
  */
 
@@ -188,7 +188,6 @@ export function formatCellsDialog(
   const body = document.createElement("div");
   body.className = "sheetwrite-format-cells";
 
-  // Tabs.
   const tab_list = document.createElement("div");
   tab_list.setAttribute("role", "tablist");
   tab_list.setAttribute("aria-label", "Format Cells");
@@ -247,7 +246,6 @@ export function formatCellsDialog(
     show_tab(next, true);
   });
 
-  // Number.
   const number_panel = add_tab("Number");
   const start_parts = numberFormatParts(style.numberFormat);
   const start_code = numberFormatCode(start_parts);
@@ -377,7 +375,6 @@ export function formatCellsDialog(
   );
   refresh_number();
 
-  // Alignment.
   const alignment_panel = add_tab("Alignment");
   const start_align = style.align ?? "general";
   const start_vertical = style.verticalAlign ?? "middle";
@@ -405,7 +402,6 @@ export function formatCellsDialog(
     wrap.wrapper,
   );
 
-  // Font.
   const font_panel = add_tab("Font");
   const theme_font = fontShorthandParts(input.font);
   const start_family = style.fontFamily ?? "";
@@ -450,7 +446,6 @@ export function formatCellsDialog(
     field("Color", color),
   );
 
-  // Border.
   const border_panel = add_tab("Border");
   const border = radios(
     `${id}-border`,
@@ -470,7 +465,6 @@ export function formatCellsDialog(
   border.group.setAttribute("aria-label", "Presets");
   border_panel.append(border.group);
 
-  // Fill.
   const fill_panel = add_tab("Fill");
   const start_fill = style.backgroundColor === undefined ? "none" : "color";
   const fill = radios(

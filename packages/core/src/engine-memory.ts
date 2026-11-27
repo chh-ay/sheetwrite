@@ -81,7 +81,8 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   const started = performance.now();
   const owner = engineGeneration();
   if (!isEngineLoaded()) {
-    // The engine stopped while page loads finished; `getEngine` reports why.
+    // The engine stopped during the wait for page loads. Free the replacement;
+    // `getEngine` below then throws `engine-failed`.
     replacement.retire();
   }
 

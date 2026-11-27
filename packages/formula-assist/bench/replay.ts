@@ -1,7 +1,7 @@
 // Types formulas key by key into formula edits and measures what a
 // suggester saves: keys pressed against characters typed, suggestions that
 // were wrong, and how often a suggestion helped. This is the quality
-// benchmark of #801; the CI gate and the per-signal reports run it.
+// benchmark of formula assist; the CI gate and the per-signal reports run it.
 //
 // The typist presses Tab when the suggestion is a prefix of the rest of the
 // formula, takes the leading words that agree with Ctrl+→ when that saves

@@ -1,7 +1,10 @@
 /** A scalar passed to or returned from a synchronous host formula function. */
 export type FormulaScalar = number | string | boolean | null;
 
-/** Ranges use row-major nested arrays. Scalar expressions use a scalar. */
+/**
+ * Ranges use row-major nested arrays; a one-cell range arrives as its scalar,
+ * and an empty range as null. Scalar expressions use a scalar.
+ */
 export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];
 
 /** One value an argument takes, as Excel's Formula AutoComplete lists it: `FALSE` - `Exact match`. */

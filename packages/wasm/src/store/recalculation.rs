@@ -28,7 +28,11 @@ impl Recalculation {
         self.rect([sheet, row, row + 1, col, col + 1]);
     }
 
-    /// Coalesce adjacent runs without scanning previously reported rectangles.
+    /// Add a `[sheet, row_start, row_end, col_start, col_end]` half-open
+    /// rectangle. It merges into the last rectangle when the two share a
+    /// column span and their rows touch or overlap, or share a row span and
+    /// their columns touch or overlap. Earlier rectangles are not scanned. A
+    /// full report clears itself and marks overflow.
     pub(crate) fn rect(&mut self, rect: [u32; RECT_WIDTH]) {
         if self.overflow {
             return;

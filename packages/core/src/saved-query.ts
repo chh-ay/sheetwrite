@@ -1,7 +1,7 @@
 // Pure saved-query rules shared by the protocol, the store and the history:
 // shape checks, structural checks and copies. Step semantics (column
 // references, types, predicate trees) are checked by the Rust query engine
-// when `@sheetwrite/queries` defines or refreshes a query (#227).
+// when `@sheetwrite/queries` defines or refreshes a query.
 
 import { isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import type { SavedQuery, SavedQuerySource } from "./types/query.js";

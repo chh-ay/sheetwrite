@@ -776,7 +776,10 @@ export class DatasourceController {
     return stable;
   }
 
-  /** Full-width compatibility shares this engine but is horizontally non-scalable. */
+  /**
+   * Every column index of the schema. A full-width datasource always loads
+   * all of them, so its cost grows with the sheet's width.
+   */
   private all_columns(schema: SchemaSnapshot): readonly number[] {
     if (!schema.allIndices) {
       schema.allIndices = Object.freeze(
@@ -1378,7 +1381,7 @@ export class DatasourceController {
     );
     if (skipping && !Number.isFinite(travel)) ahead.end = ahead.start;
     // Slow, steady scrolling (a mouse wheel) reaches no further than the margin past the
-    // view, as before speed-based lookahead: the extra rows would mostly go unseen.
+    // view: rows beyond it would mostly go unseen.
     if (!skipping && row_speed < SLOW_SCROLL_ROWS_PER_MS) {
       if (direction > 0) {
         ahead.end = Math.min(ahead.end, Math.ceil((view.end + margin) / band_rows) * band_rows);
@@ -1537,9 +1540,9 @@ export class DatasourceController {
    *
    * A row band the store holds in full is added outright. Otherwise one span
    * call per column returns the loaded runs, and every band row outside a run is
-   * dropped — one call per column instead of a call per probed row band. A store
+   * dropped. That costs one call per column, not one call per row band. A store
    * that exposes no engine (a stand-in implementing the public surface only)
-   * keeps the row-band probe.
+   * is probed one row band at a time.
    */
   private refresh_paged_residency(
     loadable: SheetwriteStore | null,

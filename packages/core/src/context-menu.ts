@@ -503,7 +503,7 @@ export class ContextMenu {
     menu.style.position = "fixed";
     menu.style.display = "none";
 
-    // Keep grid focus so selection-based actions act on the right cells.
+    // A press does not move the focus out of the menu, which gives it back on close.
     menu.addEventListener("mousedown", (e) => e.preventDefault());
     menu.addEventListener("keydown", (e) => this.on_menu_key(e, menu));
 
@@ -856,7 +856,8 @@ export class ContextMenu {
     if (!(e.target instanceof Element) || !this.owns_element(e.target)) this.close();
   };
 
-  // The menu does not handle Page Up and Page Down, so they scroll the page.
+  // Escape closes the menu. Page Up and Page Down close it too, and they still
+  // scroll the page: nothing prevents their default.
   private readonly on_key_down = (e: KeyboardEvent): void => {
     if (e.key === "Escape" || e.key === "PageUp" || e.key === "PageDown") this.close();
   };

@@ -29,10 +29,11 @@ family_functions! {
     VALUETOTEXT,
 }
 
-/// The arguments of `function` that take one value. The delimiters of
-/// TEXTBEFORE and TEXTAFTER are a list to match any of, as in TEXTSPLIT;
-/// ARRAYTOTEXT takes an array; REGEXEXTRACT and TEXTSPLIT return arrays of
-/// their own.
+/// The arguments of `function` that take one value. The delimiter of
+/// TEXTBEFORE and TEXTAFTER is not lifted: Excel reads an array there as a
+/// list of delimiters to match any of, as in TEXTSPLIT. `before_after` reads
+/// it as one text value. ARRAYTOTEXT takes an array; REGEXEXTRACT and
+/// TEXTSPLIT return arrays of their own.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::DOLLAR
@@ -195,7 +196,8 @@ fn split_parts<'a>(
         let mut parts = Vec::new();
         let mut comparisons = 0usize;
         for (index, part) in text.split(delimiter).enumerate() {
-            // ASCII byte lengths preserve the general scanner's comparison budget.
+            // Charge what the general scanner would: one comparison per character of each
+            // part, and one per match. In ASCII text each byte is one character.
             comparisons += part.len() + usize::from(index != 0);
             if !ignore_empty || !part.is_empty() {
                 parts.push(part);
@@ -350,7 +352,8 @@ fn fixed(
     text_value(format_number(rounded, &code)?.ok_or(FormulaError::Value)?)
 }
 
-/// Append directly so ARRAYTOTEXT does not allocate a string for each cell.
+/// Writes `value` at the end of `output`, so ARRAYTOTEXT builds one string, not one per
+/// cell. Only a number allocates, in `general_text`.
 fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), FormulaError> {
     match value {
         Value::Text(text) if strict => {
@@ -418,8 +421,9 @@ fn to_text(
 }
 
 /// The compiled program for a REGEX call's pattern. A literal pattern uses
-/// the program its formulas share. A computed pattern uses the program this
-/// recalculation keeps for it, which the pass drops when it ends.
+/// the program its formulas share. A computed pattern reuses a program this
+/// pass compiled for the same pattern and case mode, or compiles one and keeps
+/// it in the pass's small table of recent programs.
 fn compile_regex(
     results: &mut FormulaResults,
     args: &[Ast],

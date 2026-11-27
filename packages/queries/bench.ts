@@ -149,8 +149,9 @@ for (const rows of ROW_COUNTS) {
 collect();
 const memory_after = process.memoryUsage();
 const artifact = await readFile(new URL("./pkg/sheetwrite_queries_bg.wasm", import.meta.url));
-// The generated loader is already initialized by the public interface; this reads
-// its existing memory capacity, not a second engine or a test-only production hook.
+// The public loader has already initialized these bindings, so the generated
+// init function returns the existing instance. This reads its memory capacity
+// without loading a second engine.
 const bindings = await import("./pkg/sheetwrite_queries.js");
 const initialized = await bindings.default({ module_or_path: artifact });
 

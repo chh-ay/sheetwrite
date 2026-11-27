@@ -2,7 +2,7 @@
 // the cell the number format that shows it as typed: `12%` is 0.12 shown as
 // `0%`, `1/15/2026` the date serial shown as `m/d/yyyy`. A `general` column
 // (every column Sheetwrite makes itself) reads entries this way; a column a
-// host types as `text` keeps the text (#911).
+// host types as `text` keeps the text.
 // https://support.microsoft.com/en-us/office/available-number-formats-in-excel-0afe8f52-97db-41f1-b972-4b46e9f1e8d2
 
 import { componentsToSerial, parseDateInput } from "./date-serial.js";

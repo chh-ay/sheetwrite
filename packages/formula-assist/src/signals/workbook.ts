@@ -8,7 +8,7 @@ import { bucket, continues, type Proposal, type Signal } from "../candidates.js"
 import { formulaOf, type WorkbookPatterns } from "../workbook-patterns.js";
 import { type ColumnRelation, columnRelation } from "./column.js";
 
-/** The most common shapes moved to the edited cell when the edit opens. */
+/** How many of the most common shapes are moved to the edited cell when the edit opens. */
 const MOST_COMMON = 32;
 
 /** A common shape moved to the edited cell, with what the signal knows of it. */
@@ -17,8 +17,9 @@ interface Placed {
   /** Formulas of the workbook with this shape. */
   readonly count: number;
   /**
-   * Whether the column's nearest formula is this one. Where it is, the column
-   * pattern already shows it; where it isn't, a common formula is less sure.
+   * How this formula relates to the column's nearest formulas. Where the
+   * column agrees, the column pattern already shows it; where the column
+   * differs, a common formula is less sure.
    */
   readonly column: ColumnRelation;
 }

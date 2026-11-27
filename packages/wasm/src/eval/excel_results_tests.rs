@@ -2385,7 +2385,7 @@ fn text_applies_the_number_format_codes() {
         ("=TEXT(1234.5,\"General\")", "1234.5"),
         ("=TEXT(45000,\"yyyy-mm-dd\")", "2023-03-15"),
         // A percent code that takes the number past the largest double
-        // overflows: #NUM!, as for Excel's numeric functions (#433).
+        // overflows: #NUM!, as for Excel's numeric functions.
         ("=TEXT(9.99999999999999E+307,\"0%\")", "#NUM!"),
         ("=TEXT(-9.99999999999999E+307,\"0.0%;(0.0%)\")", "#NUM!"),
         ("=TEXT(1E+305,\"0%%\")", "#NUM!"),
@@ -2630,7 +2630,7 @@ fn branch_functions_take_array_arguments_element_by_element() {
 /// and `SUM(IF(ISERROR(Data),"",Data))`; the rows marked "documented" follow
 /// those examples. The TEXT row uses `yyyy-mm-dd`, as the engine has no
 /// month names. Every other row applies the same rule to a function the
-/// page doesn't show, and is on the Excel checks list (#219).
+/// page doesn't show, and is not yet checked in Excel.
 const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     // Documented.
     ("=SQRT({1,4;9,16})", 2, &["1", "2", "3", "4"]),
@@ -2690,8 +2690,8 @@ const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
 /// The full engine's functions under the same rule; each family declares
 /// which of its arguments take one value. Microsoft Support, "TEXTBEFORE
 /// function": an array of delimiters means any of them, so that argument is
-/// not lifted (documented). Every other row is on the Excel checks list
-/// (#219).
+/// not lifted (documented). Every other row applies the same rule and is not
+/// yet checked in Excel.
 #[cfg(feature = "analysis")]
 const LIFTED_ANALYSIS_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=TEXTBEFORE(\"a-b;c\",{\"-\",\";\"})", 1, &["a", ""]),

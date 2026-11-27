@@ -342,7 +342,7 @@ export class FillController {
   ): Array<Omit<FillCell, "kind">> {
     const sheet = this.deps.activeSheet();
     const captured = storeEngine(this.deps.store)?.captureCells(sheet, coordinates);
-    // Custom stores without an engine retain their scalar read contract.
+    // A store without an engine captures no cells: read each one through `Store.getCell`.
     return coordinates.map((coordinate, index) => {
       const cell = captured?.[index];
       if (cell) {
@@ -462,8 +462,9 @@ export class FillController {
       : null;
 
     const metadata = this.deps.sheet();
-    // Protection requires per-cell operations for policy issue indices. A fill
-    // is not checked against validation rules, as in Excel.
+    // With protected ranges, one `set` per cell lets each protection issue name
+    // its own cell's operation index. A fill is not checked against validation
+    // rules, as in Excel.
     const scalar_writes = Boolean(metadata.protectedRanges?.length);
     const patches: DocumentOp[] = [];
     const cells: SnapshotCell[] = [];

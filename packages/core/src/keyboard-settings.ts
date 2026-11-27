@@ -1,4 +1,4 @@
-// The Keyboard shortcuts panel (#802): a modal dialog where the user rebinds
+// The Keyboard shortcuts panel: a modal dialog where the user rebinds
 // the grid's built-in commands. The grid loads this chunk on first use
 // (`Grid.openKeyboardSettings`). Each change applies at once through
 // `setConfig` and reaches the host as one `key-bindings-change` event; the

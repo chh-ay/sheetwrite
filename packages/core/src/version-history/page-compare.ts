@@ -211,7 +211,7 @@ type PageShift = { rowShift: number; colShift: number } | "mixed" | "unpaired";
 /**
  * Pages of one sheet whose cells can differ between the versions, closed so
  * that every compared pair of cells is read on both sides or on neither.
- * Returns `false` once more than `budget` stored pages would be read.
+ * `close` returns `false` once more than `budget` stored pages would be read.
  */
 class SheetSelection {
   readonly later = new Set<number>();

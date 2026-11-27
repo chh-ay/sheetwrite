@@ -1,8 +1,10 @@
-// Opens the Chart panel, the pivot field list, the Explain Formula panel and
-// the Sort panel, and runs the Insert › Chart and Insert › PivotTable
-// commands. This module is the panel chunk: panel-loader.ts loads it on first
-// use and attaches it once per grid. The Sort panel is a chunk of its own
-// (`open_lazy_panel`). Everything goes through the public Grid API.
+// Opens the side panels (Chart, PivotTable Fields, Explain Formula, Name
+// Manager, Measures, Data Model, Insert Slicers, Insert KPI Card) and runs
+// the Insert › Chart, Insert › PivotChart and Insert › PivotTable commands.
+// This module is the panel chunk: panel-loader.ts loads it on first use and
+// attaches it once per grid. The Sort, Queries & Connections, Edit Links and
+// Version History panels are chunks of their own (`open_lazy_panel`).
+// Everything goes through the public Grid API.
 
 import { MAX_CHART_POINTS } from "../chart-definition.js";
 import { isDashboard } from "../dashboard.js";

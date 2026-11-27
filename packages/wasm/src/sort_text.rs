@@ -6,7 +6,8 @@
 //! depends on the locale; they sort after the documented characters by
 //! their lowercase code point.
 
-/// Punctuation in the documented order, after the digits and space.
+/// Space, then punctuation, in the documented order. All of them rank after
+/// the digits.
 const PUNCTUATION_ORDER: &[u8] = b" !\"#$%&()*,./:;?@[\\]^_`{|}~+<=>";
 
 const ASCII_COUNT: usize = 128;

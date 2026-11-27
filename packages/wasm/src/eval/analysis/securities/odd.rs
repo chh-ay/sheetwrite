@@ -165,8 +165,9 @@ impl FirstPeriodBond {
     }
 
     /// The whole quasi-coupon periods from the settlement date to the first
-    /// coupon date. A first coupon on the 29th or 30th of a 31-day month
-    /// takes its month-end rule from the settlement date.
+    /// coupon date. A first coupon on the 29th or 30th of a month other than
+    /// February, when that day is not the month's last, takes its month-end
+    /// rule from the settlement date.
     fn quasi_periods_to_first_coupon(&self) -> f64 {
         let first = self.first_coupon;
         let mut is_month_end = first.is_last_day_of_month();
