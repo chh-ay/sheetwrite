@@ -1,26 +1,30 @@
 //! Formula trees built from a kept formula of the same shape.
 //!
 //! A filled column or row of formulas repeats one formula whose cell
-//! references name other cells: `=A1*2`, `=A2*2`, `=A3*2`. Without a sheet,
-//! table or defined name, a formula's tree depends on its text alone, and
-//! two such texts that differ only in the cells their references name lex to
-//! the same tokens and parse along the same path. Their trees then differ
-//! only in those references. So ingest keeps the last few parsed formulas
-//! with the places of their references in the text, and builds the tree of
-//! a formula of the same shape by copying the kept tree and writing the new
-//! references into it, without lexing or parsing it.
+//! references name other cells: `=A1*2`, `=A2*2`, `=A3*2`. Without a table,
+//! defined name or LAMBDA, a formula's tree depends on its text and on the
+//! sheets its sheet names bind to, and two such texts that differ only in
+//! the cells their references name lex to the same tokens and parse along
+//! the same path. Their trees then differ only in those references. So
+//! ingest keeps the last few parsed formulas with the places of their
+//! references in the text, and builds the tree of a formula of the same
+//! shape by copying the kept tree and writing the new references into it,
+//! without lexing or parsing it.
 //!
-//! The kept formulas are parse scratch, like the parser's argument stack:
-//! a kept tree depends on text alone, so every store on the thread shares
-//! them. Dropping a store drops them, so a store's formulas leave nothing
-//! behind on the thread.
+//! The kept formulas are parse scratch, like the parser's argument stack,
+//! so every store on the thread shares them. A kept formula with sheet
+//! names keeps the sheet each name bound to, and is reused only while the
+//! store that asks binds every name to the same sheet: a renamed, removed
+//! or added sheet, or another store, gets a full parse. Dropping a store
+//! drops them, so a store's formulas leave nothing behind on the thread.
 
 use super::*;
 use std::hash::Hasher;
 
-/// Where an `Ast::Cell` or `Ast::Range` of a parsed tree came from, found by
-/// [`scan_sites`] in the order the parser makes those nodes, which is the
-/// order of the text and of a walk over the tree's children.
+/// Where an `Ast::Cell`, `Ast::Range`, `Ast::AbsCell` or `Ast::AbsRange` of
+/// a parsed tree came from, found by [`scan_sites`] in the order the parser
+/// makes those nodes, which is the order of the text and of a walk over the
+/// tree's children.
 #[derive(Clone, Copy)]
 pub(super) enum RefSite {
     /// A cell reference: the token at this span.
@@ -40,6 +44,12 @@ enum SiteValue {
     Fixed,
 }
 
+/// A sheet name of a kept formula and the sheet it bound to.
+struct KeptSheet {
+    name: String,
+    handle: u32,
+}
+
 /// A parsed formula kept for the formulas after it.
 #[derive(Default)]
 struct Template {
@@ -49,6 +59,10 @@ struct Template {
     /// The formula's text, trimmed and without its `=`.
     text: String,
     sites: Vec<RefSite>,
+    /// Each sheet name of the text once, with the sheet it bound to.
+    sheets: Vec<KeptSheet>,
+    /// What the parse found, which a built tree reports as its own.
+    features: ParseFeatures,
     /// The tree, kept once a second formula of this shape arrived. A
     /// formula that no other repeats costs one text copy, not a tree copy.
     tree: Option<Ast>,
@@ -65,8 +79,13 @@ struct Templates {
     kept: Vec<Template>,
     /// The template the next new shape replaces once `kept` is full.
     next: usize,
+    /// The template the last lookup found or kept. A filled column repeats
+    /// it, so it is compared first, without the text's shape hash.
+    last: usize,
     /// The sites [`scan_sites`] lists for the formula being kept.
     sites: Vec<RefSite>,
+    /// The sheet names [`scan_sites`] lists for the formula being kept.
+    sheet_names: Vec<String>,
     values: Vec<SiteValue>,
 }
 
@@ -75,7 +94,9 @@ thread_local! {
         std::cell::Cell::new(Templates {
             kept: Vec::new(),
             next: 0,
+            last: 0,
             sites: Vec::new(),
+            sheet_names: Vec::new(),
             values: Vec::new(),
         })
     };
@@ -93,10 +114,10 @@ const FIRST_PAUSE: u16 = 16;
 const LONGEST_PAUSE: u16 = 1024;
 
 /// When ingest looks for kept shapes. Formulas that repeat no shape, such as
-/// ones that differ in a number or name a sheet, would pay for the lookup and
-/// the copy of their text every time; after [`MISS_LIMIT`] misses in a row,
-/// ingest parses the next formulas without either, for a pause that doubles
-/// while the misses go on and resets at the first match.
+/// ones that differ in a number or use a defined name, would pay for the
+/// lookup and the copy of their text every time; after [`MISS_LIMIT`] misses
+/// in a row, ingest parses the next formulas without either, for a pause that
+/// doubles while the misses go on and resets at the first match.
 #[derive(Clone, Copy)]
 struct Backoff {
     misses: u16,
@@ -139,8 +160,9 @@ impl Drop for FormulaTemplatesHold {
 }
 
 enum Lookup {
-    /// The formula's tree, built from a kept formula.
-    Tree(Ast),
+    /// The formula's tree, built from a kept formula, and what its parse
+    /// would find.
+    Tree(Ast, ParseFeatures),
     /// The kept formula at this index has the formula's shape, but no tree.
     Shape(usize),
     Miss,
@@ -161,20 +183,25 @@ pub(super) fn looks_for_shapes() -> bool {
 }
 
 /// The tree of formula text `body` (trimmed, without its `=`), built from a
-/// kept formula of the same shape when there is one, or else `parse`d. A
-/// parsed formula without sheet, table, defined name or LAMBDA is kept for
-/// the formulas after it. Out of line: a load that repeats no shape spends
-/// most formulas in a pause, and their parse should not carry this code.
+/// kept formula of the same shape when there is one, or else `parse`d with
+/// `resolve` binding its sheet names. A parsed formula without table,
+/// defined name, LAMBDA or a sheet `resolve` does not know is kept for the
+/// formulas after it. Out of line: a load that repeats no shape spends most
+/// formulas in a pause, and their parse should not carry this code.
 #[inline(never)]
-pub(super) fn reuse_or_parse(body: &str, parse: impl FnOnce() -> ParseResult) -> ParseResult {
+pub(super) fn reuse_or_parse(
+    body: &str,
+    resolve: &SheetResolver<'_>,
+    parse: impl FnOnce() -> ParseResult,
+) -> ParseResult {
     let backoff = BACKOFF.get();
     let mut kept = TEMPLATES.take();
     let mut hash = None;
-    let shape = match kept.lookup(body, &mut hash) {
-        Lookup::Tree(tree) => {
+    let shape = match kept.lookup(body, &mut hash, resolve) {
+        Lookup::Tree(tree, features) => {
             TEMPLATES.set(kept);
             BACKOFF.set(Backoff::START);
-            return Ok((tree, ParseFeatures::default()));
+            return Ok((tree, features));
         }
         Lookup::Shape(index) => Some(index),
         Lookup::Miss => None,
@@ -186,13 +213,44 @@ pub(super) fn reuse_or_parse(body: &str, parse: impl FnOnce() -> ParseResult) ->
     });
     let parsed = parse();
     if let Ok((tree, features)) = &parsed {
-        if depends_on_text_alone(*features) && scan_sites(body, &mut kept.sites) {
+        let bound_sheets = (keeps_tree(*features)
+            && scan_sites(body, &mut kept.sites, &mut kept.sheet_names))
+        .then(|| kept_sheets(&kept.sheet_names, resolve))
+        .flatten();
+        if let Some(sheets) = bound_sheets {
             let body_hash = hash.unwrap_or_else(|| shape_hash(body));
-            kept.keep(body, body_hash, tree, shape);
+            let kept_parse = KeptParse {
+                tree,
+                features: *features,
+                sheets,
+            };
+            kept.keep(body, body_hash, kept_parse, shape);
         }
     }
     TEMPLATES.set(kept);
     parsed
+}
+
+/// A parse to keep: its tree, what the parse found and the sheets its sheet
+/// names bound to.
+struct KeptParse<'a> {
+    tree: &'a Ast,
+    features: ParseFeatures,
+    sheets: Vec<KeptSheet>,
+}
+
+/// The sheet each of `sheet_names` binds to through `resolve`; `None` when
+/// one binds to none.
+fn kept_sheets(sheet_names: &[String], resolve: &SheetResolver<'_>) -> Option<Vec<KeptSheet>> {
+    sheet_names
+        .iter()
+        .map(|name| {
+            resolve(name).map(|handle| KeptSheet {
+                name: name.clone(),
+                handle,
+            })
+        })
+        .collect()
 }
 
 /// The start and end byte offsets of a token in formula text.
@@ -208,13 +266,16 @@ fn span_in(body: &str, text: &str) -> Option<TokenSpan> {
 }
 
 /// Lists in `sites` the reference sites of `body`, a formula that parsed
-/// without sheet, table, defined name or LAMBDA, as the parser meets them:
-/// a name before `(` is a call, `TRUE` and `FALSE` are values, a name or a
-/// number before `:` starts a range whose end is the token after it, and any
-/// other name is a cell. `false` for a name that is none of these, which
-/// such a formula does not hold.
-fn scan_sites(body: &str, sites: &mut Vec<RefSite>) -> bool {
+/// without table, defined name or LAMBDA, as the parser meets them, and in
+/// `sheet_names` each sheet name once: a name before `!` names the sheet of
+/// the reference after it, a name before `(` is a call, `TRUE` and `FALSE`
+/// are values, a name or a number before `:` starts a range whose end is
+/// the token after it, and any other name is a cell. `false` for a name that
+/// is none of these, which such a formula does not hold, and for a 3-D
+/// reference or a range whose end names a sheet again.
+fn scan_sites(body: &str, sites: &mut Vec<RefSite>, sheet_names: &mut Vec<String>) -> bool {
     sites.clear();
+    sheet_names.clear();
     let mut cursor = Cursor::over_text(body);
     while let Some(tok) = cursor.next() {
         let followed_by_colon = matches!(cursor.peek_at(0), Some(Tok::Colon));
@@ -229,6 +290,13 @@ fn scan_sites(body: &str, sites: &mut Vec<RefSite>) -> bool {
         let Tok::Ident(name, _) = tok else {
             continue;
         };
+        if matches!(cursor.peek_at(0), Some(Tok::Bang)) {
+            if !note_sheet_name(name, sheet_names) {
+                return false;
+            }
+            let _ = cursor.next();
+            continue;
+        }
         if matches!(cursor.peek_at(0), Some(Tok::LParen))
             || name.eq_ignore_ascii_case("TRUE")
             || name.eq_ignore_ascii_case("FALSE")
@@ -236,29 +304,10 @@ fn scan_sites(body: &str, sites: &mut Vec<RefSite>) -> bool {
             continue;
         }
         if followed_by_colon {
-            let Some(start) = AreaEnd::of_name(&name) else {
+            let Some(site) = range_site(body, &name, &mut cursor) else {
                 return false;
             };
-            let _ = cursor.next();
-            let end_tok = cursor.next();
-            let end_span = if let Some(Tok::Ident(end_name, _)) = &end_tok {
-                span_in(body, end_name)
-            } else {
-                None
-            };
-            let both_cells = matches!(start, AreaEnd::Cell(..))
-                && matches!(
-                    end_tok.as_ref().and_then(AreaEnd::of),
-                    Some(AreaEnd::Cell(..))
-                );
-            let spans = (span_in(body, &name), end_span);
-            sites.push(
-                if let (true, (Some(first), Some(last))) = (both_cells, spans) {
-                    RefSite::Range(first, last)
-                } else {
-                    RefSite::Fixed
-                },
-            );
+            sites.push(site);
         } else if parse_a1(&name).is_some() {
             sites.push(span_in(body, &name).map_or(RefSite::Fixed, RefSite::Cell));
         } else {
@@ -268,11 +317,54 @@ fn scan_sites(body: &str, sites: &mut Vec<RefSite>) -> bool {
     true
 }
 
-/// Whether a parsed tree with `features` is a function of its text: it
-/// names no sheet, table, defined name or LAMBDA, which the store binds.
-const fn depends_on_text_alone(features: ParseFeatures) -> bool {
+/// The site of the range that starts with `name`, read from the `:` at the
+/// cursor through the range's end. `None` when `name` cannot start a range
+/// and when the end names a sheet again, as in `Data!A1:Data!B2`.
+fn range_site(body: &str, name: &str, cursor: &mut Cursor<'_>) -> Option<RefSite> {
+    let _ = cursor.next();
+    let end_tok = cursor.next();
+    if matches!(cursor.peek_at(0), Some(Tok::Bang)) {
+        return None;
+    }
+    let start = AreaEnd::of_name(name)?;
+    let end_span = if let Some(Tok::Ident(end_name, _)) = &end_tok {
+        span_in(body, end_name)
+    } else {
+        None
+    };
+    let both_cells = matches!(start, AreaEnd::Cell(..))
+        && matches!(
+            end_tok.as_ref().and_then(AreaEnd::of),
+            Some(AreaEnd::Cell(..))
+        );
+    let spans = (span_in(body, name), end_span);
+    Some(
+        if let (true, (Some(first), Some(last))) = (both_cells, spans) {
+            RefSite::Range(first, last)
+        } else {
+            RefSite::Fixed
+        },
+    )
+}
+
+/// Adds the sheet name before a `!` to `sheet_names` once; `false` for the
+/// quoted sheet span of a 3-D reference, which the kept formulas leave out.
+fn note_sheet_name(name: Cow<'_, str>, sheet_names: &mut Vec<String>) -> bool {
+    if name.contains(':') {
+        return false;
+    }
+    if !sheet_names.iter().any(|kept| *kept == *name) {
+        sheet_names.push(name.into_owned());
+    }
+    true
+}
+
+/// Whether a parsed tree with `features` is a function of its text and of
+/// the sheets its sheet names bind to: it names no table, defined name,
+/// LAMBDA or sheet that the workbook does not have.
+const fn keeps_tree(features: ParseFeatures) -> bool {
     let ParseFeatures {
-        sheet_refs,
+        sheet_refs: _,
         names,
         table_refs,
         detached_sheets,
@@ -281,7 +373,7 @@ const fn depends_on_text_alone(features: ParseFeatures) -> bool {
     } = features;
     #[cfg(not(feature = "analysis"))]
     let lambdas = false;
-    !(sheet_refs || names || table_refs || detached_sheets || lambdas)
+    !(names || table_refs || detached_sheets || lambdas)
 }
 
 /// A hash of formula text that every formula of one shape has: each run of
@@ -321,35 +413,58 @@ fn shape_hash(body: &str) -> u64 {
 }
 
 impl Templates {
-    /// The kept formula of `body`'s shape. `hash` caches `body`'s
-    /// [`shape_hash`], which only a lookup among kept formulas needs.
-    fn lookup(&mut self, body: &str, hash: &mut Option<u64>) -> Lookup {
-        if self.kept.is_empty() {
-            return Lookup::Miss;
-        }
-        let body_hash = *hash.get_or_insert_with(|| shape_hash(body));
-        let Some(index) = self.kept.iter().position(|template| {
-            template.hash == body_hash && template.values_in(body, &mut self.values)
-        }) else {
-            return Lookup::Miss;
+    /// The kept formula of `body`'s shape: the last one found when `body`
+    /// repeats it, or else one with `body`'s [`shape_hash`], which `hash`
+    /// caches. A kept formula whose sheet names `resolve` binds to other
+    /// sheets has the shape but no usable tree.
+    fn lookup(
+        &mut self,
+        body: &str,
+        hash: &mut Option<u64>,
+        resolve: &SheetResolver<'_>,
+    ) -> Lookup {
+        let repeated = self
+            .kept
+            .get(self.last)
+            .is_some_and(|template| template.values_in(body, &mut self.values));
+        let index = if repeated {
+            self.last
+        } else {
+            if self.kept.is_empty() {
+                return Lookup::Miss;
+            }
+            let body_hash = *hash.get_or_insert_with(|| shape_hash(body));
+            let Some(index) = self.kept.iter().position(|template| {
+                template.hash == body_hash && template.values_in(body, &mut self.values)
+            }) else {
+                return Lookup::Miss;
+            };
+            self.last = index;
+            index
         };
-        let Some(tree) = &self.kept[index].tree else {
+        let template = &self.kept[index];
+        let (Some(tree), true) = (&template.tree, template.binds_same_sheets(resolve)) else {
             return Lookup::Shape(index);
         };
         let mut built = tree.clone();
         let mut values = self.values.iter();
         if write_values(&mut built, &mut values, 0) && values.next().is_none() {
-            Lookup::Tree(built)
+            Lookup::Tree(built, template.features)
         } else {
             Lookup::Miss
         }
     }
 
-    /// Keeps the parse of `body` (`tree` and `self.sites`), whose shape
-    /// hash is `hash`. A formula of the kept shape at `shape` keeps its tree
-    /// there; a new shape keeps only its text and sites until a second
-    /// formula of that shape arrives.
-    fn keep(&mut self, body: &str, hash: u64, tree: &Ast, shape: Option<usize>) {
+    /// Keeps `parsed`, the parse of `body` with the sites in `self.sites`,
+    /// whose shape hash is `hash`. A formula of the kept shape at `shape`
+    /// keeps its tree there; a new shape keeps only its text and sites until
+    /// a second formula of that shape arrives.
+    fn keep(&mut self, body: &str, hash: u64, parsed: KeptParse<'_>, shape: Option<usize>) {
+        let KeptParse {
+            tree,
+            features,
+            sheets,
+        } = parsed;
         let index = match shape {
             Some(index) => index,
             None if self.kept.len() < KEPT_SHAPES => {
@@ -362,6 +477,7 @@ impl Templates {
                 index
             }
         };
+        self.last = index;
         let Some(template) = self.kept.get_mut(index) else {
             return;
         };
@@ -370,12 +486,22 @@ impl Templates {
         template.text.push_str(body);
         template.sites.clear();
         template.sites.extend_from_slice(&self.sites);
+        template.sheets = sheets;
+        template.features = features;
         template.tree = (shape.is_some() && count_sites(tree, 0) == Some(self.sites.len()))
             .then(|| tree.clone());
     }
 }
 
 impl Template {
+    /// Whether `resolve` binds every sheet name of this formula to the
+    /// sheet its parse bound it to.
+    fn binds_same_sheets(&self, resolve: &SheetResolver<'_>) -> bool {
+        self.sheets
+            .iter()
+            .all(|sheet| resolve(&sheet.name) == Some(sheet.handle))
+    }
+
     /// Whether `body` is this formula with only the cells of its
     /// references changed. Then `values` holds the value of each site in
     /// `body`, in site order.
@@ -451,9 +577,10 @@ fn same_then_cell(
     parse_a1(body.get(start..*body_at)?)
 }
 
-/// Writes `values` into the cell and range nodes of `ast` in walk order;
-/// `false` when the nodes and the values disagree or the tree is deeper
-/// than the evaluator allows.
+/// Writes `values` into the cell and range nodes of `ast` in walk order,
+/// keeping each sheet-bound node's sheet and quoting; `false` when the
+/// nodes and the values disagree or the tree is deeper than the evaluator
+/// allows.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "only cell and range nodes hold site values; every other node is walked through its children"
@@ -480,6 +607,27 @@ fn write_values(ast: &mut Ast, values: &mut std::slice::Iter<'_, SiteValue>, dep
             Some(SiteValue::Fixed) => true,
             Some(SiteValue::Cell(..)) | None => false,
         },
+        Ast::AbsCell(_, row, col, flags) => match values.next() {
+            Some(&SiteValue::Cell(new_row, new_col, new_flags)) => {
+                (*row, *col, *flags) = (new_row, new_col, new_flags.with_quoted(flags.quoted()));
+                true
+            }
+            Some(SiteValue::Fixed) => true,
+            Some(SiteValue::Range(..)) | None => false,
+        },
+        Ast::AbsRange(_, row_start, col_start, row_end, col_end, flags) => match values.next() {
+            Some(&SiteValue::Range(r0, c0, r1, c1, range_flags)) => {
+                let written_flags = RangeFlags {
+                    start: range_flags.start.with_quoted(flags.start.quoted()),
+                    end: range_flags.end.with_quoted(flags.end.quoted()),
+                };
+                (*row_start, *col_start, *row_end, *col_end, *flags) =
+                    (r0, c0, r1, c1, written_flags);
+                true
+            }
+            Some(SiteValue::Fixed) => true,
+            Some(SiteValue::Cell(..)) | None => false,
+        },
         other => {
             let mut written = true;
             other.fold_children_mut(&mut |child| {
@@ -491,7 +639,8 @@ fn write_values(ast: &mut Ast, values: &mut std::slice::Iter<'_, SiteValue>, dep
     }
 }
 
-/// The cell and range nodes of `ast`; `None` past the evaluator's depth.
+/// The cell and range nodes of `ast`, sheet-bound or not; `None` past the
+/// evaluator's depth.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "only cell and range nodes hold site values; every other node is walked through its children"
@@ -501,7 +650,7 @@ fn count_sites(ast: &Ast, depth: usize) -> Option<usize> {
         return None;
     }
     match ast {
-        Ast::Cell(..) | Ast::Range(..) => Some(1),
+        Ast::Cell(..) | Ast::Range(..) | Ast::AbsCell(..) | Ast::AbsRange(..) => Some(1),
         other => {
             let mut count = Some(0usize);
             other.any_child(&mut |child| {
