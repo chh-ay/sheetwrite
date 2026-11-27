@@ -117,7 +117,6 @@ export function measurePanel(grid: Grid): GridPanel {
 
       /** The ID of the measure the form edits; null for a new one. */
       let editing: string | null = null;
-      // Another store than `SheetwriteStore` shows no status.
       const store = reports_measure_status(grid.store) ? grid.store : null;
 
       const edit = (measure: Measure | null): void => {
