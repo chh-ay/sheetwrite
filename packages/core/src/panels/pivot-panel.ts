@@ -397,9 +397,11 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
           distinctValues: (field) => distinct_values(pivot, field),
           formatting: () => formatting,
           editFormat: (index) => {
+            const closed = formatting;
             formatting = index;
             refresh(true);
-            const focus = index === null ? `values-${index}-menu` : `values-${index}-format`;
+            // Closing the editor returns focus to the menu of the field it edited.
+            const focus = index === null ? `values-${closed}-menu` : `values-${index}-format`;
             body.querySelector<HTMLElement>(`[data-focus-key="${focus}"]`)?.focus();
           },
           measureName: (measure_id) =>
