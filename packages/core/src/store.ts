@@ -214,7 +214,6 @@ export class SheetwriteStore implements Store {
   private readonly snapshot_resource_limits: Readonly<SnapshotResourceLimits>;
   private document_id?: string;
   private document_version?: number;
-  /** Engine generation at construction; a different current value means the instance stopped. */
   private readonly generation = engineGeneration();
 
   /** Creates a store for `workbook`, filled from `data` when given; too large a workbook throws. */
