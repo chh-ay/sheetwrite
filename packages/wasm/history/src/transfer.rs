@@ -53,6 +53,18 @@ impl Block {
         Some(&self.text[start as usize..end as usize])
     }
 
+    /// Whether rows `row..row + rows` and columns `col..col + cols` lie inside
+    /// the block.
+    pub(crate) fn holds(&self, row: u32, col: u32, rows: u32, cols: u32) -> bool {
+        let inside = |start: u32, len: u32, size: usize| {
+            start
+                .checked_add(len)
+                .is_some_and(|end| end as usize <= size)
+        };
+
+        inside(row, rows, self.rows) && inside(col, cols, self.cols)
+    }
+
     /// Formula source of a cell; empty when the cell has no formula entry.
     pub(crate) fn formula(&self, cell: usize) -> &[u8] {
         let (start, end) = self.formulas[cell];
