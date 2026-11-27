@@ -97,6 +97,7 @@ pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use statistic_args::StatisticCall;
+pub(crate) use statistic_args::{OrderedRange, OrderedRanges};
 pub(crate) use subtotal::ast_calls_subtotal;
 use value::{bool_from_value, cached_formula_value, compare_values};
 pub(crate) use wildcard::Wildcard;
