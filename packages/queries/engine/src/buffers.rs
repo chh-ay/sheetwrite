@@ -27,7 +27,6 @@ impl From<FromUtf8Error> for Diagnostic {
 }
 
 impl From<Utf8Error> for Diagnostic {
-    /// Host text that is not valid UTF-8 is rejected as a whole.
     fn from(_: Utf8Error) -> Self {
         Self::new("utf8")
     }

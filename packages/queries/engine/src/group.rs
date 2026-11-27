@@ -10,8 +10,8 @@ use std::cmp::Ordering;
 /// The input column index of each aggregate; row counts have none.
 type SourceColumns = Vec<Option<u32>>;
 
-/// Null keys form one group. Every fold except `CountRows` skips null values, and an error
-/// value makes the result that error.
+/// Null keys form one group. [`AggregateOp`](crate::AggregateOp) gives the null and error
+/// rules of each fold.
 pub(crate) fn group(
     batch: &Batch,
     ids: &[String],
@@ -22,8 +22,7 @@ pub(crate) fn group(
     let sources = source_columns(batch, aggregates)?;
     let mut columns = output_columns(batch, &keys, aggregates, &sources)?;
 
-    // Table.Group partitions by key equality, so all null keys share a run.
-    // List.Sum ignores null and returns null when no non-null values exist.
+    // The null rules follow M:
     // https://learn.microsoft.com/powerquery-m/table-group
     // https://learn.microsoft.com/powerquery-m/list-sum
     let sorted = sorted_rows(batch, &keys)?;
