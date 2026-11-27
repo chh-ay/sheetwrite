@@ -420,8 +420,9 @@ fn fraction_floor(value: f64) -> f64 {
     }
 }
 
-// Series for P and modified Lentz fraction for Q. The requested small tail
-// is calculated directly; subtracting a tiny tail would lose its precision.
+// Uses the series for P when x < shape + 1, and the modified Lentz continued fraction for Q
+// otherwise; the other tail is 1 minus the computed one. A very small tail lies in the
+// region that computes it directly, so it keeps its precision.
 pub(super) fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
     if x == 0.0 {
         return Ok(if is_right { 1.0 } else { 0.0 });
@@ -665,7 +666,8 @@ fn gamma_inverse(probability: f64, shape: f64, scale: f64, is_right: bool) -> Nu
     } else {
         1.0 - probability
     };
-    // The shape is fixed throughout bracketing and bisection.
+    // The shape does not change during bracketing and bisection, so its log-gamma is
+    // computed once here.
     let log_shape = log_gamma(shape);
     Ok(scale
         * positive_inverse(
@@ -771,7 +773,7 @@ fn binomial_cumulative(successes: f64, trials: f64, probability: f64) -> NumberR
 /// at least `criterion`. Arguments must already be truncated and validated.
 ///
 /// The cumulative probability rises with the count, so a bisection over the
-/// integer counts needs about 34 steps for the largest trial counts. A
+/// integer counts needs about log2(trials) steps: 34 for 1E10 trials. A
 /// cumulative probability within rounding error of `criterion` meets it, so
 /// exact cases such as 1/16 for no successes in 4 fair trials stop there.
 pub(super) fn binomial_inverse(trials: f64, probability: f64, criterion: f64) -> NumberResult {
