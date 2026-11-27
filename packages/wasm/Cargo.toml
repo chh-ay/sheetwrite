@@ -49,10 +49,9 @@ codegen-units = 1
 # section before either engine is packaged.
 wasm-opt = ["--no-inline=*_family", "-O3", "--converge", "-g"]
 
-# The three crates share this lint set; `bun scripts/rust-lint.ts` fails when
-# their `[lints]` tables differ. Policy and examples: docs/contributing/rust.md.
-# A lint at "warn" still fails CI when its count rises above
-# scripts/rust-lint-baseline.json; it moves to "deny" once it reaches zero.
+# The three crates share this lint set. `bun scripts/rust-lint.ts` fails when
+# their `[lints]` tables differ, or when a lint's warning count differs from
+# scripts/rust-lint-baseline.json. Policy and examples: docs/contributing/rust.md.
 
 [lints.rust]
 elided_lifetimes_in_paths = "warn"

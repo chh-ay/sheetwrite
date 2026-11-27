@@ -25,10 +25,7 @@ panic = "abort"
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Os"]
 
-# The three crates share this lint set; `bun scripts/rust-lint.ts` fails when
-# their `[lints]` tables differ. Policy and examples: docs/contributing/rust.md.
-# A lint at "warn" still fails CI when its count rises above
-# scripts/rust-lint-baseline.json; it moves to "deny" once it reaches zero.
+# The lint set of packages/wasm/Cargo.toml; see the note there.
 
 [lints.rust]
 elided_lifetimes_in_paths = "warn"
