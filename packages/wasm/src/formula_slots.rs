@@ -863,7 +863,6 @@ pub(crate) struct FormulaResults {
 struct PassScratch {
     /// LET slot values and resolved bindings.
     let_frame: crate::eval::LetFrame,
-    /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
     regexes: PassRegexes,
     /// LAMBDA parameter values of the calls in progress.
@@ -1063,7 +1062,6 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
-    /// The search states of lookup ranges in this pass.
     pub(crate) fn lookup_states(&mut self) -> &mut crate::eval::LookupStates {
         &mut self.lookups
     }
