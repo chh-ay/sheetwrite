@@ -3,7 +3,6 @@
 use super::{Directory, PageState, PagedStorage, FREE_ENTRY, FREE_SLOT, NONE};
 
 impl Directory {
-    /// Opens `count` empty columns at `at`.
     fn insert_columns(&mut self, at: usize, count: usize) {
         if at < self.columns.len() {
             self.columns
