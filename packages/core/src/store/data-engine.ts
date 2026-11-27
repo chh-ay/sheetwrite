@@ -1132,7 +1132,8 @@ export class StoreDataEngine {
     validatePivotShape(pivot, "pivot", issues);
     if (issues.length > 0) return issues;
 
-    // Shape validation above proves the definition schema.
+    // `validatePivotShape` found no issues, so `pivot` has the shape of a
+    // `PivotDefinition`.
     validatePivotReferences(
       pivot as PivotDefinition,
       { rows: owner.rowCount, cols: owner.columns.length },
@@ -1617,7 +1618,11 @@ export class StoreDataEngine {
     );
   }
 
-  /** Empty protection releases remain valid after their sheet has been removed. */
+  /**
+   * Pin the row bands a viewport shows, so the paged cache keeps their chunks.
+   * An empty `bands` releases the pins; for a removed sheet it does nothing.
+   * Any other call for an unknown sheet throws.
+   */
   pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
     const handle = this.sheets.handles.get(sheet);
     if (handle === undefined && bands.length === 0) return;
@@ -2858,8 +2863,8 @@ export class StoreDataEngine {
    * Previous values of one dense block, read in one packed call.
    *
    * Each entry is the resolved value and style `getCell` reports for the same
-   * address, so captured `oldValue`/`oldStyle` payloads stay unchanged while the
-   * read costs one crossing instead of one per cell.
+   * address, so the captured `oldValue`/`oldStyle` payloads match `getCell`,
+   * and the read costs one crossing, not one per cell.
    */
   private capture_block_before_cells(
     bounds: Range,
@@ -3158,9 +3163,10 @@ export class StoreDataEngine {
 
       return { appliedPatches: applied_patches, changes, storageRevision: storage_revision };
     } finally {
-      // Most transactions queue no hidden rows. With the flush and its nested
-      // try on every edit, JavaScriptCore optimized one-cell edits later, and
-      // the engine memory probe measured a 27% slower edit median.
+      // Most transactions queue no hidden rows, so the flush and its nested
+      // try run only when one did. Run on every edit, they make
+      // JavaScriptCore optimize one-cell edits later: the engine memory probe
+      // measured a 27% slower edit median.
       if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
       else this.commit_engine_sources();
     }
@@ -5382,8 +5388,9 @@ export class StoreDataEngine {
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.sync_pivots(sheet, replacement);
       }
-      // Installing definitions marks pivots dirty; finish calculation before the
-      // replacement becomes observable, without changing no-pivot transfers.
+      // Installing definitions marks pivots dirty, so commit the replacement's
+      // sources to calculate them before it becomes observable. A workbook
+      // without pivots skips this call.
       if (this.workbook.sheets.some((sheet) => sheet.pivots?.length)) replacement.commitSources();
     } catch (cause) {
       for (const snapshot of history) snapshot.replacement.free();

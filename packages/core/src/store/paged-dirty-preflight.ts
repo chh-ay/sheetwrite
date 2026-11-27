@@ -26,8 +26,10 @@ export interface PagedDirtyPreflightStats {
   admissionReferenceMapsMaterialized: number;
 }
 
-// Sparse batches amortize the dirty-coordinate set after 128 probes and eight probes
-// per dirty cell; measurements favor scalar reads below this transfer/setup cost.
+// A sparse batch asks the engine about each cell (`cellState`) until it has
+// made 128 probes and eight probes per dirty cell of the sheet. It then reads
+// the sheet's dirty cells into a set once and checks the set. Below that
+// point, measurements show the single reads cost less than the bulk read.
 const SPARSE_BULK_MIN_PROBES = 128;
 const SPARSE_BULK_DIRTY_RATIO = 8;
 

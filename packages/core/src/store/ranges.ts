@@ -65,7 +65,11 @@ export function collapseRowGroup(
   return groups.map((group) => (group.start === start ? { ...group, collapsed } : group));
 }
 
-/** Right visible neighbor, then left; `removedIndex` retains ordering after removal. */
+/**
+ * The first visible sheet to the right of `source`, else the first to its
+ * left, else null. When `source` is no longer in `sheets`, `removedIndex` is
+ * the position it had, and the search starts there.
+ */
 export function visibleSheetNeighbor(
   sheets: readonly { id: SheetId; visibility?: SheetVisibility }[],
   source: SheetId,
