@@ -608,6 +608,7 @@ export class DocumentController {
             to: patch.from,
           },
           ...this.move_losses(patch),
+          // A partly moved source range does not map back exactly.
           ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 
@@ -673,6 +674,7 @@ export class DocumentController {
             to: patch.from,
           },
           ...this.move_losses(patch),
+          // A partly moved source range does not map back exactly.
           ...this.chart_restores(patch.sheet, { includeOwned: true }),
         ];
 
