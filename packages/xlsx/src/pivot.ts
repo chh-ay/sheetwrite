@@ -1211,15 +1211,15 @@ interface Relationship {
 
 /** Native pivot parts of one save, and the places that must reference them. */
 export interface PivotWrite {
-  /** Pivot table relationships of a worksheet; pivots have no worksheet element. */
+  /** Pivot table relationships of a worksheet. */
   sheetRelationships(sheetId: string): readonly Relationship[];
   readonly workbookRelationships: readonly Relationship[];
   /** `<pivotCache>` elements for the workbook relationship ids of `workbookRelationships`. */
   pivotCaches(ids: readonly string[]): string[];
   /**
    * The output written as cells for each pivot kept in Sheetwrite metadata,
-   * by pivot ID. Metadata keeps it as the pivot's saved output, so the reader
-   * knows which cells are the pivot's and not user values.
+   * by pivot ID. Metadata keeps it as the pivot's saved output (see
+   * `metadata_snapshot` in writer.ts).
    */
   readonly keptOutputs: ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
   readonly overrides: readonly ContentTypeOverride[];

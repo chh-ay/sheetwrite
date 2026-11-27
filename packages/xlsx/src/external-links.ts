@@ -51,7 +51,6 @@ export const ERROR_VALUES: Readonly<Record<string, true>> = {
 /** Most saved link cells one import keeps, which bounds engine memory. */
 const MAX_LINK_CELLS = 1_000_000;
 
-/** The links of an imported workbook. */
 export interface ImportedExternalLinks {
   /** Links Sheetwrite reads, in `<externalReferences>` order. */
   readonly links: ExternalLink[];

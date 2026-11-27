@@ -30,7 +30,6 @@ function data_model_element(workbook_root: XmlElement): XmlElement | undefined {
   return undefined;
 }
 
-/** Whether the workbook root declares an Excel data model. */
 export function hasExcelDataModel(workbookRoot: XmlElement): boolean {
   return data_model_element(workbookRoot) !== undefined;
 }

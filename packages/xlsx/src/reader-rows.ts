@@ -37,7 +37,6 @@ interface PendingSharedFormula extends SharedFormulaMember {
   readonly index: string;
 }
 
-/** The text and position of a shared formula's master cell. */
 interface SharedFormulaMaster {
   formula: string;
   row: number;
