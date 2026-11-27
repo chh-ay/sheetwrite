@@ -3680,6 +3680,7 @@ export class StoreDataEngine {
         if (!chart || !chartFitsSheets(chart, sheet, this.workbook.sheets)) return false;
         const previous = sheet.charts?.find((candidate) => candidate.id === chart.id);
 
+        // Chart lists are replaced, never mutated, so captured definitions stay exact for undo.
         const charts = upsertById(sheet.charts ?? [], chart, MAX_CHARTS_PER_SHEET);
         if (!charts) return false;
         sheet.charts = charts;
