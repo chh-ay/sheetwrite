@@ -236,8 +236,8 @@ impl CellStore {
         self.rebind_name_users(changed);
     }
 
-    /// Give each of `formulas` the entry `rebind` makes of it, if any: the
-    /// dependency index patches its reads and the formula recalculates.
+    /// Give each of `formulas` the entry `rebind` makes of it, if any, through
+    /// [`Self::replace_bound_formula`].
     /// Out of line, so the two table passes share one copy of the loop.
     #[inline(never)]
     fn rebind_table_users(&mut self, formulas: Vec<FormulaId>, rebind: &TableRebind<'_>) {

@@ -601,8 +601,8 @@ impl PagedStorage {
         })
     }
 
-    /// Local storage for a sheet without a datasource: chunks of
-    /// `chunk_rows`, no eviction and no dirty overlay.
+    /// Local storage with chunks of `chunk_rows` rows; see
+    /// [`Self::local`].
     pub(super) fn new_local(chunk_rows: usize) -> Result<Self, String> {
         let mut storage = Self::new(chunk_rows, 0, 0)?;
         storage.local = true;
@@ -1837,7 +1837,6 @@ impl PagedStorage {
         }
     }
 
-    /// Writes the page records.
     fn write_record_transfer(&self, out: &mut Writer) {
         out.usize(self.records.len());
         for record in &self.records {

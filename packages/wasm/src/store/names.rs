@@ -235,7 +235,6 @@ impl NameFacts {
     #[cfg(feature = "analysis")]
     pub(crate) const CALLS_PIVOT_DATA: Self = Self(1 << 4);
 
-    /// Whether `fact` holds.
     pub(crate) const fn has(self, fact: Self) -> bool {
         self.0 & fact.0 != 0
     }
@@ -283,7 +282,6 @@ pub(crate) enum InPlace<'a> {
     Shifted(&'a Ast, (u32, u32)),
 }
 
-/// The cells a named range covers.
 const fn range_cells(range: &NamedRangeRef) -> CellRange {
     CellRange::new(
         range.sheet,
@@ -303,7 +301,6 @@ pub(crate) struct NameRead<'a> {
 }
 
 impl<'a> NameRead<'a> {
-    /// A read that guards no name.
     const fn unguarded(view: NameView<'a>) -> Self {
         Self {
             view,
@@ -412,12 +409,10 @@ pub(crate) struct NameScope<'a> {
 }
 
 impl<'a> NameScope<'a> {
-    /// The names of a formula on `sheet`, read from `bindings`.
     pub(crate) const fn new(bindings: &'a Bindings, sheet: u32) -> Self {
         Self { bindings, sheet }
     }
 
-    /// The name table.
     pub(crate) const fn table(self) -> &'a NameTable {
         &self.bindings.names
     }
@@ -814,14 +809,13 @@ impl NameTable {
         let before = entry.definitions.len();
         entry.definitions.retain(|(defined, _)| *defined != scope);
         let removed = entry.definitions.len() != before;
-        // A name left with no definition keeps only its entry.
+        // A name left with no definition frees its list; its entry stays.
         if entry.definitions.is_empty() {
             entry.definitions = Vec::new();
         }
         removed
     }
 
-    /// Whether any scope defines `key`.
     pub(super) fn defines(&self, key: &str) -> bool {
         self.id(key)
             .and_then(|id| self.entry(id))
@@ -1230,8 +1224,6 @@ impl CellStore {
                 formula.nodes.set(None);
             }
         }
-        // Past the limit, a formula reads as `#NUM!`, as a LET does past
-        // its expansion limit.
         for (at, _) in bound {
             let oversized = table.entries().get(at.0).is_some_and(|entry| {
                 let scope = entry.definitions.get(at.1).and_then(|(scope, _)| *scope);
@@ -1359,7 +1351,6 @@ impl CellStore {
         }
     }
 
-    /// Follow a sheet rename in every name's formula.
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         let sheets = &self.sheet_names;
         for entry in self.bindings.names.entries_mut() {
@@ -1550,7 +1541,6 @@ fn name_use(
     }
 }
 
-/// Visit `ast` and every node below it.
 fn walk(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     visit(ast);
     ast.any_child(&mut |child| {

@@ -706,9 +706,8 @@ impl CellStore {
     /// is not asked again. The literal-only loop is chosen once per range, so
     /// a numeric or text import does not test the source map for every cell.
     ///
-    /// The rectangle is dirtied and its spills detached once, so readers
-    /// outside it keep their calculated values and the per-cell writes skip
-    /// both the spill scan and the dirty mark.
+    /// [`prepare_rect_write`] dirties the rectangle and detaches its spills
+    /// once, so the per-cell writes skip both the spill scan and the dirty mark.
     pub(crate) fn replace_range_sources(
         &mut self,
         sheet: usize,
@@ -860,8 +859,6 @@ mod tests {
         assert!(store.read_range_memory(&bytes, 0, 0, 0).is_err());
     }
 
-    /// A range of no cells has nothing to restore, and restoring one would
-    /// compute its last row or column as one before its first.
     #[test]
     fn range_transfer_rejects_a_range_without_rows_or_columns() {
         let mut store = CellStore::new();

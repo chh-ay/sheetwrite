@@ -1,6 +1,4 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
-//! Missing sheet references retain their tree and are indexed by stable formula
-//! identity, so naming a sheet binds only its waiting users without reparsing.
 
 use std::borrow::Cow;
 
@@ -1242,7 +1240,8 @@ impl CellStore {
 
     /// Commit staged user or host sources. Admission metadata must be staged
     /// before this barrier; derived values and string roots are complete on return.
-    /// Beginning a page load suppresses local dirty tracking until this commit.
+    /// It ends the edit that `beginMutation`, `beginPageLoad` or
+    /// `beginRemoteLoad` started.
     ///
     /// Returns [`Self::recalculated_rect_count`] for the commit, so a chart
     /// tracker learns whether there is a report without another call.
@@ -1373,7 +1372,7 @@ impl Default for CellStore {
 /// Marks a validated bulk source rectangle once and detaches intersecting
 /// spills in one pass, so the per-cell loop that follows writes storage only.
 /// Range writes reserve the rectangle's dirty overlay before calling;
-/// `clear_range` skips unloaded paged cells, so it reserves per written cell.
+/// `clear_range` reserves only the loaded cells it writes.
 fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
     sheet.formulas.mark_dirty_rect(rect);
 
@@ -1775,8 +1774,10 @@ impl CellStore {
         self.recompute_seed_sheets(&live);
     }
 
-    /// A sheet rename or removal changes what INDIRECT text names, and no
-    /// static read records that, so the volatile sheets join the seeds.
+    /// Recomputes the `seeds` sheets and every sheet with a volatile formula.
+    /// Adding, renaming, removing or reordering sheets changes results that
+    /// no static read records: INDIRECT text names a sheet, and SHEET and
+    /// SHEETS read the tabs.
     fn recompute_with_volatile_sheets(&mut self, mut seeds: Vec<usize>) {
         for (sheet, data) in self.sheets.iter().enumerate() {
             if data.formulas.has_volatile() && !seeds.contains(&sheet) {
@@ -1821,7 +1822,8 @@ impl CellOut {
         self.kind
     }
 
-    /// The number, for number and boolean cells.
+    /// The number, for number and boolean cells, and for a formula cell whose
+    /// kind is `KIND_FORMULA`.
     #[wasm_bindgen(getter, js_name = num)]
     #[must_use]
     pub fn num(&self) -> f64 {
@@ -1835,7 +1837,7 @@ impl CellOut {
         self.string.clone()
     }
 
-    /// The cell's style id.
+    /// The cell's style id; 0 for a cell outside the sheet or still loading.
     #[wasm_bindgen(getter, js_name = style)]
     #[must_use]
     pub fn style(&self) -> u32 {
@@ -1865,13 +1867,13 @@ impl CellSnapshot {
         self.kinds.clone()
     }
 
-    /// Each cell's number, for number and boolean cells.
+    /// Each cell's number, as [`CellOut::num`] reports it.
     #[wasm_bindgen(getter, js_name = numbers)]
     pub fn numbers(&self) -> Vec<f64> {
         self.numbers.clone()
     }
 
-    /// Each cell's style id.
+    /// Each cell's style id, as [`CellOut::style`] reports it.
     #[wasm_bindgen(getter, js_name = styles)]
     pub fn styles(&self) -> Vec<u32> {
         self.styles.clone()
