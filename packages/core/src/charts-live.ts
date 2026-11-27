@@ -787,7 +787,8 @@ class ChartTracker {
         // refresh also names them through pivotViewsChanged().
         for (const chart of index.pivotIndices) hits.add(chart);
       } else {
-        // Custom stores and bounded-report overflow keep the conservative contract.
+        // Without precise rectangles (a custom store, or an engine report that
+        // overflowed its bound), any chart may have changed.
         for (let chart = 0; chart < index.charts.length; chart++) hits.add(chart);
       }
     }
@@ -830,9 +831,9 @@ const TRACKERS = new WeakMap<Store, ChartTracker>();
  * Listen for commits that change any chart's `ChartView`. Edited rectangles are
  * matched against an index of series ranges, so edits outside every series
  * range cost no chart work. Recomputed formulas and changed spill/pivot cells
- * query the same index. Custom stores and report overflow refresh conservatively.
- * Returns an unsubscribe
- * function; the index is dropped with the last listener.
+ * query the same index. Custom stores, and commits whose engine report of
+ * recalculated rectangles overflowed, name every chart. The index is dropped
+ * with the last listener.
  *
  * @returns A function that removes `listener`.
  */

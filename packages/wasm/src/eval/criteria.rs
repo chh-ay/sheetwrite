@@ -199,7 +199,7 @@ impl WildcardPattern {
         })
     }
 
-    /// Matches the text a lookup candidate shows a wildcard.
+    /// Whether the text of a lookup candidate matches the pattern.
     pub(super) fn matches_text(&self, text: &str) -> bool {
         self.wildcard.matches(text)
     }
@@ -467,7 +467,7 @@ impl CellStore {
     /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
     /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
     /// one function enables it for the whole module, which makes other range
-    /// formulas up to 1.8x slower on x86-64 (#342).
+    /// formulas up to 1.8x slower on x86-64.
     #[inline(never)]
     fn dense_number_count_if_family(
         &self,

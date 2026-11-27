@@ -845,7 +845,7 @@ export class InteractionSessions {
       });
     }
 
-    // edit-begin remains a before-open notification. Reentrant callbacks can
+    // edit-begin is a before-open notification. Reentrant callbacks can
     // replace or invalidate this request, but cannot reopen its stale target.
     if (generation !== this.generation || this.deps.readOnly()) return;
 
@@ -2389,9 +2389,9 @@ export class InteractionSessions {
   }
 
   /**
-   * Window-drag replacement: capture the initiating pointer on the scroller and
-   * track it until `pointerup` (commit) or `pointercancel` (abandon, never
-   * commit). Events from other pointers are ignored for the drag's lifetime.
+   * Capture the initiating pointer on the scroller and track it until
+   * `pointerup` (commit) or `pointercancel` (abandon, never commit). Events
+   * from other pointers are ignored for the drag's lifetime.
    */
   private attach_drag(
     e: PointerEvent,

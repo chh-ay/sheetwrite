@@ -82,8 +82,8 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     assert_eq!(loaded[1], 2.0);
     assert_eq!(loaded[2], 0.0);
 
-    // A local edit moves into the sparse overlay. Loading two more clean chunks
-    // evicts the older clean chunk without affecting the local edit.
+    // A local edit moves into the sparse overlay. Two more clean chunks fill
+    // the page budget and evict the older chunks; the local edit stays.
     store.set_number(sheet, 0, 0, 10.0, 0);
     store.begin_page_load();
     crate::tests::write_number_column(&mut store, sheet, 0, 8192, &[3.0]);

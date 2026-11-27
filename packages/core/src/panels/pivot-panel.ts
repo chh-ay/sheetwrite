@@ -413,7 +413,7 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
     }
   };
 
-  /** Rebuild when the definition, its fields, the relationships or the message changed. */
+  /** Rebuild when the definition, its fields, the data model or the message changed, or on `force`. */
   const refresh = (force = false): void => {
     const pivot = read();
     const fields = pivot === null ? [] : grid.getPivotFields(sheet, id);
@@ -594,7 +594,7 @@ function area_section(
     item.className = "sheetwrite-panel-area-item";
     const value = area === "values" ? pivot.values[index] : undefined;
     // A measure value has no source field, so it cannot move to another
-    // area or shift by field; the list can only remove it.
+    // area or shift by field; its menu offers only Number Format and Remove.
     const is_measure = value !== undefined && "measure" in value;
     item.draggable = !is_measure;
 

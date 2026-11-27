@@ -474,8 +474,8 @@ export async function readCheckpointManifest(
 /**
  * Read the cell pages of a manifest that `keep` selects (every page when it
  * is omitted) into a validated snapshot, which a replay store takes without
- * validating every cell again. Decoded bytes are counted against the
- * working-set reservation before the next page is read. Cells of pages that
+ * validating every cell again. Each page's decoded size is counted against
+ * the working-set reservation before the page is decoded. Cells of pages that
  * are not kept are empty in the snapshot.
  */
 export async function readCheckpointCells(

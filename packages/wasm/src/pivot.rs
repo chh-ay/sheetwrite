@@ -5,8 +5,10 @@
 //! axis and on the column axis, and the values it contributed. For every pair
 //! of row and column groups, at every level (leaf, subtotal and grand total),
 //! it keeps one partial aggregate per value field. An edit of k source rows
-//! removes the old contribution of each row and adds the new one, which is
-//! O(k · fields) partial updates, independent of the source size.
+//! removes the old contribution of each row and adds the new one in every
+//! pair of groups on the row's paths: O(k · (row levels + 1) · (column
+//! levels + 1) · value fields) partial updates, independent of the source
+//! size.
 //!
 //! COUNT and COUNTA keep reversible counters; SUM and AVERAGE keep an exact
 //! sum, so removals do not drift from a fresh build. MIN, MAX and
@@ -600,7 +602,8 @@ impl Axis {
 
     /// The displayed groups in output order. Siblings sort by key in the
     /// level's direction. `subtotals_first` puts each subtotal before its
-    /// children (compact rows), otherwise after them; the grand total is last.
+    /// children (compact rows), otherwise after them. With `include_root`,
+    /// the grand total is last. An axis without fields has only the root.
     fn ordered(
         &self,
         descending: &[bool],
@@ -1216,7 +1219,7 @@ fn shown_position(positions: &[u32], group: u32) -> Option<usize> {
 }
 
 /// Whether two names are equal without case. Text that is all ASCII
-/// compares in place; other text compares lower-cased, as before.
+/// compares in place, without allocation; other text compares lower-cased.
 fn same_name(left: &str, right: &str) -> bool {
     if left.is_ascii() && right.is_ascii() {
         left.eq_ignore_ascii_case(right)
@@ -1275,8 +1278,9 @@ pub(crate) fn source_fields(source: &impl PivotSource) -> (Vec<String>, Vec<u8>)
 }
 
 /// The incremental grouping and aggregates of one pivot table over its
-/// source rows: edits of k rows cost O(k · fields) partial updates, and the
-/// output cells are read from it on demand.
+/// source rows. An edit of k rows costs partial updates in proportion to k,
+/// not to the source size (see the module docs). The output cells are read
+/// from it on demand.
 pub(crate) struct PivotCache {
     definition: PivotDefinition,
     headers: Vec<Value>,
@@ -1441,7 +1445,7 @@ fn dense_ancestors(axis: &Axis, depth: u32) -> DenseAncestors {
     (ids, leaves, count as usize)
 }
 
-/// Orders `rows` stably by `key(row)`, which is below `keys`.
+/// Orders `rows` stably by `key_of[row]`. Every key is below `keys`.
 fn counting_sort(rows: &[u32], keys: usize, key_of: &[u32]) -> Vec<u32> {
     let key = |row: u32| key_of[row as usize];
     let mut starts = vec![0u32; keys + 1];
@@ -1601,7 +1605,8 @@ impl PivotCache {
     }
 
     /// The label of a row or column group's ancestor at axis level `level`,
-    /// which must be below the group's depth.
+    /// for a level below the group's depth. At the group's own depth the
+    /// label is `Total`; past it, blank.
     pub(crate) fn path_label(&self, on_rows: bool, group: u32, level: usize) -> Value {
         self.axis(on_rows).level_label(group, level)
     }
@@ -1671,7 +1676,9 @@ impl PivotCache {
     }
 
     /// Places each row under its cell (counts in `starts[cell + 1]`, rows
-    /// stay ascending inside a cell) and evaluates every non-empty cell.
+    /// stay ascending inside a cell) and evaluates every cell that has rows.
+    /// With `include_empty`, it also evaluates each empty cell whose groups
+    /// are at the current depths and show values.
     fn visit_cells(
         &self,
         layout: &PivotLayout,
@@ -1760,8 +1767,9 @@ impl PivotCache {
         definition.tabular || definition.subtotals || depth == 0 || depth >= definition.rows.len()
     }
 
-    /// Groups and aggregates every source row. Fails with `#NUM!` as soon as
-    /// the groups pass [`MAX_PIVOT_GROUPS`], before memory grows further.
+    /// Groups and aggregates every source row. Fails with `#REF!` when a
+    /// field is past the source width, and with `#NUM!` as soon as the groups
+    /// pass [`MAX_PIVOT_GROUPS`], before memory grows further.
     pub(crate) fn build(
         definition: &PivotDefinition,
         source: &impl PivotSource,
@@ -2057,7 +2065,7 @@ impl PivotCache {
             return RowUpdate::Skipped;
         }
         if self.read_keys(row, source).is_err() {
-            // The old path records the key error.
+            // The caller's `add_row` reads the keys again and records the error.
             return RowUpdate::Skipped;
         }
         let (row_keys, col_keys) = self.keys.split_at(self.definition.rows.len());
@@ -2157,9 +2165,8 @@ impl PivotCache {
     /// Adds or removes `row`'s contribution in every pair of its row and
     /// column groups, at every level, or with `every_level` false in its
     /// leaf pair only, which a build rolls up later. The build shares this
-    /// loop rather than calling a helper of its own: with one caller, the
-    /// pair lookup and the aggregate update stay inline here, where each
-    /// edit runs them.
+    /// loop instead of a loop of its own, so the always-inlined pair lookup
+    /// and aggregate update are not expanded into one more loop body.
     fn apply_row(&mut self, row: usize, adding: bool, every_level: bool) {
         let mut row_path = std::mem::take(&mut self.row_path);
         let mut col_path = std::mem::take(&mut self.col_path);
@@ -2328,8 +2335,9 @@ impl PivotCache {
         }
     }
 
-    /// A header cell: a row field name above the label columns, then the
-    /// column group labels and the value captions above the value columns.
+    /// A header cell: the row field names in the first header row above the
+    /// label columns, then the column group labels and the value captions
+    /// above the value columns.
     fn header_cell(&self, layout: &PivotLayout, row: usize, col: usize) -> Value {
         let definition = &self.definition;
         if col < layout.label_cols {
@@ -2541,8 +2549,8 @@ impl PivotCache {
     }
 
     /// Takes the changes since the last call: `None` when the output needs a
-    /// new layout, otherwise the row-major offsets in `layout` whose values
-    /// may have changed.
+    /// new layout or `layout` shows only a blank cell, otherwise the
+    /// row-major offsets in `layout` whose values may have changed.
     pub(crate) fn take_changes(&mut self, layout: &PivotLayout) -> Option<Vec<usize>> {
         let pairs = std::mem::take(&mut self.changed_pairs);
         if std::mem::replace(&mut self.relayout, false) || layout.header_rows == 0 {
@@ -2710,7 +2718,7 @@ mod tests {
         assert!(matches!(cache.layout(), Err(FormulaError::Num)));
     }
 
-    /// The filter check before kept values were bucketed: a scan of `keep`.
+    /// The reference filter check: a scan of every value in `keep`.
     fn scanned_keeps(keep: &[Value], value: &Value) -> bool {
         let Ok(part) = key_part(value) else {
             return false;

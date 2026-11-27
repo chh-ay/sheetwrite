@@ -341,8 +341,8 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
     let sheet = store.add_sheet(1, 16);
     fill_mixed_distinct_column(&mut store, sheet);
 
-    // The error formula at row 3 restarts the scan on content hashing, so a
-    // limit that lands past it still returns identical values.
+    // The error formula at row 3 has no pool id, so the scan restarts with
+    // content hashing; a limit past that row still lists first-seen values.
     let mut three = store.distinct_values(sheet, 0, 3);
     assert_eq!(three.take_kinds(), vec![2, 1, 2]);
     assert_eq!(distinct_number_bits(&mut three), vec![2.0f64.to_bits()]);
@@ -442,8 +442,8 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
     assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
 }
 
-/// "Values" filter coverage: the per-column lookup must answer exactly what the
-/// linear scan answered, including NaN, `-0.0`, blanks, booleans and text.
+/// "Values" filter coverage: the per-column lookup must keep the same rows as
+/// the linear scan, including NaN, `-0.0`, blanks, booleans and text.
 mod value_set_filter {
     use crate::*;
 
@@ -525,10 +525,10 @@ mod value_set_filter {
     }
 }
 
-/// The dense column scans in `filterRows`, `dataEdgeOrdered`, `rangeStyleIds`
-/// and `aggregate` classify literals from the raw kind byte. These tests put
-/// formula results and calculated spill cells in the same column, so the
-/// branches that resolve a calculated slot are covered too.
+/// The dense column scans in `filterRows` and `dataEdgeOrdered` classify
+/// literals from the raw kind byte. These tests put formula results and
+/// calculated spill cells in the same column, so the branches that resolve a
+/// calculated slot are covered too.
 mod dense_reader_fast_paths {
     use super::*;
 

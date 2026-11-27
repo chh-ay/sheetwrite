@@ -48,11 +48,12 @@ const SECTION_DIGEST_ENTRY = "SheetwriteSectionDigest";
 
 const UINT32_BYTES = 4;
 const BINARY_VERSION = 0;
-/** Bounds the decoded mashup; a workbook's queries are small text. */
-// Snapshot protocol caps for kept members (core document-protocol.ts).
+// Caps on the unsupported query members the snapshot keeps. They match the
+// snapshot protocol caps (core document-protocol.ts).
 const MAX_UNSUPPORTED_QUERIES = 256;
 const MAX_QUERY_MEMBER_LENGTH = 1024;
 const MAX_QUERY_REASON_LENGTH = 64;
+/** Bounds the decoded mashup; a workbook's queries are small text. */
 const MAX_MASHUP_BYTES = 16 * 1024 * 1024;
 const MAX_SECTION_BYTES = 4 * 1024 * 1024;
 const UTF16_LE_BOM = [0xff, 0xfe] as const;

@@ -1,10 +1,11 @@
 //! Optional function families for the complete analysis engine.
 
-/// Declares a family's functions once, in ASCII order of their names: the
-/// `NAMES` the registry looks names up in, and the `Function` enum the
-/// family's evaluators match. A name defaults to its variant's spelling; a
-/// name with dots gives it after `=`. A function's registry index is its
-/// position in both lists, so an id always names the same variant.
+/// Declares a family's functions once: the `NAMES` the registry looks names
+/// up in, and the `Function` enum the family's evaluators match. List the
+/// functions in ASCII order of their names, because `lookup` binary-searches
+/// `NAMES`. A name defaults to its variant's spelling; a name with dots
+/// gives it after `=`. A function's registry index is its position in both
+/// lists, so an id always names the same variant.
 macro_rules! family_functions {
     ($($function:ident $(= $name:literal)?,)+) => {
         pub(crate) const NAMES: &[&str] = &[
@@ -58,9 +59,9 @@ macro_rules! scalar_hook {
     };
 }
 
-/// An AST hook that passes `family`'s typed function to `evaluate`. A family
-/// whose hooks also take other input names that type (see
-/// `lambda::Invocation`); it has an `of(id)` as `Function` does.
+/// An AST hook that passes `family`'s typed function to `evaluate`. The
+/// second form passes another type instead of the family's `Function`, such
+/// as `lambda::Invocation`; that type needs an `of(id)` as `Function` has.
 macro_rules! ast_hook {
     ($family:ident::$evaluate:ident) => {
         ast_hook!($family::$evaluate, $family::Function)
@@ -165,7 +166,7 @@ pub(super) struct ArrayHooks {
 }
 
 pub(super) struct Family {
-    /// ASCII uppercase spellings in alphabetical order, including any aliases.
+    /// ASCII uppercase spellings in ASCII order, so that `lookup` can binary-search them.
     pub(super) names: &'static [&'static str],
     /// Whether a function's single-cell arguments are references, like
     /// `SUM(A1)`: text and logical values in the cell are ignored instead of
@@ -180,7 +181,7 @@ pub(super) struct Family {
     pub(super) array: Option<ArrayHooks>,
 }
 
-/// Whether no function of a family reads single-cell arguments as references.
+/// A family where no function reads single-cell arguments as references.
 const NO_REFERENCE_CELLS: fn(u16) -> bool = |_| false;
 /// A family whose functions take one value in every argument.
 const EVERY_ARGUMENT: fn(u16) -> ValueArgs = |_| ValueArgs::ALL;
@@ -403,7 +404,8 @@ const _: () = {
     }
 };
 
-// Keep named IDs tied to the registry when families or names move.
+// Finds the registry id of `input` at compile time, so the named ids below stay right when
+// families or names move. An unregistered name panics, which fails the build.
 const fn known_id(input: &str) -> u16 {
     let mut family = 0;
 
@@ -527,7 +529,8 @@ pub(crate) const fn accepts_union(id: u16) -> bool {
 ///
 /// Family position sorts go through the engine's shared stable index sort,
 /// [`crate::sorting::sort_indices_by`], so they add no sort of their own.
-/// Plain f64 sorts can reuse the default engine's unstable f64 sort instead.
+/// A plain sort of numbers can use [`crate::sorting::sort_f64`] instead: equal
+/// numbers cannot be told apart, so their order does not matter.
 pub(super) fn sorted_positions(
     count: usize,
     compare: &mut dyn FnMut(usize, usize) -> std::cmp::Ordering,

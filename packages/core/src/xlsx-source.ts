@@ -25,7 +25,10 @@ export function hasAdmittedXlsxSource(store: object): boolean {
   return admitted_stores.has(store);
 }
 
-/** Verified provenance follows the document, not the facade that used to hold it. */
+/**
+ * Verified provenance follows the document: when `replacement`'s document
+ * moves into `store`, `store` is admitted only if `replacement` was.
+ */
 export function replaceStoreXlsxSource(store: object, replacement: object): void {
   admitted_stores.delete(store);
   if (admitted_stores.has(replacement)) admitted_stores.add(store);

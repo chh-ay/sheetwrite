@@ -29,7 +29,7 @@ function source_code(kind: SavedQuerySource["kind"]): number {
   }
 }
 
-// Reverse tables of the one-based operator codes in `plan-wire.ts`.
+// Reverse tables of the one-based codes in `plan-wire.ts`: entry `i` has code `i + 1`.
 const COMPARE_OPS = ["eq", "neq", "lt", "lte", "gt", "gte"] as const;
 const POLICIES = ["error", "null"] as const;
 const JOIN_KINDS: readonly QueryJoinKind[] = [

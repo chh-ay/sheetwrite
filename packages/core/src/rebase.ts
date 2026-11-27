@@ -57,8 +57,8 @@ interface TransformFailure {
  * Conservative server-ordered rebase for pending offline work. Non-overlapping
  * literal edits are shifted across row/column insertion and deletion. Ambiguous
  * formula, overlapping, sheet-lifecycle, and move cases become explicit
- * conflicts instead of lossy guesses. This is the collaboration design gate;
- * no CRDT dependency is required for the supported cases.
+ * conflicts instead of lossy guesses. The supported cases need no CRDT
+ * dependency.
  *
  * Each local operation is written after the local operations before it, and
  * each remote operation after the remote operations before it. A remote
@@ -1315,7 +1315,7 @@ function operation_identity(operation: DocumentOp): string {
     case "setCalculation":
       return "calculation";
 
-    // The whole list is replaced, so the last writer wins.
+    // Each change replaces the whole list, so two concurrent changes conflict.
     case "setExternalLinks":
       return "external-links";
 

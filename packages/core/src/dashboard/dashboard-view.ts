@@ -1,8 +1,8 @@
 // The dashboard view: the items of the active dashboard sheet on a grid of
 // 12 columns, drawn over the cells. Items move and resize with the mouse
 // (drag the header, drag the corner) and with the keyboard (the item menu,
-// then arrow keys). Each drop or arrow step is ONE `setDashboardItem`, so it
-// is one undo step. This module loads as its own chunk (#231).
+// then arrow keys). Each drop or arrow step is one `setDashboardItem`, so it
+// is one undo step. This module loads as its own chunk.
 
 import { cellScalarToText } from "../cell-input.js";
 import { createChartRenderer } from "../chart-backend.js";

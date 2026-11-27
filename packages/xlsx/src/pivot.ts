@@ -215,7 +215,7 @@ interface ReadPivot {
   readonly pivot: PivotDefinition;
   /** The pivot body from its anchor, as the producing application rendered it. */
   readonly body: CellRect;
-  /** Cells the producing application rendered; Sheetwrite's engine owns them now. */
+  /** Cells the producing application rendered; after import, Sheetwrite's engine owns them. */
   readonly output: readonly CellRect[];
 }
 
