@@ -1,11 +1,11 @@
 // What the engine computes for a dashboard. Each slicer keeps the rows whose value
 // in its column is selected, and filters every pivot whose base table reaches
 // the slicer's table through relationships, as an Excel slicer filters the
-// PivotTables connected to it (#231). The result is what the engine computes;
+// PivotTables connected to it. The result is what the engine computes;
 // the saved pivot definitions do not change.
 //
 // A worksheet adds one hidden copy of each pivot that a chart reads, so the
-// chart plots the pivot's leaf items without its totals (#487).
+// chart plots the pivot's leaf items without its totals.
 
 import { baseTable, relatedTables, withModelField } from "../panels/pivot-model.js";
 import type { CellScalar } from "../types/cell.js";
@@ -199,8 +199,8 @@ export interface PivotViewPayload {
  * The definitions the engine computes for the pivots of `sheet`: first its
  * pivots in their order, each with the keep-list of every slicer that
  * reaches it, then one hidden pivot per slicer that marks values with no data
- * and one per chart item and KPI card. Undefined when nothing differs from the saved
- * definitions.
+ * and one per chart item and KPI card. Undefined when the sheet has no
+ * slicer, chart item or KPI card, so the saved definitions apply as they are.
  */
 export function dashboardPayload(
   sheet: Sheet,

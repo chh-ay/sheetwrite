@@ -27,8 +27,8 @@ const MAX_DIRTY_RECTS: usize = 64;
 /// Formulas a remote edit's seeded cell may stand for before recalculating
 /// the whole sheet is cheaper. Measured on 10,000 rows of `=SUM(A:H)`: 150
 /// remote cells took 10.2 ms seeded and 13.5 ms with every formula
-/// recalculated, 300 cells 15.3 and 11.1 ms, so the two meet near one cell
-/// per 50 formulas.
+/// recalculated, 300 cells 15.3 and 11.1 ms. So the two meet between one
+/// cell per 67 formulas and one cell per 33 formulas; 64 is in that range.
 const FORMULAS_PER_SEEDED_CELL: usize = 64;
 
 /// Inclusive source coordinates; rectangles never enumerate logical sheet area.
@@ -233,8 +233,9 @@ impl Default for DirtyState {
     }
 }
 
-// Bound a scalar insert or delete's shifts to one small row band, not a column.
-// The exact-reader index uses the same bands, so a topology patch is as local.
+// Rows per page of the formula address index. A single insert or delete
+// shifts cells in one small row band, not a whole column. The exact-reader
+// index in eval/dependency.rs uses the same bands, so its patches are as local.
 pub(crate) const FORMULA_INDEX_PAGE_ROWS: u32 = 256;
 const FORMULA_INDEX_INITIAL_CAPACITY: usize = 1;
 const FULL_PAGE_CELLS: usize = FORMULA_INDEX_PAGE_ROWS as usize;
@@ -299,7 +300,8 @@ impl<'a> FormulaAddresses<'a> {
         }
     }
 
-    // Share the address walk instead of copying nested iterators into callers.
+    // Out of line (the `_family` suffix also stops wasm-opt from inlining it),
+    // so every caller shares one copy of the nested walk.
     #[inline(never)]
     fn next_address_family(&mut self) -> Option<(CellKey, FormulaId)> {
         loop {
@@ -363,7 +365,8 @@ impl SheetFormulas {
         self.count
     }
 
-    /// Translate a cell address once before indexed evaluation.
+    /// The formula id at a cell address. Evaluation translates each address
+    /// once, then works by id.
     #[inline]
     pub(crate) fn id(&self, (row, col): CellKey) -> Option<FormulaId> {
         let column = self
@@ -384,7 +387,8 @@ impl SheetFormulas {
         cells.get(offset).map(|&(_, id)| id)
     }
 
-    /// Keep entry ownership in the workbook, not in each sheet index.
+    /// The formula entry at `key`. The workbook's `slots` own the entries;
+    /// the sheet index holds only ids.
     #[inline]
     pub(crate) fn get<'a>(
         &self,
@@ -394,13 +398,14 @@ impl SheetFormulas {
         slots.get(self.id(key)?)
     }
 
-    /// Source-kind checks need membership without borrowing an entry.
+    /// Whether a formula is at `key`, without borrowing its entry.
     #[inline]
     pub(crate) fn contains(&self, key: CellKey) -> bool {
         self.id(key).is_some()
     }
 
-    /// Share one address walk across queries, transfers and source rewrites.
+    /// Every formula of the sheet with its address, column by column and in
+    /// row order within a column.
     pub(crate) fn iter<'a>(
         &'a self,
         slots: &'a FormulaStore,
@@ -411,23 +416,26 @@ impl SheetFormulas {
         }
     }
 
-    /// Seed pass work without rebuilding coordinate keys.
+    /// The id of every formula of the sheet, without building its address.
     pub(crate) fn ids(&self) -> impl Iterator<Item = FormulaId> + '_ {
         FormulaAddresses::new(&self.columns).map(|(_, id)| id)
     }
 
-    /// Address-only operations do not need to read formula entries.
+    /// The address of every formula of the sheet, without reading entries.
     pub(crate) fn keys(&self) -> impl Iterator<Item = CellKey> + '_ {
         FormulaAddresses::new(&self.columns).map(|(key, _)| key)
     }
 
-    /// Avoid a workbook membership scan for non-volatile sheets.
+    /// Whether the sheet holds a volatile formula. A sheet without one skips
+    /// the scan of the workbook's volatile formulas.
     #[inline]
     pub(crate) const fn has_volatile(&self) -> bool {
         self.volatile_count != 0
     }
 
-    /// Add this sheet's volatile sources at an edit barrier.
+    /// The cells of this sheet's volatile formulas, which an edit barrier
+    /// recalculates. The sheet comes from the location of its first formula,
+    /// so a sheet without formulas yields nothing.
     pub(crate) fn volatile_keys<'a>(
         &'a self,
         slots: &'a FormulaStore,
@@ -440,7 +448,8 @@ impl SheetFormulas {
         slots.volatile_keys(sheet)
     }
 
-    /// Visibility changes need only this sheet's SUBTOTAL sources.
+    /// The cells of this sheet's formulas that call SUBTOTAL or AGGREGATE, or
+    /// `None` when it has none. A visibility change recalculates only these.
     pub(crate) fn subtotal_keys<'a>(
         &'a self,
         slots: &'a FormulaStore,
@@ -541,7 +550,9 @@ impl SheetFormulas {
         self.replace(key, Some(entry), sheet, slots);
     }
 
-    /// Retire a removed id until its old graph reads are owned.
+    /// Removes the formula at `key`, if any, and retires its id. A retired id
+    /// is not reused until the pending graph edits own the removed formula's
+    /// reads.
     pub(crate) fn remove(&mut self, key: CellKey, slots: &mut FormulaStore) {
         self.replace(key, None, 0, slots);
     }
@@ -612,9 +623,10 @@ impl SheetFormulas {
         slots.retire(id)
     }
 
-    /// Refresh source metadata without replacing surviving ids. Each entry
-    /// that uses a defined name is rewritten as the formula at its cell, so
-    /// a name placed by the cell that reads it is read there.
+    /// Applies `rewrite` to every entry in place, keeping each id, and
+    /// recounts the volatile and SUBTOTAL formulas. Each entry that uses a
+    /// defined name is rewritten as the formula at its cell, so a name placed
+    /// by the cell that reads it is read there.
     pub(crate) fn rewrite_entries(
         &mut self,
         slots: &mut FormulaStore,
@@ -770,7 +782,8 @@ impl SheetFormulas {
         self.mark_all_dirty();
     }
 
-    /// Clean sheets do not need a dirty-collection pass.
+    /// Whether the sheet has dirty seeds. A clean sheet skips the
+    /// dirty-collection pass.
     #[inline]
     pub(crate) fn has_dirty(&self) -> bool {
         match &self.dirty {
@@ -780,7 +793,8 @@ impl SheetFormulas {
         }
     }
 
-    /// Coalesce repeated source writes before traversing dependents.
+    /// Marks one source cell dirty. Repeated writes of one cell coalesce, so
+    /// the dependents walk sees each cell once.
     #[inline]
     pub(crate) fn mark_cell_dirty(&mut self, key: CellKey) {
         match &mut self.dirty {
@@ -889,12 +903,14 @@ impl SheetFormulas {
         ranges[nearest] = ranges[nearest].union(rect);
     }
 
-    /// Structural rewrites must select every surviving source.
+    /// Marks every formula of the sheet dirty. Structural rewrites use it,
+    /// because they move or rewrite every surviving formula.
     pub(crate) fn mark_all_dirty(&mut self) {
         self.dirty = DirtyState::All;
     }
 
-    /// Keep only small seed capacity after the pass consumes it.
+    /// Clears the seeds after a pass. A cell list larger than
+    /// `RETAINED_DIRTY_CAPACITY` is dropped, not kept empty.
     pub(crate) fn clear_dirty(&mut self) {
         if let DirtyState::Cells(cells) = &mut self.dirty {
             if cells.cells.capacity() <= RETAINED_DIRTY_CAPACITY {
@@ -907,7 +923,7 @@ impl SheetFormulas {
         self.dirty = DirtyState::default();
     }
 
-    /// Borrow seeds so dirty collection does not clone the source edit set.
+    /// The seeds, borrowed, so dirty collection does not copy them.
     pub(crate) fn dirty_seeds(&self) -> DirtySeeds<'_> {
         match &self.dirty {
             DirtyState::All => DirtySeeds::All,
@@ -916,7 +932,8 @@ impl SheetFormulas {
         }
     }
 
-    /// Count the sparse index here; entries are owned by `FormulaStore`.
+    /// Counts the sparse address index and the dirty seeds. `FormulaStore`
+    /// counts the entries.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
         formulas.add_vec::<FormulaColumn>(self.columns.len(), self.columns.capacity());
@@ -1029,8 +1046,9 @@ impl FormulaGraph {
     /// Stores `entry` at `key` on `sheet`, or removes the formula there for
     /// `None`, and queues the change on the index before the replaced entry is
     /// dropped. A rewrite that keeps every read and the array shape queues
-    /// nothing; one that pushes the queue past a substantial share of the
-    /// workbook's formulas invalidates instead, since a rebuild is then cheaper.
+    /// nothing; one that pushes the queue past 256 formulas, or a quarter of
+    /// the workbook's formulas when that is more, invalidates instead, since
+    /// a rebuild is then cheaper.
     pub(crate) fn replace_entry(
         &mut self,
         formulas: &mut SheetFormulas,
@@ -1041,8 +1059,8 @@ impl FormulaGraph {
     ) {
         let stores_formula = entry.is_some();
         let (previous, changed) = formulas.replace(key, entry, sheet, slots);
-        // A literal written over a literal is the bulk-load case: the index
-        // has no change to record.
+        // A literal written where no formula was (the bulk-load case) leaves
+        // the index with no change to record.
         if !stores_formula && previous.is_none() {
             return;
         }
@@ -1155,8 +1173,9 @@ mod tests {
         );
     }
 
-    /// The order walk relies on every occupied formula slot being indexed at
-    /// its location. Each path that fills, moves or empties slots keeps it.
+    /// Code that goes from a formula slot to its cell, and back through the
+    /// sheet index, needs every occupied slot indexed at its location. Each
+    /// path that fills, moves or empties slots must keep that true.
     #[test]
     fn every_slot_stays_indexed_at_its_location() {
         let mut store = CellStore::new();

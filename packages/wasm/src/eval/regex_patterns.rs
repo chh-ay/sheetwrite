@@ -17,7 +17,8 @@ use crate::calc::{Ast, Func};
 use crate::memory::MemoryOwnerStats;
 use crate::types::FormulaError;
 
-/// Compiled program size limit, matching the `regex-lite` default bound.
+/// The largest compiled program a pattern may build: 2 MiB, below the
+/// `regex-lite` default of 10 MiB.
 const MAX_REGEX_BYTES: usize = 2 * 1024 * 1024;
 
 /// The index sweeps dead entries once it holds this many, and after that

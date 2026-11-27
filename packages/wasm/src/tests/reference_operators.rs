@@ -260,7 +260,8 @@ fn moving_or_removing_an_endpoint_moves_the_span_edge_as_excel_does() {
     assert_eq!(source(&store, 0).as_deref(), Some("=SUM(Middle:First!A1)"));
     assert_close(number(&store, summary, 0, 0), 11.0);
 
-    // Removing every sheet of a span leaves #REF!.
+    // Removing every sheet of a span leaves #REF!: `Middle:Middle` loses its
+    // only sheet, while `Middle:First` keeps `First`.
     assert!(store.remove_sheet(middle));
     assert_eq!(source(&store, 0).as_deref(), Some("=SUM(First:First!A1)"));
     assert_close(number(&store, summary, 0, 0), 1.0);

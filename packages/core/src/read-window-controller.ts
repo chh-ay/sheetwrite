@@ -142,7 +142,11 @@ export class ReadWindowController {
     this.bind_memory_release();
   }
 
-  /** A replacement has a new engine and must not retain the old window or listener. */
+  /**
+   * Prepare for a replacement document, which has a new engine: drop every
+   * window, pin and value pool read from the previous engine, and bind the
+   * memory-release listener again.
+   */
   resetDocument(): void {
     this.stop_memory_release?.();
     this.cancel_frame();

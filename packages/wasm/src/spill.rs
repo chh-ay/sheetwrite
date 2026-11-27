@@ -19,7 +19,9 @@ use crate::types::{CellKey, FormulaError, KIND_EMPTY};
 
 pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
 const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
-// Includes installed-owner metadata and its source-independent scalar overlay.
+// Bytes charged per owned cell: its share of the ownership metadata and its
+// calculated value. At this size, `MAX_SPILL_OWNER_CELLS` cells stay under
+// `MAX_SPILL_OWNER_BYTES`, so the cell limit is the one that applies.
 const SPILL_OWNER_ENTRY_BYTES: usize = 64;
 
 pub(crate) fn spill_ownership_within_budget(owner_cells: usize) -> bool {
@@ -236,14 +238,15 @@ struct ColumnRuns {
     runs: Vec<OwnedRun>,
 }
 
-/// Vacated runs a sheet keeps beyond its live ones before
-/// [`OwnerRuns::drop_vacant_runs`] drops them.
+/// Vacated runs a sheet may always keep. Past this count,
+/// [`OwnerRuns::drop_vacant_runs`] drops them once they also outnumber the
+/// live runs.
 const VACANT_RUN_SLACK: usize = 64;
 
 /// The cells installed spills own, by column (sorted, only columns that hold
 /// runs): runs sorted by row that never overlap. A cell belongs to the live
 /// run that covers it; a cell a source write detached is cut out of its run.
-/// One run per column of a spill replaces one map entry per cell.
+/// One run per column of a spill costs far less than one map entry per cell.
 #[derive(Debug, Default)]
 struct OwnerRuns {
     columns: Vec<ColumnRuns>,
@@ -318,8 +321,6 @@ impl OwnerRuns {
         self.owned_cells += run.rows();
     }
 
-    /// Marks the runs of `anchor` in column `col` between `row_start` and
-    /// `row_end` vacant.
     /// The runs of column `col` that meet rows `row_start..=row_end`.
     fn runs_meeting(&self, col: u32, row_start: u32, row_end: u32) -> &[OwnedRun] {
         let Some(column) = self.runs(col) else {
@@ -339,6 +340,8 @@ impl OwnerRuns {
         })
     }
 
+    /// Marks the runs of `anchor` in column `col` that meet rows
+    /// `row_start..=row_end` vacant.
     fn vacate(&mut self, col: u32, anchor: CellKey, row_start: u32, row_end: u32) {
         let Some(column) = runs_mut(&mut self.columns, col) else {
             return;
@@ -394,7 +397,8 @@ impl OwnerRuns {
         column.splice(first..last, kept);
     }
 
-    /// Drops vacated runs once they outnumber the live ones by the slack.
+    /// Drops every vacated run once there are more than `VACANT_RUN_SLACK`
+    /// of them and more than the live runs.
     fn drop_vacant_runs(&mut self) {
         if self.vacant_runs > VACANT_RUN_SLACK && self.vacant_runs > self.live_runs() {
             for column in &mut self.columns {
@@ -431,7 +435,8 @@ pub(crate) struct SpillState {
     /// the first installed spill, so a sheet without spills keeps one
     /// pointer.
     owners: Option<Box<OwnerRuns>>,
-    /// Host-owned merge/protection cells that a spill must never overwrite.
+    /// Host-owned rectangles that a spill must never cover: merges, protected
+    /// ranges and validation ranges.
     blockers: Vec<SpillBlocker>,
 }
 
@@ -840,10 +845,10 @@ impl SpillState {
     /// `offset` is its row-major position in the range. The anchor's own value
     /// is the formula result and is stored by the caller. Returns the
     /// non-anchor cells written.
-    // Inlined into the recalculation pass, where develop had it. Left to
-    // LLVM, `install` became its own WASM function once `reinstall` existed,
-    // and a first install of 100,000 cells ran up to 15% slower on Linux
-    // (spill-sequence-admission) with identical native instruction counts.
+    // Always inlined into the recalculation pass. Left to LLVM, `install`
+    // becomes its own WASM function next to `reinstall`, and a first install
+    // of 100,000 cells then ran up to 15% slower on Linux (benchmark
+    // spill-sequence-admission), with the same native instruction count.
     #[inline(always)]
     pub(crate) fn install(
         &mut self,

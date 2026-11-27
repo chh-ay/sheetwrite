@@ -16,7 +16,11 @@ export const xlsxImportCommand: RibbonButtonSpec = {
   run: (grid) => grid.actions.importXlsx(),
 };
 
-/** A loader that ignores cancellation must not retain the caller's pending operation. */
+/**
+ * The workbook `source` gives. An abort rejects at once with `signal.reason`,
+ * even when the loader ignores the signal, so a loader that never settles
+ * does not hold the caller's operation.
+ */
 export async function loadWorkbook(
   source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
   signal: AbortSignal,
@@ -79,9 +83,11 @@ export async function pickXlsxWorkbook(
 }
 
 /**
- * Export is cold document work; replacement and destruction both cancel it.
- * The grid checks that the active sheet is complete before it loads this
- * module, so this lazy module does not import the store and its dependencies.
+ * Write the grid's workbook, with its active sheet, through `toXlsxTable`
+ * and download the file. Export is rare document work: the grid loads this
+ * module on first use and runs it in `run`, which replacing the document or
+ * destroying the grid cancels. The grid checks that the active sheet is
+ * complete before it loads this module.
  */
 export async function exportWorkbookFile(
   grid: Pick<Grid, "store" | "getActiveSheet">,

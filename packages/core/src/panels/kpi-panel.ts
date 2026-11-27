@@ -1,5 +1,5 @@
 // Insert › Dashboard › KPI Card: choose a data model measure. The card shows
-// its value in the filter context of the dashboard's slicers (#231).
+// its value in the filter context of the dashboard's slicers.
 
 import { firstFreeBox } from "../dashboard/dashboard-layout.js";
 import type { SheetId } from "../types/coordinates.js";

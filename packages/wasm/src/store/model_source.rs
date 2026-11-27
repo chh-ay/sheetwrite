@@ -2,8 +2,8 @@
 //!
 //! Relationships are followed from the many side to the one side. Each hop
 //! that a field uses builds a sorted key index once and maps every parent row
-//! through it. The index and maps live for one cache build; nothing is kept
-//! between recomputes.
+//! through it. The index is freed once its map is built, and the maps live
+//! only as long as the source; nothing is kept between recomputes.
 
 use super::pivots::SourceRect;
 use super::relationships::{ColumnRef, KeyColumn, Relationship, RelationshipError};
@@ -141,8 +141,9 @@ const fn model_error(error: RelationshipError) -> FormulaError {
 /// from, and the relationship of that last hop (`None` for the base).
 pub(super) type Route<'a> = (&'a str, usize, Option<&'a Relationship>);
 
-/// Breadth-first over many-to-one relationships from `base`. Core admits no
-/// cycle, so each reachable table has exactly one route; route 0 is `base`.
+/// Breadth-first over many-to-one relationships from `base`. Each reachable
+/// table gets one route, the first the search finds, even where two paths
+/// lead to it. Route 0 is `base`.
 pub(super) fn model_routes<'a>(store: &'a CellStore, base: &'a str) -> Vec<Route<'a>> {
     let relationships = store
         .relationships

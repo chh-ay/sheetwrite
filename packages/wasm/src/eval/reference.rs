@@ -649,9 +649,9 @@ fn r1c1_axis(text: &str, origin: u32, limit: usize) -> Result<u32, FormulaError>
 }
 
 impl CellStore {
-    /// `OFFSET`, `INDIRECT`, reference operators, `CHOOSE`, `ROW(S)`,
-    /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
-    /// out-of-line `*_family` handlers.
+    /// `OFFSET`, `INDIRECT`, the reference operators, `AREAS`, `CHOOSE`,
+    /// `ROW(S)`, `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families
+    /// live in out-of-line `*_family` handlers.
     #[inline(never)]
     #[allow(
         clippy::wildcard_enum_match_arm,

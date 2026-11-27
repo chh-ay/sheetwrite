@@ -1,6 +1,8 @@
-//! Functions that describe a referenced cell instead of computing with its
-//! value: FORMULATEXT, ISFORMULA and CELL, plus HYPERLINK, which returns its
-//! display value.
+//! Information functions: the `IS*` tests, TYPE, N, T, ERROR.TYPE,
+//! ISNONTEXT, ISREF, FORMULATEXT, ISFORMULA, CELL, INFO, SHEET and SHEETS,
+//! plus HYPERLINK, which returns its display value. FORMULATEXT, ISFORMULA,
+//! CELL and ISREF describe a referenced cell instead of computing with its
+//! value.
 
 use super::matrix::{optional_ast, range_from_ast};
 use super::{address_text, current_formula_origin, EvalPass};

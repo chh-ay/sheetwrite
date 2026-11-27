@@ -346,8 +346,8 @@ export type DataValidationComparison =
 /**
  * Serializable condition enforced by a data-validation rule.
  *
- * `min` and `max` remain inclusive legacy bounds. Use `comparison` when the
- * operator itself is significant; comparison and legacy bounds are mutually exclusive.
+ * `min` and `max` are inclusive bounds. Use `comparison` when the operator
+ * itself is significant; a condition takes `comparison` or `min`/`max`, not both.
  * Formulas (`source`, `formula`, formula operands) are relative to the
  * top-left cell of the rule's range, as in Excel.
  */
@@ -462,7 +462,7 @@ export type CommitReason =
   | "edit-tab"
   | "edit-programmatic"
   | "paste"
-  /** No longer emitted: a cut changes nothing, and its paste commits as `"paste"`. */
+  /** Never emitted: a cut changes nothing, and its paste commits as `"paste"`. */
   | "cut"
   | "clear"
   | "fill"
@@ -778,7 +778,7 @@ export interface XlsxSourceSnapshot {
 
 /** Schema-versioned serializable workbook document. */
 export interface WorkbookSnapshot {
-  /** Format version of the snapshot; always `1` today. */
+  /** Format version of the snapshot; always `1`. */
   schemaVersion: 1;
   /** ID of the document in your storage, kept through sync and persistence. */
   documentId?: string;
