@@ -242,6 +242,14 @@ shared Joined = let
     Merged = Table.Join(Typed, {"Region"}, Files, {"Name"}, JoinKind.Inner)
 in
     Merged;
+
+shared Unfiltered = let
+    Source = Excel.CurrentWorkbook(){[Name="Keys"]}[Content],
+    Typed = Table.TransformColumnTypes(Source, {{"Amount", type number}}),
+    Positive = Table.SelectRows(Typed, each [Amount] > 0),
+    Merged = Table.RemoveColumns(Table.Sort(Table.Join(Table.AddIndexColumn(Typed, "Sheetwrite.LeftRow", 0, 1), {"Amount"}, Table.AddIndexColumn(Orders, "Sheetwrite.RightRow", 0, 1), {"Total"}, JoinKind.Inner), {{"Amount", Order.Ascending}}), {"Sheetwrite.LeftRow", "Sheetwrite.RightRow"})
+in
+    Merged;
 "#;
 
 #[test]
@@ -298,6 +306,7 @@ fn workbook_queries_from_m_documentation_forms_import() {
         vec![
             ("Files", "source", "Folder.Files"),
             ("Lambda", "syntax", "syntax"),
+            ("Unfiltered", "step", "Table.Join"),
             ("Joined", "dependency", ""),
         ]
     );

@@ -624,8 +624,9 @@ impl Builder<'_> {
         Ok(())
     }
 
-    /// The emitter's join: remove-helpers(sort(join(add-index(left), add-index(right)))).
-    fn helper_join(&mut self, sorted: &Expr) -> Outcome<()> {
+    /// The emitter's join: remove-helpers(sort(join(add-index(left), add-index(right)))). The
+    /// left input must be the previous binding, as for a plain `Table.Join`.
+    fn helper_join(&mut self, sorted: &Expr, previous: &str) -> Outcome<()> {
         let Some([joined, _order]) = call(sorted, "Table.Sort") else {
             return fail("step", "Table.RemoveColumns");
         };
@@ -638,7 +639,11 @@ impl Builder<'_> {
                 _ => fail("step", "Table.AddIndexColumn"),
             }
         };
-        let _left = unwrap(left, LEFT_ROW)?;
+        let left_input = unwrap(left, LEFT_ROW)?;
+        if !matches!(&left_input, Expr::Identifier(name) if name == previous) {
+            return fail("step", "Table.Join");
+        }
+
         let right_input = unwrap(right, RIGHT_ROW)?;
 
         self.join(left_keys, &right_input, right_keys, kind)
@@ -805,7 +810,7 @@ impl Builder<'_> {
                 self.select(&names_of(names)?)
             }
             ("Table.RemoveColumns", [sorted, _]) if call(sorted, "Table.Sort").is_some() => {
-                self.helper_join(sorted)
+                self.helper_join(sorted, previous)
             }
             ("Table.RemoveColumns", [input, names]) if input_is_previous(input) => {
                 self.remove(&names_of(names)?)
