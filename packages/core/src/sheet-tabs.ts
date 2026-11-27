@@ -773,7 +773,8 @@ export class SheetTabs {
     choices.setAttribute("role", "group");
     choices.setAttribute("aria-label", "Hidden sheets");
     choices.hidden = true;
-    // As in the sheet menu, keep focus where it is.
+    // WebKit does not focus a pressed button, so a press would move focus out
+    // of the menu and close it before the click; keep focus where it is.
     choices.addEventListener("mousedown", (event) => event.preventDefault());
     const close = (restore_focus: boolean): void => {
       if (typeof choices.hidePopover === "function") {
