@@ -12,10 +12,8 @@
 //! scalar binding's use as a scalar, which is what it sees through the
 //! expansion too: such a binding is never a range, a reference or an array.
 //! A function call qualifies only when no shape check looks inside it
-//! ([`call_has_scalar_result`]): those checks see through `INTERSECT`, the
-//! array functions, `INDEX`, `CHOOSE`, `OFFSET`, `INDIRECT` and spill
-//! references, and take the scalar path for every other call. So results do
-//! not depend on which path a LET takes.
+//! ([`call_has_scalar_result`]). So results do not depend on which path a LET
+//! takes.
 
 use std::ptr;
 
@@ -430,8 +428,7 @@ impl LetFrame {
 impl CellStore {
     /// Evaluates a LET whose names were resolved to slots when the formula
     /// was entered: binds each slot to its expression in the original tree,
-    /// then evaluates the result expression. A binding is evaluated on its
-    /// first use, as the expansion does.
+    /// then evaluates the result expression.
     #[inline(never)]
     pub(super) fn eval_let_family(
         &self,
@@ -583,7 +580,8 @@ mod tests {
         "=LET(k,LEN(B1),ROWS(A1:A3)+k)",
     ];
 
-    /// Values of `formula` in D1 of a small sheet, before and after an edit.
+    /// The cells D1:D3 of a small sheet that holds `formula` in D1, before
+    /// and after an edit.
     fn evaluate(formula: &str, resolve: bool) -> Vec<String> {
         RESOLVE_LET_NAMES.with(|cell| cell.set(resolve));
         let mut store = CellStore::new();

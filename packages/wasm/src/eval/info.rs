@@ -292,7 +292,8 @@ impl CellStore {
     }
 
     /// SHEETS([reference]): every sheet of the workbook, or the sheets a
-    /// reference covers. A value that is not a reference is `#REF!`.
+    /// reference covers. A value that is not a reference is `#REF!`, after
+    /// its own error.
     fn sheet_count(
         &self,
         args: &[Ast],

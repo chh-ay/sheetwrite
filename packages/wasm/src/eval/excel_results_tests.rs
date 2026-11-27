@@ -164,9 +164,7 @@ fn engineering_functions() {
     ]);
 }
 
-/// The IM function examples, parsed text forms and errors. Published
-/// results with 15 significant digits can differ in the last digit with the
-/// order of operations, so they match to 1E-13 of their size.
+/// The IM function examples, parsed text forms and errors.
 #[cfg(feature = "analysis")]
 #[allow(clippy::too_many_lines, reason = "one table of formula cases")]
 #[test]
@@ -261,7 +259,9 @@ fn complex_functions() {
         ("IMSQRT(\"1+i\")", "1.09868411346781+0.455089860562227i"),
         ("IMTAN(\"4+3i\")", "0.00490825806749606+1.00070953606723i"),
     ];
-    // Each part within 1E-13 of its own size, as the published digits allow.
+    // Published results with 15 significant digits can differ in the last
+    // digit with the order of operations, so each part matches to 1E-13 of
+    // its own size.
     let cases: Vec<(String, &str)> = rounded
         .iter()
         .flat_map(|(call, published)| {
@@ -2733,8 +2733,7 @@ fn functions_that_take_one_value_run_once_for_each_element() {
 }
 
 /// A call decides whether it can lift when the formula is entered. A name
-/// that the formula reads before it is defined can still become a range,
-/// so the call lifts once the name is defined.
+/// that the formula reads before it is defined can still become a range.
 #[test]
 fn a_name_defined_after_the_formula_still_lifts_the_call() {
     let (mut store, report) = data_workbook(2, 4);
@@ -2747,9 +2746,8 @@ fn a_name_defined_after_the_formula_still_lifts_the_call() {
     assert_eq!(shown_cells, ["1", "0", "1"]);
 }
 
-/// A scalar condition evaluates only the branch it takes: the SEQUENCE in
-/// the untaken branch builds no array. The second formula takes that branch
-/// and shows that the count sees it.
+/// The SEQUENCE in the untaken branch builds no array. The second formula
+/// takes that branch and shows that the count sees it.
 #[test]
 fn a_scalar_condition_evaluates_only_the_branch_it_takes() {
     let result_and_arrays_built = |formula: &str| {
