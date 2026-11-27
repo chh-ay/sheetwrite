@@ -161,7 +161,7 @@ export function openKpiPanel(grid: Grid): void {
   grid.openPanel({ ...panel, render: (body) => track_open(state, open, panel.render(body)) });
 }
 
-/** Data › Custom Sort. */
+/** Data › Custom Sort: the Sort panel for the selection or the current region. */
 export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
   // loads on first open instead of with every grid.

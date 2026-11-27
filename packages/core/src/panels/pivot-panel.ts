@@ -92,6 +92,7 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
 
   let drag: DragState | null = null;
   let message: string | null = null;
+  // The value field whose number format form is open.
   let formatting: number | null = null;
   /** Definition, data model and message the panel was built from, as JSON. */
   let rendered_structure = "";
