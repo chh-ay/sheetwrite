@@ -24,7 +24,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
+use crate::calc::{parse_a1, sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{CellRange, EvalResult, FormulaError, Value};
@@ -541,6 +541,18 @@ impl CellStore {
             };
             &converted
         };
+        // A plain cell address, the usual INDIRECT text, is the cell the
+        // formula parse below would find, without the parse.
+        if let Some((target_row, target_col, _)) = parse_a1(source) {
+            let formula_sheet = self.name_scope(sheet).sheet;
+            return Ok(CellRange::new(
+                formula_sheet,
+                target_row,
+                target_col,
+                target_row,
+                target_col,
+            ));
+        }
         let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(source, sheet as u32, row, col);
         entry
