@@ -14,17 +14,18 @@ import {
 import forcedLayoutPage from "./forced-layout-bench.html";
 import { median } from "./stats.js";
 
-// Forced style and layout gate in Chromium (#625). Each action runs in a fresh
-// page. Five actions are user input followed by the frames that paint it: a
-// scroll step that moves the painted window, an arrow key, opening the cell
-// editor, an edit commit (open, type, Enter), and a scroll step while the
-// editor is open. Three more repeat the render benchmark's timed loop, where
-// `grid.refresh()` paints and the steps run back to back with no frame between
-// them: scroll, arrow key and edit commit. Two User Timing marks bracket each
-// step. A style recalculation (`UpdateLayoutTree`) or a `Layout` that runs
-// inside script is forced: script asked for a style or a geometry while the DOM
-// had unapplied writes. The browser's own frame update runs outside script and
-// is reported, not gated.
+// Forced style and layout gate in Chromium. Each action runs in a fresh page.
+// Seven actions are user input followed by the frames that paint it: a scroll
+// step that moves the painted window, an arrow key, opening the cell editor,
+// an edit commit (open, type, Enter), a scroll step while the editor is open,
+// and two that type one character per step, into the open cell editor or into
+// a formula bar beside the grid. Three more repeat the render benchmark's timed
+// loop, where `grid.refresh()` paints and the steps run back to back with no
+// frame between them: scroll, arrow key and edit commit. Two User Timing marks
+// bracket each step. A style recalculation (`UpdateLayoutTree`) or a `Layout`
+// that runs inside script is forced: script asked for a style or a geometry
+// while the DOM had unapplied writes. The browser's own frame update runs
+// outside script and is reported, not gated.
 //
 //   bun bench/src/forced-layout-bench.ts [--runs 3] [--warmups 10] [--steps 40] [--output file.json]
 
@@ -59,7 +60,7 @@ const LAYOUT_EVENT = "Layout";
  * step, into the open cell editor or into a formula bar beside the grid; they
  * hold what sizing the typed field needs. The `-refresh` rows keep the mirror: a
  * synchronous `grid.refresh()` writes it in the same task, as assistive
- * technology expects, so the next step's scroll read lays it out (#625).
+ * technology expects, so the next step's scroll read lays it out.
  */
 const FORCED_LAYOUT_CEILINGS: Readonly<Record<ForcedLayoutAction, number>> = {
   scroll: 0,
