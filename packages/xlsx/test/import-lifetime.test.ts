@@ -55,10 +55,8 @@ async function run_probe(bytes: Uint8Array): Promise<ProbeReport> {
   return JSON.parse(stdout.trim()) as ProbeReport;
 }
 
-// Objects held by other suites in the shared `bun test` process can keep a
-// referent alive, and an export in the same process would optimize the import's
-// code before it runs, so each import runs first in a fresh process
-// (import-lifetime-probe.ts).
+// An export in the same process would optimize the import's code before it
+// runs, so each import runs first in a fresh process (import-lifetime-probe.ts).
 it("frees an imported workbook once the caller drops it", async () => {
   const workbook = book(Array.from({ length: SHEETS }, (_unused, index) => numbered_sheet(index)));
   const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(workbook);

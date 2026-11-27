@@ -126,7 +126,6 @@ export function mountDashboardView(grid: Grid, viewport: HTMLElement): Dashboard
   let mode: KeyboardMode | null = null;
   let message: string | null = null;
   let rendered = "";
-  // A read-only viewer's slicer selections: they filter this view only, not the document.
   const overrides = slicerOverridesOf(grid.store);
   // Slicers filter the dashboard pivots that the engine computes; the saved definitions keep theirs.
   const filter_pivots = (dashboards: readonly SheetId[]): void => {

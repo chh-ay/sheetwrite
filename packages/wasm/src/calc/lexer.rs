@@ -171,7 +171,6 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
 /// short whole numbers, and the decimal parser costs several times more.
 const EXACT_INTEGER_DIGITS: usize = 15;
 
-/// The token of one ASCII punctuation byte, or `None` for any other byte.
 const fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
     Some(match byte {
         b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => Tok::Op(byte as char),
@@ -348,7 +347,7 @@ fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
 /// The section and column name of a table reference.
 type StructuredParts<'a> = (TableSection, &'a str);
 
-/// The section and column name of a `[...]` table reference token.
+/// Splits a `[...]` table reference token.
 pub(super) fn structured_parts(raw: &str) -> Result<StructuredParts<'_>, String> {
     if !raw.starts_with('[') || !raw.ends_with(']') {
         return Err("This table reference is not valid.".into());

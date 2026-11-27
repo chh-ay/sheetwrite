@@ -863,12 +863,13 @@ pub(crate) struct FormulaResults {
 struct PassScratch {
     /// LET slot values and resolved bindings.
     let_frame: crate::eval::LetFrame,
-    /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
     regexes: PassRegexes,
     /// LAMBDA parameter values of the calls in progress.
     #[cfg(feature = "analysis")]
     call_frame: crate::eval::analysis::lambda::CallFrame,
+    /// Sorted numbers of the literal ranges LARGE, SMALL and RANK.EQ share.
+    ordered_ranges: crate::eval::OrderedRanges,
 }
 
 /// Compiled regex programs one pass keeps at once. Formulas that alternate
@@ -1063,9 +1064,27 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
-    /// The search states of lookup ranges in this pass.
     pub(crate) fn lookup_states(&mut self) -> &mut crate::eval::LookupStates {
         &mut self.lookups
+    }
+
+    /// The sorted numbers this pass keeps for range group `group`.
+    pub(crate) fn ordered_range(&self, group: usize) -> Option<crate::eval::OrderedRange> {
+        self.scratch.as_deref()?.ordered_ranges.get(group)
+    }
+
+    /// Keeps the sorted numbers of range group `group` for the rest of the
+    /// pass; `groups` is the index's group count.
+    pub(crate) fn share_ordered_range(
+        &mut self,
+        group: usize,
+        groups: usize,
+        sorted: crate::eval::OrderedRange,
+    ) {
+        self.scratch
+            .get_or_insert_with(Box::default)
+            .ordered_ranges
+            .insert(group, groups, sorted);
     }
 
     /// The program this pass compiled for exactly `pattern` in this case mode.

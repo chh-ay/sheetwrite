@@ -33,7 +33,6 @@ enum Group {
     Speed,
 }
 
-/// The prefixes a unit accepts.
 #[derive(Clone, Copy)]
 enum Prefixes {
     None,
@@ -61,7 +60,7 @@ const PICA_POINT: f64 = INCH / 72.0;
 const LIGHT_YEAR: f64 = 9_460_730_472_580_800.0;
 /// 648000 / pi astronomical units of 149,597,870,700 m.
 const PARSEC: f64 = 3.085_677_581_491_367e16;
-/// 1200 / 3937 m.
+/// The U.S. survey foot, in metres.
 const SURVEY_FOOT: f64 = 1_200.0 / 3_937.0;
 const POUND_GRAMS: f64 = 453.592_37;
 const STANDARD_GRAVITY: f64 = 9.806_65;

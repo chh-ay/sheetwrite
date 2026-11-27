@@ -236,7 +236,6 @@ pub(crate) struct ShapeScope<'a> {
     kinds: &'a [Kind<'a>],
     /// Where the called LAMBDA was created.
     outer: Shapes<'a>,
-    /// The LAMBDA called.
     callee: &'a LambdaDefinition,
     /// The call whose body holds this call, while its shape is decided.
     caller: Option<&'a Self>,
@@ -266,7 +265,6 @@ impl<'a> Shapes<'a> {
         }
     }
 
-    /// The defined names the checked formula reads.
     pub(crate) const fn names(self) -> NameScope<'a> {
         self.names
     }
@@ -550,7 +548,6 @@ pub(crate) fn parameter_count(
     definition(expression, names).map(|shared| shared.parameters.len())
 }
 
-/// The value a parameter use reads.
 pub(crate) fn parameter_value(
     store: &CellStore,
     frame: Option<&CallFrame>,
@@ -1141,7 +1138,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(callee)
     }
 
-    /// A call's value as a scalar.
     fn call_value(&mut self, arguments: &[Ast]) -> Result<Value, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let value = self.scalar(&callee.definition.body);
@@ -1149,7 +1145,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(value)
     }
 
-    /// A call's value as an array.
     fn call_matrix(&mut self, arguments: &[Ast]) -> Result<EvalMatrix, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let matrix = self.matrix(&callee.definition.body);

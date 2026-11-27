@@ -185,8 +185,6 @@ fn pick_switch(count: usize, mut element: impl FnMut(usize) -> Value) -> Pick {
     }
 }
 
-/// A lifted call: its rule, its arguments, and the sheet and depth it is
-/// evaluated at.
 #[derive(Clone, Copy)]
 struct LiftedCall<'a> {
     kind: Branching,

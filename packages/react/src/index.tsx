@@ -101,7 +101,6 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   fill?: true;
 }
 
-/** Advanced framework component for workbook data or datasource input. */
 const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
   function SheetwriteGrid(props, ref): ReactElement {
     const {

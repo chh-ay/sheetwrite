@@ -6,7 +6,6 @@ import type {
   XlsxWorkbookBackend,
 } from "@sheetwrite/core";
 
-/** Loads the codec chunk. */
 function import_codec() {
   return import("./codec.js");
 }

@@ -262,7 +262,6 @@ struct Reference {
     /// The cell, spill (`A1#`) or range of a cell, range or 3-D reference,
     /// without its sheet qualifier. A table reference and `#REF!` have none.
     ast: Option<Ast>,
-    /// Whether a sheet name qualifies the reference.
     qualified: bool,
     /// Byte offset of the reference, with its sheet or workbook qualifier.
     start: usize,

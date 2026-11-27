@@ -43,7 +43,6 @@ export const DEVELOPMENT_SETS: readonly ReplaySetName[] = [
   "enron-dev2",
 ];
 
-/** One replay set's name. */
 export type ReplaySetName = (typeof REPLAY_SETS)[number];
 
 /** A sheet of `rows` by `cols` with `cells` in one block. */

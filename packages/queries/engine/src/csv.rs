@@ -36,7 +36,6 @@ impl Record {
         self.text.get(start..*self.ends.get(index)?)
     }
 
-    /// Yields fields in record order.
     pub(crate) fn fields(&self) -> impl Iterator<Item = &str> {
         (0..self.len()).filter_map(|index| self.field(index))
     }

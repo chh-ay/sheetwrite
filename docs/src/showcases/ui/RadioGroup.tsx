@@ -6,7 +6,6 @@ export interface RadioOption<Value extends string> {
   readonly label: string;
 }
 
-/** Props of {@link RadioGroup}. */
 export interface RadioGroupProps<Value extends string> {
   readonly label: string;
   readonly options: readonly RadioOption<Value>[];

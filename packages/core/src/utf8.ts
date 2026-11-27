@@ -14,7 +14,6 @@ const TWO_BYTE_CODE_POINT = 2;
 const THREE_BYTE_CODE_POINT = 3;
 /** UTF-8 bytes of a code point outside the Basic Multilingual Plane, written as a surrogate pair. */
 const SURROGATE_PAIR_BYTES = 4;
-/** UTF-16 code units of a surrogate pair. */
 const SURROGATE_PAIR_UNITS = 2;
 
 /**

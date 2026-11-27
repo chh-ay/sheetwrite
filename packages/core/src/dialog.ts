@@ -38,7 +38,6 @@ interface DialogOptions {
   readonly accept?: (value: string) => boolean;
 }
 
-/** An open dialog. */
 interface Dialog {
   readonly element: HTMLElement;
   /** Resolves once the dialog closes, with the chosen button's value or `cancel`. */

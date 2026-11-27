@@ -587,7 +587,7 @@ it("applies Column.headerStyle, contrasting a label with its own fill", () => {
   expect(bg && { x: bg.x, w: bg.w, h: bg.h }).toEqual({ x: 100, w: 80, h: HEADER_HEIGHT });
 });
 
-// Excel paints a number in its format section's color, over the cell's font color.
+// As Excel does.
 it("paints a number in its section's color, over the font color", () => {
   const styles: CellStyle[] = [
     { numberFormat: "#,##0;[Red]-#,##0" },

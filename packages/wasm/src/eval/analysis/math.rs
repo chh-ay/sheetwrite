@@ -53,8 +53,8 @@ pub(super) const fn value_args(function: Function) -> ValueArgs {
     }
 }
 
-/// Functions whose arguments are number lists: a single-cell argument is a
-/// reference, so text and logical values in that cell are ignored.
+/// Functions whose arguments are number lists. See
+/// [`super::Family::reference_cells`] for what this changes.
 pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
     matches!(function, Function::MULTINOMIAL | Function::SUMSQ)
 }
@@ -383,12 +383,12 @@ fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
     }
 }
 
-/// The whole, nonnegative item count and chosen count of COMBIN, COMBINA,
-/// PERMUT and PERMUTATIONA.
+/// The item count and the chosen count of COMBIN, COMBINA, PERMUT and
+/// PERMUTATIONA.
 type Choice = (f64, f64);
 
-/// The [`Choice`] arguments of COMBIN, COMBINA, PERMUT and PERMUTATIONA.
-/// Each is whole and nonnegative.
+/// Reads the [`Choice`] arguments. Each one is truncated, and a negative one
+/// is `#NUM!`.
 fn choice_counts(values: &FuncAccumulator) -> Result<Choice, FormulaError> {
     require_arity(values, 2, 2)?;
     let total = number_arg(values, 0, None)?.trunc();

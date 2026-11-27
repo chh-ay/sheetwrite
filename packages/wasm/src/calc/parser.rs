@@ -715,7 +715,6 @@ pub(crate) fn is_external_sheet(name: &str) -> bool {
     name.contains(']')
 }
 
-/// The error for a token after a complete formula.
 fn trailing_token_error(tok: &Tok<'_>) -> String {
     if matches!(tok, Tok::RParen) {
         "This ) has no matching (.".into()
@@ -724,7 +723,7 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
     }
 }
 
-/// Parse a formula source (with or without a leading `=`) into an AST.
+/// The leading `=` is optional.
 pub(crate) fn parse(src: &str) -> Result<Ast, String> {
     parse_with_features(src).map(|(ast, _)| ast)
 }
@@ -759,8 +758,8 @@ fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
     // Only ingest binds references, and only ingest meets long runs of
     // formulas of one shape, so only its parses look for a kept tree.
-    if sheets.is_some() && looks_for_shapes() {
-        return reuse_or_parse(body, || parse_body(body, sheets));
+    if let Some(binding) = sheets.filter(|_| looks_for_shapes()) {
+        return reuse_or_parse(body, binding.resolve, || parse_body(body, sheets));
     }
     parse_body(body, sheets)
 }

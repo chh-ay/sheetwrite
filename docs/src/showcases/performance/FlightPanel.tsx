@@ -50,7 +50,6 @@ export function FlightControls(props: Readonly<{ flight: ScaleFlight; ready: boo
   );
 }
 
-/** Props of {@link FlightReadout}. */
 interface FlightReadoutProps {
   flight: ScaleFlight;
   requests: number;

@@ -90,7 +90,6 @@ function reconcile<T extends Keyed>(
   return next;
 }
 
-/** A node with the role `role`. */
 function node(role: string): HTMLDivElement {
   const el = document.createElement("div");
   el.setAttribute("role", role);

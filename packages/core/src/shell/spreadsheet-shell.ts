@@ -89,7 +89,10 @@ function mount_toolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions
   });
 }
 
-/** The ribbon renders the same commands as the toolbar, which replaces it if its chunk fails. */
+/**
+ * Mount the ribbon. The toolbar shows the same commands, so it takes the
+ * ribbon's place if the ribbon's chunk fails.
+ */
 function mount_ribbon(
   host: HTMLElement,
   grid: Grid,
@@ -157,9 +160,7 @@ function shell_grid_config(config: GridConfig | undefined): GridConfig {
 /**
  * Mount a complete spreadsheet shell into `host`: toolbar row, formula row
  * (name box + formula bar), the grid, and a bottom row with sheet tabs and a
- * selection status. The host must have a real size; the shell fills it. Returns
- * the shell handle; `destroy` tears down every piece, the grid, and the shell
- * DOM, and is safe to call twice.
+ * selection status. The host must have a real size; the shell fills it.
  *
  * @param host - Element the shell is appended to and fills; give it a size.
  * @param options - Options for the grid the shell creates, the toolbar or

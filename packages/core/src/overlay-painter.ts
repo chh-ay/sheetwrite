@@ -253,9 +253,7 @@ export interface OverlayPainterDeps {
   isEditing: () => boolean;
   fillTarget: () => SelRect | null;
   fillHandleScreen: (contentTop: number, scrollLeft: number) => { x: number; y: number } | null;
-  /** The value tip beside the fill handle while it is dragged. */
   fillTip: () => FillTip | null;
-  /** The new cells of the dragged fill handle's fill, which show their values in place. */
   fillValuesArea: () => SelRect | null;
   /** What a cell of `fillValuesArea` will show; null for a formula. */
   fillValueAt: (row: number, col: number) => { text: string; right: boolean } | null;
@@ -265,7 +263,6 @@ export interface OverlayPainterDeps {
   autoFillTarget: () => SelRect | null;
   /** Open Auto Fill Options at a viewport point, below its button. */
   openAutoFillOptions: (clientX: number, clientY: number) => void;
-  /** The host's icon overrides. */
   icons: () => IconOverrides | undefined;
   searchMatches: () => SearchMatchSet;
   searchActive: () => number;

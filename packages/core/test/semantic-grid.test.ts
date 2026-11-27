@@ -136,7 +136,6 @@ it("removes grid DOM when disposing its owned store fails", () => {
 
 it("updates aria-rowcount when rows are inserted", () => {
   const request_frame = globalThis.requestAnimationFrame;
-  // Paint at once, so the test reads the state that the next frame shows.
   globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
     callback(0);
     return 0;
@@ -447,7 +446,6 @@ describe("custom editor canonical lifecycle", () => {
     }
   });
 
-  /** Press `key` on `target`, as a user does. */
   const press = (target: HTMLElement, key: string): void => {
     target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   };

@@ -35,9 +35,24 @@ impl NumberStatistic {
     pub(super) const fn is_paired(self) -> bool {
         matches!(self, Self::Paired(_))
     }
+
+    /// The argument whose range LARGE, SMALL and RANK.EQ may read as the
+    /// sorted numbers of a range shared in the pass.
+    pub(super) const fn ordered_arg(self) -> Option<usize> {
+        match self {
+            Self::Large | Self::Small => Some(0),
+            Self::Rank => Some(1),
+            Self::Median
+            | Self::Mode
+            | Self::Percentile
+            | Self::Quartile
+            | Self::Variance { .. }
+            | Self::GeoMean
+            | Self::Paired(_) => None,
+        }
+    }
 }
 
-/// What a statistical function computes.
 enum Statistic {
     Numbers(NumberStatistic),
     CountBlank,
@@ -54,7 +69,6 @@ enum Statistic {
     },
 }
 
-/// The statistic `func` computes, or `None` for a function of another family.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
@@ -118,7 +132,6 @@ const fn statistic(func: Func) -> Option<Statistic> {
     })
 }
 
-/// The statistic of `func` that reads only numbers, if it is one.
 pub(super) const fn number_statistic(func: Func) -> Option<NumberStatistic> {
     match statistic(func) {
         Some(Statistic::Numbers(statistic)) => Some(statistic),
@@ -150,7 +163,6 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
     })
 }
 
-/// `statistic` of `values`.
 pub(super) fn apply_numbers(statistic: NumberStatistic, values: &mut StatisticArgs) -> EvalResult {
     aggregate_result(match statistic {
         NumberStatistic::Median => median(values),
@@ -271,6 +283,13 @@ fn large_small(values: &mut StatisticArgs, ascending: bool) -> Result<f64, Formu
     require_args(values, 2, 2)?;
     values.numbers(0, MAX_SELECTION_VALUES)?;
     let k = usize::try_from(integer_at(values, 1)?).map_err(|_| FormulaError::Num)?;
+    if let Some(sorted) = values.ordered() {
+        if k == 0 || k > sorted.len() {
+            return Err(FormulaError::Num);
+        }
+        let index = if ascending { k - 1 } else { sorted.len() - k };
+        return sorted.get(index).copied().ok_or(FormulaError::Num);
+    }
     let numbers = values.numbers(0, MAX_SELECTION_VALUES)?;
     if k == 0 || k > numbers.len() {
         return Err(FormulaError::Num);
@@ -284,6 +303,10 @@ fn large_small(values: &mut StatisticArgs, ascending: bool) -> Result<f64, Formu
 fn rank_eq(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_args(values, 2, 3)?;
     let target = number_at(values, 0, None)?;
+    if values.ordered().is_some() {
+        values.numbers(1, MAX_SELECTION_VALUES)?;
+        return sorted_rank(values, target);
+    }
     let numbers = values.numbers(1, MAX_SELECTION_VALUES)?;
     if numbers.is_empty() || !numbers.contains(&target) {
         return Err(FormulaError::Na);
@@ -300,6 +323,24 @@ fn rank_eq(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
             }
         })
         .count();
+    Ok((before + 1) as f64)
+}
+
+/// [`rank_eq`] over the sorted numbers of a shared range: the same checks
+/// and count, found by binary search.
+fn sorted_rank(values: &StatisticArgs, target: f64) -> Result<f64, FormulaError> {
+    let sorted = values.ordered().unwrap_or_default();
+    let below = sorted.partition_point(|&value| value < target);
+    let through = sorted.partition_point(|&value| value <= target);
+    if below == through {
+        return Err(FormulaError::Na);
+    }
+    let ascending = number_at(values, 2, Some(0.0))? != 0.0;
+    let before = if ascending {
+        below
+    } else {
+        sorted.len() - through
+    };
     Ok((before + 1) as f64)
 }
 
@@ -485,7 +526,6 @@ fn geomean(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     }
 }
 
-/// The statistic a paired function computes.
 #[derive(Clone, Copy)]
 pub(super) enum PairedKind {
     Correlation,
@@ -493,7 +533,6 @@ pub(super) enum PairedKind {
     PopulationCovariance,
 }
 
-/// The running moments of a paired statistic.
 #[derive(Default)]
 pub(super) struct PairedMoments {
     count: usize,
@@ -549,7 +588,6 @@ pub(super) enum PairedCell {
 }
 
 impl PairedCell {
-    /// The cell holding `value`.
     pub(super) const fn of(value: &Value) -> Self {
         match value {
             Value::Number(number) => Self::Number(*number),

@@ -148,7 +148,10 @@ export function normalizeBindings(bindings: KeyBindings): KeyBindings {
   return normal;
 }
 
-/** `bindings` with `action`'s keys set to `keys`. */
+/**
+ * `bindings` with `action`'s keys set to `keys`, normalized: an empty list
+ * unbinds the action, and an action back at Excel's defaults drops out.
+ */
 export function withKeys(
   bindings: KeyBindings,
   action: KeyboardAction,
@@ -263,7 +266,6 @@ export function matchesQuery(
   return words.every((word) => haystack.includes(word));
 }
 
-/** A key press read as keys. */
 export type PressedKeys =
   /** Only modifiers so far; `label` shows them. */
   | { readonly kind: "pending"; readonly label: string }
@@ -515,7 +517,7 @@ export function keyboardOptions(config: GridConfig | undefined): KeyboardOptions
   return typeof keyboard === "object" ? keyboard : null;
 }
 
-/** `config` with `bindings` as its keyboard bindings. */
+/** `config` with `bindings` in place of its keyboard bindings; its other keyboard options stay. */
 export function withBindings(config: GridConfig | undefined, bindings: KeyBindings): GridConfig {
   return { ...config, keyboard: { ...keyboardOptions(config), bindings } };
 }

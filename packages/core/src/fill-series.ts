@@ -11,7 +11,6 @@ import type { CellScalar } from "./types/cell.js";
 
 /** One source cell in fill order (top→bottom for a vertical fill, left→right for a horizontal one). */
 export interface FillSourceCell {
-  /** Resolved scalar value of the source cell. */
   value: CellScalar;
   /** True when the cell holds a formula; formulas copy (with ref-shift), never extend. */
   isFormula: boolean;

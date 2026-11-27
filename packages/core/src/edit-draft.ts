@@ -32,7 +32,6 @@ export interface EditDraftChannel {
    * because its formula does not parse; the user is told why.
    */
   commit(): boolean;
-  /** Cancel the open cell edit. */
   cancel(): void;
 }
 

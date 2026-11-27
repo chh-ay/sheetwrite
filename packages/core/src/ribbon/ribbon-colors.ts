@@ -18,7 +18,6 @@ const THEME_BASE = [
 /** Excel's rows under the theme colors: lighter by 80/60/40%, darker by 25/50%. */
 const THEME_VARIANTS = [0.8, 0.6, 0.4, -0.25, -0.5] as const;
 
-/** Excel's "Standard Colors" row. */
 export const STANDARD_COLORS: readonly string[] = [
   "#c00000",
   "#ff0000",

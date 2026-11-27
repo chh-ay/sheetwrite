@@ -19,7 +19,11 @@ import type {
 
 /** Most pivots one workbook may hold; each one owns an engine cache. */
 export const MAX_PIVOTS_PER_WORKBOOK = 1_000;
-/** Longest pivot ID. */
+/**
+ * Longest pivot ID. It is longer than the 128 that table, chart and hyperlink
+ * IDs allow because pivot tables shipped with 255 in 0.6.0: a lower bound
+ * would refuse documents saved since then.
+ */
 const MAX_PIVOT_ID_LENGTH = 255;
 /** Longest pivot or value-field caption. */
 const MAX_PIVOT_NAME_LENGTH = 255;
@@ -1004,7 +1008,6 @@ export function applyPivotRewrites(
   }
 }
 
-/** Owner sheet of the pivot with `id`, if any sheet holds it. */
 export function pivotOwner(sheets: readonly Sheet[], id: string): Sheet | undefined {
   return sheets.find((sheet) => sheet.pivots?.some((pivot) => pivot.id === id));
 }

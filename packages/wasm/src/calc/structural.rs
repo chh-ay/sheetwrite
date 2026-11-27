@@ -9,7 +9,6 @@ pub(crate) enum Axis {
 }
 
 impl Axis {
-    /// The rows or columns of a sheet.
     pub(super) const fn len(self) -> u32 {
         match self {
             Self::Row => SHEET_ROWS,

@@ -565,7 +565,7 @@ interface AreaActions {
   formatting(): number | null;
   /** Open the number format form of value field `index`, or close it with null. */
   editFormat(index: number | null): void;
-  /** The panel's signal; an open menu stops listening on the document when it aborts. */
+  /** The panel's signal, for {@link menuButton}. */
   signal: AbortSignal;
 }
 

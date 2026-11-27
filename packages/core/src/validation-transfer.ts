@@ -13,7 +13,6 @@ import type { Range, SheetId } from "./types/coordinates.js";
 import type { DataValidationRule, DocumentOp, Sheet } from "./types/document.js";
 import { mapValidationFormulas } from "./validation-rule.js";
 
-/** A rule's fields without its ID and range. */
 export type ValidationSettings = Omit<DataValidationRule, "id" | "range">;
 
 /**

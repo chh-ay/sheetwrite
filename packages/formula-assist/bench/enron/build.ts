@@ -37,7 +37,6 @@ import {
 import { analyzeFormula } from "@sheetwrite/core/functions";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
-/** Where figshare serves the archive. */
 const ARCHIVE_URL = "https://ndownloader.figshare.com/files/3242531";
 /** MD5 of the archive as figshare lists it. */
 const ARCHIVE_MD5 = "188ec98d04c83a4725d9205cc75ce5a2";

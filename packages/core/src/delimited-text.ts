@@ -142,13 +142,9 @@ export function resolveDelimitedTextResourceLimits(
 
 /** Highest code unit that UTF-8 encodes as a single byte. */
 const ASCII_MAX_CODE_UNIT = 0x7f;
-/** UTF-16 code unit of a double quote. */
 const QUOTE_CODE_UNIT = 0x22;
-/** UTF-16 code unit of a carriage return. */
 const CARRIAGE_RETURN_CODE_UNIT = 0x0d;
-/** UTF-16 code unit of a line feed. */
 const LINE_FEED_CODE_UNIT = 0x0a;
-/** UTF-16 code unit of a leading byte-order mark. */
 const BOM_CODE_UNIT = 0xfeff;
 /** Records scanned or encoded between two abort checks; never one check per field. */
 const ABORT_CHECK_RECORDS = 1024;

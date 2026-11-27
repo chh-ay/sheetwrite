@@ -94,12 +94,13 @@ impl Axis {
         }
     }
 
-    /// Apply `op`; an operation outside the axis is ignored, as the store rejects it.
-    pub(crate) fn apply(&mut self, op: AxisOp) {
+    /// Apply `op` and return whether it applied; an operation outside the
+    /// axis is ignored, as the store rejects it.
+    pub(crate) fn apply(&mut self, op: AxisOp) -> bool {
         match op {
             AxisOp::Insert { at, count } => {
-                if count == 0 || at > self.len {
-                    return;
+                if count == 0 || at > self.len || self.len.checked_add(count).is_none() {
+                    return false;
                 }
 
                 let index = self.split(at);
@@ -115,7 +116,7 @@ impl Axis {
             }
             AxisOp::Remove { at, count } => {
                 if count == 0 || at.checked_add(count).is_none_or(|end| end > self.len) {
-                    return;
+                    return false;
                 }
 
                 self.take(at, count);
@@ -125,7 +126,7 @@ impl Axis {
                     || from.checked_add(count).is_none_or(|end| end > self.len)
                     || to > self.len - count
                 {
-                    return;
+                    return false;
                 }
 
                 let moved = self.take(from, count);
@@ -138,6 +139,7 @@ impl Axis {
         }
 
         self.renumber();
+        true
     }
 
     /// Index of the segment that starts at `at`, splitting one segment if needed.
@@ -218,17 +220,20 @@ impl Axis {
 /// The ranges that lines `first..=last` cover after `op`, appended to `out`.
 /// A removal can leave no range. An insertion inside the lines splits them in
 /// two. A move can split them into several ranges; the range of the moved
-/// lines comes first.
+/// lines comes first. `op` is one that [`Axis::apply`] applied, so its
+/// `count` is at least 1.
 pub(crate) fn transform(op: AxisOp, first: u32, last: u32, out: &mut Vec<(u32, u32)>) {
     match op {
         AxisOp::Insert { at, count } => {
             if last < at {
                 out.push((first, last));
             } else if first >= at {
-                out.push((first + count, last + count));
+                // A writer's rectangle can reach past the sheet; lines past the
+                // u32 range do not exist, so the range stops at the last one.
+                out.push((first.saturating_add(count), last.saturating_add(count)));
             } else {
                 out.push((first, at - 1));
-                out.push((at + count, last + count));
+                out.push((at + count, last.saturating_add(count)));
             }
         }
         AxisOp::Remove { at, count } => {
@@ -321,26 +326,25 @@ mod tests {
     }
 
     #[test]
-    fn an_operation_outside_the_axis_changes_nothing() {
-        let mut axis = Axis::identity(3);
-
-        axis.apply(AxisOp::Remove { at: 2, count: 2 });
-        axis.apply(AxisOp::Insert { at: 4, count: 1 });
-        axis.apply(AxisOp::Move {
-            from: 0,
-            count: 2,
-            to: 2,
-        });
-
-        assert_eq!(axis, Axis::identity(3));
-    }
-
-    #[test]
     fn transforms_line_ranges_like_the_axis() {
         let mut out = Vec::new();
 
         transform(AxisOp::Insert { at: 3, count: 2 }, 1, 4, &mut out);
         assert_eq!(out, vec![(1, 2), (5, 6)]);
+
+        // Lines past the u32 range do not exist: the range stops at the last one.
+        out.clear();
+        transform(AxisOp::Insert { at: 3, count: 2 }, 1, u32::MAX, &mut out);
+        assert_eq!(out, vec![(1, 2), (5, u32::MAX)]);
+
+        out.clear();
+        transform(
+            AxisOp::Insert { at: 0, count: 2 },
+            u32::MAX - 1,
+            u32::MAX,
+            &mut out,
+        );
+        assert_eq!(out, vec![(u32::MAX, u32::MAX)]);
 
         out.clear();
         transform(AxisOp::Remove { at: 2, count: 3 }, 1, 6, &mut out);

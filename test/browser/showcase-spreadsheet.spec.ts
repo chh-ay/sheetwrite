@@ -937,8 +937,8 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     });
   });
 
-  // #921: cut and paste moves the cells and the references to them in every
-  // engine; Firefox and WebKit keep only plain text and HTML on the clipboard.
+  // Cut and paste moves the cells and the references to them in every engine;
+  // Firefox and WebKit keep only plain text and HTML on the clipboard.
   // https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e
   await select_range(page, 2, 0, 3, 0);
   await page.keyboard.press("ControlOrMeta+x");
@@ -1181,7 +1181,7 @@ test("Excel's keys reach the grid and its dialogs: cut and paste, formats, hide,
     addr: { sheet: second, row: 1, col: 1 },
   });
 
-  // #802: the Keyboard shortcuts panel finds a command by its pressed keys,
+  // The Keyboard shortcuts panel finds a command by its pressed keys,
   // records new keys for Bold, and the new keys bold the active cell at once.
   // The modifier the page treats as Mod: ⌘ where it reports an Apple platform, else Ctrl.
   const mod = await page.evaluate(() => {

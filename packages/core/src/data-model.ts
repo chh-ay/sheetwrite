@@ -353,7 +353,6 @@ export function findMeasure(model: DataModel | undefined, id: string): Measure |
   return model?.measures?.find((measure) => measure.id === id);
 }
 
-/** The table with `id` among the workbook's sheets. */
 export function findTable(sheets: readonly Sheet[], id: string) {
   for (const sheet of sheets) {
     const table = sheet.tables?.find((candidate) => candidate.id === id);

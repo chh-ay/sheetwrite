@@ -163,9 +163,7 @@ function commit_merge(deps: StyleActionsDeps, merge: MergeBounds, center: boolea
     end: { row: merge.r1, col: merge.c1 },
   };
   const engine = storeEngine(deps.store);
-  // One `set` per cell without an engine, or with validation rules, protected
-  // ranges or spill children: the mutation policy then reports each issue at its
-  // own cell's operation index, and a write into a spill child can be refused alone.
+  // One `set` per cell in the cases `StyleActions.applyStyle` explains.
   const scalar_writes =
     !engine ||
     Boolean(

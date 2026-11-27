@@ -163,7 +163,7 @@ async function setup(xlsx_source?: Workbook["xlsxSource"]) {
     host
       .querySelector("form")
       ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  /** A Data command's button while the ribbon shows it; hidden commands stay in the DOM. */
+  /** A Data command's button while the ribbon shows it. */
   const command_button = (id: string): HTMLButtonElement => {
     const button = host.querySelector<HTMLButtonElement>(
       `.sheetwrite-ribbon [data-command="${id}"]`,

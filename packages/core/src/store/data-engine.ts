@@ -298,7 +298,6 @@ const RELATIONSHIP_STATUS = {
   duplicateKey: 5,
 } as const;
 
-/** Decodes one engine `relationshipStatus` record. */
 function relationship_status_of(record: Uint32Array): RelationshipStatus {
   const [code, first = 0, second = 0, unmatched = 0] = record;
   switch (code) {
@@ -2327,7 +2326,7 @@ export class StoreDataEngine {
     return { values, formats, counts };
   }
 
-  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  /** `StoreViewState.filteredRows`, but throws `IncompleteDataError` while the sheet has unloaded cells. */
   filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
     this.requireCompleteQuery(sheet);
     return this.view.filteredRows(sheet, filters);
@@ -3041,8 +3040,6 @@ export class StoreDataEngine {
       }
     }
 
-    // One UTF-8 buffer for the text cells, so a block does not cross the
-    // boundary as one JS string per cell.
     const packed_text = pack_texts(literal_texts);
 
     this.note_range_mutation_ffi(cells.length);

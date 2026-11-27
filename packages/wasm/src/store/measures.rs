@@ -280,12 +280,10 @@ fn kept_run(
     (entry, ancestors[entry].run(cache, groups))
 }
 
-/// The local name of calculation `index` in a prepared measure.
 fn calculation_name(index: usize) -> String {
     format!("{CALCULATION_PREFIX}{index}")
 }
 
-/// A 32-bit hash of a sequence of keys.
 fn keys_hash<'a>(keys: impl Iterator<Item = &'a KeyPart>) -> u32 {
     let mut hasher = FxHasher::default();
     for key in keys {
@@ -695,7 +693,7 @@ impl CellStore {
     }
 
     /// Evaluates the expression of a prepared measure that `owner` names
-    /// (0 for the measure's own, `k + 1` for calculation `k`), binding each
+    /// (numbered as in [`PreparedMeasure::owners`]), binding each
     /// of its column names to the settled values of its table's rows in the
     /// cell (`rows_of(table)`), as LAMBDA binds parameters. The measure's
     /// own expression also reads the `calculated` values. A measure returns
@@ -980,9 +978,9 @@ impl CellStore {
 }
 
 /// Turns the local names of a prepared expression into parameters of its
-/// cell's call: expression `owner` (0 the measure's own, `k + 1` calculation
-/// `k`) binds its columns in order, then, for the measure's own, the
-/// `calculated` values of its calculations.
+/// cell's call: expression `owner` (see [`PreparedMeasure::owners`]) binds
+/// its columns in order, then, for the measure's own, the `calculated`
+/// values of its calculations.
 fn number_parameters(ast: &mut Ast, owner: usize, owners: &[usize], calculated: usize) {
     let read_here = |read_by: &&usize| **read_by == owner;
     let columns = owners.iter().filter(read_here).count();

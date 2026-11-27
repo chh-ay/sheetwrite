@@ -32,7 +32,6 @@ function read_example(block: HTMLElement): Example {
   };
 }
 
-/** Props of {@link RunnableCode}. */
 interface RunnableCodeProps {
   readonly children?: JSX.Element;
   /** The code is inside a collapsed disclosure; the button runs it without opening it. */

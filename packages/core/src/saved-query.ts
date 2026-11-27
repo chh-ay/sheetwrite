@@ -272,8 +272,8 @@ function query_dependencies(query: SavedQuery): string[] {
 
 /**
  * Structural checks for shape-valid queries: unique IDs, unique names when
- * ASCII letter case is ignored, joins that name another existing query, no
- * join cycle, and at most one query per output table.
+ * letter case is ignored, joins that name another existing query, no join
+ * cycle, and at most one query per output table.
  */
 function validate_query_structure(
   queries: readonly SavedQuery[],
@@ -500,7 +500,6 @@ export function withoutQuery(
   return next.length > 0 ? next : undefined;
 }
 
-/** The saved query with `id`, if there is one. */
 export function findQuery(
   queries: readonly SavedQuery[] | undefined,
   id: string,

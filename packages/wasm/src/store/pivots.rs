@@ -1403,8 +1403,8 @@ impl CellStore {
         self.mark_pivot_cells_dirty(owner, changed)
     }
 
-    /// Shows `error` at the pivot's anchor and keeps `attempt` (or the anchor
-    /// cell) registered, so clearing a blocker or the anchor retries it.
+    /// Shows `error` at the pivot's anchor. See [`Self::show_output_error`]
+    /// for how `attempt` stays registered.
     fn show_pivot_error(
         &mut self,
         owner: usize,

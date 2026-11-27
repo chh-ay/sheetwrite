@@ -1,4 +1,3 @@
-// Commits the text of a shell input to a cell.
 // Everything here goes through the public `Grid` contract — never `Store`
 // internals, never private grid DOM.
 

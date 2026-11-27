@@ -23,13 +23,13 @@ export interface CellBorder {
 export interface CellBorders {
   /** Border for every side that has no border of its own. */
   all?: CellBorder;
-  /** Border along the cell's top edge. */
+  /** Border of the top edge; it overrides `all` there. */
   top?: CellBorder;
-  /** Border along the cell's right edge. */
+  /** Border of the right edge; it overrides `all` there. */
   right?: CellBorder;
-  /** Border along the cell's bottom edge. */
+  /** Border of the bottom edge; it overrides `all` there. */
   bottom?: CellBorder;
-  /** Border along the cell's left edge. */
+  /** Border of the left edge; it overrides `all` there. */
   left?: CellBorder;
 }
 

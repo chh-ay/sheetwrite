@@ -103,7 +103,6 @@ impl CriteriaRead<'_, '_, '_> {
         }
     }
 
-    /// Reads the value range at the position required by the function family.
     fn read_value(&mut self, pass: &mut EvalPass<'_>) -> Result<Option<Value>, FormulaError> {
         self.values.as_mut().map_or(Ok(None), |range| {
             range

@@ -490,7 +490,6 @@ export function renderFormulaFunctionPages(
     }
   }
 
-  // A family with no functions has nothing to publish.
   const published_families = Object.entries(families).flatMap(([family_id, family]) => {
     const family_functions = functions.filter((formula) => formula.family === family_id);
     if (family_functions.length === 0) return [];
@@ -611,8 +610,6 @@ export function renderFormulaFunctionPages(
       "",
       "## Functions",
       "",
-      // The open tag alone on its line starts an HTML block, so the filter is
-      // not wrapped in a paragraph.
       `<FormulaReference family="${slug}">`,
       "</FormulaReference>",
       "",

@@ -490,7 +490,6 @@ export function rangeContains(range: Range, addr: CellAddress): boolean {
   );
 }
 
-/** A row or column axis of a sheet. */
 export type SheetAxis = "row" | "column";
 
 /** `range` with its `axis` span remapped; null when the remap removes the whole span. */

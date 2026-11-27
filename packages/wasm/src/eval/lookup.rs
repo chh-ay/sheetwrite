@@ -142,7 +142,6 @@ fn compare(left_entry: Entry<'_>, right_entry: Entry<'_>) -> Result<Ordering, Fo
     }
 }
 
-/// A search's answer: the matching position, or none.
 type SearchResult = Result<Option<usize>, FormulaError>;
 
 /// What every search reads: a list's length and its entries by position.
@@ -551,7 +550,6 @@ fn approximate_boundary<L: SearchList>(
     Ok(Some(upper))
 }
 
-/// First position whose entry is not below `probe`.
 fn first_not_below<L: SearchList>(list: &L, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
@@ -565,7 +563,6 @@ fn first_not_below<L: SearchList>(list: &L, probe: Entry<'_>) -> Result<usize, F
     Ok(low)
 }
 
-/// First position whose entry is above `probe`.
 fn first_above<L: SearchList>(list: &L, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
@@ -906,7 +903,8 @@ impl LookupStates {
         self.states.clear();
     }
 
-    /// Releases a wide pass's state list.
+    /// Frees the state list's capacity after a wide pass. [`Self::clear`]
+    /// keeps it.
     pub(crate) fn release(&mut self) {
         self.states = Vec::new();
     }

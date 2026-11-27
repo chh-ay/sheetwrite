@@ -56,7 +56,6 @@ interface ReplaySuggester {
   dispose(): void;
 }
 
-/** Attaches a suggester to the store of one workbook. */
 export type AttachReplay = (store: SheetwriteStore) => ReplaySuggester;
 
 /** What one signal's suggestions did. */
@@ -91,7 +90,6 @@ export interface ReplayCounts {
   readonly suggestMs: number[];
 }
 
-/** An empty set of counts. */
 export function emptyCounts(): ReplayCounts {
   return {
     formulas: 0,
@@ -141,7 +139,6 @@ function percentile(values: readonly number[], rank: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(rank * sorted.length))] ?? 0;
 }
 
-/** The rates of `counts`. */
 export function replayMetrics(counts: ReplayCounts): ReplayMetrics {
   return {
     formulas: counts.formulas,
@@ -413,7 +410,6 @@ export async function replayWorkbook(
   }
 }
 
-/** Replay every workbook of a set. */
 export async function replaySet(
   workbooks: Iterable<ReplayWorkbook> | AsyncIterable<ReplayWorkbook>,
   attach: AttachReplay,

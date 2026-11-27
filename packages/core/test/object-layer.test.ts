@@ -14,7 +14,7 @@ import type {
 import { makeWorkbook } from "./fixtures.js";
 
 const ROW_HEIGHT = DEFAULT_THEME.rowHeight;
-/** Column widths of `makeWorkbook`: name, amount, city. */
+/** Width of the name column of `makeWorkbook`. */
 const NAME_WIDTH = 160;
 
 const original_raf = globalThis.requestAnimationFrame;

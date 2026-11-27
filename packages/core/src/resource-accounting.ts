@@ -284,7 +284,6 @@ export class BoundaryResourceAccounting {
     counter.scalarCalls = next_scalar_calls;
   }
 
-  /** Sets every counter back to zero. */
   reset(): void {
     for (const counter of this.counters) {
       if (!counter) continue;

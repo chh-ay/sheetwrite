@@ -53,7 +53,9 @@ pub(crate) struct CustomFunction {
 pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 
 impl CellStore {
-    /// Adds or replaces a host function and recalculates the workbook.
+    /// Adds or replaces a host function, then recalculates the workbook.
+    /// Returns `false`, and changes nothing, when
+    /// [`Self::insert_custom_function`] refuses the name.
     #[cfg_attr(
         not(target_arch = "wasm32"),
         allow(

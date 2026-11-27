@@ -117,8 +117,7 @@ pub(crate) fn fixed_text(number: f64, places: u32) -> String {
         return text;
     }
 
-    // A number with a fraction is below 2^52, so it keeps its decimals in
-    // 64 bits.
+    // `MAX_FIXED_PLACES` keeps the scaled digits below 2^64.
     let (digits, [half, ..]) = scale(&Binary::of(number), place_count as i32);
     let rounded_digits = digits as u64 + u64::from(rounds_up(half, digits as u64));
     let mut buffer = [0; U64_DIGITS];

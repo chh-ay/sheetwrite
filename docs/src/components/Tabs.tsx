@@ -20,7 +20,6 @@ interface TabProps {
   readonly children?: JSX.Element;
 }
 
-/** Props of {@link Tabs}. */
 interface TabsProps {
   /**
    * Tabs with the same `sync` value switch together across the site, and the

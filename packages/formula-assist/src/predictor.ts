@@ -46,7 +46,6 @@ export interface PredictorOptions {
   readonly build?: BuildMode;
 }
 
-/** How each signal opens for one edit. */
 const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
   syntax: openSyntax,
@@ -54,7 +53,6 @@ const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   workbook: openWorkbookFormulas,
 };
 
-/** The signals named in `signals`, opened for one edit. */
 export function openSignals(
   edit: FormulaEdit,
   signals: readonly SignalName[],
@@ -140,7 +138,6 @@ class Session implements PredictionSession {
 
 /** The predictor of one store's formula bars, and what it has counted of the store's workbook. */
 export interface Predictor {
-  /** Open the suggestions of one formula edit. */
   open(edit: FormulaEdit): PredictionSession;
   /** Stop following the workbook, and forget it. */
   dispose(): void;

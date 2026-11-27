@@ -6,7 +6,6 @@ export interface HubFilterGroup {
   readonly label: string;
 }
 
-/** Props of {@link HubFilter}. */
 export interface HubFilterProps {
   /** "All" first, then each group a card can belong to. */
   readonly groups: readonly HubFilterGroup[];

@@ -12,7 +12,8 @@ use crate::plan::{
 };
 use crate::wire::{decode_strings, decode_type};
 
-/// Code lanes above this length are rejected before decoding; saved plans are small.
+/// Code and literal lanes above this length are rejected before decoding; saved plans and
+/// query lists are small.
 const MAX_PLAN_CODES: usize = 256 * 1024;
 
 /// Step codes. `filter`: predicate. `select`: count, ids. `rename`: count, id/name pairs.
@@ -104,6 +105,10 @@ pub(crate) fn definition() -> Diagnostic {
 
 impl<'a> Cursor<'a> {
     pub(crate) fn new(wire: PlanWire<'a>) -> Result<Self, Diagnostic> {
+        if wire.codes.len() > MAX_PLAN_CODES || wire.numbers.len() > MAX_PLAN_CODES {
+            return Err(Diagnostic::limit());
+        }
+
         Ok(Self {
             codes: wire.codes,
             position: 0,
@@ -333,10 +338,6 @@ impl Cursor<'_> {
 
 /// Decodes a bounded saved step list; schema-dependent validation happens in execution.
 pub fn decode_plan(wire: PlanWire<'_>, limits: &Limits) -> Result<Plan, Diagnostic> {
-    if wire.codes.len() > MAX_PLAN_CODES || wire.numbers.len() > MAX_PLAN_CODES {
-        return Err(Diagnostic::limit());
-    }
-
     let mut cursor = Cursor::new(wire)?;
     let plan = cursor.steps(limits)?;
 

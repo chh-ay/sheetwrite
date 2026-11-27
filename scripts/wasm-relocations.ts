@@ -88,7 +88,6 @@ interface Engine {
   /** Function numbers in table order, from `elementOffset`. */
   elements: number[];
   globals: number[];
-  /** Export name → kind and index. */
   exports: Map<string, { kind: number; index: number }>;
   /** Linear memory as the data section initializes it, from address 0. */
   memory: Uint8Array;

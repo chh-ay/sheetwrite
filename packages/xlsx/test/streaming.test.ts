@@ -493,7 +493,6 @@ describe("ZIP deflate", () => {
     const written = await writeZip(unsorted, native());
     const reference = fflate_archive(parts);
     expect(entry_headers(written)).toEqual(entry_headers(reference));
-    // fflate reads every part of both archives, and so does this package's reader.
     expect(unzipSync(written)).toEqual(unzipSync(reference));
     const reader = await ZipReader.open(written, createCodecContext("import"));
     for (const [name, data] of Object.entries(parts)) expect(await reader.read(name)).toEqual(data);

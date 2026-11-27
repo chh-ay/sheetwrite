@@ -66,8 +66,7 @@ export const FLIGHTS: Readonly<Record<FlightKind, FlightPlan>> = {
     label: "Cross to cell ALL1000000",
     summary: "Rows and columns together, to the far corner.",
     durationMs: (CORNER_STOPS.length - 1) * 1_700,
-    // Both axes share one progress, so the route is the sheet's diagonal. (The
-    // depth flight is the one that moves by orders of magnitude.)
+    // Both axes share one progress, so the route is the sheet's diagonal.
     at: (t) => {
       const { leg, move } = leg_at(t, CORNER_STOPS.length - 1);
       const from = CORNER_STOPS[leg] ?? 0;

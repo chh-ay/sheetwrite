@@ -407,7 +407,10 @@ function adaptive_row_header_width(theme: Theme, data_row_count: number): number
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * font_px * 0.6 + 12));
 }
 
-/** Options of {@link initSheetwrite}. */
+/**
+ * What {@link initSheetwrite} loads: the engine, where its WASM comes from,
+ * and the add-ons it installs.
+ */
 export interface InitSheetwriteOptions {
   /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
   engine?: SheetwriteEngine;
@@ -613,7 +616,7 @@ export class GridImpl implements Grid {
   private find_bar: FindBar | null = null;
   /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
   private readonly find_bar_builds = new ScopeSlot(this.lifetime);
-  /** What the AutoFilter commands and the lazily loaded dropdown use; built on first use. */
+  /** Built on first use by `auto_filter()`, whose doc says what uses it. */
   private auto_filter_host: (AutoFilterHost & AutoFilterCommandsHost) | null = null;
   /** The dropdown chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly auto_filter_builds = new ScopeSlot(this.lifetime);
@@ -621,7 +624,7 @@ export class GridImpl implements Grid {
   private readonly dialogs = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialog_host: DialogHost;
-  /** What the cell commands use; built on their first use. */
+  /** Built on first use by `cell_commands()`, whose doc says what uses it. */
   private cell_commands_host: CellCommandsHost | null = null;
   /** Find, dialogs, panels and the dashboard builder whose code is loading on first use. */
   private command_loads = 0;

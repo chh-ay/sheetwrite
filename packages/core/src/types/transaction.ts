@@ -283,7 +283,7 @@ export interface GridTransaction {
 
 /** One committed cell edit, carrying enough to roll back. */
 export interface CellChange {
-  /** The cell that changed. */
+  /** Data address of the changed cell, in sheet rows, not view rows. */
   addr: CellAddress;
   /** The cell's content before the commit. */
   oldValue: CellValue;

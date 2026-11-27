@@ -13,8 +13,7 @@ use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL};
 
-/// Key and value rules that `GROUPBY` and `PIVOTBY` share with pivot tables. It is a
-/// submodule, not a family, so the function registry does not list it.
+/// This module is not a family, so the function registry does not list it.
 pub(crate) mod grouping;
 
 family_functions! {

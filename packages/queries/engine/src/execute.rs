@@ -23,12 +23,13 @@ pub fn execute(
     // Host batches skip source parsing, so the input shape is checked here too.
     limits.shape(batch.row_count(), batch.columns.len())?;
 
+    // Join, group and unpivot check the shape limit inside the step, so a failure carries its
+    // index; the other steps keep or shrink the shape.
     for (step_index, step) in plan.iter().enumerate() {
         batch = apply_step(batch, step, inputs, limits).map_err(|mut issue| {
             issue.step = Some(step_index);
             issue
         })?;
-        limits.shape(batch.row_count(), batch.columns.len())?;
     }
 
     batch.validate_budget(limits)?;

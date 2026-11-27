@@ -376,7 +376,6 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
           exported.resolve();
         },
       });
-      // The test's exporter stands in for any installed one, which it puts back.
       const installedTableExport = xlsxTableExportBackend();
       setXlsxTableExportBackend({
         name: "adapter-rejecting-export",

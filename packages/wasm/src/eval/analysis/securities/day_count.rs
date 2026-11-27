@@ -167,12 +167,10 @@ impl Date {
         Self { year, month, day }
     }
 
-    /// The same date with another day of the month.
     pub(crate) const fn with_day(self, day: i64) -> Self {
         Self { day, ..self }
     }
 
-    /// The last day of the date's month.
     pub(crate) fn month_end(self) -> Self {
         self.with_day(days_in_month(self.year, self.month))
     }
@@ -215,12 +213,10 @@ impl Coupons {
     }
 }
 
-/// The months in one coupon period.
 pub(crate) const fn period_months(frequency: f64) -> i64 {
     MONTHS_PER_YEAR / frequency as i64
 }
 
-/// Actual calendar days from `start` to `end`.
 pub(crate) fn actual_days(start: Date, end: Date) -> f64 {
     end.serial() - start.serial()
 }
