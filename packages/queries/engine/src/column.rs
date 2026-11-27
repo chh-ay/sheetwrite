@@ -309,21 +309,31 @@ impl Batch {
 }
 
 /// Every column needs a non-empty identity and a non-blank name. Identities must be unique,
-/// and names must be unique when ASCII letter case is ignored, as table headers require. This
-/// holds even when the batch has no rows.
+/// and names must be unique when letter case is ignored in every alphabet, as table headers
+/// require. This holds even when the batch has no rows.
 pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
     for (index, column) in columns.iter().enumerate() {
         if column.id().is_empty()
             || column.name().trim().is_empty()
-            || columns.iter().take(index).any(|prior| {
-                prior.id() == column.id() || prior.name().eq_ignore_ascii_case(column.name())
-            })
+            || columns
+                .iter()
+                .take(index)
+                .any(|prior| prior.id() == column.id() || same_header(prior.name(), column.name()))
         {
             return Err(Diagnostic::new("duplicate-column"));
         }
     }
 
     Ok(())
+}
+
+/// Whether two header names clash in a table: equal in upper case, as core's
+/// `workbookTableNameKey` compares them. Compares uppercase characters without building
+/// uppercase copies.
+fn same_header(left: &str, right: &str) -> bool {
+    left.chars()
+        .flat_map(char::to_uppercase)
+        .eq(right.chars().flat_map(char::to_uppercase))
 }
 
 /// A total key order keeps joins and groups deterministic across source batches. Values of
