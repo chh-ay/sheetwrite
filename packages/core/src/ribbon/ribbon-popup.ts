@@ -74,7 +74,8 @@ export class RibbonPopup {
   constructor(private readonly host: HTMLElement) {
     const signal = this.listeners.signal;
     document.addEventListener("pointerdown", this.on_outside_pointer, { capture: true, signal });
-    // Ignore delayed events when the popup already uses the current geometry.
+    // Resize and scroll close a popup only when the geometry it was placed
+    // against changed, so a late event does not close it.
     window.addEventListener("resize", this.on_resize, { signal });
     document.addEventListener("scroll", this.on_scroll, { capture: true, signal });
   }
@@ -214,7 +215,8 @@ export class RibbonPopup {
   };
 
   private readonly on_keydown = (event: KeyboardEvent): void => {
-    // Popups are mounted in the grid host too; see Ribbon.onKeydown.
+    // Popups are mounted in the grid host too, so plain keys stop here, as in
+    // `Ribbon.on_keydown`.
     if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
     // Nested surfaces both hear the key; only the innermost one acts on it.
     const surface = event.currentTarget;

@@ -3,9 +3,7 @@
 // so a new command is added here once. Add its glyph to scripts/icon-glyphs.ts
 // and run `bun scripts/icon-sheet.ts`; no renderer-specific entry is needed.
 // The DOM side (ribbon-controls.ts) never decides behavior, so Excel parity
-// is reviewed here. A command is added only with the feature it runs. The
-// tab, group and glyph planned for each 0.7 feature are on the Toolbar and
-// ribbon docs page, so features that land separately still form one layout.
+// is checked here. Add a command together with the feature it runs.
 
 import { actionFeedbackFor } from "../action-feedback.js";
 import { CHART_KINDS } from "../chart-kinds.js";
@@ -53,7 +51,7 @@ import type {
   RibbonTabSpec,
 } from "./command-spec.js";
 
-/** Zoom step of `Grid.setZoom`, shown as percents. */
+/** How much Zoom In and Zoom Out change the zoom factor: 10%. */
 const ZOOM_STEP = 0.1;
 /** The zoom that the ribbon's percent readout resets to: 100%. */
 export const ZOOM_RESET = 1;
@@ -94,9 +92,12 @@ function show_query_panel(grid: Grid, create: boolean): void {
   requestPanel(grid, (controller) => controller.openQueryPanel(grid, create));
 }
 
-/** The query commands show only while a query session is connected to the grid. */
-// They stay enabled in a read-only grid: the grid rejects the write and the
-// rejection message is shown, because no command state reports read-only alone.
+/**
+ * The query commands show only while a query session is connected to the
+ * grid. They stay enabled in a read-only grid: the grid rejects the write and
+ * shows the rejection message, because no command state reports read-only
+ * alone.
+ */
 const queries_connected = (grid: Grid): boolean => queryCommandsOf(grid) !== undefined;
 
 const QUERIES_REFRESHED = "Queries refreshed.";
