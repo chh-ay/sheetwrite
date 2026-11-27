@@ -58,7 +58,10 @@ export type QueryFetchSource = (
 
 /** Host I/O for a session; the engine limits apply to every parse and execution. */
 export interface QuerySessionOptions {
-  /** Called once for each query a refresh loads, with that refresh's abort signal. */
+  /**
+   * Loads each saved query's source, once for each query a refresh loads, with
+   * that refresh's abort signal. The session has no other way to reach data.
+   */
   readonly fetchSource: QueryFetchSource;
   /** Overrides for the engine's limits; unset ones keep their defaults. */
   readonly limits?: Partial<QueryLimits>;
