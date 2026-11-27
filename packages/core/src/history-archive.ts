@@ -148,11 +148,16 @@ const REPLAY_BATCH_BYTES = DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes;
 /** Working-set bytes per encoded operation byte: the JSON bytes, the string and the parsed operations. */
 const TRANSACTION_RESERVATION_MULTIPLIER = 4;
 
+/** UTF-16 code units in an ID the archive holds or a document ID: the bound IDs were stored under. */
+const MAX_STORED_ID_LENGTH = 256;
+
 /**
- * UTF-8 bytes in a document ID, mutation ID or author ID. Sync counts
- * mutation and author IDs the same way, with this as its default limit.
+ * UTF-8 bytes in the mutation, author or restored version ID of a commit the
+ * archive records now. Sync counts mutation and author IDs the same way, with
+ * this as its default limit. IDs already archived keep `MAX_STORED_ID_LENGTH`,
+ * so an archive written before this bound still opens and replays.
  */
-const MAX_ID_BYTES = DEFAULT_SYNC_COORDINATOR_LIMITS.maxMutationIdBytes;
+const MAX_NEW_ID_BYTES = DEFAULT_SYNC_COORDINATOR_LIMITS.maxMutationIdBytes;
 
 interface ListVersionsOptions {
   maxEntries?: number;
@@ -171,15 +176,20 @@ function is_operation(value: unknown): value is DocumentOp {
   return validateDocumentOperationShape(value).length === 0;
 }
 
-function valid_id(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    utf8ByteLength(value, MAX_ID_BYTES) <= MAX_ID_BYTES
-  );
+/** Whether `value` is an ID an archive may hold. */
+function stored_id(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_STORED_ID_LENGTH;
 }
 
-function restore_value(value: unknown): RestoreProvenance | undefined {
+/** Whether `value` is an ID a commit recorded now may bring. */
+function new_id(value: unknown): value is string {
+  return stored_id(value) && utf8ByteLength(value, MAX_NEW_ID_BYTES) <= MAX_NEW_ID_BYTES;
+}
+
+function restore_value(
+  value: unknown,
+  valid_id: (id: unknown) => id is string,
+): RestoreProvenance | undefined {
   if (!object(value)) {
     return undefined;
   }
@@ -192,13 +202,15 @@ function restore_value(value: unknown): RestoreProvenance | undefined {
 
 /**
  * Validate one committed transaction that follows `base_revision`, and return
- * its encoded operation bytes. A transaction spans at most one atomic batch.
+ * its encoded operation bytes. A transaction spans at most one atomic batch;
+ * `valid_id` checks its IDs.
  */
 function check_commit(
   commit: CommittedTransaction,
   base_revision: number,
   not_before: number,
   limits: Readonly<HistoryLimits>,
+  valid_id: (id: unknown) => id is string,
 ): number {
   const valid_revision =
     commit.baseRevision === base_revision &&
@@ -216,7 +228,7 @@ function check_commit(
     commit.operations.length > 0 &&
     commit.operations.length <= MAX_OPERATIONS &&
     commit.operations.every(is_operation) &&
-    (commit.restore === undefined || restore_value(commit.restore) !== undefined);
+    (commit.restore === undefined || restore_value(commit.restore, valid_id) !== undefined);
 
   if (!valid) {
     throw new HistoryError(
@@ -292,7 +304,7 @@ async function read_commit(
     operationBytes: operation_bytes,
     segments,
   } = envelope;
-  const restore = restore_value(envelope.restore);
+  const restore = restore_value(envelope.restore, stored_id);
   const max_segments = Math.ceil(limits.maxTransactionBytes / limits.maxSegmentBytes);
   const valid =
     integer(base_revision) &&
@@ -470,7 +482,7 @@ async function rebuild_version(
 
     for (const transaction_id of tail) {
       const commit = await read_commit(transaction_id, read, limits);
-      const bytes = check_commit(commit, revision, 0, limits);
+      const bytes = check_commit(commit, revision, 0, limits, stored_id);
 
       const full =
         batch.length + commit.operations.length > MAX_OPERATIONS ||
@@ -599,7 +611,7 @@ export class HistoryArchive {
 
   /** Open an archive by reading its manifest only; no workbook is loaded. */
   static async open(options: HistoryArchiveOptions, signal?: AbortSignal): Promise<HistoryArchive> {
-    if (!valid_id(options.documentId)) {
+    if (!stored_id(options.documentId)) {
       throw new HistoryError("invalid-history", "History requires a bounded document ID");
     }
 
@@ -700,7 +712,13 @@ export class HistoryArchive {
         throw new HistoryError("invalid-history", "History baseline is required before recording");
       }
 
-      const encoded_bytes = check_commit(commit, current.revision, current.time, this.limits);
+      const encoded_bytes = check_commit(
+        commit,
+        current.revision,
+        current.time,
+        this.limits,
+        new_id,
+      );
       const records = await write_commit(commit, this.limits);
       const envelope = records[records.length - 1];
       if (!envelope) {
