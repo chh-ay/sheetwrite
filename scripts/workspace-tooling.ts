@@ -23,7 +23,6 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/svelte",
 ] as const;
 
-/** One published package name. */
 export type PublishablePackage = (typeof PUBLISHABLE_PACKAGE_ORDER)[number];
 
 /** Publication position of a package name, or -1 for a name that is not published. */

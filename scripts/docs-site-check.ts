@@ -24,7 +24,6 @@ import { SITE_URL } from "../docs/src/lib/seo.js";
 
 const repository_root = resolve(import.meta.dir, "..");
 const PUBLISHED_URLS = join(repository_root, "docs/published-urls.txt");
-/** Routes that must never be indexed. */
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\//, /^\/404\/$/];
 /** Fewer characters of main text than this is a page whose content renders only in the browser. */
 const MIN_MAIN_TEXT = 200;
