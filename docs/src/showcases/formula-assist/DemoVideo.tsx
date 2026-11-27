@@ -22,7 +22,7 @@ export interface DemoTakes {
 export interface DemoVideoProps {
   /** The takes for wide screens, recorded at 960 × 540 CSS pixels. */
   readonly wide: DemoTakes;
-  /** The takes for phones, recorded at 390 CSS pixels wide; demo-video.css switches at the same width. */
+  /** The takes for phones, recorded at 390 CSS pixels wide. */
   readonly narrow: DemoTakes;
   readonly label: string;
   /** Length of the full recording, as the button shows it, such as `1:12`. */

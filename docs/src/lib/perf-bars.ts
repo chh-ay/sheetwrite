@@ -110,7 +110,6 @@ const MAX_LOG_DECADES = 6;
 /** Linear axes tick at quarters. */
 const LINEAR_TICKS = 4;
 
-/** Escapes text for HTML. */
 export function escapeHtml(text: string): string {
   return text
     .replaceAll("&", "&amp;")

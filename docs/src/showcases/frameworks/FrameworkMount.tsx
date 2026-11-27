@@ -5,7 +5,6 @@ import { whenNearViewport } from "../lib/near-viewport.js";
 /** Mounts a workbench written in another framework into `host`; returns its unmount. */
 export type MountWorkbench = (host: HTMLElement) => () => void;
 
-/** Props of {@link FrameworkMount}. */
 export interface FrameworkMountProps {
   /** The framework the workbench is written in. */
   readonly framework: "react" | "vue" | "svelte";

@@ -363,7 +363,6 @@ function ClientPanel(props: Readonly<ClientPanelProps>) {
   );
 }
 
-/** Props of {@link CollaborationStage}. */
 export interface CollaborationStageProps {
   readonly demoLabel: string;
   /** The two collaborators, from the route: the island imports no protocol code before its grid loads. */

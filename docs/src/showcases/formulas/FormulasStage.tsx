@@ -18,7 +18,7 @@ import type { FormulasWorkbook, Recalc } from "./boot.js";
 
 type GridState = "loading" | "ready" | "error";
 
-/** Props of {@link FormulasStage}: each panel's A1 address and the playground's. */
+/** Each panel's A1 address and the playground's. */
 export interface FormulasStageProps {
   readonly addresses: Readonly<Record<string, string>>;
   readonly playgroundAddress: string;

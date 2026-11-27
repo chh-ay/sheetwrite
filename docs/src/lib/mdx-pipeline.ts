@@ -300,7 +300,6 @@ function mark_short_cells(node: HastNode): void {
   }
 }
 
-/** The children of `node` that are `tag_name` elements. */
 function child_elements(node: HastNode | undefined, tag_name: string): HastNode[] {
   return (node?.children ?? []).filter((child) => child.tagName === tag_name);
 }

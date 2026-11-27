@@ -7,7 +7,6 @@ export type { IconName } from "../../icons/icon-names.js";
 /** Rendered size: 16, 20 or 24 px. */
 export type IconSize = "sm" | "md" | "lg";
 
-/** Props of {@link Icon}. */
 export interface IconProps {
   readonly name: IconName;
   readonly size?: IconSize;
