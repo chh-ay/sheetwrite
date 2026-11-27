@@ -144,7 +144,6 @@ impl StatisticArgs {
         Ok(())
     }
 
-    /// Room for `cells` more cells.
     fn reserve(&mut self, cells: usize) -> Result<(), FormulaError> {
         let reserved = match &mut self.cells {
             Cells::Numbers(numbers) => numbers.try_reserve(cells),
@@ -184,7 +183,6 @@ impl StatisticArgs {
         self.args.push(arg);
     }
 
-    /// The number of arguments.
     pub(super) const fn arg_count(&self) -> usize {
         self.args.len()
     }
@@ -238,7 +236,6 @@ impl StatisticArgs {
         self.numbers_of(index..index + 1, max_cells)
     }
 
-    /// The numbers of every argument.
     pub(super) fn all_numbers(&mut self, max_cells: usize) -> Result<&mut [f64], FormulaError> {
         let count = self.args.len();
         self.numbers_of(0..count, max_cells)
@@ -255,7 +252,6 @@ impl StatisticArgs {
     }
 }
 
-/// Reads the arguments of one statistic call.
 struct Reader<'a> {
     store: &'a CellStore,
     func: Func,
@@ -393,7 +389,6 @@ impl Reader<'_> {
     }
 }
 
-/// One call of a statistic that reads numbers.
 pub(super) struct StatisticCall<'a> {
     pub(super) statistic: NumberStatistic,
     pub(super) func: Func,

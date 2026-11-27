@@ -2107,11 +2107,9 @@ impl CellStore {
     /// The value of a defined name for a formula on `sheet`. A formula read
     /// in place is evaluated here; every other name takes
     /// [`Self::eval_defined_name_read_family`]. Out of line, so the name adds
-    /// one call to `eval_ast`, which must stay under the size above which
-    /// JavaScriptCore does not optimize a function; the `_family` suffix
-    /// keeps wasm-opt from inlining it back. The read path has its own
-    /// function, so this one keeps a small frame and its calls stay tail
-    /// calls.
+    /// one call to `eval_ast`; see [`Self::eval_func`] for why. The read path
+    /// has its own function, so this one keeps a small frame and its calls
+    /// stay tail calls.
     #[inline(never)]
     fn eval_defined_name_family(
         &self,

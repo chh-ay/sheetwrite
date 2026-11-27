@@ -211,7 +211,6 @@ fn precise(values: &FuncAccumulator, operation: fn(f64) -> f64) -> Value {
     result.map_or_else(Value::Error, Value::number)
 }
 
-/// The two numeric arguments of a two-argument function.
 fn binary_numbers(values: &FuncAccumulator) -> Result<(f64, f64), FormulaError> {
     require_arity(values, 2, 2)?;
     Ok((number_arg(values, 0, None)?, number_arg(values, 1, None)?))
@@ -504,7 +503,6 @@ impl SubtotalFold {
         }
     }
 
-    /// The result after every value.
     pub(super) fn finish(&self) -> Value {
         if let Some(error) = self.error {
             return Value::Error(error);

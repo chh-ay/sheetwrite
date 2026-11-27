@@ -280,7 +280,6 @@ impl DepIndex {
             .binary_search_by(|group| group.range.cmp(&range))
     }
 
-    /// The formulas that read `cell` exactly.
     fn exact_readers(&self, cell: AbsCellKey) -> &[FormulaId] {
         let Ok(column) = self
             .exact
@@ -311,7 +310,6 @@ impl DepIndex {
         .map_or(&[], |source| band.readers_at(source))
     }
 
-    /// Every exact source cell of `sheet` with its readers.
     fn exact_sources_of(
         &self,
         sheet: u32,
