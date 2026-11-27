@@ -69,10 +69,11 @@ fn formula_start(src: &str) -> usize {
     }
 }
 
-/// The tokens of `src` with their spans. Unlike the parser's `tokenize`, it
-/// never stops: text that the lexer cannot read becomes one bad token and
-/// lexing goes on after it, because the text is often incomplete while the
-/// user types. Intersection operators are tokens here, as for the parser.
+/// The tokens of `src` with their spans. Unlike the parser's cursor, which
+/// stops at the first lex error, it never stops: text that the lexer cannot
+/// read becomes one bad token and lexing goes on after it, because the text
+/// is often incomplete while the user types. Intersection operators are
+/// tokens here, as for the parser.
 pub(crate) fn lex_tolerant(src: &str) -> Vec<Spanned<'_>> {
     let mut tokens: Vec<Spanned<'_>> = Vec::new();
     let mut index = formula_start(src);
@@ -135,7 +136,8 @@ fn token_kind(tok: &Result<Tok<'_>, String>, next: Option<&Spanned<'_>>) -> Toke
         Tok::RParen => TokenKind::RParen,
         Tok::LBrace => TokenKind::LBrace,
         Tok::RBrace => TokenKind::RBrace,
-        // The lexer emits neither as a token with text of its own.
+        // `formula_tokens` skips an intersection, which is only whitespace,
+        // and the lexer never emits `End`.
         Tok::Intersect | Tok::End => TokenKind::Bad,
     }
 }
@@ -234,8 +236,9 @@ impl FormulaSyntaxError {
         self.to
     }
 
-    /// The text ends before the formula is complete: a value, a `)` or a
-    /// closing quote is missing at the end. Typing on usually completes it.
+    /// The text ends before the formula is complete: a value, a `)` or `}`,
+    /// or a closing quote or bracket is missing at the end. Typing on
+    /// usually completes it.
     #[wasm_bindgen(getter, js_name = incomplete)]
     #[must_use]
     pub fn incomplete(&self) -> bool {

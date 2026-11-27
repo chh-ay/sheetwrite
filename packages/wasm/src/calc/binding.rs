@@ -2,9 +2,12 @@
 
 use super::*;
 
-/// Resolve sheet-qualified refs to numeric sheet handles once, at formula ingest.
-/// `place_span` gives a resolved 3-D reference the sheets it spans, and fails
-/// when an endpoint is not in the tab order.
+/// Bind the detached sheet references of a tree to sheet handles: a
+/// sheet-qualified cell or range whose sheet `resolve` finds gets its
+/// handle, and so does each endpoint of a 3-D reference. `place_span` gives
+/// a 3-D reference with both endpoints bound the sheets it spans, and fails
+/// when an endpoint is not in the tab order. A sheet that `resolve` does not
+/// find stays detached. Returns whether any reference changed.
 pub(crate) fn bind_sheet_refs(
     ast: &mut Ast,
     resolve: &SheetResolver<'_>,

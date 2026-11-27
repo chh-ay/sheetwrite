@@ -683,8 +683,7 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// `[BUDGET.XLSX]!TOTAL`; the sheet-scoped `[Budget.xlsx]Annual!Total`
 /// gives `[BUDGET.XLSX]ANNUAL!TOTAL`. The folder and the letter case are
 /// left out, as for link sheets. A quote in a book or sheet name stays
-/// doubled, as a quoted formula writes it. `None` for a name without a
-/// workbook.
+/// doubled, as a quoted formula writes it. `None` for text without `!`.
 pub(crate) fn external_name_key(text: &str) -> Option<String> {
     let (quoted_qualifier, name) = text.rsplit_once('!')?;
     let qualifier = quoted_qualifier
@@ -704,7 +703,7 @@ pub(crate) fn external_name_key(text: &str) -> Option<String> {
 /// Whether the text before `!` names another workbook: a sheet of it
 /// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
 /// `C:\Reports\Budget.xlsx`). A file name has an extension, and a path
-/// has a folder; Excel sheet names hold neither `\\` nor `/`.
+/// has a folder; Excel sheet names hold neither `\` nor `/`.
 fn names_workbook(qualifier: &str) -> bool {
     is_external_sheet(qualifier) || qualifier.contains(['.', '\\', '/'])
 }
@@ -735,9 +734,10 @@ pub(crate) fn parse_with_features(src: &str) -> ParseResult {
     parse_source(src, None)
 }
 
-/// Bind a sheet token to its stable id while constructing its reference node.
-/// A formula of the same shape as one parsed before it gets a copy of that
-/// tree instead of a parse (`template`).
+/// [`parse_with_features`], binding sheet names to their stable handles,
+/// placing 3-D references and binding table references while the tree is
+/// built. During ingest, a formula of the same shape as one parsed before
+/// it gets a copy of that tree instead of a parse (`template`).
 pub(crate) fn parse_bound_with_features(
     src: &str,
     resolve: &SheetResolver<'_>,

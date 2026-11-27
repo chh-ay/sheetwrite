@@ -1,5 +1,6 @@
-//! The digit writer against `core`'s float formatting, which it replaces in
-//! the engine: every case must give the same digits and text.
+//! The digit writer checked against `core`'s float formatting. The engine
+//! writes numbers with the digit writer and does not link `core`'s code;
+//! every case must give the same digits and text.
 
 use super::*;
 

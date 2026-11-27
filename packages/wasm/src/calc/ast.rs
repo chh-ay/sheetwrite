@@ -355,10 +355,13 @@ pub(crate) enum Shape {
     Scalar,
     /// An array, wherever and whenever it is evaluated.
     Array,
-    /// Decided by the shape check when it is asked: the node reads a LAMBDA
-    /// parameter, a defined name, a structured or detached reference, a LET
-    /// name, a call whose result has no shape of its own (OFFSET, INDIRECT,
-    /// `A1#`, a LAMBDA call), or a node that binding can still change.
+    /// Decided by the shape check when it is asked. The node is a LAMBDA
+    /// parameter, a defined name, a structured reference, a detached range,
+    /// a 3-D reference, a LET name, a bare name that binding can still
+    /// change, or an unknown call such as a LAMBDA call. Or it is a call
+    /// whose result has no shape of its own (OFFSET, INDIRECT, `A1#`, a
+    /// function family with array hooks), or an operator or a call whose
+    /// shape follows such an operand.
     Dynamic,
 }
 
@@ -576,8 +579,8 @@ impl Ast {
         changed
     }
 
-    /// Heap payload owned below an inline AST root. The root itself is already
-    /// included in its formula hash-table bucket.
+    /// Heap payload owned below an inline AST root. The owner of the root
+    /// (a formula entry or a defined name) counts the root node itself.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]
