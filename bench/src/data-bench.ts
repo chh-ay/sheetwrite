@@ -210,10 +210,10 @@ export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
  */
 const QUERY_SCENARIO_ROWS: Partial<Record<QueryScenario, readonly number[]>> = {
   "filter-value-set-50000": [100_000],
-  // The AutoFilter rows cover the 100,000-row column of #735's acceptance.
+  // The AutoFilter rows open the dropdown on a 100,000-row column and apply a value filter there.
   "autofilter-dropdown": [100_000],
   "autofilter-apply-values": [100_000],
-  // AutoComplete over a 100,000-row column of distinct entries (#759).
+  // AutoComplete over a 100,000-row column of distinct entries.
   "autocomplete-first-key": [100_000],
 };
 

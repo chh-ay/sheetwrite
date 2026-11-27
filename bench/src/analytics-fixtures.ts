@@ -13,7 +13,7 @@ import type {
   WorkbookTable,
 } from "@sheetwrite/core";
 
-// Workbooks of the analytics benchmark (#625): charts over a large source,
+// Workbooks of the analytics benchmark: charts over a large source,
 // a sheet with many charts, and dashboards with KPI cards, a slicer, a
 // PivotChart and a pivot over an Orders table.
 
