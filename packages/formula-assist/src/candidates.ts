@@ -9,10 +9,10 @@ import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 import type { WorkbookPatterns } from "./workbook-patterns.js";
 
 /**
- * The signals that earn their keep on the benchmark. #801 also listed
- * argument roles, repeats within a formula and the ranges AutoSum picks; the
- * formulas typed in the session and the same cell on other sheets were tried
- * too. None of those paid on the benchmark.
+ * The signals that earn their keep on the benchmark. Argument roles, repeats
+ * within a formula, the ranges AutoSum picks, the formulas typed in the
+ * session and the same cell on other sheets were tried as signals too. None
+ * of those paid on the benchmark.
  */
 export const SIGNALS = ["neighbours", "syntax", "column", "workbook"] as const;
 
