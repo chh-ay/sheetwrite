@@ -918,7 +918,7 @@ impl CellStore {
     #[wasm_bindgen(js_name = search)]
     #[expect(
         clippy::too_many_arguments,
-        reason = "wasm-bindgen export: JS passes flat scalars; separate flags keep older five-argument callers reading values"
+        reason = "a WebAssembly export: JavaScript passes the sheet, columns, query and three flags as plain arguments, without building an object per call"
     )]
     pub fn search(
         &self,

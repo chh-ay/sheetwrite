@@ -63,7 +63,7 @@ impl CellStore {
     /// reports a non-reference argument.
     #[allow(
         clippy::wildcard_enum_match_arm,
-        reason = "two Ast variants exist only with the analysis feature, so a full list differs by build; every other reference shape takes the last arm"
+        reason = "three Ast variants exist only with the analysis feature, so a full list differs by build; the last arm hands every other expression to range_from_ast, which finds no range in a non-reference"
     )]
     fn reference_cell(
         &self,

@@ -53,7 +53,7 @@ impl Default for FuncAccumulator {
 impl FuncAccumulator {
     #[allow(
         unsafe_code,
-        reason = "arguments live in a fixed array of MaybeUninit slots; a safe layout is not yet measured on both machines"
+        reason = "a new accumulator leaves its 254 argument slots (about 4 KB) unwritten; only the slots below arg_count, which are written first, are read"
     )]
     fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
         if index >= self.arg_count {
