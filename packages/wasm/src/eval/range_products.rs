@@ -115,8 +115,6 @@ impl CellStore {
     }
 }
 
-// The slice loop tells empty and number kinds apart from the rest by their
-// bits alone.
 const _: () = assert!(
     KIND_EMPTY == 0 && KIND_NUMBER == 1,
     "the slice loop tells empty and number kinds apart by their bits"
@@ -178,10 +176,10 @@ mod tests {
 
     const ROWS: usize = 40;
 
-    /// Columns A–F mixing numbers, text, booleans and blanks; B also holds a
-    /// non-finite number and F numbers large enough to overflow a product.
-    /// G and H hold only numbers and blanks, with a non-finite number in H's
-    /// last rows.
+    /// Columns A–E mix numbers, text, booleans and blanks; B also holds a
+    /// non-finite number. F holds numbers large enough to overflow a
+    /// product. G and H hold only numbers and blanks, with a non-finite
+    /// number near the end of H.
     fn mixed_store() -> (CellStore, usize) {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(12, ROWS + 2);
