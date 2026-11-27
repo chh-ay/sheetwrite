@@ -213,21 +213,20 @@ export function relationshipPanel(grid: Grid): GridPanel {
           to_column.setError("Choose two different tables.");
           return;
         }
+
+        // As in Excel, the panel does not keep a relationship whose keys
+        // cannot resolve; the API admits one, because cells change later. The
+        // keys are checked before the commit, so a refused one leaves no trace.
+        const status = storeEngine(grid.store)?.getRelationshipKeyStatus(relationship);
+        if (status !== undefined && status.status !== "ok" && status.status !== "unavailable") {
+          to_column.setError(status_text(status));
+          return;
+        }
+
         const patch: DocumentOp = { op: "setRelationship", relationship };
         const message = rejectionMessage(grid.applyTransaction({ patches: [patch] }));
         if (message !== null) {
           to_column.setError("Each pair of tables can have one relationship, without a cycle.");
-          return;
-        }
-
-        // As in Excel, the panel does not keep a relationship whose keys
-        // cannot resolve; the API admits one, because cells change later.
-        // The engine reports key status only for a relationship in the
-        // workbook, so the panel applies it first and undoes it on failure.
-        const status = storeEngine(grid.store)?.getRelationshipStatus(relationship.id);
-        if (status !== undefined && status.status !== "ok" && status.status !== "unavailable") {
-          grid.undo();
-          to_column.setError(status_text(status));
           return;
         }
 
