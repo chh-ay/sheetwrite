@@ -151,9 +151,14 @@ it("refuses a relationship in the panel while its lookup keys repeat", async () 
       picker.value = value;
       picker.dispatchEvent(new Event("change", { bubbles: true }));
     }
+    let changes = 0;
+    grid.on("change", () => changes++);
     press(save);
     expect(grid.store.getWorkbook().dataModel).toBeUndefined();
     expect(panel_text()).toContain("The lookup table repeats a key in rows 1 and 3.");
+    // The panel checks the keys first, so the refused relationship is never
+    // committed: nothing syncs and no redo step is left.
+    expect(changes).toBe(0);
 
     expect(set_id("C3").status).toBe("applied");
     press(save);
