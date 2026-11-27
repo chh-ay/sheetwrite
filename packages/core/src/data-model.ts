@@ -1,6 +1,6 @@
 // Pure data-model rules shared by the protocol, the store and the history:
 // shape checks, structural checks and copies of table relationships. Nothing
-// here reads cells; the engine checks key values (#229).
+// here reads cells; the engine checks key values.
 
 import { isPlainRecord, ownValue } from "./plain-data.js";
 import type { DataModel, Measure, TableColumnRef, TableRelationship } from "./types/data-model.js";

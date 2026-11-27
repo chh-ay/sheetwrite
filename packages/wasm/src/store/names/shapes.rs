@@ -8,7 +8,7 @@
 //! the names are bound. Some sheet can define a name in its own scope; a
 //! workbook formula that uses such a name reads with another shape on that
 //! sheet, so it is read in a copy marked for the reading sheet
-//! ([`read_in_copy`], [`mark_copy`]), as develop expanded it per sheet.
+//! ([`read_in_copy`], [`mark_copy`]).
 
 use super::{Definition, NameFacts, NameScope, SheetFacts};
 use crate::calc::{Ast, NameId};

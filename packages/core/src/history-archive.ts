@@ -146,7 +146,7 @@ const REPLAY_BATCH_BYTES = DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes;
 /** Working-set bytes per encoded operation byte: the JSON bytes, the string and the parsed operations. */
 const TRANSACTION_RESERVATION_MULTIPLIER = 4;
 
-/** UTF-8 code units in a document ID, mutation ID or author ID. */
+/** Longest document ID, mutation ID or author ID, in UTF-16 code units. */
 const MAX_ID_LENGTH = 256;
 
 interface ListVersionsOptions {

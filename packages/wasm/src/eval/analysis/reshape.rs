@@ -33,7 +33,7 @@ family_functions! {
 
 const MAX_ARGUMENTS: usize = 255;
 
-/// Largest TOCOL and TOROW `ignore` code: 1 skips blanks, 2 skips errors.
+/// Largest TOCOL and TOROW `ignore` code: 1 skips blanks, 2 skips errors, 3 skips both.
 const MAX_IGNORE_CODE: f64 = 3.0;
 const IGNORE_BLANKS: u8 = 1;
 const IGNORE_ERRORS: u8 = 2;
@@ -311,14 +311,15 @@ fn estimate(
             literal_expand_size(static_argument(args, 2), source_cols),
         ) {
             (Some(rows), Some(cols)) => Estimate::Exact { rows, cols },
-            // A size read from a cell is known only after evaluation.
+            // A computed size is known only after evaluation, and so is the error for a
+            // literal below the source size.
             _ => Estimate::Unknown,
         },
         Function::SORTBY => Estimate::Exact {
             rows: source_rows,
             cols: source_cols,
         },
-        // The stacks returned above: their extent is their sources'.
+        // Unreachable: the stacks return above, sized from their sources.
         Function::HSTACK | Function::VSTACK => return Err(FormulaError::Value),
     })
 }
@@ -690,7 +691,7 @@ fn wrap(
     Ok(EvalMatrix::new(rows, cols, values.values))
 }
 
-/// EXPAND size: the source size when omitted, `#VALUE!` below it.
+/// EXPAND size: the source size when omitted or blank, `#VALUE!` below it.
 fn expand_size(value: Option<Value>, source: usize) -> Result<usize, FormulaError> {
     let Some(given) = value else {
         return Ok(source);

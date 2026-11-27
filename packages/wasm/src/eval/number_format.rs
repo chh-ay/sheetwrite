@@ -758,7 +758,8 @@ impl Layout {
 }
 
 /// The mantissa and exponent of a scientific format: the mantissa has as many
-/// integer digits as the format has `0` placeholders before the point.
+/// integer digits as the format has `0` placeholders before the point, and at
+/// least one.
 fn scientific_parts(value: f64, layout: &Layout) -> (f64, i32) {
     if value == 0.0 {
         return (0.0, 0);

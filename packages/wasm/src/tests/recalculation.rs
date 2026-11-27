@@ -61,7 +61,7 @@ fn many_scalar_writes_before_a_bulk_write_recompute_every_reader() {
         store.set_number(sheet, index * ROW_STEP, SCALAR_COL, WRITTEN_VALUE, 0);
     }
 
-    // A scalar written into the formula column is a dirty formula reader too.
+    // A formula set by a single-cell write in the formula column is a dirty reader too.
     store.set_formula(sheet, 3, FORMULA_COL, "=C10+1", 0);
     crate::tests::write_number_column(&mut store, sheet, BULK_COL, 0, &[BULK_VALUE; BULK_ROWS]);
     store.commit_sources();
@@ -142,7 +142,8 @@ fn dirty_formula_work_survives_replacement_before_the_pass() {
     store.set_formula(sheet, 0, 2, "=B1*10", 0);
     store.commit_sources();
 
-    // The old dependency reads must leave before a removed slot can be reused.
+    // A replaced formula's dependency reads must leave the index before
+    // another formula reuses its slot.
     store.set_number(sheet, 0, 1, 7.0, 0);
     store.set_formula(sheet, 1, 1, "=A1+100", 0);
     store.set_formula(sheet, 0, 1, "=A1+5", 0);
@@ -158,9 +159,9 @@ fn dirty_formula_work_survives_replacement_before_the_pass() {
     assert_eq!(number(&store, sheet, 1, 1), 104.0);
 }
 
-/// Volatile formulas (RAND, RANDBETWEEN, NOW, TODAY) recalculate with their
-/// dependents at every edit barrier, as in Excel; every other formula
-/// recalculates only when something it reads changed.
+/// Volatile formulas, such as RAND, RANDBETWEEN, NOW and TODAY, recalculate
+/// with their dependents at every edit barrier, as in Excel; every other
+/// formula recalculates only when something it reads changed.
 mod volatile_recalculation {
     use super::*;
 

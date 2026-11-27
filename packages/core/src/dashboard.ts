@@ -1,5 +1,5 @@
 // Pure dashboard rules shared by the protocol, the store and the history:
-// shape checks, layout checks and copies of dashboard items (#231). Nothing
+// shape checks, layout checks and copies of dashboard items. Nothing
 // here reads cells or computes item values. The store and the protocol load
 // this module at first paint, so each check reports one short message.
 

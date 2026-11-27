@@ -114,8 +114,7 @@ impl Table {
 /// Tables by slot. A removed table's slot is reused: the formulas that used
 /// it no longer name it. Names are found by scanning the few tables of a
 /// workbook, the last table found first, so a column of formulas that name
-/// one table builds no name key; the store keeps the same size it had with
-/// a map by name.
+/// one table builds no name key, and the store needs no map by name.
 #[derive(Default)]
 pub(crate) struct TableSlots {
     slots: Vec<Option<Table>>,

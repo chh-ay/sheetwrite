@@ -15,8 +15,8 @@ mod transfer;
 // One u64 per cell keeps the numeric bits and string-pool id in one cache
 // stream. `kind` stays the discriminator; the payload holds canonical f64 bits
 // for numbers and `STR_TAG | id` for string-pool ids.
-// Numeric writes canonicalize NaN, so the tag surface (a negative signaling
-// NaN pattern) can never be produced by a number.
+// Numeric writes canonicalize NaN to `CANON_NAN`, so no number has the tag's
+// high bits (a negative quiet NaN pattern).
 
 pub(crate) const STR_TAG_HI: u64 = 0xFFFC_0000;
 const STR_TAG: u64 = STR_TAG_HI << 32;
@@ -67,8 +67,11 @@ pub(crate) fn payload_str_id(bits: u64) -> u32 {
 
 /// Default allocation-lazy row granularity used when the host does not supply one.
 pub(crate) const DEFAULT_PAGE_CHUNK_ROWS: usize = 4096;
-// Presence is orthogonal to the source kind: calculated spill children keep
-// an empty source, and formula cells keep a formula source with payload zero.
+// The CALCULATED bit of a dense kind byte marks a slot whose payload holds a
+// calculated value (see `encode_cell`). It is independent of the source kind
+// in the low bits: a calculated spill child keeps an empty source, and a
+// formula cell keeps a formula source. The source payload of such a slot
+// reads as zero.
 const CALCULATED: u8 = 0x80;
 #[inline]
 fn dense_source(kind: u8, payload: u64) -> (u8, u64) {
@@ -116,8 +119,8 @@ pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 /// about 260 MB. A host may set a lower limit per store.
 pub(crate) const MAX_LOCAL_PAGED_CELLS: usize = 20_000_000;
 
-/// Rows per page of a local sheet: a dense sheet that grew past
-/// [`MAX_DENSE_CELLS`].
+/// Rows per page of a local sheet: a sheet that does not fit the store's
+/// dense-cell limit, which is at most [`MAX_DENSE_CELLS`].
 const LOCAL_PAGE_CHUNK_ROWS: usize = DEFAULT_PAGE_CHUNK_ROWS;
 
 pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Option<usize> {
@@ -177,12 +180,16 @@ pub(crate) struct CellStorage {
     style: Vec<u32>,
     /// Boxed so a dense sheet carries one pointer for it.
     paged: Option<Box<PagedStorage>>,
-    /// Makes invalidation constant-time for literal-only sheets.
+    /// Dense slots with the CALCULATED bit. At zero, `invalidate_derived`
+    /// skips its scan, so a literal-only sheet invalidates in constant time.
     dense_calculated_cells: usize,
 }
 
 impl CellStorage {
-    /// Physical roots include shadowed clean pages: acknowledgement can expose them.
+    /// Visits every string id a payload holds. Paged storage visits whole
+    /// clean pages, including rows that a dirty edit shadows, because
+    /// [`Self::remap_string_ids`] rewrites every clean payload and needs each
+    /// id in its table.
     pub(crate) fn visit_string_ids(&self, mut visit: impl FnMut(u32)) {
         let mut visit_payload = |payload: u64| {
             let id = payload_str_id(payload);
@@ -276,8 +283,8 @@ impl CellStorage {
         self.paged.as_ref().is_some_and(|paged| !paged.local)
     }
 
-    /// Whether the sheet grew past the dense cap and keeps its cells in local
-    /// pages.
+    /// Whether the sheet keeps its cells in local pages, because it did not
+    /// fit the store's dense-cell limit when it was added or grew.
     pub(crate) fn is_local_paged(&self) -> bool {
         self.paged.as_ref().is_some_and(|paged| paged.local)
     }
@@ -1180,7 +1187,8 @@ impl CellRun<'_> {
         if self.is_dense {
             return None;
         }
-        // A formula cell's result or one edit only overlays its own row.
+        // A dirty or calculated block can cover rows outside this run, so
+        // test each cell of the run, not only whether a block exists.
         let mut cells = self.start..self.end;
         if self.dirty.is_some() && cells.any(|index| self.dirty_cell(index).is_some()) {
             return None;
@@ -1262,11 +1270,13 @@ impl CellStorage {
     }
 
     /// Writes a `rows x cols` block of literal sources at `start`, dropping any
-    /// calculated value each cell held. A paged sheet takes it only without a
-    /// `revision` (a page load): each column goes through the paged column
+    /// calculated value each cell held. A datasource-paged sheet takes it only
+    /// without a `revision` (a page load); a local sheet, which keeps no dirty
+    /// overlay, takes any write. Paged columns go through the paged column
     /// writer, and a row with an unacknowledged edit has the edit's value
     /// replaced, as one unrevisioned cell write does. Returns `false` without
-    /// writing for a revisioned paged write, which needs dirty slots per cell.
+    /// writing for a revisioned write to a datasource-paged sheet, which needs
+    /// dirty slots per cell.
     ///
     /// Bulk ingest runs here once per column: one bounds check per column
     /// instead of per-cell sheet lookups, and the calculated-count update is
@@ -1324,8 +1334,8 @@ impl CellStorage {
     /// `entries`. Paged rows are unrevisioned writes; `dirty` decides rows
     /// with an edit.
     ///
-    /// The dense loop walks `entries` directly: indexing them through the
-    /// paged writer's per-index callback cost ~14 instructions per cell.
+    /// The dense loop walks `entries` directly. Going through the paged
+    /// writer's per-index callback adds about 14 instructions per cell.
     pub(crate) fn write_column_cells(
         &mut self,
         col: usize,
@@ -1417,8 +1427,9 @@ impl CellStorage {
         }
     }
 
-    /// The run containing `start`, ending no later than `end` or the column,
-    /// source page boundary. Reading a paged run counts as an access to its page.
+    /// The run from `start` to the first of `end`, the end of the column, or
+    /// the end of a paged block. Reading a paged run counts as an access to
+    /// its page.
     pub(crate) fn run(&self, start: usize, end: usize) -> CellRun<'_> {
         self.page_run(start, end, true)
     }

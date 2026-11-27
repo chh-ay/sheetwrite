@@ -13,7 +13,7 @@ export type PermuteRowsOperation = Extract<DocumentOp, { op: "permuteRows" }>;
 export const ROW_ORDER_ENCODING = "u32le-base64-v1";
 
 const BYTES_PER_ROW = 4;
-/** Characters passed to `String.fromCharCode` at once, below engine argument limits. */
+/** Characters per `String.fromCharCode` call; it stays below JavaScript argument count limits. */
 const CHARACTER_CHUNK = 8192;
 
 // Typed arrays use the platform byte order, which is little-endian on every

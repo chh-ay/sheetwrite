@@ -13,8 +13,8 @@ use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL};
 
-/// Key and aggregate rules that `PIVOTBY` shares with pivot tables. It lives
-/// below this family so the function registry does not list it.
+/// Key and value rules that `GROUPBY` and `PIVOTBY` share with pivot tables. It is a
+/// submodule, not a family, so the function registry does not list it.
 pub(crate) mod grouping;
 
 family_functions! {
@@ -89,7 +89,8 @@ impl Context<'_, '_> {
         rows: &[usize],
         column: usize,
     ) -> Result<Value, FormulaError> {
-        // These slices belong to stable group vectors for this evaluation.
+        // The key is the address and length of a group's rows. Group vectors do not change
+        // or move during this evaluation, so one key always means the same rows.
         let key = (rows.as_ptr() as usize, rows.len(), column);
         if let Some(sum) = self.sums.get(&key) {
             return Ok(sum.clone());
@@ -920,8 +921,8 @@ pub(crate) fn evaluate_matrix(
 mod tests {
     use super::*;
 
-    /// Sales rows as in #605: 10 regions, 100 products (each in one region),
-    /// an amount of 1 and one of 4 quarters. Each product has the same number
+    /// Sales rows: 10 regions, 100 products (each in one region), an amount of 1, and one
+    /// of 4 quarters. When `rows` is a multiple of 400, each product has the same number
     /// of rows in every quarter.
     fn sales(rows: usize, formula: &str) -> (CellStore, usize) {
         let mut store = CellStore::new();
@@ -940,8 +941,8 @@ mod tests {
 
     #[test]
     fn source_rows_do_not_count_against_the_operation_cap() {
-        // Develop charged about 38 operations per source row here and gave
-        // #NUM! above about 52,600 rows.
+        // At about 38 operations per source row, this call would pass the operation cap
+        // above about 52,600 rows.
         let (store, sheet) = sales(
             70_000,
             "=PIVOTBY(A1:B70000,D1:D70000,C1:C70000,PERCENTOF,0,2,,1,,,2)",
@@ -972,7 +973,8 @@ mod tests {
             Some("Total")
         );
         assert_eq!(store.get_cell(sheet, 111, 11).num(), 1.0);
-        // Develop charged about 19 per row and gave #NUM! above 100,000 rows.
+        // At about 19 operations per source row, this call would pass the operation cap
+        // above 100,000 rows.
         let (store, sheet) = sales(120_000, "=GROUPBY(A1:B120000,C1:C120000,SUM,0,2)");
         assert_eq!(store.get_cell(sheet, 0, 7).num(), 1_200.0);
         assert_eq!(store.get_cell(sheet, 110, 7).num(), 120_000.0);
@@ -986,7 +988,7 @@ mod tests {
             store.get_cell(sheet, 0, 5).string().as_deref(),
             Some("#NUM!")
         );
-        // A full sheet in the #605 shape fits; a second value column does not.
+        // A full sheet of rows in the `sales` shape fits; a second value column does not.
         assert!(check_placements(1_048_575, 2, Some(1), 1).is_ok());
         assert_eq!(
             check_placements(1_048_575, 2, Some(1), 2),

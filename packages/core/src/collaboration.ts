@@ -188,7 +188,7 @@ export class PresenceCoordinator {
     }
   }
 
-  /** Removes collaborators silent for longer than `timeout_ms`; the heartbeat also calls it. */
+  /** Removes collaborators silent for longer than `timeoutMs`; the heartbeat also calls it. */
   pruneStale(): void {
     if (this.destroyed) return;
     const cutoff = this.now() - this.timeout_ms;

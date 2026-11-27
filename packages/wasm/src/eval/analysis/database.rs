@@ -1,4 +1,6 @@
-//! Database functions keep header rows and criteria rows intact.
+//! Database functions: `DSUM`, `DCOUNT`, `DGET` and their relatives. Each one
+//! aggregates one field of the database records that match a criteria range.
+//! The first row of the database and of the criteria range holds field names.
 
 use crate::calc::Ast;
 use crate::store::CellStore;
@@ -91,7 +93,8 @@ fn compile_criteria(
     for cells in criteria.values[criteria.cols..].chunks_exact(criteria.cols) {
         let mut conditions = Vec::new();
         for (column, value) in cells.iter().enumerate() {
-            // A blank criterion imposes no restriction, even under an unused header.
+            // A blank criterion matches every record. It is skipped before its header
+            // is looked up, so a header that names no database field is no error.
             if matches!(value, Value::Blank)
                 || matches!(value, Value::Text(text) if text.is_empty())
             {
@@ -207,7 +210,7 @@ fn aggregate(
                 mean += delta / count as f64;
                 squared_deviations += delta * (number - mean);
             }
-            // Counted and returned above.
+            // These arms `continue` above, so they never reach this match.
             Function::DCOUNT | Function::DCOUNTA | Function::DGET => {}
         }
     }

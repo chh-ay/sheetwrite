@@ -141,11 +141,11 @@ pub struct CellStore {
     pub(crate) custom_functions: Option<Box<crate::eval::custom::CustomFunctions>>,
     /// Weak index of the literal REGEX patterns this store's formulas share.
     /// `None` until a formula uses one, and only the full engine has it. A
-    /// `Cell` adds one pointer to the store, so readers take the index out
-    /// and put it back.
+    /// `Cell` keeps the field one pointer wide and lets readers that hold
+    /// `&self` take the index out and put it back.
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
-    /// Open page loads; `u16` keeps `remote_load` in the word it used alone.
+    /// Count of open page loads. A `u16` lets `remote_load` share its word.
     loading_page: u16,
     /// Set while a page load applies edits another client committed, which
     /// recalculate only the formulas that read them.
@@ -178,7 +178,7 @@ pub struct CellStore {
     pub(crate) pivots: Option<Box<pivots::PivotRegistry>>,
     #[cfg(not(feature = "analysis"))]
     pub(crate) pivots: Option<Box<pivot_output::SavedPivots>>,
-    /// Table relationships of the full engine (#229). `None` until the host
+    /// Table relationships and measures of the full engine. `None` until the host
     /// sends one, so a workbook without relationships pays one pointer.
     #[cfg(feature = "analysis")]
     #[allow(
@@ -775,8 +775,9 @@ impl CellStore {
         out
     }
 
-    /// Return packed `[source_sheet, source_row, source_col, ...]` references
-    /// targeting one sheet, bounded before crossing into the host.
+    /// Packed `[source_sheet, source_row, source_col, ...]` of each formula
+    /// that is only a reference to a cell of `target_sheet`. `None` when there
+    /// are more than `max_entries`, so the list stays bounded for the host.
     #[wasm_bindgen(js_name = referencesTargeting)]
     pub fn references_targeting(
         &self,
@@ -860,10 +861,11 @@ impl CellStore {
         true
     }
 
-    /// Applies the cell move. When memory runs out the cells and formulas stay
-    /// where they were, and every formula of the sheet recalculates, since the
-    /// spills it showed were already detached. `edit` reads the sheet's
-    /// defined names through the scope it gets.
+    /// Runs `edit`, a row or column insert or delete, on `sheet`. When it
+    /// fails because memory runs out, the cells and formulas stay where they
+    /// were, and every formula of the sheet recalculates, since
+    /// `begin_structural_edit` already detached the spills they showed.
+    /// `edit` reads the sheet's defined names through the scope it gets.
     fn finish_cell_edit(
         &mut self,
         sheet: usize,
@@ -979,9 +981,11 @@ impl CellStore {
     }
 
     /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
-    /// the 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,
-    /// RANDBETWEEN, OFFSET, INDIRECT) and their dependents recalculate, and TODAY and NOW use
-    /// `serial` instead of the clock. Later recalculations read the clock.
+    /// the 1899-12-30 epoch. Only volatile formulas and their dependents
+    /// recalculate: formulas that call TODAY, NOW, RAND, RANDBETWEEN, OFFSET,
+    /// INDIRECT, SHEET, SHEETS, INFO or a host function registered as
+    /// volatile. TODAY and NOW use `serial` instead of the clock. Later
+    /// recalculations read the clock.
     #[wasm_bindgen(js_name = recomputeVolatile)]
     pub fn recompute_volatile(&mut self, serial: f64) -> bool {
         if !serial.is_finite() {
@@ -996,15 +1000,17 @@ impl CellStore {
     /// Parse and store a formula at `(row, col)`.
     ///
     /// Setters only mark cells dirty; they do not recompute formulas. The host
-    /// calls `recompute(sheet)` once at the transaction barrier so a multi-cell
-    /// edit performs one dependency-scoped pass instead of one full-sheet pass
-    /// per setter. A successful parse returns the pre-write cached scalar; a
-    /// parse rejection returns `0.0`, and a rejected write returns `NaN`.
+    /// recalculates once at the transaction barrier (`commitSources` or
+    /// `recompute`), so a multi-cell edit performs one dependency-scoped pass
+    /// instead of one full-sheet pass per setter. A successful parse returns
+    /// the pre-write cached scalar; a parse rejection returns `0.0`, and a
+    /// rejected write returns `NaN`.
     ///
-    /// The dependency index is invalidated only when the rewrite changes what
-    /// the formula reads or whether it produces an array. A constant-only edit
-    /// keeps the cached index, so its next recompute visits just the edited
-    /// formula and its dependents instead of every formula in the workbook.
+    /// A rewrite that keeps every read and the array shape, such as a
+    /// constant-only edit, leaves the dependency index as it is. Any other
+    /// rewrite queues a patch that the next recompute applies to the index.
+    /// Either way, that recompute visits just the edited formula and its
+    /// dependents instead of every formula in the workbook.
     #[wasm_bindgen(js_name = setFormula)]
     pub fn set_formula(
         &mut self,
@@ -1116,8 +1122,8 @@ impl CellStore {
         true
     }
 
-    /// Stable spill owner coordinate, or `u32::MAX` when `cell` is not part of
-    /// a materialized spill.
+    /// Stable spill owner row, or `u32::MAX` when the cell is not part of a
+    /// materialized spill; the column comes from `spillAnchorCol`.
     #[wasm_bindgen(js_name = spillAnchorRow)]
     pub fn spill_anchor_row(&self, sheet: usize, row: usize, col: usize) -> u32 {
         cell_key(row, col)
@@ -1300,7 +1306,7 @@ impl CellStore {
     /// Resolved values of a sparse coordinate list in one batched read.
     ///
     /// `rows` and `cols` are absolute coordinates and must have the same length;
-    /// otherwise the result carries no cells. Every entry reads exactly like
+    /// otherwise the result is `None`. Every entry reads exactly like
     /// [`Self::get_cell`], so a batched capture reports the values a per-cell
     /// read would.
     #[wasm_bindgen(js_name = cellSnapshots)]
@@ -1344,7 +1350,8 @@ impl Default for CellStore {
 
 /// Marks a validated bulk source rectangle once and detaches intersecting
 /// spills in one pass, so the per-cell loop that follows writes storage only.
-/// Paged callers reserve the rectangle's dirty overlay before calling.
+/// Range writes reserve the rectangle's dirty overlay before calling;
+/// `clear_range` skips unloaded paged cells, so it reserves per written cell.
 fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
     sheet.formulas.mark_dirty_rect(rect);
 
@@ -1356,9 +1363,10 @@ fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
 
 /// One destination cell plus the source that replaces whatever it held.
 ///
-/// Every writer — scalar, sparse and packed — builds this and hands it to
-/// [`CellStore::replace_cell_source`], so kind, payload, source, dirty marking
-/// and the dependency epoch are decided in one place.
+/// The scalar setters, sparse blocks and range writes build this and hand it
+/// to [`CellStore::replace_cell_source`] or its prepared-rectangle form, so
+/// kind, payload, source and dirty marking are decided in one place.
+/// `clearRange` and literal-only dense blocks write storage directly.
 struct CellSourceWrite {
     sheet: usize,
     row: usize,
@@ -1407,8 +1415,8 @@ impl CellStore {
         }
         // Every string is live, as after a fresh load: there is nothing to
         // reclaim, so the pool keeps its ids and releases its growth slack in
-        // place, instead of interning every string again and rewriting every
-        // cell. On 1,000,000 loaded rows this was about a sixth of the load.
+        // place. Interning every string again and rewriting every cell would
+        // cost about a sixth of a 1,000,000-row load.
         if marks.iter().all(|&marked| marked) {
             if force {
                 self.strings.release_slack();
@@ -1426,10 +1434,11 @@ impl CellStore {
         }
     }
 
-    /// Store one cell write and take the source-replacement decision: replace
-    /// the formula source, mark the destination dirty, and bump the dependency
-    /// epoch only when the replacement reads a different dependency graph.
-    /// Rejected writes leave sources and the epoch untouched.
+    /// Store one cell write: write the cell, replace its formula source and
+    /// mark what must recalculate. The dependency index records the change
+    /// only when the replacement reads differently
+    /// ([`FormulaGraph::replace_entry`]). A rejected write leaves the cell,
+    /// the sources and the index untouched.
     fn replace_cell_source(&mut self, write: CellSourceWrite) -> bool {
         self.replace_cell_source_inner(write, false)
     }
@@ -1622,8 +1631,8 @@ impl CellStore {
 
     /// Parses a formula as [`Self::resolve_unbound_formula`] does, then binds
     /// its literal REGEX patterns to the patterns the store's formulas share.
-    /// The features tell whether a sheet reference stayed detached and
-    /// whether the formula has a table reference.
+    /// The features tell what the parse found, such as a defined name, a
+    /// table reference or a sheet reference left detached.
     fn resolve_formula_ast(
         &self,
         source: &str,
@@ -1692,9 +1701,9 @@ impl CellStore {
     }
 
     /// Resolves a parsed formula as if it were in the cell at
-    /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, defined
-    /// names with their shapes, then structured references. Measures
-    /// resolve their inlined expression this way.
+    /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, then
+    /// defined names, then structured references, and last the shapes of the
+    /// defined names. Measures resolve their inlined expression this way.
     #[cfg(feature = "analysis")]
     pub(crate) fn resolve_parsed_formula(
         &self,
@@ -1757,8 +1766,7 @@ impl CellStore {
     }
 }
 
-/// A resolved formula tree, and what its parse found: whether a sheet
-/// reference stayed detached and whether it has a table reference.
+/// A resolved formula tree, and what its parse found ([`ParseFeatures`]).
 type ResolvedFormula = (Ast, ParseFeatures);
 
 /// Result of a single-cell read.

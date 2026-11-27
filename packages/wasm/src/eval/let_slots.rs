@@ -531,8 +531,8 @@ mod tests {
         }
     }
 
-    /// The LET formulas of the test suite and the gate rows, with cells that
-    /// hold numbers, text, an error and formulas that use LET themselves.
+    /// LET formulas over cells that hold numbers, text, an error and
+    /// formulas that use LET themselves.
     const FORMULAS: &[&str] = &[
         "=LET(x,1,x+1)",
         "=LET(x,1,y,x+1,x+y)",
