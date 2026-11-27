@@ -1091,9 +1091,8 @@ function render_number_text(value: number, code: string | undefined, locale: str
 
   const descriptor = section.numeric;
   if (!descriptor) return section.literal.replaceAll("@", "");
-  // Only the first-section fallback keeps a negative magnitude. Put its
-  // automatic sign before all affixes, not inside the formatted digit run.
-  // Preserve the existing handling of raw -0, dates, and explicit sections.
+  // Only the first-section fallback keeps a negative magnitude. Its automatic
+  // sign goes before all affixes, not inside the formatted digit run.
   const automatic_minus = magnitude < 0;
   const numeric_value = automatic_minus ? -magnitude : magnitude;
   const scaled = descriptor.percent ? numeric_value * 100 : numeric_value;

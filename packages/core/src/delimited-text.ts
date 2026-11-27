@@ -39,9 +39,9 @@ export const DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS: Readonly<DelimitedTextResou
     maxInputBytes: 32 * 1024 * 1024,
     // Bound the single returned string; exports cannot stream partial output.
     maxOutputBytes: 64 * 1024 * 1024,
-    // Preserve the million-row Sheetwrite data contract.
+    // Sheetwrite's million-row data limit.
     maxRows: 1_000_000,
-    // Preserve the XLSX-compatible worksheet width.
+    // The XLSX worksheet width.
     maxColumns: 16_384,
     // Bound aggregate parser arrays and encoder field work.
     maxCells: 1_000_000,
