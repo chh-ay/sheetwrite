@@ -296,7 +296,6 @@ fn value_bytes(values: &Vec<PivotValue>) -> usize {
             .sum::<usize>()
 }
 
-/// Text payload bytes of `values`.
 fn text_bytes(values: &[Value]) -> usize {
     values
         .iter()
@@ -782,9 +781,8 @@ fn inline_partials(partials: &[f64]) -> [f64; INLINE_PARTIALS] {
 }
 
 impl ExactSum {
-    // Inline at both callers: a row update and a build's merge. With two
-    // callers wasm-opt keeps it out of line, and each edit then pays a call
-    // per aggregate.
+    // Inline at both callers (a row update and a build's merge), for the
+    // reason given on `Partial::update`.
     #[inline(always)]
     fn add(&mut self, number: f64) {
         // Sums of whole numbers keep one partial and add without a rounding
@@ -2382,7 +2380,7 @@ impl PivotCache {
             };
         }
 
-        // Compact rows without subtotals show inner groups as bare labels.
+        // The `shows_values` rule, checked inline on the group already read.
         let depth = group.depth as usize;
         if !definition.tabular
             && !definition.subtotals
