@@ -89,7 +89,10 @@ function mount_toolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions
   });
 }
 
-/** Mount the ribbon; the toolbar takes its place if the ribbon's chunk fails. */
+/**
+ * Mount the ribbon. The toolbar shows the same commands, so it takes the
+ * ribbon's place if the ribbon's chunk fails.
+ */
 function mount_ribbon(
   host: HTMLElement,
   grid: Grid,
