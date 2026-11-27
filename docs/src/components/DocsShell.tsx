@@ -22,11 +22,10 @@ import { Icon } from "./Icon.js";
 import { InlineTableOfContents, TableOfContents } from "./TableOfContents.js";
 
 /*
- * The documentation page layout, ported from docs/src/components/DocsShell.tsx:
- * the sidebar, the top bar, the page head, the article with its outline, and
- * the footer. It is static markup; search and the API filter are islands, and
- * lib/shell.ts adds the theme toggle, the menu, the outline's current section
- * and the sidebar's scroll position.
+ * The documentation page layout: the sidebar, the top bar, the page head, the
+ * article with its outline, and the footer. It is static markup; search and
+ * the API filter are islands, and lib/shell.ts adds the theme toggle, the
+ * menu, the outline's current section and the sidebar's scroll position.
  */
 
 interface DocsShellProps {

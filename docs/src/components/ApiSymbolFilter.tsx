@@ -4,11 +4,10 @@ import { isServer } from "solid-js/web";
 import { Icon } from "./Icon.js";
 
 /*
- * Filter over the generated exported-symbol cards of an entry-point page,
- * ported from docs/src/components/ApiSymbolFilter.tsx. An island that hydrates
- * on first use. The cards are filtered in place rather than re-rendered: the
- * article's anchors, the outline and the Pagefind index keep pointing at the
- * same elements.
+ * Filter over the generated exported-symbol cards of an entry-point page. An
+ * island that hydrates on first use. The cards are filtered in place rather
+ * than re-rendered: the article's anchors, the outline and the Pagefind index
+ * keep pointing at the same elements.
  */
 
 interface SymbolCard {

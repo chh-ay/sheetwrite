@@ -13,8 +13,8 @@ import type {
 } from "@sheetwrite/core";
 
 /**
- * The workbook the docs screenshots show (scripts/docs-figure-shots.ts): a
- * year of orders by month, region and product, a table of regions with their
+ * The workbook the docs screenshots show (figures/capture.ts): a year of
+ * orders by month, region and product, a table of regions with their
  * managers, a data model that relates the two with revenue measures, and a
  * dashboard over it; for the formatting, analysis and formula pages, a
  * formatted regional report with a chart, a pivot of the orders with its

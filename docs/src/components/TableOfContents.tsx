@@ -4,10 +4,9 @@ import { For, Show } from "solid-js";
 import { Icon } from "./Icon.js";
 
 /*
- * The page outline, ported from docs/src/components/TableOfContents.tsx. The
- * build collects it from the page's headings (lib/outline.ts); it renders as
- * static markup, and lib/shell.ts marks the section being read and hides
- * entries whose headings the symbol filter hides.
+ * The page outline. The build collects it from the page's headings
+ * (lib/outline.ts); it renders as static markup, and lib/shell.ts marks the
+ * section being read and hides entries whose headings the symbol filter hides.
  */
 
 function OutlineLinks(props: { readonly items: readonly OutlineItem[] }) {

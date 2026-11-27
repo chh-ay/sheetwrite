@@ -11,10 +11,11 @@ import { count, ease, fadeWindow, lerp, span } from "./scene-math.js";
  *    list; ticking Units adds a second value column.
  *
  * The ribbon, formula bar and sheet tabs mirror the real shell and use its
- * glyph sheet. `frameAt` is a pure function of time; `apply` writes text,
- * transforms, opacity and data attributes, so the loop never re-renders
- * React. The server renders the still frame (the finished edit), which is
- * also what reduced motion and a page without scripting show.
+ * glyph sheet. `frameAt` is a pure function of time; `apply` in HeroApp.tsx
+ * writes text, transforms, opacity and data attributes straight into the DOM,
+ * so the loop updates no Solid state. The server renders the still frame (the
+ * finished edit), which is also what reduced motion and a page without
+ * scripting show.
  */
 
 export const HERO_LOOP_SECONDS = 25;

@@ -1,7 +1,7 @@
 /**
  * One Tab stop per code block. A code block can hold dozens of focusable
- * symbols (hover triggers and API links); each used to be its own Tab stop,
- * so leaving a block took one press per symbol. This build pass leaves the
+ * symbols (hover triggers and API links). If each were its own Tab stop,
+ * leaving a block would take one press per symbol. This build pass leaves the
  * block's first symbol in the tab order and takes the rest out; at runtime
  * `code-enhancements.ts` moves the stop with the arrow keys (a roving
  * tabindex), so Tab always leaves the block in one press.

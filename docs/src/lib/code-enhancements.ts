@@ -1,6 +1,6 @@
 /**
- * Page-wide behaviour of rendered code blocks, installed once by the root
- * route and kept across client-side navigations.
+ * Page-wide behaviour of rendered code blocks, installed once per page by the
+ * islands client (islands/client.tsx).
  *
  * - A code block wider than its column becomes a focusable region, so a
  *   keyboard can scroll it.

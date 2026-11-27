@@ -19,9 +19,8 @@ export interface CodeTabsProps {
 }
 
 /**
- * The landing's framework snippets, ported from
- * docs/src/components/landing/CodeTabs.tsx. Every snippet is markup in the
- * page (hidden until its tab is chosen), so choosing a tab loads nothing; the
+ * The landing's framework snippets. Every snippet is markup in the page
+ * (hidden until its tab is chosen), so choosing a tab loads nothing; the
  * island reads the panels back from the page when it hydrates.
  */
 export function CodeTabs(props: CodeTabsProps) {

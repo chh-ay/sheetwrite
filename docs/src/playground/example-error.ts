@@ -43,7 +43,7 @@ function error_line(reason: object): number | undefined {
   const frame = SOURCE_LOCATION.exec(typeof stack === "string" ? stack : "")?.[1];
   if (frame !== undefined) return from_function_line(Number.parseInt(frame, 10));
 
-  // JavaScriptCore: `line` is the throwing line; a `source_url` means it was in another file.
+  // JavaScriptCore: `line` is the throwing line; a `sourceURL` means it was in another file.
   const line = Reflect.get(reason, "line");
   const source_url = Reflect.get(reason, "sourceURL");
   if (typeof line !== "number" || !Number.isInteger(line) || source_url !== undefined) {

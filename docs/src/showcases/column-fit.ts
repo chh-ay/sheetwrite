@@ -31,7 +31,8 @@ export function fitColumnPixels(
     scale = policy.minimumScale;
   }
   if (policy.rounding === "ceil") return natural.map((width) => Math.ceil(width * scale));
-  // The additive form preserves the Svelte host's existing rounding at integer boundaries.
+  // `ordered` (the Svelte host) adds each column's floored share of the gap to its
+  // width; at integer boundaries this can round differently from `width * scale`.
   const widths = natural.map((width) =>
     policy.rounding === "ordered"
       ? width + Math.floor(((target - total) * width) / total)
