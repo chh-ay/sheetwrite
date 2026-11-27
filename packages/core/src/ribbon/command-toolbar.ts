@@ -445,9 +445,8 @@ export class CommandToolbar {
   }
 
   private readonly on_keydown = (event: KeyboardEvent): void => {
-    // The toolbar sits inside the grid host, whose handler treats Enter, Space
-    // and arrows as cell navigation. Keep plain keys here; Ctrl/Cmd shortcuts
-    // (undo, copy) still reach the grid, as they do from the ribbon.
+    // Plain keys stop here and Ctrl/Cmd shortcuts reach the grid, as in
+    // `Ribbon.on_keydown`.
     if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
     if (event.key === "Escape") {
       event.preventDefault();
