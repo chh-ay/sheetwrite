@@ -44,7 +44,7 @@ function normalize_text(text: string): string {
 
 /**
  * `TypeFormatFlags` is not part of the TypeScript 7 API surface, but its values
- * are unchanged; these are the two flags the manifest has always rendered with.
+ * are unchanged; these are the two flags the manifest renders with.
  */
 const TYPE_FORMAT_FLAGS = {
   NoTruncation: 1,

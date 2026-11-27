@@ -1,8 +1,7 @@
 /**
- * Writes the input files of the Excel checks for a model pivot (#229),
- * external links (#226), measures (#230), dashboards (#231) and multi-level
- * category labels (#501), and the unconfirmed fraction and Text format cases
- * (#799), to test/fixtures/excel-checks/.
+ * Writes the input files of the Excel checks for a model pivot, external
+ * links, measures, dashboards and multi-level category labels, and the
+ * unconfirmed fraction and Text format cases, to test/fixtures/excel-checks/.
  * Sheetwrite writes each file, through the same export a user runs, with the
  * full engine, so model pivots, measures and dashboards hold their values.
  *
