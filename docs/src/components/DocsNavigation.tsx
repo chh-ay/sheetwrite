@@ -13,8 +13,8 @@ import { createUniqueId, For, Show } from "solid-js";
 import { Icon } from "./Icon.js";
 
 /*
- * The docs navigation tree, ported from docs/src/components/DocsNavigation.tsx.
- * Static markup: groups are native <details>, so opening them needs no script.
+ * The docs navigation tree. Static markup: groups are native <details>, so
+ * opening them needs no script.
  */
 
 /**

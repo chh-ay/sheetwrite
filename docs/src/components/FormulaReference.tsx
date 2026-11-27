@@ -4,9 +4,9 @@ import { isServer } from "solid-js/web";
 import { Select } from "./Select.js";
 
 /*
- * A formula family's filter, ported from docs/src/components/FormulaReference.tsx.
- * The family's table is static page markup beside it (islands/content.tsx
- * renders both); this island only hides and counts the table's rows.
+ * A formula family's filter. The family's table is static page markup beside
+ * it (islands/content.tsx renders both); this island only hides and counts the
+ * table's rows.
  */
 
 const ENGINE_OPTIONS = [

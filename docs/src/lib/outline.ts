@@ -59,11 +59,10 @@ function find_element(
 }
 
 /**
- * The outline of a page's content, by the same rules the browser applies to
- * the rendered article (`useDocumentOutline`): h2 and h3 headings with ids,
- * and member cards on API pages without their own member index (where the
- * group headings, Properties and Methods, stand in for them); a member's
- * inner headings and search anchors are left out.
+ * The outline of a page's content: h2 and h3 headings with ids, and member
+ * cards on API pages without their own member index. On a page with a member
+ * index, the group headings (Properties, Methods) stand in for the cards. A
+ * member's inner headings and search anchors are left out.
  */
 function collect_outline(tree: HastElement): OutlineItem[] {
   const lists_members =

@@ -10,9 +10,9 @@ import { Icon } from "./Icon.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 /*
- * The documentation top bar, ported from docs/src/components/DocsTopbar.tsx,
- * with the theme toggle and the menu (DocsNavigationMenu.tsx) as static
- * markup; lib/shell.ts gives them their behaviour. Search is an island.
+ * The documentation top bar, with the theme toggle and the menu
+ * (NavigationMenu below) as static markup; lib/shell.ts gives them their
+ * behaviour. Search is an island.
  */
 
 const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";

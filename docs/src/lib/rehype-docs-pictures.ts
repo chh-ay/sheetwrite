@@ -1,8 +1,8 @@
-// Puts the docs art into compiled pages: each section card's illustration, the
-// diagrams replacing older figure images, and a diagram after each heading the
-// placement table names (art/docs-pictures.ts). Runs after rehype-slug,
-// so headings have their ids. A placement whose heading is missing fails the
-// build, so the table can't drift from the pages.
+// Puts the docs art into compiled pages: each section card's illustration,
+// the art that draws a page's `<Diagram name>` figures, and a diagram after
+// each heading the placement table names (art/docs-pictures.ts). Runs after
+// rehype-slug, so headings have their ids. A placement whose heading is
+// missing fails the build, so the table can't drift from the pages.
 import {
   AFTER_LEAD,
   AT_START,

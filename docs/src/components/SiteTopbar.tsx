@@ -16,13 +16,12 @@ function current_section(pathname: string): Section {
 }
 
 /**
- * The site header outside the documentation, ported from
- * docs/src/components/SiteTopbar.tsx: brand, Docs, Showcases, Releases, GitHub
- * and the theme toggle. On phones the site links open from the menu button as
- * a native popover (open, close, Escape, light dismiss and focus come from the
- * browser, without script). The theme toggle's behaviour is in lib/shell.ts.
- * Its first stop is the skip link: every page with this header has its main
- * region at `#main-content`, as the docs shell does.
+ * The site header outside the documentation: brand, Docs, Showcases, Releases,
+ * GitHub and the theme toggle. On phones the site links open from the menu
+ * button as a native popover (open, close, Escape, light dismiss and focus
+ * come from the browser, without script). The theme toggle's behaviour is in
+ * lib/shell.ts. Its first stop is the skip link: every page with this header
+ * has its main region at `#main-content`, as the docs shell does.
  */
 export function SiteTopbar(props: { readonly pathname: string }) {
   const section = () => current_section(props.pathname);
