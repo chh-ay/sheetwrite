@@ -42,13 +42,16 @@ import { RIBBON_TABS } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
 
 export interface RibbonMountOptions extends RibbonConfig {
-  /** Called after the ribbon is minimized to its tab row or expanded again. */
+  /**
+   * Called when the ribbon's height changes: after it is minimized to its tab
+   * row or expanded again, and after it switches between full and compact.
+   */
   readonly onHeightChange: (height: number) => void;
   /** Where keyboard focus goes back to; defaults to focusing the host. */
   readonly focusGrid?: () => void;
   /** Host glyph overrides, as `GridConfig.icons`. */
   readonly icons?: IconOverrides;
-  /** `GridConfig` switches that choose commands; defaults show every command but Export. */
+  /** `GridConfig` switches that choose commands; defaults show every command but Export and Keyboard Shortcuts. */
   readonly flags?: CommandFlags;
 }
 
@@ -210,7 +213,8 @@ export class Ribbon {
     );
     // Some commands depend on the document, such as Edit Links on its links.
     this.lifetime.add(grid.on("change", () => this.update_availability()));
-    // Absent in some test environments; the ribbon then never shrinks groups.
+    // Absent in some test environments. The ribbon then fits its groups only
+    // when it changes itself (a tab picked, the layout switched), not on resize.
     if (typeof ResizeObserver === "function") {
       const resize_observer = new ResizeObserver(() => this.schedule_fit());
       resize_observer.observe(this.element);
