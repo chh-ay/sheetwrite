@@ -18,6 +18,7 @@ import {
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "./hyperlink.js";
+import { markOwnedArray } from "./json-bytes.js";
 import {
   conditionalFormatPastePatches,
   copyConditionalFormats,
@@ -1981,6 +1982,10 @@ export class ClipboardController {
       }
 
       if (can_pack) {
+        // Built here from the parsed cells and reached by nothing else before
+        // the commit measures them: the measurement reads the entries directly.
+        markOwnedArray(values);
+        markOwnedArray(style_ids);
         const block: PackedCellBlock = {
           rowCount: available_rows,
           colCount: width,
