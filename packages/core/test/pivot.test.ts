@@ -240,6 +240,14 @@ describe("pivot definitions in snapshots", () => {
       "invalid-value",
     ],
     [
+      "an ID longer than a table ID",
+      (input: WorkbookSnapshot) => {
+        input.sheets[0]!.pivots = [range_pivot({ id: "p".repeat(129) })];
+      },
+      "sheets[0].pivots[0].id",
+      "invalid-value",
+    ],
+    [
       "more filter values than the limit",
       (input: WorkbookSnapshot) => {
         input.sheets[0]!.pivots = [
