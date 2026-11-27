@@ -1,7 +1,7 @@
 // Formula help in a formula editor: the function list as you type, the
 // argument guide, live errors with their fixes and coloured references. This
-// module is a chunk of its own, which formula-assist.ts loads. Every feature
-// reads one `analyzeFormula` result.
+// module is a chunk of its own: formula-assist.ts loads it on the first
+// formula edit. Every feature reads one `analyzeFormula` result.
 
 import {
   analyzeFormula,

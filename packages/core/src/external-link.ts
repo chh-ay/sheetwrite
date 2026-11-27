@@ -8,6 +8,7 @@ import type {
 
 /** Most linked workbooks in one workbook; Excel files rarely hold more than a few. */
 const MAX_EXTERNAL_LINKS = 1_024;
+/** Most defined names of one linked workbook. */
 const MAX_EXTERNAL_NAMES = 10_000;
 /** Longest book name, sheet name or target. */
 const MAX_NAME_LENGTH = 2_048;
