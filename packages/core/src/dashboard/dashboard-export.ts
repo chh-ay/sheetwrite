@@ -55,7 +55,6 @@ function pivot_export(store: Store, sheet: SheetId, item: DashboardItem & { kind
   };
 }
 
-/** The static content of one item. */
 function item_export(store: Store, sheet: SheetId, item: DashboardItem): DashboardItemExport {
   const caption = dashboardItemTitle(store, sheet, item);
   if (item.kind === "pivot") return { id: item.id, ...pivot_export(store, sheet, item) };

@@ -107,7 +107,6 @@ export function applyPivotViews(store: Store, dashboards: readonly SheetId[]): v
   storeEngine(store)?.setPivotView((owner) => payload_of(store, owner)?.pivots, [...sheets]);
 }
 
-/** The IDs of the dashboard sheets of `store`. */
 export function dashboardsOf(store: Store): SheetId[] {
   return store
     .getWorkbook()
@@ -115,7 +114,6 @@ export function dashboardsOf(store: Store): SheetId[] {
     .map((sheet) => sheet.id);
 }
 
-/** The chart `id` of dashboard `sheet`, or undefined. */
 export function chartOf(store: Store, sheet: SheetId, id: string): ChartDefinition | undefined {
   const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
   return owner?.charts?.find((chart) => chart.id === id);
