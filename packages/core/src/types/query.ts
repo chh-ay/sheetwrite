@@ -137,7 +137,7 @@ export interface SavedQueryOutput {
 export interface SavedQuery {
   /** Stable identity, unique in the workbook. */
   readonly id: string;
-  /** Display name, unique in the workbook when ASCII letter case is ignored. */
+  /** Display name, unique in the workbook when letter case is ignored. */
   readonly name: string;
   /** Where the query reads its rows, and their columns. */
   readonly source: SavedQuerySource;
