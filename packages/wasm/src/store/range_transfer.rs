@@ -63,7 +63,11 @@ impl CellStore {
         let payload = input.words()?;
         let style = input.ints()?;
 
-        if rows.checked_mul(cols) != Some(kind.len())
+        // `capture_range` never writes an empty range, and restoring one would
+        // take its last row or column as one before its first.
+        if rows == 0
+            || cols == 0
+            || rows.checked_mul(cols) != Some(kind.len())
             || kind.len() != payload.len()
             || kind.len() != style.len()
         {
@@ -854,5 +858,28 @@ mod tests {
         bytes[row..row + 4].copy_from_slice(&1u32.to_le_bytes());
 
         assert!(store.read_range_memory(&bytes, 0, 0, 0).is_err());
+    }
+
+    /// A range of no cells has nothing to restore, and restoring one would
+    /// compute its last row or column as one before its first.
+    #[test]
+    fn range_transfer_rejects_a_range_without_rows_or_columns() {
+        let mut store = CellStore::new();
+        store.add_sheet(2, 2);
+
+        for (rows, cols) in [(0, 2), (2, 0), (0, 0)] {
+            let mut out = Writer::new(RANGE_TAG);
+            out.usize(rows);
+            out.usize(cols);
+            out.bytes(&[]);
+            out.words(&[]);
+            out.ints(&[]);
+            out.strings(&StringStorage::new());
+            out.usize(0);
+            assert!(
+                store.read_range_memory(&out.0, 0, 0, 0).is_err(),
+                "{rows} by {cols}"
+            );
+        }
     }
 }

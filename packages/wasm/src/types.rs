@@ -18,8 +18,8 @@ use crate::store::names::{shapes, InPlace, NameFacts, NameScope};
 use std::borrow::Cow;
 use std::rc::Rc;
 
-// TypeScript mirrors these values in packages/core/src/store/wire-tags.ts.
-// No test checks the pairing: change both files together.
+// TypeScript mirrors these values in packages/core/src/store/wire-tags.ts;
+// packages/core/test/wire-tags.test.ts checks that the two agree.
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;
 pub(crate) const KIND_STRING: u8 = 2;

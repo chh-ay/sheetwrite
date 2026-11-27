@@ -69,6 +69,26 @@ fn data_edge_follows_google_ctrl_arrow_semantics() {
     assert_eq!(store.data_edge(sheet, 50, 0, 1, 0), 0);
 }
 
+/// A formula is data whatever it returns: Excel's Ctrl+Arrow stops at a
+/// formula that shows nothing, and the scan in a view order agrees.
+#[test]
+fn data_edge_stops_at_a_formula_with_a_blank_result_in_any_order() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 4);
+    store.set_string(sheet, 0, 1, "x", 0);
+    store.set_formula(sheet, 1, 1, "=C4", 0);
+    store.set_string(sheet, 3, 1, "x", 0);
+    store.recompute(sheet);
+
+    let view_order: Vec<u32> = (0..4).collect();
+    assert_eq!(store.data_edge(sheet, 0, 1, 1, 0), 1, "in data order");
+    assert_eq!(
+        store.data_edge_ordered(sheet, &view_order, 0, 1, 1, 0),
+        1,
+        "in a view order"
+    );
+}
+
 #[test]
 fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     let mut store = CellStore::new();
