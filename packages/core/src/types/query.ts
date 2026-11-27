@@ -149,7 +149,7 @@ export interface SavedQuery {
 
 /** One place where exported M behaves differently from the Sheetwrite engine. */
 export interface PowerQueryLoss {
-  /** Saved query identity. */
+  /** `SavedQuery.id` of the query the loss is in. */
   readonly query: string;
   /** Zero-based step, or null for the source or the query as a whole. */
   readonly step: number | null;

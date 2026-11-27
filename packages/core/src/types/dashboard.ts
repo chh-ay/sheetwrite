@@ -27,7 +27,7 @@ export interface DashboardPivotItem {
   id: string;
   /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
-  /** Always `"pivot"`. */
+  /** Tags the item as a pivot in `DashboardItem`. */
   kind: "pivot";
   /** `PivotDefinition.id` of a pivot on the same dashboard sheet. */
   pivot: string;
@@ -43,7 +43,7 @@ export interface DashboardSlicerItem {
   id: string;
   /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
-  /** Always `"slicer"`. */
+  /** Tags the item as a slicer in `DashboardItem`. */
   kind: "slicer";
   /** The table column whose values the slicer lists. */
   field: TableColumnRef;
@@ -65,7 +65,7 @@ export interface DashboardChartItem {
   id: string;
   /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
-  /** Always `"chart"`. */
+  /** Tags the item as a chart in `DashboardItem`. */
   kind: "chart";
   /** `ChartDefinition.id` of a chart on the same dashboard sheet; its `pivot` names the data. */
   chart: string;
@@ -80,7 +80,7 @@ export interface DashboardKpiItem {
   id: string;
   /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
-  /** Always `"kpi"`. */
+  /** Tags the item as a KPI card in `DashboardItem`. */
   kind: "kpi";
   /** `Measure.id` of a measure of the workbook's data model. */
   measure: string;
@@ -108,7 +108,7 @@ export interface Dashboard {
  * export: Excel has no dashboard sheet, so the export writes these values.
  */
 export interface DashboardItemExport {
-  /** The item's ID. */
+  /** `DashboardItem.id` of the item this content fills. */
   readonly id: string;
   /** Rows of values from the top-left corner of the box; the first row is the caption. */
   readonly cells: readonly (readonly CellScalar[])[];

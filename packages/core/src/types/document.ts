@@ -603,9 +603,9 @@ export interface SnapshotCell {
  * Formula/reference tuples are sparse exceptions keyed by row-major offset.
  */
 export interface PackedCellBlock {
-  /** Number of rows in the block. */
+  /** Rows in the block; `values` holds `rowCount * colCount` entries. */
   rowCount: number;
-  /** Number of columns in the block. */
+  /** Columns in the block: the length of one row in `values`. */
   colCount: number;
   /** One value per cell, row by row: cell (r, c) is at `r * colCount + c`. */
   values: CellScalar[];
@@ -625,9 +625,9 @@ export interface CellBlock {
   startRow: number;
   /** Zero-based sheet column of the block's first column. */
   startCol: number;
-  /** Number of rows the block spans. */
+  /** Rows the block spans, down from `startRow`. */
   rowCount: number;
-  /** Number of columns the block spans. */
+  /** Columns the block spans, right from `startCol`. */
   colCount: number;
   /** The block's stored cells, placed by offsets from its first row and column. */
   cells: SnapshotCell[];
@@ -649,7 +649,7 @@ export interface SheetSnapshot {
   visibility?: SheetVisibility;
   /** See `Sheet.tabColor`. */
   tabColor?: string;
-  /** Number of rows the sheet has. */
+  /** Rows in the sheet, empty rows after the last stored cell included. */
   rowCount: number;
   /** Keys are stable, unique document column identities as well as datasource keys. */
   columns: Column[];

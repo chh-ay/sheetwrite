@@ -673,9 +673,9 @@ export type ContextMenuActionName =
 export interface ContextMenuContext {
   /** Right-clicked cell, or null when the pointer is outside the cell body. */
   readonly cell: CellAddress | null;
-  /** Viewport-relative browser pointer coordinate. */
+  /** Pointer position in CSS pixels from the viewport's left edge. */
   readonly clientX: number;
-  /** Viewport-relative browser pointer coordinate. */
+  /** Pointer position in CSS pixels from the viewport's top edge. */
   readonly clientY: number;
 }
 
@@ -1804,7 +1804,7 @@ export interface Grid {
   setFrozen(rows: number, cols?: number): void;
   /** Content zoom factor (0.5–2): scales row/column geometry and fonts. */
   setZoom(zoom: number): void;
-  /** The current content zoom factor. */
+  /** The content zoom factor, from 0.5 to 2. */
   getZoom(): number;
   /**
    * Which renderer is actually active: `"worker"` when the OffscreenCanvas
