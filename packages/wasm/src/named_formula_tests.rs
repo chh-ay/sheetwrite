@@ -157,8 +157,7 @@ fn chain_over_rate(sheet_rate: bool) -> usize {
 
 /// A sheet's own name changes what the names over it read on that sheet,
 /// not how often they are read: a chain over it is read about as often as
-/// a chain over a workbook name, not once per path through the chain
-/// (#1060).
+/// a chain over a workbook name, not once per path through the chain.
 #[test]
 fn a_chain_of_names_over_a_sheets_own_name_reads_as_often_as_over_a_workbook_name() {
     let workbook = chain_over_rate(false);
@@ -575,8 +574,9 @@ fn retained_bytes(store: &CellStore) -> f64 {
 /// some spare capacity that a rebuild would not. That growth comes with the
 /// first edit and stays flat after it: 50 edits that move `Rate` back and
 /// forth over the formulas that use it retain what the first one did. The
-/// index patches the reads of up to 256 changed formulas in place and
-/// rebuilds past that, so 200 and 300 users take each path.
+/// index patches the reads of up to 256 changed formulas in place (or a
+/// quarter of all formulas, when that is more) and rebuilds past that, so
+/// 200 and 300 users take each path.
 #[test]
 fn name_edits_retain_bounded_index_capacity() {
     const EDITS: usize = 50;

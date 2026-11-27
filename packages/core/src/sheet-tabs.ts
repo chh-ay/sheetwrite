@@ -781,7 +781,7 @@ export class SheetTabs {
         try {
           choices.hidePopover();
         } catch {
-          // The fallback path was open without placing the menu in the top layer.
+          // `hidePopover` throws when the menu is not open as a popover: nothing to hide.
         }
       }
 
@@ -1227,7 +1227,7 @@ export class SheetTabs {
         try {
           list.hidePopover();
         } catch {
-          // The fallback path was open without placing the list in the top layer.
+          // `hidePopover` throws when the list is not open as a popover: nothing to hide.
         }
       }
       list.remove();

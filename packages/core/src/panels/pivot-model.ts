@@ -183,8 +183,9 @@ export function placeField(
 
 /** Remove one entry from its area. */
 export function removeField(pivot: PivotDefinition, placement: PivotPlacement): PivotDefinition {
-  // A measure value has no source field to carry anywhere, so removing it
-  // is the one edit it takes.
+  // `remove_placement` returns no moved field for a measure value, and the
+  // code below reads that as nothing removed, so a measure value is removed
+  // here.
   const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
   if (value !== undefined && "measure" in value) {
     return { ...pivot, values: without_index(pivot.values, placement.index) };

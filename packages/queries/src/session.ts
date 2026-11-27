@@ -98,7 +98,7 @@ export interface QuerySession {
   refresh(id: string, options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
   /** Refreshes every query with an output table, as one undoable change. */
   refreshAll(options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
-  /** Aborts pending refreshes; later calls are rejected. */
+  /** Aborts pending refreshes and removes the grid's query commands; later refreshes resolve `{ status: "aborted" }`. */
   dispose(): void;
 }
 
@@ -177,7 +177,9 @@ function dependency_order(
   const ordered: SavedQuery[] = [];
   const visited = new Set<string>();
 
-  // Saved definitions have no cycle (core admission), so a post-order walk terminates.
+  // A post-order walk pushes each query after the queries it joins. Core
+  // rejects saved definitions with a join cycle, so the order is valid; the
+  // `visited` set also stops the walk on a cycle.
   const visit = (id: string): string | undefined => {
     if (visited.has(id)) return undefined;
 

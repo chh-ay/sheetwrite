@@ -12,8 +12,9 @@
 //!   I. A. Stegun, "Handbook of Mathematical Functions" (NBS, 1964),
 //!   formulas 9.8.1 to 9.8.8.
 //! - Higher orders: the recurrence f(n+1) = 2n/x f(n) -/+ f(n-1). It runs
-//!   upward where that is stable, and downward from a high start order,
-//!   normalized by a known sum, where it is not.
+//!   upward where that is stable (Y, K, and J when x is above the order), and
+//!   downward from a high start order where it is not (I, and J when x is at
+//!   or below the order). It normalizes J by a known sum and I by I0.
 //!
 //! The results are accurate to about 1E-8.
 
@@ -35,10 +36,10 @@ const I_SCALE: f64 = 3.75;
 const K_SCALE: f64 = 2.0;
 
 /// The following parameters are chosen to match Excel's published results
-/// to 1E-9: the start of each downward recurrence, n + sqrt(m n) with m 40
-/// for J and 200 for I, and the constants 2/pi, pi/4, 3pi/4 and Euler's
-/// constant rounded to the digits below. The exact constants change the
-/// ninth digit.
+/// to 1E-9: the start orders of the downward recurrences, n + sqrt(40 n)
+/// rounded down to even for J and 2 (n + sqrt(200 n)) for I, and the
+/// constants 2/pi, pi/4, 3pi/4 and Euler's constant rounded to the digits
+/// below. The exact constants change the ninth digit.
 const J_START_FACTOR: f64 = 40.0;
 const I_START_FACTOR: f64 = 200.0;
 #[allow(clippy::approx_constant, reason = "chosen to match Excel's results")]
@@ -48,8 +49,8 @@ const THREE_PI_OVER_FOUR: f64 = 2.356_194_491;
 #[allow(clippy::approx_constant, reason = "chosen to match Excel's results")]
 const EULER_GAMMA: f64 = 0.577_215_66;
 
-/// A downward recurrence scales its values down by this factor when they
-/// pass the bound, to stay in range.
+/// A downward recurrence multiplies its values by `OVERFLOW_SCALE` when one
+/// passes this bound, to stay in range.
 const OVERFLOW_BOUND: f64 = 1e10;
 const OVERFLOW_SCALE: f64 = 1e-10;
 
@@ -432,7 +433,7 @@ fn modified_second_kind(order: u32, x: f64) -> f64 {
 }
 
 /// f(n+1) = 2n/x f(n) + sign f(n-1) from f(0) and f(1): Y with `sign` -1,
-/// K with 1, and J above its order with -1.
+/// K with 1, and J with -1 when x is above the order.
 fn upward(order: u32, x: f64, zero: f64, one: f64, sign: f64) -> f64 {
     if order == 0 {
         return zero;

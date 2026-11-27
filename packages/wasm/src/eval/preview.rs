@@ -1,5 +1,5 @@
 //! The result of a formula text, evaluated against the store without
-//! changing it, for the result preview in formula help (#221).
+//! changing it, for the result preview in formula help.
 //!
 //! A preview parses and resolves the text as the cell at its position would,
 //! then evaluates it with an empty set of formulas to recompute: every
@@ -321,7 +321,8 @@ impl CellStore {
         if let Some(refusal) = walk.refusal {
             return FormulaPreview::unavailable(refusal);
         }
-        // Marked as a stored formula's uses are, for the shape checks.
+        // The shape checks read the marks that a stored formula's tree
+        // carries, so the preview tree gets the same marks.
         shapes::mark(&mut ast, self.name_scope(sheet));
 
         let preview = self.evaluate_preview(&ast, sheet);

@@ -76,7 +76,11 @@ function describe_summary(summary: SelectionSummary | null, number_format?: stri
   };
 }
 
-/** Runs of spaces collapse in HTML, so parts need a visible separator. shell.css draws it between shown parts. */
+/**
+ * Joins the parts of the screen-reader text. Runs of spaces collapse in HTML,
+ * so the parts need a visible separator. shell.css draws the same separator
+ * between the drawn parts that show.
+ */
 const STATUS_SEPARATOR = " · ";
 
 /** `B2:D9`, or `C5` for one cell, with the sheet's row numbers. */

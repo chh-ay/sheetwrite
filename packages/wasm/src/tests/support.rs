@@ -3,7 +3,7 @@
 
 use super::*;
 
-/// Load numeric fixture data through the retained packed column writer.
+/// Loads numeric fixture data with the packed column writer.
 pub(crate) fn write_number_column(
     store: &mut CellStore,
     sheet: usize,

@@ -1,6 +1,10 @@
 const OUTPUT_CHUNK_BYTES = 64 * 1024;
 
-/** No producer work occurs until demand; cancellation closes the underlying generator. */
+/**
+ * A byte stream over `chunks` that pulls one chunk per read, so no chunk is
+ * produced before a reader asks for it. A failure or a cancel closes the
+ * iterator; `normalizeError` maps the error the stream reports.
+ */
 export function readableBytes(
   chunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
   normalizeError: (error: unknown) => unknown = (error) => error,

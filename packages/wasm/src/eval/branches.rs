@@ -37,7 +37,8 @@ enum Branching {
 
 /// What a call returns for one element: the argument at an index, or a
 /// value its rule computed (an error, FALSE for IF without
-/// `value_if_false`, the value IFERROR and IFNA tested).
+/// `value_if_false`, 0 for IFERROR without `value_if_error`, or the value
+/// IFERROR and IFNA tested).
 enum Pick {
     Argument(usize),
     Value(Value),

@@ -1,4 +1,4 @@
-//! Table relationships of the full engine (#229): the definitions core sends
+//! Table relationships of the full engine: the definitions core sends
 //! and their key checks. Core admits the structure (tables, no cycle); the
 //! engine checks the key values, which change with the cells.
 

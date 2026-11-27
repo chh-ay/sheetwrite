@@ -922,8 +922,9 @@ impl LookupStates {
     }
 }
 
-/// A clamped range of literal sources on a dense sheet, which lookups read
-/// in place. `first` is the slot of its top-left cell.
+/// A clamped range of literal sources, on a dense sheet or a loaded paged
+/// one, which lookups read in place. `first` is the slot of its top-left
+/// cell.
 #[derive(Clone, Copy)]
 pub(crate) struct StorageRange {
     pub(super) sheet: usize,
@@ -1229,9 +1230,9 @@ impl CellStore {
         }
     }
 
-    /// Reads a lookup argument. A range of literal sources on a dense sheet
-    /// is kept in place, after the checks `eval_range_matrix` makes; anything
-    /// else is evaluated into values for this lookup.
+    /// Reads a lookup argument. A range of literal sources is kept in place,
+    /// after the checks `eval_range_matrix` makes; anything else is evaluated
+    /// into values for this lookup.
     fn lookup_arg(
         &self,
         ast: &Ast,
@@ -1266,10 +1267,11 @@ impl CellStore {
         Ok(LookupArg::Values { rows, cols, values })
     }
 
-    /// `range` clamped to the sheet, when every cell is a literal source of a
-    /// dense sheet. The structural, shape and byte checks and their errors
-    /// are those of `eval_range_matrix`. `Ok(None)` is a range with a formula
-    /// or spill cell, paged storage, or a depth past the literal fast path.
+    /// `range` clamped to the sheet, when every cell is a literal source. A
+    /// paged sheet takes [`Self::paged_storage_range`]. The structural, shape
+    /// and byte checks and their errors are those of `eval_range_matrix`.
+    /// `Ok(None)` is a range with a formula or spill cell, a paged range that
+    /// is not fully loaded, or a depth past the literal fast path.
     fn storage_range(
         &self,
         range: CellRange,
@@ -1311,8 +1313,9 @@ impl CellStore {
                 return Ok(None);
             };
 
-            // One pass without a branch per cell: the literal kinds only use
-            // the low two bits, and text sets bit 1 without bit 0.
+            // One pass without a branch per cell: every literal kind fits in
+            // `LITERAL_KIND_BITS`, so one OR over the column finds any other
+            // kind, and a second flag notes whether any cell holds text.
             let (any_kind, any_text) = column_kinds.iter().fold((0, 0), |(any, text), &kind| {
                 (any | kind, text | u8::from(kind == KIND_STRING))
             });
@@ -1428,8 +1431,8 @@ const NEXT_SMALLER: i32 = -1;
 const BINARY_ASCENDING: i32 = 2;
 
 impl CellStore {
-    /// `LOOKUP(lookup_value`, `lookup_vector`, [`result_vector`]) and
-    /// `LOOKUP(lookup_value`, array). The search finds the largest value at
+    /// `LOOKUP(lookup_value, lookup_vector, [result_vector])` and
+    /// `LOOKUP(lookup_value, array)`. The search finds the largest value at
     /// or below `lookup_value` in an ascending list. The array form
     /// searches the first row of an array wider than it is tall, and the
     /// first column otherwise, and returns the value at the same position

@@ -1,5 +1,5 @@
 // The static content of dashboards and worksheet pivots, and the values of
-// charts over pivots, for an XLSX export (#231, #487, #495). Excel has no
+// charts over pivots, for an XLSX export. Excel has no
 // dashboard sheet, so the export writes each item's current values: what the
 // dashboard shows, with its slicer filters. A worksheet pivot that the export
 // cannot write natively also writes its current output as cells, as Excel
@@ -27,7 +27,7 @@ import {
 } from "./dashboard-engine.js";
 import { slicerSelection } from "./dashboard-payload.js";
 
-/** A caption row over value rows that use General. */
+/** The item's caption as the first row, over its value rows. */
 function captioned(
   caption: string,
   rows: readonly (readonly CellScalar[])[],

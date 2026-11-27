@@ -521,7 +521,8 @@ mod tests {
         // Code 9 skips only the filtered row, so the two kinds stay apart.
         original.set_formula(0, 1, 1, "=SUBTOTAL(9,A1:A3)", 0);
         original.recompute_changed();
-        // The filter keeps rows 0, 1 and 3 of the four.
+        // Row 0 is hidden by hand. The filter keeps rows 0, 1 and 3 of the
+        // four, so it hides row 2.
         assert!(original.set_row_visibility(0, &[0, 0], Some(vec![0, 1, 3])));
 
         let mut replacement =

@@ -1,8 +1,9 @@
 //! Smaller resource limits for one read-only formula preview.
 //!
 //! Ordinary evaluation never opens a preview, and every hook below starts
-//! with one thread-local read at a range read, an array allocation, a text
-//! output or a LAMBDA call. No hook runs per expression or per range cell.
+//! with one thread-local read at a range read, a single cell read, an array
+//! allocation, a text output or a LAMBDA call. No hook runs per expression or
+//! per range cell.
 
 use std::cell::Cell;
 

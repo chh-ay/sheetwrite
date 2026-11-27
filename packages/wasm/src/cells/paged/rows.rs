@@ -136,8 +136,9 @@ impl PagedStorage {
         pages
     }
 
-    /// Fill one destination through a scratch page. Traversal goes against the
-    /// move direction so even overlapping source slices are still untouched.
+    /// Fills `target`, a scratch page, with the rows that land on page `page`
+    /// of column `col`. `moved_pages` lists pages against the move direction,
+    /// so a source page is read before its own rows are replaced.
     fn moved_page(&self, col: usize, page: usize, movement: RowMove, target: &mut CleanPage) {
         target.reset();
         let first = page * self.chunk_rows;

@@ -1,7 +1,7 @@
 //! Row order of the engine sort against the sort order that Microsoft
 //! documents for Excel ("Sort data in a range or table in Excel", section
-//! "Learn about sort orders"). Each test sorts one column and checks the
-//! data-row permutation for both directions.
+//! "Learn about sort orders"). Each case sorts one column and checks the
+//! data-row permutation ascending and, where the case gives one, descending.
 
 use crate::store::CellStore;
 

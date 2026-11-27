@@ -69,7 +69,9 @@ pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResu
     calculate(function, values).map_or_else(Value::Error, Value::number)
 }
 
-/// Fold a reference directly; literal numbers need no evaluation or value list.
+/// SUMSQ of one range reference, read cell by cell without a value list: a number cell is
+/// read directly, any other cell is evaluated. `None` when the argument is not a range, so
+/// the caller takes the general path.
 pub(in crate::eval) fn streamed_sum_squares(
     store: &CellStore,
     args: &[Ast],
@@ -145,7 +147,8 @@ impl RangeContext<'_, '_> {
     }
 }
 
-/// Callers consume at most the validated range length.
+/// Walks a range in row-major order. It does not check the end: callers read at
+/// most the range length that `RangeReader` validated.
 struct NumberCursor<'a> {
     source: &'a SheetData,
     sheet: usize,
@@ -426,8 +429,8 @@ fn factorial(number: f64, double: bool) -> NumberResult {
     Ok(result)
 }
 
-/// Each factor is at least 1, so the product overflows to #NUM! after a few
-/// hundred steps at most.
+/// Every factor is at least 1, and after k steps the product is at least C(2k, k). So the
+/// loop ends, or overflows to #NUM!, within about 515 steps.
 fn combinations(total: f64, picked: f64) -> NumberResult {
     if picked > total {
         return Err(FormulaError::Num);

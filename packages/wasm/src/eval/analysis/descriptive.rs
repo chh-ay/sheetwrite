@@ -28,9 +28,10 @@ family_functions! {
     TRIMMEAN,
 }
 
-/// The arguments of `function` that take one value: `x` of FORECAST, `k`,
-/// the percent of TRIMMEAN, `x` and the significance of PERCENTRANK, and the
-/// number and order of RANK.AVG. The data are ranges or arrays.
+/// The arguments of `function` that take one value: `x` of FORECAST, `k` of
+/// PERCENTILE.EXC, `quart` of QUARTILE.EXC, the percent of TRIMMEAN, `x` and
+/// the significance of PERCENTRANK, and the number and order of RANK.AVG.
+/// The data are ranges or arrays.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::FORECAST | Function::FORECAST_LINEAR => ValueArgs::at(&[0]),

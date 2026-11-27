@@ -1,4 +1,5 @@
-// DOM helpers shared by the Chart panel and the pivot field list.
+// DOM helpers shared by the side panels, and the message a panel shows when
+// the grid rejects a change.
 
 import type { ApplyTransactionResult } from "../types/transaction.js";
 

@@ -64,7 +64,10 @@ export interface FormulaFunctionDefinition {
   readonly implementation: FormulaFunction;
 }
 
-/** Register `functions` on the store of a new grid, then recalculate once. */
+/**
+ * Register `functions` on the store of a new grid. The engine recalculates as
+ * each function registers; one change event then tells the grid to repaint.
+ */
 function register_functions(store: Store, functions: readonly FormulaFunctionDefinition[]): void {
   if (functions.length === 0) return;
 
