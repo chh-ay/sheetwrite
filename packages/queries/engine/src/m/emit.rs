@@ -2,10 +2,11 @@
 //! binding, built only from functions documented in the M function reference:
 //! <https://learn.microsoft.com/powerquery-m/power-query-m-function-reference>
 //!
-//! Where an M default differs from the engine, the binding says so explicitly:
-//! `Table.Sort`, `Table.Group` and `Table.Join` do not promise a row order, so
-//! joins sort by keys and then by added row-index columns, and groups sort by
-//! their keys, which gives the engine's order.
+//! Where an M default differs from the engine, the binding says so explicitly.
+//! `Table.Group` and `Table.Join` do not promise a row order, and `Table.Sort`
+//! does not promise to keep the order of equal keys. So joins sort by keys and
+//! then by added row-index columns, and groups sort by their keys, which gives
+//! the engine's order.
 
 use super::text::{field, identifier, member_name, number, text};
 use super::{MQuery, MSourceKind};
@@ -15,7 +16,8 @@ use crate::plan::{
 
 /// Culture for every type conversion, so a refresh does not depend on the user's locale.
 const CULTURE: &str = "en-US";
-/// UTF-8, the encoding the engine reads ([MS-QDEFF] code page values follow Windows code pages).
+/// The `Encoding` option of `Csv.Document` takes a Windows code page; 65001 is UTF-8, the
+/// encoding the engine reads.
 const UTF8_CODE_PAGE: u32 = 65_001;
 const LEFT_ROW: &str = "Sheetwrite.LeftRow";
 const RIGHT_ROW: &str = "Sheetwrite.RightRow";
@@ -527,7 +529,9 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
         .filter(|locator| locator.starts_with("https://") || locator.starts_with("http://"));
 
     let Some(locator) = web.filter(|_| !matches!(source.kind, MSourceKind::Host)) else {
-        // A host-supplied source has no M connector; refresh in Excel reports this error.
+        // A host source, or a file source without an http(s) locator, has no M connector.
+        // The query evaluates to an error that names the source, and refresh in Excel
+        // reports it.
         writer.loss(None, "host-source");
         bindings.push((String::from("Source"), host_source_error(&source.source_id)));
         typed_binding(writer, query, bindings);
@@ -640,7 +644,8 @@ fn json_steps(
     bindings.push((String::from("Selected"), table));
 }
 
-/// The explicit typed schema; every conversion uses one fixed culture.
+/// The explicit typed schema. Every conversion uses one fixed culture, which is reported as
+/// a `conversion-culture` difference.
 fn typed_binding(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(String, String)>) {
     let source = &query.source;
     let previous = last_binding(bindings);
@@ -665,7 +670,8 @@ fn typed_binding(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(St
     writer.loss(None, "conversion-culture");
 }
 
-/// Queries in an order where joined inputs come first; the definitions have no cycle.
+/// Query indexes in an order where each joined input comes before the queries that join it.
+/// A join to an id outside the list does not hold a query back.
 fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     let mut order: Vec<usize> = Vec::with_capacity(queries.len());
 
@@ -705,8 +711,8 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     order
 }
 
-/// Member names for every query, unique when letter case is ignored, as Excel requires for
-/// query names. A name that had to change is reported as a difference.
+/// Member names for every query, unique when ASCII letter case is ignored, as Excel requires
+/// for query names. A name that had to change is reported as a difference.
 fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
     let mut members: Vec<String> = Vec::with_capacity(queries.len());
 

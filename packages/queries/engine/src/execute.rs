@@ -8,7 +8,8 @@ use crate::keys::indexes;
 use crate::plan::*;
 use crate::predicate::{compile_predicate, test_predicate};
 
-/// Executes one ordered plan; every failure carries its step and leaves inputs unchanged.
+/// Executes one ordered plan. A failure inside a step carries the index of that step; the
+/// borrowed `inputs` are never changed.
 pub fn execute(
     mut batch: Batch,
     plan: &[Step],

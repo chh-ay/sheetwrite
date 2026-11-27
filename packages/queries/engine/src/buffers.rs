@@ -55,7 +55,8 @@ pub(crate) fn flat_index(index: usize) -> Result<u32, Diagnostic> {
     Ok(u32::try_from(index)?)
 }
 
-/// Lengths written for the host saturate at `u32::MAX`, which every decoder rejects.
+/// A length or index for the host, saturated at `u32::MAX` instead of wrapping. The engine's
+/// own decoders reject `u32::MAX` as a count, string index or text offset.
 pub(crate) fn saturating_u32(value: usize) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
@@ -107,7 +108,7 @@ impl Bits {
         Ok(byte & (1 << (row % BITS_PER_BYTE)) != 0)
     }
 
-    /// Physical bit count does not include padding in the last byte.
+    /// Number of rows; the padding bits in the last byte are not counted.
     pub(crate) const fn len(&self) -> usize {
         self.len
     }
@@ -164,7 +165,7 @@ impl Texts {
         })
     }
 
-    /// Every appended string ends on UTF-8 boundaries and within the u32 byte limit.
+    /// Every appended string ends on a UTF-8 boundary and within `MAX_TEXT_BYTES`.
     pub(crate) fn push(&mut self, value: &str) -> Result<(), Diagnostic> {
         let end = self
             .bytes

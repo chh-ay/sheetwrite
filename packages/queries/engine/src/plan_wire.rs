@@ -43,7 +43,8 @@ pub(crate) const LITERAL_TRUE: u32 = 2;
 pub(crate) const LITERAL_NUMBER: u32 = 3;
 pub(crate) const LITERAL_TEXT: u32 = 4;
 
-/// A row-count aggregate has no source column.
+/// Marks an absent string: the source column of a row-count aggregate, or an optional string
+/// in a query list.
 pub(crate) const NO_COLUMN: u32 = u32::MAX;
 
 /// Operator codes are one-based positions in these tables; zero is never valid.
@@ -75,7 +76,8 @@ const AGGREGATE_OPS: [AggregateOp; 6] = [
     AggregateOp::Max,
 ];
 
-/// Borrowed host lanes for one plan; the decoder copies only the strings it keeps.
+/// Borrowed host lanes for one plan. The decoder copies the string table once, then clones
+/// each string that the plan uses.
 #[derive(Debug)]
 pub struct PlanWire<'a> {
     /// Step, predicate and literal codes, starting with the step count.
@@ -170,7 +172,7 @@ impl<'a> Cursor<'a> {
                     .get(row_index(self.code()?)?)
                     .ok_or_else(definition)?;
 
-                // Number lanes store finite values only.
+                // A number literal must be finite, like the values of a number column.
                 if !number.is_finite() {
                     return Err(definition());
                 }
