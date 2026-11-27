@@ -30,17 +30,14 @@ export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend | null): void {
   setXlsxSourceVerifier(next?.verifySource?.bind(next));
 }
 
-/** The installed table export backend, or `null`. */
 export function xlsxTableExportBackend(): XlsxTableExportBackend | null {
   return table_export_backend;
 }
 
-/** The installed table import backend, or `null`. */
 export function xlsxTableImportBackend(): XlsxTableImportBackend | null {
   return table_import_backend;
 }
 
-/** The installed workbook backend, or `null`. */
 export function xlsxWorkbookBackend(): XlsxWorkbookBackend | null {
   return workbook_backend;
 }

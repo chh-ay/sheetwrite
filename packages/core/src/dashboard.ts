@@ -12,7 +12,6 @@ import type { PivotDefinition } from "./types/pivot.js";
 
 /** Columns of the dashboard grid. */
 const DASHBOARD_COLUMNS = 12;
-/** Most items on one dashboard. */
 const MAX_DASHBOARD_ITEMS = 64;
 /** Tallest item, in grid rows. */
 const MAX_ITEM_HEIGHT = 64;
@@ -54,7 +53,6 @@ function is_integer_in(value: unknown, min: number, max: number): value is numbe
   return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;
 }
 
-/** Whether `sheet` is a dashboard. */
 export function isDashboard(sheet: { kind?: string } | null | undefined): boolean {
   return sheet?.kind === "dashboard";
 }
@@ -258,7 +256,6 @@ export function dashboardFields(sheet: DashboardSheet): {
     : {};
 }
 
-/** The item with `id` on `sheet`, if it has one. */
 export function findDashboardItem(
   sheet: DashboardSheet | null | undefined,
   id: string,
