@@ -304,7 +304,14 @@ export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolea
   const box = firstFreeBox(items, PIVOT_CHART_BOX.w, PIVOT_CHART_BOX.h);
   const title = grid.getPivots(sheet).find((pivot) => pivot.id === source.pivot)?.name;
   // A dashboard places the chart through its item box, so the anchor stays at the origin.
-  const anchor = { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 };
+  const anchor = {
+    row: 0,
+    col: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: DEFAULT_CHART_WIDTH,
+    height: DEFAULT_CHART_HEIGHT,
+  };
   const result = grid.applyTransaction({
     patches: [
       {

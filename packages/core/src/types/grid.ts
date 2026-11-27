@@ -1277,7 +1277,6 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
-  getCellInput(row: number, col: number): CellInputSnapshot | null;
   /**
    * Editable snapshot of the active cell, also when its row is hidden (see
    * {@link goToCell}); null without an active cell.
