@@ -138,7 +138,8 @@ describe("XLSX pivot tables", () => {
         },
       },
     ]);
-    // Excel's rendered output, page filter included, belongs to the pivot now.
+    // The pivot owns Excel's rendered output, page filter included, so the
+    // sheets keep none of its cells.
     expect(cell_count(sheetNamed(snapshot, "Tabelle2"))).toBe(0);
     expect(cell_count(sheetNamed(snapshot, "Tabelle3"))).toBe(0);
     expect(

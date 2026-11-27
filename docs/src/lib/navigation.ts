@@ -3,6 +3,7 @@ import apiNav from "../generated/api-nav.json" with { type: "json" };
 import formulaNav from "../generated/formula-nav.json" with { type: "json" };
 import releaseFacts from "../generated/release-facts.json" with { type: "json" };
 import type { IconName } from "../icons/icon-names.js";
+import { minorVersion } from "./releases.js";
 
 interface NavigationEntry {
   label: string;
@@ -613,11 +614,6 @@ const READING_ORDER: readonly NavigationPage[] = navigationPages(
 
 export type NavigationBadge = "new" | "updated";
 
-/** The major and minor version; patch releases share the same feature set. */
-function minor_version(version: string): string {
-  return version.replace(/\.\d+$/, "");
-}
-
 /**
  * Badge for an entry in the given release. A group shows the strongest badge
  * of its pages, so a collapsed group still tells the reader something inside
@@ -628,9 +624,9 @@ export function navigationBadge(
   item: NavigationItem,
   release: string,
 ): NavigationBadge | undefined {
-  const minor = minor_version(release);
+  const minor = minorVersion(release);
   const same_minor = (version: string | undefined) =>
-    version !== undefined && minor_version(version) === minor;
+    version !== undefined && minorVersion(version) === minor;
 
   if (same_minor(item.added)) return "new";
 

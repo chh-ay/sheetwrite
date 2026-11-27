@@ -121,7 +121,7 @@ pub(crate) fn test_predicate(
         } => {
             let left = checked_value(batch, *column, row)?;
 
-            // Null must survive NOT/AND/OR until the final row-selection decision.
+            // In M, an ordering operator with a null operand gives null.
             // https://learn.microsoft.com/powerquery-m/m-spec-operators#relational-operators
             if !matches!(op, CompareOp::Eq | CompareOp::Neq) {
                 if left == Value::Null || *right == Value::Null {

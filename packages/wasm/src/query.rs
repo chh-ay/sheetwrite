@@ -1,4 +1,5 @@
-//! Whole-column queries: sort, filter, search, aggregate — cache-local scans.
+//! Whole-column queries: sort, filter, find, distinct values, data edges and
+//! aggregates, as cache-local scans of the column-major cell storage.
 
 use std::cell::{Cell, OnceCell};
 use std::cmp::Ordering;
@@ -211,9 +212,9 @@ impl<'a> ValueSet<'a> {
         }
     }
 
-    /// Whether the cell at `index`, of resolved `kind` (1 number, 2 text,
-    /// 3 logical), holds a picked value. `numbers` and `texts` are the picks
-    /// the set was built from.
+    /// Whether `cell`, of resolved `kind` (1 number, 2 text, 3 logical),
+    /// holds a picked value. `numbers` and `texts` are the picks the set was
+    /// built from.
     fn holds(&self, cell: FilterCell<'_>, kind: u8, numbers: &[f64], texts: &'a [String]) -> bool {
         let FilterCell { data, store, index } = cell;
         let slots = &store.formula_slots;
@@ -326,7 +327,8 @@ impl<'a> FilterInput<'a> {
                 },
                 FILTER_EMPTY => FilterRule::Empty,
                 FILTER_NON_EMPTY => FilterRule::NonEmpty,
-                // Custom filters match as COUNTIF criteria do: one or two per filter.
+                // Each text of a custom filter is a COUNTIF criterion. One that
+                // does not parse makes `rules` return `None`.
                 FILTER_CUSTOM => FilterRule::Custom {
                     any: flag & 1 != 0,
                     criteria: texts
@@ -568,8 +570,9 @@ const MASK_ROWS: usize = 64;
 /// The rows of `0..row_count` that `keeps` accepts, ascending. The answers of
 /// each 64 rows go into a bit mask, and only then are the kept rows pushed: a
 /// branch on each answer mispredicts on every kept row of a filter that keeps
-/// rows scattered over the sheet. On 1,000,000 rows of seven cities this
-/// halved a contains filter natively (4.9 to 2.6 ms).
+/// rows scattered over the sheet. On 1,000,000 rows of seven cities, a
+/// native contains filter takes about half the time of a branch per row
+/// (2.6 ms against 4.9 ms).
 fn keep_all_rows(row_count: usize, mut keeps: impl FnMut(usize) -> bool) -> Vec<u32> {
     let mut kept = Vec::new();
     for block_start in (0..row_count).step_by(MASK_ROWS) {
@@ -590,13 +593,14 @@ fn keep_all_rows(row_count: usize, mut keeps: impl FnMut(usize) -> bool) -> Vec<
 const FILTER_CASE_INSENSITIVE: bool = true;
 const FILTER_WHOLE_CELL: bool = false;
 
-/// `aggregate` op codes. Every op except SUM also needs count and extrema.
+/// `aggregate` op codes. Op 4, and any unknown op, counts the numbers.
 const AGGREGATE_SUM: u8 = 0;
 const AGGREGATE_AVERAGE: u8 = 1;
 const AGGREGATE_MIN: u8 = 2;
 const AGGREGATE_MAX: u8 = 3;
 
-/// Running column aggregate. A sum skips the count and extrema updates.
+/// Running column aggregate. For SUM it keeps only the sum; for every other
+/// op it also keeps the count, the minimum and the maximum.
 struct NumericAccumulator {
     sum: f64,
     count: u32,
@@ -658,7 +662,7 @@ impl CellStore {
 
         // Dense columns scan their slices directly. A run read per cell adds a
         // dirty-overlay probe, a payload load and bounds checks for cells that
-        // are not numbers, which made this scan 2.6-6x slower than 0.5.4.
+        // are not numbers, which makes the scan 2.6 to 6 times slower.
         if let Some(column) = s.cells.dense_column(col) {
             let (kinds, payloads) = column.raw_slices();
             for (row, &raw) in kinds.iter().enumerate() {
@@ -735,7 +739,7 @@ impl CellStore {
                     0.0
                 }
             }
-            // COUNT is op 4; an unknown op also counts, as it always has.
+            // COUNT is op 4; an unknown op also counts.
             _ => f64::from(count),
         }
     }
@@ -964,8 +968,8 @@ impl CellStore {
     }
 }
 
-/// Single-key sort stays a crate helper: JS sorts through `sortRowsMulti`,
-/// which delegates here for one key without a survivor list.
+/// Single-key sort is a crate helper: JS sorts through `sortRowsMulti`,
+/// which calls it for one key and no candidate rows.
 impl CellStore {
     /// Stable row order sorted by a column. Returns a data-row permutation.
     pub(crate) fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
@@ -986,10 +990,10 @@ impl CellStore {
             return order;
         }
 
-        // Decorate-sort-undecorate: materialize each row's comparison key ONCE
-        // (one pool deref per row) instead of rebuilding both operands inside
-        // the comparator — a comparison sort would otherwise reconstruct keys
-        // ~2·n·log2(n) times, each a scattered heap deref for text cells.
+        // Decorate-sort-undecorate: build each row's sort key once (one pool
+        // read per row), rank the keys, then radix-sort the packed ranks. A
+        // comparator that built both operands would rebuild keys about
+        // 2·n·log2(n) times, each a scattered heap read for text cells.
         let mut keys = SortKeyBuilder::with_capacity(s.cells.row_count());
         let mut start = base;
         let end = base + s.cells.row_count();
@@ -1020,11 +1024,11 @@ impl CellStore {
     /// row at position `p` is `k * rows.len() + p`.
     fn ranked_row_keys(&self, data: &SheetData, cols: &[u32], rows: &[u32]) -> SortKeys {
         let row_count = rows.len();
-        // Decorate-sort-undecorate per key, the same way the one-key path does:
-        // a comparison sort that rebuilt both operands would reconstruct each
-        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
-        // every time. Keys are stored key-major so the first key — the one that
-        // decides nearly every comparison — stays contiguous.
+        // Decorate-sort-undecorate per key, as the one-key path does: a
+        // comparator that built both operands would rebuild each key about
+        // 2·n·log2(n) times, and a text key costs a scattered pool read every
+        // time. Keys are stored key-major, so the first key, which orders
+        // nearly every row, stays contiguous.
         let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
@@ -1174,15 +1178,16 @@ impl CellStore {
     ///
     /// - 0, a value list: its next `num_counts[i]` numbers in `value_nums` and
     ///   next `text_counts[i]` texts in `value_texts` (booleans as `\0TRUE` and
-    ///   `\0FALSE`); bit 1 of `flags[i]` also keeps empty cells.
+    ///   `\0FALSE`); the low bit of `flags[i]` also keeps empty cells.
     /// - 1, text that contains its one text in `value_texts`; `flags[i]` 1
     ///   matches case.
     /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
     ///   3 `<=`, 4 `=`, anything else `<>`.
     /// - 3, empty cells; 4, cells that are not empty.
     /// - 5, Excel's custom filter: its next `text_counts[i]` texts in
-    ///   `value_texts` are COUNTIF criteria (`">5"`, `"=ab*"`); bit 1 of
-    ///   `flags[i]` keeps a row that meets any of them, else it must meet all.
+    ///   `value_texts` are COUNTIF criteria (`">5"`, `"=ab*"`); with the low
+    ///   bit of `flags[i]` set, a row that meets any of them passes, else it
+    ///   must meet all. A criterion that does not parse gives no rows.
     /// - 6, dates in some months of any year, as Excel's "All Dates in the
     ///   Period": its next `num_counts[i]` numbers in `value_nums` are the
     ///   months it keeps, 1 to 12. Numbers that are not dates and other
@@ -1395,7 +1400,8 @@ impl<'a> DistinctScan<'a> {
         }
     }
 
-    /// Whether a scan that only lists holds `limit` values, so it is done.
+    /// Whether a scan that only lists holds `reach.values` values, so it is
+    /// done.
     #[inline]
     const fn listed_all(&self) -> bool {
         !self.reach.counted && self.reach.values != 0 && self.out.kinds.len() >= self.reach.values
@@ -1822,7 +1828,8 @@ fn resolved_text<'a>(
 ///
 /// The texts are kept end to end in one string with their UTF-16 lengths, so
 /// JavaScript decodes them in one call and slices them. Decoding one string
-/// per value took about 40% of the cell editor's completion read of 100,000 entries.
+/// per value costs about 40% of the cell editor's completion read of 100,000
+/// entries.
 #[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
@@ -1850,8 +1857,8 @@ impl DistinctColumn {
 
 #[wasm_bindgen]
 impl DistinctColumn {
-    /// Surrenders the per-value kind tags (number/string/boolean codes); the
-    /// column keeps an empty buffer afterwards.
+    /// Surrenders the per-value kind tags (0 blank, 1 number, 2 text or
+    /// error, 3 boolean); the column keeps an empty buffer afterwards.
     #[wasm_bindgen(js_name = takeKinds)]
     pub fn take_kinds(&mut self) -> Vec<u8> {
         std::mem::take(&mut self.kinds)
@@ -2814,7 +2821,7 @@ mod packed_order_tests {
     }
 
     /// A stable sort by [`SortKeys::compare`], key by key, then by row: the
-    /// order the row sorts gave before they packed their keys.
+    /// reference order that the packed-key sorts must give.
     fn compared_order(
         store: &CellStore,
         sheet: usize,

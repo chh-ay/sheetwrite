@@ -122,10 +122,7 @@ describe("dynamic arrays in XLSX", () => {
     });
 
     // The covered cells A2:A3 keep no value: the spill fills them again.
-    const values = cellsOf(imported)
-      .filter(({ value }) => value.kind !== "literal" || value.value !== null)
-      .map(({ row, col, value }) => ({ row, col, value }));
-    expect(values).toEqual([
+    expect(filled_cells(imported)).toEqual([
       { row: 0, col: 0, value: formula("=SEQUENCE(3)") },
       { row: 0, col: 2, value: { kind: "literal", value: "=ROW(A1:A2)" } },
       { row: 1, col: 2, value: { kind: "literal", value: 2 } },
@@ -157,8 +154,8 @@ describe("dynamic arrays in XLSX", () => {
     ]);
   });
 
-  // Security review of #914, finding 2: a spill area that is not the formula's own
-  // was kept for every later row and scanned for every value cell.
+  // A spill area that is not the formula's own must not be kept for every later
+  // row and scanned for every value cell.
   it("reads a file whose dynamic arrays claim other cells' areas in linear time", async () => {
     const rows = 100_000;
     const parts: string[] = [];
@@ -178,7 +175,7 @@ describe("dynamic arrays in XLSX", () => {
     );
   }, 20_000);
 
-  // Security review of #914, finding 3: each spill rebuilt a column map of its whole row.
+  // A spill must not rebuild a column map of its whole row.
   it("writes a row of many spills in linear time", async () => {
     const width = 4_096;
     const height = 30;

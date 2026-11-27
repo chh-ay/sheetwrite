@@ -28,9 +28,9 @@ family_functions! {
     TREND,
 }
 
-/// The arguments of `function` that take one value: `k`, `x` and the
-/// significance of PERCENTRANK, and the number and order of RANK. The other
-/// functions return arrays of their own or read whole ranges.
+/// The arguments of `function` that take one value: `k` of PERCENTILE, `quart` of
+/// QUARTILE, `x` and the significance of PERCENTRANK, and the number and order of
+/// RANK. The other functions return arrays of their own or read whole ranges.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::PERCENTILE | Function::QUARTILE => ValueArgs::at(&[1]),
@@ -269,8 +269,9 @@ fn validate_prediction_resources(
     Ok(())
 }
 
-/// MODE.MULT keeps one count per distinct value, so its work and memory are
-/// linear in the number of input cells.
+/// MODE.MULT holds a few words per input cell: the numbers, their sorted positions and
+/// one run per distinct value. Its memory is linear in the input cells, and the cell
+/// count is bounded by the work limit.
 fn validate_mode_resources(cells: usize) -> Result<(), FormulaError> {
     if cells > SPILL_MAX_RECOMPUTE_CELLS {
         return Err(FormulaError::Num);
@@ -495,8 +496,8 @@ fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix
             }
         }
     }
-    // Sort positions by value. The sort is stable, so each run of equal values
-    // starts at its first occurrence.
+    // The sort is stable, so each run of equal values starts at its first
+    // occurrence.
     let positions = super::sorted_positions(numbers.len(), &mut |left, right| {
         numbers[left].total_cmp(&numbers[right])
     });

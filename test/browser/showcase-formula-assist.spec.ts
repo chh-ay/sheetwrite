@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures.js";
 
-// The formula assist showcase (#801): ghost text in the formula bar and its keys.
+// The formula assist showcase: ghost text in the formula bar and its keys.
 
 test("suggests a row total from its neighbours, Tab takes it, and = on the filled cell starts again @portability", async ({
   page,

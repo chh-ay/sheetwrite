@@ -41,7 +41,8 @@ pub(crate) struct Block {
 }
 
 impl Block {
-    /// Text of a string payload, or `None` when the payload is not a string.
+    /// Text of a string payload, or `None` when the payload is not a string or
+    /// its string ID is outside the table.
     pub(crate) fn string(&self, payload: u64) -> Option<&[u8]> {
         if payload >> 32 != STRING_TAG_HIGH {
             return None;
@@ -50,6 +51,18 @@ impl Block {
         let (start, end) = *self.strings.get(payload as u32 as usize)?;
 
         Some(&self.text[start as usize..end as usize])
+    }
+
+    /// Whether rows `row..row + rows` and columns `col..col + cols` lie inside
+    /// the block.
+    pub(crate) fn holds(&self, row: u32, col: u32, rows: u32, cols: u32) -> bool {
+        let inside = |start: u32, len: u32, size: usize| {
+            start
+                .checked_add(len)
+                .is_some_and(|end| end as usize <= size)
+        };
+
+        inside(row, rows, self.rows) && inside(col, cols, self.cols)
     }
 
     /// Formula source of a cell; empty when the cell has no formula entry.
@@ -104,7 +117,10 @@ impl<'a> Reader<'a> {
         Ok(count)
     }
 
-    /// Decode one run-length coded byte array: runs of zero bytes are not stored.
+    /// Decode one run-length coded byte array and append it to `out`. The
+    /// array starts with its length. Each run is a `u32`: the high 31 bits
+    /// hold the byte count. When the low bit is set, the bytes follow; when it
+    /// is clear, the run is zero bytes, which are not stored.
     fn runs(&mut self, out: &mut Vec<u8>) -> Result<(), InvalidTransfer> {
         let length = self.u32()? as usize;
         let start = out.len();
@@ -129,7 +145,7 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
-    /// Append one text to `text` and return its byte range.
+    /// Append one UTF-8 text to `text` and return its byte range.
     fn text(&mut self, text: &mut Vec<u8>) -> Result<TextRange, InvalidTransfer> {
         let first = text.len();
         self.runs(text)?;
@@ -166,7 +182,8 @@ pub(crate) fn read_block(bytes: &[u8], block: &mut Block) -> Result<(), InvalidT
     block.styles.clear();
     block.text.clear();
 
-    // The scratch byte vector is reused for both word arrays.
+    // The `text` buffer is scratch for both word arrays. It is cleared and put
+    // back before the strings are read into it.
     let mut words = std::mem::take(&mut block.text);
     input.runs(&mut words)?;
     block.payloads.extend(
@@ -202,7 +219,7 @@ pub(crate) fn read_block(bytes: &[u8], block: &mut Block) -> Result<(), InvalidT
         block.strings.push(range);
     }
 
-    // String table epoch.
+    // Skip the string table epoch: the diff does not use it.
     input.u32()?;
 
     block.formulas.clear();
@@ -274,7 +291,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// One test cell: kind, payload and style.
+    /// One test cell: its kind and value. `block_bytes` takes styles separately.
     #[derive(Clone)]
     pub(crate) enum Cell {
         Empty,

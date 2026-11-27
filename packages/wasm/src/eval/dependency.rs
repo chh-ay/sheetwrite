@@ -74,7 +74,7 @@ struct ExactBand {
 }
 
 impl ExactBand {
-    /// Store sorted `(row, reader)` edges with no spare capacity.
+    /// Stores sorted `(row, reader)` edges with no spare capacity.
     fn from_edges(band: u32, edges: &[(u32, FormulaId)]) -> Self {
         let mut sources = Vec::with_capacity(edges.chunk_by(|a, b| a.0 == b.0).count());
         let mut readers = Vec::with_capacity(edges.len());
@@ -280,7 +280,6 @@ impl DepIndex {
             .binary_search_by(|group| group.range.cmp(&range))
     }
 
-    /// The formulas that read `cell` exactly.
     fn exact_readers(&self, cell: AbsCellKey) -> &[FormulaId] {
         let Ok(column) = self
             .exact
@@ -311,7 +310,6 @@ impl DepIndex {
         .map_or(&[], |source| band.readers_at(source))
     }
 
-    /// Every exact source cell of `sheet` with its readers.
     fn exact_sources_of(
         &self,
         sheet: u32,
@@ -863,7 +861,7 @@ impl RangeInterval {
     }
 }
 
-/// Build the whole-workbook dependency index.
+/// Builds the whole-workbook dependency index.
 ///
 /// The fields this function reads from each formula entry -- the read cells,
 /// the read ranges and whether the AST produces an array -- are also compared
@@ -1127,7 +1125,10 @@ fn with_group_marks<R>(index: &DepIndex, walk: impl FnOnce(&mut GroupMarks) -> R
     result
 }
 
-/// Collect every seed into one id worklist so shared readers enter it once.
+/// The formulas that the dirty cells of the `seeds` sheets reach, directly
+/// or through other formulas, added to `affected`. Every seed feeds one id
+/// worklist, so a reader that several seeds reach enters it once, and the
+/// walk visits each selected formula's readers once.
 pub(super) fn collect_affected_formulas(
     sheets: &[SheetData],
     slots: &FormulaStore,

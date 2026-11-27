@@ -1,4 +1,4 @@
-//! Table relationships of the full engine (#229): the definitions core sends
+//! Table relationships of the full engine: the definitions core sends
 //! and their key checks. Core admits the structure (tables, no cycle); the
 //! engine checks the key values, which change with the cells.
 
@@ -154,7 +154,40 @@ impl CellStore {
         }) else {
             return Vec::new();
         };
-        let record = match self.relationship_rows(relationship) {
+        self.status_record(relationship).to_vec()
+    }
+
+    /// The `relationshipStatus` record of a relationship that is not saved:
+    /// the keys of `fromTable`'s `fromColumn` (the many side) checked against
+    /// those of `toTable`'s `toColumn` (the one side). A caller checks a
+    /// relationship with it before committing one.
+    #[wasm_bindgen(js_name = relationshipKeyStatus)]
+    pub fn relationship_key_status(
+        &self,
+        from_table: String,
+        from_column: String,
+        to_table: String,
+        to_column: String,
+    ) -> Vec<u32> {
+        let relationship = Relationship {
+            id: String::new(),
+            from: ColumnRef {
+                table: from_table,
+                column: from_column,
+            },
+            to: ColumnRef {
+                table: to_table,
+                column: to_column,
+            },
+        };
+        self.status_record(&relationship).to_vec()
+    }
+}
+
+impl CellStore {
+    /// `[code, firstRow, secondRow, unmatched]` for the keys of `relationship`.
+    fn status_record(&self, relationship: &Relationship) -> [u32; 4] {
+        match self.relationship_rows(relationship) {
             Ok((map, _)) => {
                 // Error keys match no row, so they count as unmatched.
                 let unmatched = map
@@ -174,12 +207,9 @@ impl CellStore {
             Err(RelationshipError::Keys(KeyProblem::DuplicateKey { first, second })) => {
                 [STATUS_DUPLICATE_KEY, first, second, 0]
             }
-        };
-        record.to_vec()
+        }
     }
-}
 
-impl CellStore {
     /// The table with stable ID `id`. Tables are kept by slot, so this scans.
     #[inline(never)]
     pub(super) fn table_by_id(&self, id: &str) -> Option<&Table> {

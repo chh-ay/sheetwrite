@@ -69,6 +69,7 @@ import {
   clonePivot,
   encodePivotPayload,
   encodeSavedPivotPayload,
+  isPivotShape,
   MAX_PIVOTS_PER_WORKBOOK,
   type PivotIssue,
   pivotOwner,
@@ -78,7 +79,6 @@ import {
   sheetPivotScope,
   uncomputedPivotResult,
   validatePivotReferences,
-  validatePivotShape,
 } from "../pivot.js";
 import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
@@ -127,7 +127,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, RelationshipStatus, TableRelationship } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -298,7 +298,6 @@ const RELATIONSHIP_STATUS = {
   duplicateKey: 5,
 } as const;
 
-/** Decodes one engine `relationshipStatus` record. */
 function relationship_status_of(record: Uint32Array): RelationshipStatus {
   const [code, first = 0, second = 0, unmatched = 0] = record;
   switch (code) {
@@ -1129,12 +1128,10 @@ export class StoreDataEngine {
 
   private pivot_issues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
     const issues: PivotIssue[] = [];
-    validatePivotShape(pivot, "pivot", issues);
-    if (issues.length > 0) return issues;
+    if (!isPivotShape(pivot, "pivot", issues)) return issues;
 
-    // Shape validation above proves the definition schema.
     validatePivotReferences(
-      pivot as PivotDefinition,
+      pivot,
       { rows: owner.rowCount, cols: owner.columns.length },
       sheetPivotScope(sheets),
       "pivot",
@@ -1624,7 +1621,11 @@ export class StoreDataEngine {
     );
   }
 
-  /** Empty protection releases remain valid after their sheet has been removed. */
+  /**
+   * Pin the row bands a viewport shows, so the paged cache keeps their chunks.
+   * An empty `bands` releases the pins; for a removed sheet it does nothing.
+   * Any other call for an unknown sheet throws.
+   */
   pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
     const handle = this.sheets.handles.get(sheet);
     if (handle === undefined && bands.length === 0) return;
@@ -1956,6 +1957,17 @@ export class StoreDataEngine {
   /** Key status of the relationship with `id`, checked now from the cell values. */
   getRelationshipStatus(id: string): RelationshipStatus {
     const record = this.wasm.relationshipStatus?.(id);
+    if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
+    return relationship_status_of(record);
+  }
+
+  /**
+   * Key status of `relationship` before it is saved, checked now from the
+   * cell values; `unavailable` on an engine that does not check keys.
+   */
+  getRelationshipKeyStatus(relationship: TableRelationship): RelationshipStatus {
+    const { from, to } = relationship;
+    const record = this.wasm.relationshipKeyStatus?.(from.table, from.column, to.table, to.column);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
     return relationship_status_of(record);
   }
@@ -2321,7 +2333,7 @@ export class StoreDataEngine {
     return { values, formats, counts };
   }
 
-  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  /** `StoreViewState.filteredRows`, but throws `IncompleteDataError` while the sheet has unloaded cells. */
   filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
     this.requireCompleteQuery(sheet);
     return this.view.filteredRows(sheet, filters);
@@ -2837,6 +2849,17 @@ export class StoreDataEngine {
   }
 
   /**
+   * The distinct styles of a rectangle of data rows and columns, collected
+   * inside the engine. A paged sheet leaves its unloaded cells out.
+   */
+  rangeStyles(sheet: SheetId, r0: number, c0: number, r1: number, c1: number): CellStyle[] {
+    return Array.from(
+      this.wasm.rangeStyleIds(this.sheets.handleOf(sheet), r0, c0, r1, c1),
+      (style_id) => this.styles.get(style_id),
+    );
+  }
+
+  /**
    * Previous values of a sparse cell list, read in one batched call.
    *
    * Entry `n` belongs to cell `n` of `cells` and matches what `getCell` reports
@@ -2865,8 +2888,8 @@ export class StoreDataEngine {
    * Previous values of one dense block, read in one packed call.
    *
    * Each entry is the resolved value and style `getCell` reports for the same
-   * address, so captured `oldValue`/`oldStyle` payloads stay unchanged while the
-   * read costs one crossing instead of one per cell.
+   * address, so the captured `oldValue`/`oldStyle` payloads match `getCell`,
+   * and the read costs one crossing, not one per cell.
    */
   private capture_block_before_cells(
     bounds: Range,
@@ -3024,8 +3047,6 @@ export class StoreDataEngine {
       }
     }
 
-    // One UTF-8 buffer for the text cells, so a block does not cross the
-    // boundary as one JS string per cell.
     const packed_text = pack_texts(literal_texts);
 
     this.note_range_mutation_ffi(cells.length);
@@ -3165,9 +3186,10 @@ export class StoreDataEngine {
 
       return { appliedPatches: applied_patches, changes, storageRevision: storage_revision };
     } finally {
-      // Most transactions queue no hidden rows. With the flush and its nested
-      // try on every edit, JavaScriptCore optimized one-cell edits later, and
-      // the engine memory probe measured a 27% slower edit median.
+      // Most transactions queue no hidden rows, so the flush and its nested
+      // try run only when one did. Run on every edit, they make
+      // JavaScriptCore optimize one-cell edits later: the engine memory probe
+      // measured a 27% slower edit median.
       if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
       else this.commit_engine_sources();
     }
@@ -5389,8 +5411,9 @@ export class StoreDataEngine {
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.sync_pivots(sheet, replacement);
       }
-      // Installing definitions marks pivots dirty; finish calculation before the
-      // replacement becomes observable, without changing no-pivot transfers.
+      // Installing definitions marks pivots dirty, so commit the replacement's
+      // sources to calculate them before it becomes observable. A workbook
+      // without pivots skips this call.
       if (this.workbook.sheets.some((sheet) => sheet.pivots?.length)) replacement.commitSources();
     } catch (cause) {
       for (const snapshot of history) snapshot.replacement.free();

@@ -115,14 +115,15 @@ export class StoreViewState {
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
     if (!Number.isInteger(dataRow) || dataRow < 0) return null;
 
-    const order = this.order_by_sheet.get(sheet);
-    if (!order) {
-      const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
-      return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
-    }
-
+    // A sheet keeps a valid index only while it has an order (`drop_order`).
     let index = this.row_index_by_sheet.get(sheet);
     if (!index?.valid) {
+      const order = this.order_by_sheet.get(sheet);
+      if (!order) {
+        const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
+        return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
+      }
+
       const meta = this.sheets.sheetMeta(sheet);
       if (dataRow >= meta.rowCount) return null;
       index = this.rebuild_row_index(sheet, order, meta.rowCount, index);
@@ -148,7 +149,7 @@ export class StoreViewState {
     }
   }
 
-  /** Retained packed backing bytes for focused resource attribution. */
+  /** Bytes of the sheet's packed data-row-to-view-row index, for memory reports. */
   inverseIndexByteLength(sheet: SheetId): number {
     return this.row_index_by_sheet.get(sheet)?.storage.byteLength ?? 0;
   }
@@ -215,8 +216,9 @@ export class StoreViewState {
   }
 
   /**
-   * Row structures already rebased workbook metadata; invalidate the sort and
-   * rebuild from it. Column filters keep: they name columns, not rows, as an
+   * The row edit already moved the hidden rows and row groups in the
+   * workbook metadata; clear the sort and build the view again from that
+   * metadata. Column filters keep: they name columns, not rows, as an
    * AutoFilter's do in Excel when rows are inserted or deleted.
    */
   rowsChanged(sheet: SheetId): void {

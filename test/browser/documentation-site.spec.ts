@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import type { Page } from "@playwright/test";
 
-import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
+import { BOX_ROUNDING_PX, expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
 // The served site, real layout and the real Pagefind index. Unit and deployment
 // tests own the logic (moved-pages, search-ranking, prepare-docs-deployment).
@@ -192,9 +192,6 @@ test("a guide has one heading, a canonical URL and its section icon; sidebar ico
   await expect(page.locator(".sw-document__header > svg")).toHaveCount(0);
 });
 
-/** Layout rounds boxes to device pixels. */
-const ICON_CENTRE_TOLERANCE_PX = 1;
-
 /** Eyebrow and visible sidebar labels whose icon is off their first line's centre. */
 async function misplaced_icons(page: Page, { wraps = false } = {}): Promise<string[]> {
   const rows = await page
@@ -224,9 +221,7 @@ async function misplaced_icons(page: Page, { wraps = false } = {}): Promise<stri
         }),
     );
   if (wraps) expect(rows.some((row) => row.lines > 1)).toBe(true);
-  return rows
-    .filter((row) => !(Math.abs(row.offset) <= ICON_CENTRE_TOLERANCE_PX))
-    .map((row) => row.label);
+  return rows.filter((row) => !(Math.abs(row.offset) <= BOX_ROUNDING_PX)).map((row) => row.label);
 }
 
 test("a code-name title wraps between its words, never inside one", async ({ page }) => {

@@ -1,5 +1,5 @@
 //! The result of a formula text, evaluated against the store without
-//! changing it, for the result preview in formula help (#221).
+//! changing it, for the result preview in formula help.
 //!
 //! A preview parses and resolves the text as the cell at its position would,
 //! then evaluates it with an empty set of formulas to recompute: every
@@ -280,11 +280,10 @@ impl CellStore {
 
 impl CellStore {
     /// The result `source` (a formula with its leading `=`) would have in the
-    /// cell at `row` and `col` of `sheet`, without changing the store.
-    /// Referenced formulas give their stored results; nothing recalculates.
-    /// A formula that calls RAND, RANDBETWEEN or a host function is refused
-    /// before any of it runs, and one that needs more than the preview
-    /// limits returns `CostLimit` rather than a partial answer.
+    /// cell at `row` and `col` of `sheet`, without changing the store. The
+    /// module docs say what a preview reads and refuses. A formula that needs
+    /// more than the preview limits returns `CostLimit` rather than a partial
+    /// answer.
     pub(crate) fn preview_formula(
         &self,
         sheet: usize,
@@ -321,7 +320,8 @@ impl CellStore {
         if let Some(refusal) = walk.refusal {
             return FormulaPreview::unavailable(refusal);
         }
-        // Marked as a stored formula's uses are, for the shape checks.
+        // The shape checks read the marks that a stored formula's tree
+        // carries, so the preview tree gets the same marks.
         shapes::mark(&mut ast, self.name_scope(sheet));
 
         let preview = self.evaluate_preview(&ast, sheet);

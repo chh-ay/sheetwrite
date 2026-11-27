@@ -1,6 +1,6 @@
-// The link between a store's pivot views and its engine (#231, #487). The
-// dashboard view, the charts over pivots and the XLSX export all read pivot
-// results through it, so they see the same slicer filters and hidden pivots.
+// The link between a store's pivot views and its engine. The dashboard view,
+// the charts over pivots and the XLSX export all read pivot results through
+// it, so they see the same slicer filters and hidden pivots.
 
 import { isDashboard } from "../dashboard.js";
 import { scanColumnValues } from "../data-window-reads.js";
@@ -107,7 +107,6 @@ export function applyPivotViews(store: Store, dashboards: readonly SheetId[]): v
   storeEngine(store)?.setPivotView((owner) => payload_of(store, owner)?.pivots, [...sheets]);
 }
 
-/** The IDs of the dashboard sheets of `store`. */
 export function dashboardsOf(store: Store): SheetId[] {
   return store
     .getWorkbook()
@@ -115,7 +114,6 @@ export function dashboardsOf(store: Store): SheetId[] {
     .map((sheet) => sheet.id);
 }
 
-/** The chart `id` of dashboard `sheet`, or undefined. */
 export function chartOf(store: Store, sheet: SheetId, id: string): ChartDefinition | undefined {
   const owner = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
   return owner?.charts?.find((chart) => chart.id === id);

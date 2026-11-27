@@ -511,7 +511,7 @@ export function ViewPipelineDiagram() {
   );
 }
 
-/** Mechanism diagrams by the name a page's `<Picture name="…" />` uses. */
+/** Mechanism diagrams by name, for the placements in docs-pictures.ts. */
 export const MECHANISM_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   spills: SpillDiagram,
   loading: LoadingDiagram,

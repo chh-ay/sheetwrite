@@ -252,7 +252,7 @@ describe("result preview", () => {
     expect(preview()).toBe("");
   });
 
-  // Excel shows no result while a function name is still being typed (#1001).
+  // Excel shows no result while a function name is still being typed.
   it("shows nothing while the name at the caret is unfinished", async () => {
     const { textarea } = begin_edit();
     const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";

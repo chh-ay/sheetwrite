@@ -123,7 +123,7 @@ export interface ClipboardWindowView {
   readonly transferredElements: number;
 }
 
-/** Authoritative source value, evaluated value, style, and load state for a cell. */
+/** The value a cell shows and the cell's own style. */
 export interface ResolvedCell {
   /** The value shown in the cell: a formula's result, or the literal itself. */
   resolved: CellScalar;
@@ -193,10 +193,10 @@ export interface Store {
     cols: readonly number[],
   ): VisibleWindowView;
   /**
-   * Optional packed clipboard read. Custom stores may omit it; the controller
-   * preserves the per-cell Store fallback contract. With `dataRows`, `viewRows`
-   * are data rows, read in sheet order with the rows the view hides, as a copy
-   * over rows hidden by hand takes them.
+   * Optional packed clipboard read. A custom store may omit it; copy then
+   * reads each cell through the per-cell `Store` reads. With `dataRows`,
+   * `viewRows` are data rows, read in sheet order with the rows the view
+   * hides, as a copy over rows hidden by hand takes them.
    */
   getClipboardWindow?(
     sheet: SheetId,

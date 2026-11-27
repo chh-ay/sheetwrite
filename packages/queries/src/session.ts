@@ -1,15 +1,16 @@
-import type {
-  ApplyTransactionResult,
-  DocumentOp,
-  Grid,
-  QueryCommands,
-  Range,
-  SavedQuery,
-  SavedQueryOutput,
-  SavedQuerySource,
-  Sheet,
-  Workbook,
-  WorkbookTable,
+import {
+  type ApplyTransactionResult,
+  type DocumentOp,
+  type Grid,
+  type QueryCommands,
+  type Range,
+  type SavedQuery,
+  type SavedQueryOutput,
+  type SavedQuerySource,
+  type Sheet,
+  SheetwriteError,
+  type Workbook,
+  type WorkbookTable,
 } from "@sheetwrite/core";
 
 import { sessionCommands } from "./commands.js";
@@ -57,7 +58,10 @@ export type QueryFetchSource = (
 
 /** Host I/O for a session; the engine limits apply to every parse and execution. */
 export interface QuerySessionOptions {
-  /** Loads each saved query's source; the session has no other way to reach data. */
+  /**
+   * Loads each saved query's source, once for each query a refresh loads, with
+   * that refresh's abort signal. The session has no other way to reach data.
+   */
   readonly fetchSource: QueryFetchSource;
   /** Overrides for the engine's limits; unset ones keep their defaults. */
   readonly limits?: Partial<QueryLimits>;
@@ -98,7 +102,11 @@ export interface QuerySession {
   refresh(id: string, options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
   /** Refreshes every query with an output table, as one undoable change. */
   refreshAll(options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
-  /** Aborts pending refreshes; later calls are rejected. */
+  /**
+   * Aborts pending refreshes and removes the grid's query commands. Later
+   * refreshes resolve `{ status: "aborted" }`, and later `define` and
+   * `remove` calls throw a `SheetwriteError` with code `unavailable`.
+   */
   dispose(): void;
 }
 
@@ -177,7 +185,9 @@ function dependency_order(
   const ordered: SavedQuery[] = [];
   const visited = new Set<string>();
 
-  // Saved definitions have no cycle (core admission), so a post-order walk terminates.
+  // A post-order walk pushes each query after the queries it joins. Core
+  // rejects saved definitions with a join cycle, so the order is valid; the
+  // `visited` set also stops the walk on a cycle.
   const visit = (id: string): string | undefined => {
     if (visited.has(id)) return undefined;
 
@@ -486,8 +496,23 @@ export function createSessionWithEngine(
       : { status: "rejected", transaction };
   };
 
+  /** Throws once the session is disposed, so a definition change no longer reaches the grid. */
+  const assert_live = (): void => {
+    if (!lifetime.signal.aborted) return;
+
+    throw new SheetwriteError(
+      "unavailable",
+      "query",
+      "Sheetwrite: this query session was disposed",
+      {
+        retryable: false,
+      },
+    );
+  };
+
   const session: QuerySession = {
     define(query) {
+      assert_live();
       const diagnostic = check(query, saved_queries());
       if (diagnostic) return { status: "invalid", diagnostic };
 
@@ -495,6 +520,7 @@ export function createSessionWithEngine(
     },
 
     remove(id) {
+      assert_live();
       return grid.applyTransaction({ patches: [{ op: "removeQuery", id }] });
     },
 
@@ -516,8 +542,6 @@ export function createSessionWithEngine(
     },
   };
 
-  // The grid's Get Data, Refresh All and Queries & Connections commands appear
-  // while this session is alive.
   const unregister = registerCommands(sessionCommands(session));
 
   return session;

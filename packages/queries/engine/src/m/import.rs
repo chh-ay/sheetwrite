@@ -79,7 +79,8 @@ fn text(expression: &Expr) -> Option<&str> {
 }
 
 fn texts(expression: &Expr) -> Option<Vec<String>> {
-    // A single column name is also accepted where M takes `any`.
+    // M parameters typed `any`, such as the column list of `Table.SelectColumns`, also accept
+    // one name; a single text reads as a one-item list.
     if let Expr::Text(value) = expression {
         return Some(vec![value.clone()]);
     }
@@ -186,6 +187,8 @@ struct Source {
     locator: Option<String>,
     /// Column names fixed before typing, if the M lists them.
     names: Option<Vec<String>>,
+    /// The `Columns` option of `Csv.Document`: how many columns the document has.
+    width: Option<f64>,
 }
 
 /// The source, its declared columns, and the index of the binding that types them.
@@ -234,7 +237,6 @@ fn csv_source(arguments: &[Expr]) -> Outcome<Source> {
         }
     }
 
-    let _ = columns;
     Ok(Source {
         kind: MSourceKind::Csv {
             delimiter,
@@ -244,6 +246,7 @@ fn csv_source(arguments: &[Expr]) -> Outcome<Source> {
         source_id: locator.clone(),
         locator: Some(locator),
         names: None,
+        width: columns,
     })
 }
 
@@ -294,6 +297,7 @@ fn source(expression: &Expr) -> Outcome<Source> {
             source_id: locator.clone(),
             locator: Some(locator),
             names: None,
+            width: None,
         });
     }
 
@@ -303,6 +307,7 @@ fn source(expression: &Expr) -> Outcome<Source> {
             source_id: id.to_owned(),
             locator: None,
             names: None,
+            width: None,
         });
     }
 
@@ -623,8 +628,9 @@ impl Builder<'_> {
         Ok(())
     }
 
-    /// The emitter's join: remove-helpers(sort(join(add-index(left), add-index(right)))).
-    fn helper_join(&mut self, sorted: &Expr) -> Outcome<()> {
+    /// The emitter's join: remove-helpers(sort(join(add-index(left), add-index(right)))). The
+    /// left input must be the previous binding, as for a plain `Table.Join`.
+    fn helper_join(&mut self, sorted: &Expr, previous: &str) -> Outcome<()> {
         let Some([joined, _order]) = call(sorted, "Table.Sort") else {
             return fail("step", "Table.RemoveColumns");
         };
@@ -637,7 +643,11 @@ impl Builder<'_> {
                 _ => fail("step", "Table.AddIndexColumn"),
             }
         };
-        let _left = unwrap(left, LEFT_ROW)?;
+        let left_input = unwrap(left, LEFT_ROW)?;
+        if !matches!(&left_input, Expr::Identifier(name) if name == previous) {
+            return fail("step", "Table.Join");
+        }
+
         let right_input = unwrap(right, RIGHT_ROW)?;
 
         self.join(left_keys, &right_input, right_keys, kind)
@@ -804,7 +814,7 @@ impl Builder<'_> {
                 self.select(&names_of(names)?)
             }
             ("Table.RemoveColumns", [sorted, _]) if call(sorted, "Table.Sort").is_some() => {
-                self.helper_join(sorted)
+                self.helper_join(sorted, previous)
             }
             ("Table.RemoveColumns", [input, names]) if input_is_previous(input) => {
                 self.remove(&names_of(names)?)
@@ -933,6 +943,31 @@ fn declared_columns(
         .collect())
 }
 
+/// `Columns` fixes how many columns `Csv.Document` returns
+/// (<https://learn.microsoft.com/powerquery-m/csv-document>), but the import keeps only the
+/// declared columns. They must therefore be all of them; only a column selection after promoted
+/// headers may keep fewer.
+fn check_width(source: &Source, declared: usize) -> Outcome<()> {
+    let Some(width) = source.width else {
+        return Ok(());
+    };
+    let selected =
+        matches!(source.kind, MSourceKind::Csv { headers: true, .. }) && source.names.is_some();
+    let fits = u32::try_from(declared).map(f64::from).is_ok_and(|count| {
+        if selected {
+            count <= width
+        } else {
+            count == width
+        }
+    });
+
+    if fits {
+        Ok(())
+    } else {
+        fail("source", "Csv.Document Columns")
+    }
+}
+
 /// The bindings before typing: headers, column selection, blanks and the typed schema.
 fn typed_source(bindings: &[(String, Expr)]) -> Outcome<TypedSource> {
     let (first_name, first) = bindings.first().ok_or_else(|| miss("source", "let"))?;
@@ -1003,6 +1038,7 @@ fn typed_source(bindings: &[(String, Expr)]) -> Outcome<TypedSource> {
             }
             (_, "Table.TransformColumnTypes", [input, list, ..]) if is_previous(input) => {
                 let columns = declared_columns(source.names.as_deref(), list, &function)?;
+                check_width(&source, columns.len())?;
                 return Ok(TypedSource {
                     source,
                     columns,
@@ -1111,7 +1147,8 @@ pub fn import_section(text: &str) -> Result<SectionImport, &'static str> {
         }
 
         if waiting.len() == before {
-            // The inputs of these members are unsupported, so they cannot refresh either.
+            // The inputs of these members are unsupported or wait on each other in a cycle, so
+            // these members cannot refresh either.
             for member in waiting {
                 unsupported.push(Unsupported {
                     member: member.name.clone(),

@@ -26,7 +26,6 @@ const RUN_LABEL: Readonly<Record<RunKind, string>> = {
 const latest = (runs: readonly MeasuredRun[], kind: RunKind) =>
   runs.find((run) => run.kind === kind);
 
-/** Props of {@link RecalculationStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface RecalculationStageProps {
   readonly rows: number;
   readonly lookups: number;

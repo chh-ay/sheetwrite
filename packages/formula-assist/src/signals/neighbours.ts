@@ -1,4 +1,4 @@
-// Signal 1 of #801, neighbouring formulas: the formulas next to the edited
+// Neighbouring formulas: the formulas next to the edited
 // cell, moved to it as a fill or paste would move them. Only a formula the
 // cells above and below, or left and right, agree on is proposed: then the
 // cell almost surely continues their pattern.
@@ -23,7 +23,11 @@ const NEIGHBOURS: readonly { readonly side: Side; readonly dRow: number; readonl
     { side: "right", dRow: 0, dCol: 2 },
   ];
 
-/** Rows searched upward for the nearest formula of the column, when the two above hold none. */
+/**
+ * Rows searched upward for the nearest formula of the column, when the two
+ * above hold none. A formula found there has no second side, so it is never
+ * proposed itself; it only counts as a contradiction of the other formulas.
+ */
 const SEARCH_ABOVE = 12;
 
 /** One moved formula and the neighbours that gave it, counted by side. */
@@ -32,7 +36,7 @@ interface Moved {
   readonly sides: Map<Side, number>;
 }
 
-/** The reasons that ship: the neighbours above and below, or left and right, give the same formula. */
+/** The reasons the signal proposes: the neighbours above and below, or left and right, give the same formula. */
 const BOTH_SIDES = /^(aboveAndBelow|leftAndRight)\b/;
 
 /** What else the neighbours said: nothing, one other formula, or another formula two of them agree on. */
@@ -44,8 +48,8 @@ type Contradiction = "none" | "single" | "pair";
  */
 function has_literal_number(formula: string): boolean {
   const text = formula.replace(/"[^"]*"/g, '""');
-  // One pass over runs of digits and dots, so a long run costs its length once (#219: a
-  // backtracking pattern took quadratic time on a long digit run followed by a letter).
+  // One pass over runs of digits and dots, so a long run costs its length once. A
+  // backtracking pattern takes quadratic time on a long digit run followed by a letter.
   let index = 0;
   while (index < text.length) {
     if (!is_digit(text.charCodeAt(index))) {
@@ -141,8 +145,8 @@ function neighbour_proposals(edit: FormulaEdit): Proposal[] {
       reason: reason_of(entry, contradiction),
     };
   });
-  // Only neighbours on both sides of the cell agreeing are strong enough to show (#801 decision):
-  // a formula from one side only was wrong too often on the held-out samples.
+  // Only neighbours on both sides of the cell agreeing are strong enough to show: a formula
+  // from one side only was wrong too often on the held-out samples.
   return proposals.filter((proposal) => BOTH_SIDES.test(proposal.reason));
 }
 

@@ -1,9 +1,6 @@
 // `analyzeFormula`, the one formula-help API: the grid's cell editor, the
 // formula bar and host editors read tokens, references, the call at the
-// cursor, completions and diagnostics from it. The tokens and the syntax error
-// come from the active engine's lexer and parser (formula-syntax.ts); the
-// function list it receives (from `listFunctions`) adds what is engine- and
-// host-specific about names.
+// cursor, completions and diagnostics from it.
 
 import { findReferences, type FormulaReference } from "./formula-references.js";
 import {
@@ -73,7 +70,7 @@ export type FormulaCompletionKind = "function" | "name" | "table" | "column" | "
 
 /** One item of the completion list. */
 export interface FormulaCompletionItem {
-  /** What the item is. */
+  /** Whether the item is a function, a name, a table, a column or an argument value. */
   readonly kind: FormulaCompletionKind;
   /** The text the list shows: `SUM`, `SalesUnits`, `Table1`, `Amount`, `FALSE`. */
   readonly name: string;

@@ -2,10 +2,11 @@
 //! binding, built only from functions documented in the M function reference:
 //! <https://learn.microsoft.com/powerquery-m/power-query-m-function-reference>
 //!
-//! Where an M default differs from the engine, the binding says so explicitly:
-//! `Table.Sort`, `Table.Group` and `Table.Join` do not promise a row order, so
-//! joins sort by keys and then by added row-index columns, and groups sort by
-//! their keys, which gives the engine's order.
+//! Where an M default differs from the engine, the binding says so explicitly.
+//! `Table.Group` and `Table.Join` do not promise a row order, and `Table.Sort`
+//! does not promise to keep the order of equal keys. So joins sort by keys and
+//! then by added row-index columns, and groups sort by their keys, which gives
+//! the engine's order.
 
 use super::text::{field, identifier, member_name, number, text};
 use super::{MQuery, MSourceKind};
@@ -15,7 +16,8 @@ use crate::plan::{
 
 /// Culture for every type conversion, so a refresh does not depend on the user's locale.
 const CULTURE: &str = "en-US";
-/// UTF-8, the encoding the engine reads ([MS-QDEFF] code page values follow Windows code pages).
+/// The `Encoding` option of `Csv.Document` takes a Windows code page; 65001 is UTF-8, the
+/// encoding the engine reads.
 const UTF8_CODE_PAGE: u32 = 65_001;
 const LEFT_ROW: &str = "Sheetwrite.LeftRow";
 const RIGHT_ROW: &str = "Sheetwrite.RightRow";
@@ -31,7 +33,7 @@ pub struct Loss {
     pub code: &'static str,
 }
 
-/// The section text, each query's member name, and every reported difference.
+/// The output of [`emit_section`].
 #[derive(Debug)]
 pub struct Section {
     /// The whole `section Section1;` document.
@@ -395,7 +397,6 @@ impl Writer<'_> {
         }
         grouped.push_str("})");
 
-        // Table.Group does not promise an order; the engine emits groups in key order.
         Self::sort(out, &grouped, &key_refs);
         self.columns = next;
     }
@@ -473,7 +474,6 @@ impl Writer<'_> {
     }
 }
 
-/// The M name of a join kind.
 const fn join_kind_name(join: JoinKind) -> &'static str {
     match join {
         JoinKind::Inner => "JoinKind.Inner",
@@ -527,8 +527,17 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
         .filter(|locator| locator.starts_with("https://") || locator.starts_with("http://"));
 
     let Some(locator) = web.filter(|_| !matches!(source.kind, MSourceKind::Host)) else {
-        // A host-supplied source has no M connector; refresh in Excel reports this error.
-        writer.loss(None, "host-source");
+        // A host source, or a file source without an http(s) locator, has no M connector.
+        // The query evaluates to an error that names the source, and refresh in Excel
+        // reports it. The loss names which of the two causes applies.
+        writer.loss(
+            None,
+            if matches!(source.kind, MSourceKind::Host) {
+                "host-source"
+            } else {
+                "source-locator"
+            },
+        );
         bindings.push((String::from("Source"), host_source_error(&source.source_id)));
         typed_binding(writer, query, bindings);
         return;
@@ -640,7 +649,8 @@ fn json_steps(
     bindings.push((String::from("Selected"), table));
 }
 
-/// The explicit typed schema; every conversion uses one fixed culture.
+/// The explicit typed schema. Every conversion uses one fixed culture, which is reported as
+/// a `conversion-culture` difference.
 fn typed_binding(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(String, String)>) {
     let source = &query.source;
     let previous = last_binding(bindings);
@@ -665,7 +675,8 @@ fn typed_binding(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(St
     writer.loss(None, "conversion-culture");
 }
 
-/// Queries in an order where joined inputs come first; the definitions have no cycle.
+/// Query indexes in an order where each joined input comes before the queries that join it.
+/// A join to an id outside the list does not hold a query back.
 fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     let mut order: Vec<usize> = Vec::with_capacity(queries.len());
 
@@ -705,6 +716,15 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     order
 }
 
+/// Whether two names are equal when letter case is ignored in every alphabet, as saved query
+/// names are compared (`toLowerCase` in core). Compares lowercase characters without building
+/// lowercase copies.
+fn same_ignoring_case(left: &str, right: &str) -> bool {
+    left.chars()
+        .flat_map(char::to_lowercase)
+        .eq(right.chars().flat_map(char::to_lowercase))
+}
+
 /// Member names for every query, unique when letter case is ignored, as Excel requires for
 /// query names. A name that had to change is reported as a difference.
 fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
@@ -716,7 +736,7 @@ fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
         let mut suffix = 2;
         while members
             .iter()
-            .any(|name| name.eq_ignore_ascii_case(&candidate))
+            .any(|name| same_ignoring_case(name, &candidate))
         {
             candidate = format!("{base} ({suffix})");
             suffix += 1;

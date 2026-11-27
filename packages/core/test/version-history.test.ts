@@ -11,12 +11,15 @@ import {
   MemoryHistoryStorage,
   type HistoryGetRequest,
   type HistoryLimits,
+  type HistoryManifest,
+  type HistoryPutRequest,
   type HistoryStorageAdapter,
 } from "../src/history-archive.js";
 import { IndexedDbHistoryStorage } from "../src/history-indexeddb.js";
 import type { CellValue } from "../src/types/cell.js";
 import type { SnapshotCell, WorkbookSnapshot } from "../src/types/document.js";
 import type { CommittedTransaction } from "../src/types/transaction.js";
+import { decodeRecord, encodeRecord, object } from "../src/version-history/codec.js";
 
 const MINUTE_MS = 60_000;
 
@@ -363,6 +366,44 @@ describe("history replay memory", () => {
   });
 });
 
+/**
+ * Memory storage that stores `author_id` as the author of every archived
+ * commit, as an earlier version stored an ID that new commits may not use.
+ */
+class EarlierAuthorStorage extends MemoryHistoryStorage {
+  constructor(private readonly author_id: string) {
+    super();
+  }
+
+  override async put(input: HistoryPutRequest): Promise<HistoryManifest> {
+    if (input.kind !== "publish") return super.put(input);
+
+    const renamed = new Map<string, string>();
+    const records = [];
+    for (const record of input.records) {
+      const envelope =
+        record.kind === "transaction" ? await decodeRecord(record, input.limits) : null;
+      if (!object(envelope)) {
+        records.push(record);
+        continue;
+      }
+      const earlier = await encodeRecord(
+        "transaction",
+        { ...envelope, authorId: this.author_id },
+        record.references,
+      );
+      renamed.set(record.id, earlier.id);
+      records.push(earlier);
+    }
+    const tail = input.head?.tail.map((id) => renamed.get(id) ?? id);
+    return super.put({
+      ...input,
+      records,
+      ...(input.head && tail ? { head: { ...input.head, tail } } : {}),
+    });
+  }
+}
+
 describe("history trust and cancellation", () => {
   it("maps exhausted IndexedDB quota to a capacity failure and keeps the last durable version", async () => {
     const storage = new IndexedDbHistoryStorage({
@@ -438,6 +479,26 @@ describe("history trust and cancellation", () => {
 
     const too_large = archive.listVersions({ maxEntries: 101 });
     await expect(too_large).rejects.toMatchObject({ code: "capacity" });
+  });
+
+  it("bounds an author ID by its UTF-8 bytes, as sync does", async () => {
+    const archive = await initialized(new MemoryHistoryStorage());
+    // "é" takes two UTF-8 bytes, so 128 of them fill the 256-byte limit.
+    await archive.record({ ...change(1), authorId: "é".repeat(128) });
+
+    const over = archive.record({ ...change(2), authorId: "é".repeat(129) });
+    await expect(over).rejects.toMatchObject({ code: "invalid-history" });
+  });
+
+  it("still replays a commit whose author ID an earlier version stored", async () => {
+    // 129 "é" are 129 UTF-16 code units, which the earlier rule allowed, but 258 UTF-8 bytes.
+    const storage = new EarlierAuthorStorage("é".repeat(129));
+    await (await initialized(storage)).record(change(1));
+
+    const reopened = await open(storage);
+    const version = await reopened.saveVersion("After", "alice", MINUTE_MS);
+    const document = await reopened.readVersion(version.id);
+    expect(first_cell(document)).toEqual({ kind: "literal", value: 1 });
   });
 });
 

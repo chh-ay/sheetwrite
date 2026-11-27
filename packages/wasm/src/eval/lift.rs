@@ -48,7 +48,6 @@ impl ValueArgs {
         Self(bits)
     }
 
-    /// Whether no argument takes one value: the function never lifts.
     pub(super) const fn is_none(self) -> bool {
         self.0 == 0
     }
@@ -300,8 +299,6 @@ fn element_args(
         .collect()
 }
 
-/// A lifted call: its function, its arguments, and the sheet and depth it
-/// is evaluated at.
 #[derive(Clone, Copy)]
 struct LiftedCall<'a> {
     func: Func,

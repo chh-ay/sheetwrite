@@ -3,27 +3,25 @@
 //! Each `sort_unstable_by` or `sort_by` call compiles its own copy of Rust's
 //! sort for its element type and comparator, 3 to 25 KB of WASM each. Engine
 //! sorts go through the instances here instead: packed integer keys for any
-//! order that fits in 64 or 128 bits, and one stable index sort with a `dyn`
-//! comparator for orders that need a real comparison.
+//! order that fits in 64 or 128 bits, one stable index sort with a `dyn`
+//! comparator for orders that need a real comparison, and one in-place sort
+//! of the dependency index's (cell, formula) pairs.
 
 use std::cmp::Ordering;
 
 use crate::formula_slots::FormulaId;
 use crate::types::AbsCellKey;
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u64(keys: &mut [u64]) {
     keys.sort_unstable();
 }
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u128(keys: &mut [u128]) {
     keys.sort_unstable();
 }
 
-/// The sign bit of a 64-bit value.
 const SIGN_BIT: u64 = 1 << 63;
 
 /// Sorts `values` ascending through [`sort_u64`], reusing their allocation:

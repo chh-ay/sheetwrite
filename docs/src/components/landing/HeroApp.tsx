@@ -27,8 +27,6 @@ import { createSignal, For, type JSX, Show } from "solid-js";
 
 import { createTimeline } from "./timeline.js";
 
-/* ---- Rendering --------------------------------------------------------------- */
-
 /** How far the badge rises as it fades in. */
 const BADGE_RISE_PX = 6;
 /** How far the Pivot sheet tab rises as it appears. */
@@ -187,8 +185,6 @@ function apply(parts: Parts, frame: Frame): void {
   parts.ripple.style.opacity = String(1 - frame.ripple);
   parts.ripple.style.transform = `scale(${lerp(RIPPLE_START_SCALE, RIPPLE_END_SCALE, frame.ripple)})`;
 }
-
-/* ---- Markup ------------------------------------------------------------------ */
 
 type GlyphName = keyof typeof iconLayout.icons;
 

@@ -71,7 +71,6 @@ const LAYERS: readonly Layer[] = [
 
 const layer_x = (id: Layer["id"]) => LAYERS.find((layer) => layer.id === id)?.x ?? 0;
 
-/* Lanes between the boxes. */
 const LANE = {
   tx: { y: 84, from: 590, to: 720 },
   window: { y: 134, from: 720, to: 590 },
@@ -97,8 +96,6 @@ const COLUMN = { w: 18, gap: 8, h: 58 } as const;
 
 /* Edits that gather into one transaction: they start on the pasted cells. */
 const EDITS = CELLS.filter((cell) => cell.index % 2 === 0);
-
-/* ---- Drawing ----------------------------------------------------------------- */
 
 function query<T extends Element>(root: Element, selector: string): T {
   const found = root.querySelector<T>(selector);
@@ -225,8 +222,6 @@ function create_draw(root: HTMLElement): (t: number) => void {
     opacity(glows.get("app"), fadeWindow(t, 8.1, 10.2, 0.3));
   };
 }
-
-/* ---- Component --------------------------------------------------------------- */
 
 function Packet(props: Readonly<{ name: string; label: string; width: number }>) {
   return (

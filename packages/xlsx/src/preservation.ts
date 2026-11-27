@@ -373,7 +373,6 @@ export async function capturePreserved(
     });
   }
 
-  // Graphs that share a part (a pivot table and its cache) are kept or dropped together.
   const units = shared_part_units(graphs);
   const kept: XlsxSourceGraph[] = [];
   const retained = new Map<string, XlsxSourcePart>();
@@ -429,6 +428,10 @@ export async function capturePreserved(
   snapshot.workbook.xlsxSource = admitPreserved(snapshot, context, true);
 }
 
+/**
+ * Group the graphs that share a part (a pivot table and its cache), so they
+ * are kept or dropped together.
+ */
 function shared_part_units(graphs: readonly XlsxSourceGraph[]): XlsxSourceGraph[][] {
   const units: XlsxSourceGraph[][] = [];
   const unit_of_part = new Map<string, XlsxSourceGraph[]>();
@@ -655,8 +658,7 @@ export function preparePreserved(
     else valid.add(graph);
   }
 
-  // Graphs that share a part (a pivot table and its cache) are kept or dropped
-  // together, and whole units are dropped once the retained-byte cap is reached.
+  // Whole `shared_part_units` are dropped once the retained-byte cap is reached.
   const graphs: XlsxSourceGraph[] = [];
   const counted = new Set<string>();
   let retained_bytes = 0;

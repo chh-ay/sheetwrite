@@ -188,7 +188,8 @@ export function resolveTransactionResourceLimits(
  * without constructing a JSON string. Compact operation ranges are measured by
  * their serialized fields; their logical cell area is deliberately irrelevant.
  *
- * @param operations - The transaction's operations.
+ * @param operations - The operations to measure; they are read, not changed. A
+ *   value JSON cannot carry gives an `invalid-operation` issue.
  * @param limits - The limits to check against; defaults to the built-in limits.
  * @throws SheetwriteError with code `invalid-operations` when `operations` is not an array.
  */
@@ -451,7 +452,6 @@ export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> 
   maxSerializedBytes: 64 * 1024 * 1024,
   // Bound logical sheet area even when paged storage defers physical allocation.
   maxLogicalCellsPerSheet: 0xffff_ffff,
-  // Bound eager dense allocation across the workbook.
   maxDenseCells: ENGINE_STORAGE_CEILINGS.maxDenseCells,
   // Bound local pages, which a full sheet fills at about 13 bytes a cell.
   maxLocalPagedCells: ENGINE_STORAGE_CEILINGS.maxLocalPagedCells,
@@ -1910,7 +1910,7 @@ function validate_sheet_shape(
     );
   }
   conditional_formats?.forEach((entry, index) => {
-    validate_conditional_format_shape(entry, `${path}.conditionalFormats[${index}]`, errors, true);
+    validate_conditional_format_shape(entry, `${path}.conditionalFormats[${index}]`, errors);
   });
 
   const validation_rules = optional_array(sheet, "validationRules", path, errors);
@@ -2076,8 +2076,8 @@ function walked_field(record: PlainRecord, key: string): unknown {
  * (`builtByCaller`), whose own fields are all enumerable data properties. A
  * direct read then gives the value `walked_field` gives, as long as
  * `Object.prototype` has only its standard properties, none of them a
- * snapshot field. It skips the property check that took a fifth of
- * validating an imported workbook.
+ * snapshot field. It skips the property check, which takes about a fifth of
+ * the time to validate an imported workbook.
  */
 function built_field(record: PlainRecord, key: string): unknown {
   return record[key];
@@ -2161,15 +2161,13 @@ function validate_conditional_format_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
-  validate_stop_if_true = false,
 ): void {
   const format = record_at(entry, path, errors);
   if (!format) return;
   validate_range_shape(ownValue(format, "range"), `${path}.range`, errors);
   validate_conditional_predicate(ownValue(format, "when"), `${path}.when`, errors);
   validate_cell_style(ownValue(format, "style"), `${path}.style`, errors);
-  // Snapshot validation checks this field; operation validation historically does not.
-  if (validate_stop_if_true) optional_boolean(format, "stopIfTrue", path, errors);
+  optional_boolean(format, "stopIfTrue", path, errors);
 }
 
 function validate_validation_rule_shape(
@@ -3284,9 +3282,9 @@ function cell_block_in_sheet(block: SheetSnapshot["cells"][number], sheet: Sheet
 // The checks that visit every cell live in small functions of their own, out of
 // `validate_json_safe_snapshot`. JavaScriptCore optimizes a long loop in a
 // background compilation, and until that compilation is used or dropped it keeps
-// every value the function's variables held when it started. The large function
-// runs once per snapshot, so its loops ended before their compilation was ready,
-// and the compilation kept the whole imported workbook alive for dozens of
+// every value the function's variables held when it started. A large function
+// that runs once per snapshot ends its loops before their compilation is ready,
+// and the compilation then keeps the whole imported workbook alive for dozens of
 // collections (35 MB after importing the XLSX benchmark corpus). A small
 // function compiles in time to be used, and its variables reach one block.
 
@@ -3361,9 +3359,9 @@ function validate_block_references(
 }
 
 /**
- * Whether two in-bounds cells share an address. A sorted 8-byte key per cell
- * replaces a Set entry per cell, which cost about 100 bytes each and made
- * validating a large snapshot allocate as much as the snapshot itself.
+ * Whether two in-bounds cells share an address. Each cell gets a sorted 8-byte
+ * key instead of a Set entry: a Set entry costs about 100 bytes, so a Set
+ * would make validating a large snapshot allocate as much as the snapshot.
  * In-bounds cells have col < columns.length, so row * width + col is unique
  * and, under the logical-cell limit, exact as a double.
  */

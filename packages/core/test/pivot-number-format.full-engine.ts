@@ -121,13 +121,26 @@ it("paints a value field's number format on its value cells only, as Excel does,
   };
   (await loadPanels(grid)).openPivotPanel(grid, "data", "by-region");
   const panel = () => document.querySelector(".sheetwrite-panel");
+  const actions = () =>
+    panel()?.querySelector('[aria-label="Count Numbers of Amount in Values actions"]');
+  const open_format = () => {
+    press(actions());
+    press(
+      [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (item) => item.textContent === "Number Format…",
+      ),
+    );
+  };
 
-  press(panel()?.querySelector('[aria-label="Count Numbers of Amount in Values actions"]'));
-  press(
-    [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-      (item) => item.textContent === "Number Format…",
-    ),
+  // Cancel closes the editor and gives focus back to the field's menu button.
+  open_format();
+  const buttons = [...(panel()?.querySelectorAll("button") ?? [])];
+  press(buttons.find((button) => button.textContent === "Cancel"));
+  expect(document.activeElement?.getAttribute("aria-label")).toBe(
+    "Count Numbers of Amount in Values actions",
   );
+
+  open_format();
   const category = panel()?.querySelector<HTMLSelectElement>('[aria-label="Category"]');
   if (category == null) throw new Error("no Category control");
   category.value = "0.00%";

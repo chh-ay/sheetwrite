@@ -10,9 +10,9 @@ const SHEETS = 4;
 const ROWS = 20_000;
 const WIDTH = 4;
 /**
- * Whether a compilation outlives the import depends on timing; before the fix
- * one fresh process in four freed the workbook in time. Three concurrent
- * processes miss the leak about once in sixty runs.
+ * Whether a compilation outlives the import depends on timing: with the leak
+ * present, about one fresh process in four still frees the workbook in time.
+ * Three concurrent processes miss the leak about once in sixty runs.
  */
 const PROBES = 3;
 
@@ -55,10 +55,8 @@ async function run_probe(bytes: Uint8Array): Promise<ProbeReport> {
   return JSON.parse(stdout.trim()) as ProbeReport;
 }
 
-// Objects held by other suites in the shared `bun test` process can keep a
-// referent alive, and an export in the same process would optimize the import's
-// code before it runs, so each import runs first in a fresh process
-// (import-lifetime-probe.ts).
+// An export in the same process would optimize the import's code before it
+// runs, so each import runs first in a fresh process (import-lifetime-probe.ts).
 it("frees an imported workbook once the caller drops it", async () => {
   const workbook = book(Array.from({ length: SHEETS }, (_unused, index) => numbered_sheet(index)));
   const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(workbook);

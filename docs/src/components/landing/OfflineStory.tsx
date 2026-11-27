@@ -92,7 +92,10 @@ const BRAM_GRID_X = 424;
 // Shift the queue near the middle of the 0.6-second chip drain.
 const QUEUE_SHIFT_DELAY = 0.35;
 
-/** A queued chip's style: one shift time per chip ahead of it, as React leaves unset ones out. */
+/**
+ * A queued chip's style: `--shift-1` to `--shift-N`, one shift time for each of
+ * the N chips ahead of it. The front chip sets none.
+ */
 function queue_style(shifts: readonly string[]): JSX.CSSProperties {
   const style: JSX.CSSProperties = { "--pitch": px(OUTBOX_PITCH) };
   shifts.forEach((shift, ahead) => {

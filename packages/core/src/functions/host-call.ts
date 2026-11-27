@@ -5,7 +5,10 @@ const KIND_NUMBER = 1;
 const KIND_TEXT = 2;
 const KIND_BOOLEAN = 3;
 
-/** The engine reads the result from this tag; an absent result is an empty cell. */
+/**
+ * The result for `#VALUE!`. Every result is a string whose first letter tags
+ * its type (`n`, `s`, `b`, `e`); an absent result is an empty cell.
+ */
 const VALUE_ERROR = "e";
 
 /**

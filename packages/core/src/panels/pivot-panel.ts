@@ -397,9 +397,11 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
           distinctValues: (field) => distinct_values(pivot, field),
           formatting: () => formatting,
           editFormat: (index) => {
+            const closed = formatting;
             formatting = index;
             refresh(true);
-            const focus = index === null ? `values-${index}-menu` : `values-${index}-format`;
+            // Closing the editor returns focus to the menu of the field it edited.
+            const focus = index === null ? `values-${closed}-menu` : `values-${index}-format`;
             body.querySelector<HTMLElement>(`[data-focus-key="${focus}"]`)?.focus();
           },
           measureName: (measure_id) =>
@@ -413,7 +415,7 @@ function render_pivot_panel(body: HTMLElement, grid: Grid, sheet: SheetId, id: s
     }
   };
 
-  /** Rebuild when the definition, its fields, the relationships or the message changed. */
+  /** Rebuild when the definition, its fields, the data model or the message changed, or on `force`. */
   const refresh = (force = false): void => {
     const pivot = read();
     const fields = pivot === null ? [] : grid.getPivotFields(sheet, id);
@@ -563,7 +565,7 @@ interface AreaActions {
   formatting(): number | null;
   /** Open the number format form of value field `index`, or close it with null. */
   editFormat(index: number | null): void;
-  /** The panel's signal; an open menu stops listening on the document when it aborts. */
+  /** The panel's signal, for {@link menuButton}. */
   signal: AbortSignal;
 }
 
@@ -594,7 +596,7 @@ function area_section(
     item.className = "sheetwrite-panel-area-item";
     const value = area === "values" ? pivot.values[index] : undefined;
     // A measure value has no source field, so it cannot move to another
-    // area or shift by field; the list can only remove it.
+    // area or shift by field; its menu offers only Number Format and Remove.
     const is_measure = value !== undefined && "measure" in value;
     item.draggable = !is_measure;
 

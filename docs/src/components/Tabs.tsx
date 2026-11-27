@@ -20,7 +20,6 @@ interface TabProps {
   readonly children?: JSX.Element;
 }
 
-/** Props of {@link Tabs}. */
 interface TabsProps {
   /**
    * Tabs with the same `sync` value switch together across the site, and the
@@ -35,7 +34,7 @@ interface TabsProps {
 }
 
 const TAB_EVENT = "sheetwrite:docs-tab";
-/** Preference keys keep the old prefix, so a reader's earlier choice still applies. */
+/** Stored tab choices already use this prefix; keeping it keeps a reader's earlier choice. */
 const PREFERENCE_PREFIX = "sheetwrite-";
 
 /** Payload of the tab event: the synchronised group and the title it selected. */

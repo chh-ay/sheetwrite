@@ -5,11 +5,10 @@ import { chromium } from "@playwright/test";
  * runner itself (Browser Smoke runs in the Playwright image instead).
  *
  * GitHub's Ubuntu image already has every library Chromium loads.
- * `playwright install --with-deps` added only fonts, which these checks never
- * look at, and it made every job depend on the Ubuntu apt mirrors: when the
- * runners could not resolve azure.archive.ubuntu.com, every pull request
- * failed for hours. So the system packages are installed only when Chromium
- * cannot start without them.
+ * `playwright install --with-deps` adds only fonts, which these checks never
+ * look at, and it makes every job depend on the Ubuntu apt mirrors, so an
+ * apt mirror outage fails every pull request. So the system packages are
+ * installed only when Chromium cannot start without them.
  */
 async function run(command: readonly [string, ...string[]]): Promise<void> {
   const child = Bun.spawn([...command], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });

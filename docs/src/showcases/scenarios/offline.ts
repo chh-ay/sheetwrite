@@ -203,12 +203,10 @@ export function createOfflineSeedSnapshot(): WorkbookSnapshot {
   };
 }
 
-/** Row targeted by the local edit script at a given step. */
 export function offlineLocalEditRow(step: number): number {
   return step % OFFLINE_ROWS;
 }
 
-/** Row targeted by the colleague edit script at a given step. */
 export function offlineColleagueEditRow(step: number): number {
   return (step * 13 + 7) % OFFLINE_ROWS;
 }

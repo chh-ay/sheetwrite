@@ -254,8 +254,6 @@ describe("CI and release workflow contracts", () => {
   });
 
   it("installs Chromium on the runners without the Ubuntu apt mirrors", () => {
-    // The runner image has Chromium's libraries; apt only added fonts, and a
-    // mirror outage failed every pull request.
     const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
       readonly scripts: Readonly<Record<string, string>>;
     };

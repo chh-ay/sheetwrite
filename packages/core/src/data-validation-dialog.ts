@@ -130,7 +130,6 @@ function parse_operand(text: string, allow: Allow): DataValidationOperand | unde
   return number;
 }
 
-/** The Allow choice of `condition`. */
 function allow_of(condition: DataValidationCondition | undefined): Allow {
   if (!condition) return "any";
   switch (condition.kind) {
@@ -287,7 +286,6 @@ export function dataValidationDialog(
     show_tab(next, true);
   });
 
-  // Settings.
   const settings_panel = add_tab("Settings");
   const allow = select(ALLOW, allow_of(start?.condition));
   const blank = checkbox("Ignore blank", start?.allowBlank ?? true);
@@ -357,7 +355,6 @@ export function dataValidationDialog(
     apply_to_all.wrapper,
   );
 
-  // Input Message.
   const input_panel = add_tab("Input Message");
   const show_input = checkbox(
     "Show input message when cell is selected",
@@ -371,7 +368,6 @@ export function dataValidationDialog(
     field("Input message", input_message),
   );
 
-  // Error Alert.
   const error_panel = add_tab("Error Alert");
   const show_error = checkbox(
     "Show error alert after invalid data is entered",

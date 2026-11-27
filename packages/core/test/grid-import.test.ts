@@ -36,7 +36,6 @@ const IMPORTED: WorkbookSnapshot = {
 let grid: Grid;
 let host: HTMLDivElement;
 let restore: () => void;
-/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
 let restore_xlsx_slots: () => void;
 
 beforeAll(async () => {

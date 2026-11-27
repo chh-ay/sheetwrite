@@ -49,7 +49,9 @@ impl Default for Limits {
 }
 
 impl Limits {
-    /// Checked multiplication prevents an expanding plan from wrapping its cell count.
+    /// Fails with a `limit` diagnostic when `rows` or `rows * columns` is over its bound, or
+    /// `rows` does not fit a `u32`. The multiplication is checked, so an expanding plan cannot
+    /// wrap its cell count.
     pub fn shape(&self, rows: usize, columns: usize) -> Result<(), Diagnostic> {
         let cells = rows.checked_mul(columns).ok_or_else(Diagnostic::limit)?;
         if rows > self.max_rows || cells > self.max_cells || u32::try_from(rows).is_err() {
@@ -253,7 +255,8 @@ pub enum JoinKind {
     RightAnti,
 }
 
-/// Numeric folds ignore nulls; counts and extrema have explicit distinct behavior.
+/// Every fold except `CountRows` skips nulls, and an error in the input column makes the
+/// result that error.
 #[derive(Clone, Copy, Debug)]
 pub enum AggregateOp {
     /// Number of rows in the group, nulls included.
@@ -346,5 +349,5 @@ pub enum Step {
     },
 }
 
-/// Execution order is list order; each error records its zero-based step index.
+/// Execution order is list order; a failure inside a step records its zero-based step index.
 pub type Plan = Vec<Step>;

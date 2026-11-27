@@ -49,8 +49,9 @@ impl CellStore {
     /// Move the rows of a rectangle: target row offset `i` gets the cells of
     /// source row offset `order[i]`, for the `cols` columns from `start_col`.
     /// `order` must be a permutation of `0..order.len()`. Status: `0`
-    /// success, `1` invalid shape, bounds or order, `3` dirty-capacity
-    /// rejection, `4` a spill range that the rectangle moves only in part.
+    /// success, `1` invalid shape, bounds or order, `3` resource limit (dirty
+    /// capacity, or a cell write that failed), `4` a spill range that the
+    /// rectangle moves only in part.
     #[wasm_bindgen(js_name = permuteRows)]
     pub fn permute_rows(
         &mut self,
@@ -95,7 +96,8 @@ impl CellStore {
     /// row `to` after the move, as Excel's Cut and Insert Cut Cells moves
     /// rows. Each cell keeps its value, style and formula, and every
     /// reference in the workbook follows the cells it names. Status: `0`
-    /// success, `1` invalid rows, `3` dirty-capacity rejection.
+    /// success, `1` invalid rows, `3` resource limit (dirty capacity, or a
+    /// cell write that failed).
     #[wasm_bindgen(js_name = moveRows)]
     pub fn move_rows(&mut self, sheet: usize, from: usize, count: usize, to: usize) -> u32 {
         self.move_block(sheet, false, (from, count, to))

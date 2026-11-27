@@ -12,7 +12,6 @@ import { Icon } from "../../components/Icon.js";
  * pieces below render inside it. Styles: @docs/styles/showcase-layout.css.
  */
 
-/** Props of {@link ShowcaseStage}. */
 export interface ShowcaseStageProps {
   /** Accessible name of the demo region. */
   readonly demoLabel: string;
@@ -55,7 +54,6 @@ export function ShowcaseStage(props: ShowcaseStageProps) {
   );
 }
 
-/** Props of {@link ShowcaseControlGroup}. */
 export interface ShowcaseControlGroupProps {
   readonly title: string;
   /** One short sentence on what the controls change. */
@@ -76,7 +74,6 @@ export function ShowcaseControlGroup(props: ShowcaseControlGroupProps) {
   );
 }
 
-/** Props of {@link ShowcaseSection}. */
 export interface ShowcaseSectionProps {
   readonly id: string;
   readonly title: string;

@@ -79,7 +79,6 @@ export class AddonRegistry {
     await Promise.all(pending_xlsx.splice(0));
   }
 
-  /** Whether an add-on with this name is installed. */
   has(name: string): boolean {
     return this.installed.has(name);
   }
@@ -128,5 +127,4 @@ export class AddonRegistry {
   }
 }
 
-/** The page's add-on registry. */
 export const addonRegistry = new AddonRegistry();

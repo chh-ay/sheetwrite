@@ -671,7 +671,6 @@ function use_vue_workbench() {
 
 type VueWorkbench = ReturnType<typeof use_vue_workbench>;
 
-/** The validation task panel. */
 const ValidationPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     selectedRule: selected_rule,
@@ -706,7 +705,6 @@ const ValidationPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
   ]);
 };
 
-/** The protection task panel. */
 const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     role,
@@ -783,7 +781,6 @@ const ProtectionPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
   ]);
 };
 
-/** The change task panel. */
 const ChangePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     pendingCount: pending_count,
@@ -822,7 +819,6 @@ const ChangePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
   ]);
 };
 
-/** The notes task panel. */
 const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     readOnly: read_only,
@@ -882,7 +878,6 @@ const NotesPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbenc
   ]);
 };
 
-/** The formatting task panel. */
 const FormattingPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const { inspectorRows: inspector_rows, panelAttrs: panel_attrs } = workbench;
 
@@ -901,7 +896,6 @@ const FormattingPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wor
   ]);
 };
 
-/** The sheets task panel. */
 const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     readOnly: read_only,
@@ -989,7 +983,6 @@ const SheetsPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workben
   ]);
 };
 
-/** The persistence task panel. */
 const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     generation,
@@ -1060,7 +1053,6 @@ const PersistencePanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ wo
   ]);
 };
 
-/** The renderer task panel. */
 const RendererPanel: FunctionalComponent<{ workbench: VueWorkbench }> = ({ workbench }) => {
   const {
     mutationPolicy: mutation_policy,

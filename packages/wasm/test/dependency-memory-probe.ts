@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { CellStore, initSync } from "../pkg/sheetwrite_wasm.js";
 
 const ROWS = 2_048;
-// A supplied binary lets the same fixture exercise the pre-fix engine without
+// A supplied binary lets the same fixture measure another engine build without
 // loading its glue or sharing a previously grown WASM memory.
 const wasmPath = process.argv[2] ?? new URL("../pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
 const wasm = initSync({ module: readFileSync(wasmPath) });

@@ -137,7 +137,7 @@ export interface SavedQueryOutput {
 export interface SavedQuery {
   /** Stable identity, unique in the workbook. */
   readonly id: string;
-  /** Display name, unique in the workbook when ASCII letter case is ignored. */
+  /** Display name, unique in the workbook when letter case is ignored. */
   readonly name: string;
   /** Where the query reads its rows, and their columns. */
   readonly source: SavedQuerySource;
@@ -149,7 +149,7 @@ export interface SavedQuery {
 
 /** One place where exported M behaves differently from the Sheetwrite engine. */
 export interface PowerQueryLoss {
-  /** Saved query identity. */
+  /** `SavedQuery.id` of the query the loss is in. */
   readonly query: string;
   /** Zero-based step, or null for the source or the query as a whole. */
   readonly step: number | null;

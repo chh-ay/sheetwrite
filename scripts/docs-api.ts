@@ -88,7 +88,7 @@ interface DeclarationShape {
 /**
  * Exports shown as one card with no member list. `InitOutput` is the raw module
  * output wasm-bindgen generates for the loader: its members are ABI glue with no
- * doc source, not API to call (#504).
+ * doc source, not API to call.
  */
 const OPAQUE_EXPORTS: ReadonlySet<string> = new Set(["InitOutput"]);
 
@@ -956,7 +956,6 @@ function render_function_fields(
       "",
     );
   }
-  // A function that returns nothing has no Returns card.
   if (!returns_nothing(fields.returns)) {
     blocks.push(
       "## Returns",

@@ -380,7 +380,11 @@ function note_key(note: CellNote): string {
   return `${note.addr.row}:${note.addr.col}`;
 }
 
-/** Notes of `current` inside `rect` that the historical notes do not keep. */
+/**
+ * Note changes inside `rect`. `clear` removes each current note that the
+ * version does not have with the same text. `set` writes each historical note
+ * that the current notes do not have with the same text.
+ */
 function note_operations(
   sheet: SheetId,
   current: readonly CellNote[],
@@ -418,7 +422,10 @@ function row_meta_of(sheet: Sheet, row: number): RowMetadata | null {
   return { ...(height !== undefined ? { height } : {}), ...(hidden ? { hidden } : {}) };
 }
 
-/** Remove or replace each keyed object of a sheet: tables, charts, pivots, rules. */
+/**
+ * Remove, add or replace the keyed objects of a sheet (such as tables, charts,
+ * pivots and rules), so they match the historical ones.
+ */
 function keyed_objects<T extends { id: string }>(
   current: readonly T[],
   historical: readonly T[],
@@ -571,7 +578,6 @@ function plan_sheet_in_place(
     plan,
   );
 
-  // Dimensions, at the end only.
   if (historical.rowCount > current.rowCount) {
     plan.structure.push({
       op: "addRows",
@@ -859,7 +865,7 @@ function plan_workbook(
   return plan;
 }
 
-/** Merges and hyperlinks that a range restore would cut, from either side of the restore. */
+/** Reject a range restore that would cut a current or historical merge or hyperlink. */
 function assert_whole(rect: Rect, objects: ReadonlyArray<{ rect: Rect; label: string }>): void {
   for (const object of objects) {
     if (intersects(rect, object.rect) && !contains(rect, object.rect)) {
@@ -1051,9 +1057,9 @@ export function planRestore(
 }
 
 /**
- * The plan of a restore whose live document is known to be `store`'s other
- * end: `changed` lists, per sheet, the only cells where the live document and
- * the version can differ, and `store` is a sparse version that holds those
+ * The plan of a restore whose live document is known to be the archive head:
+ * `changed` lists, per sheet, the only cells where the live document and the
+ * version can differ, and `store` is a sparse version that holds those
  * cells. `undefined` when the scope needs cells outside them: a sheet that
  * changes size or columns, a paged datasource sheet, or a change that rewrites
  * the whole scope (see `cells_restore_alone`).

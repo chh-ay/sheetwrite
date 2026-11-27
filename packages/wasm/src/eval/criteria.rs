@@ -199,7 +199,6 @@ impl WildcardPattern {
         })
     }
 
-    /// Matches the text a lookup candidate shows a wildcard.
     pub(super) fn matches_text(&self, text: &str) -> bool {
         self.wildcard.matches(text)
     }
@@ -304,7 +303,8 @@ impl IfExtreme {
         }
     }
 
-    /// Folds one matched row.
+    /// Folds one matched row: an error or a non-finite number stops the walk,
+    /// and only finite numbers count.
     pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
         match value {
             Value::Number(number) if number.is_finite() => {
@@ -467,7 +467,7 @@ impl CellStore {
     /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
     /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
     /// one function enables it for the whole module, which makes other range
-    /// formulas up to 1.8x slower on x86-64 (#342).
+    /// formulas up to 1.8x slower on x86-64.
     #[inline(never)]
     fn dense_number_count_if_family(
         &self,

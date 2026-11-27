@@ -140,7 +140,7 @@ export function columnFromParsed(
   if (definition?.type) semantic_types.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
   // A column default is chosen only when every formatted cell agrees; cells
-  // that differ keep their own format (see the snapshot cell mapping below).
+  // that differ keep their own format (see `cellNumberFormatOverride`).
   const mixed = semantic_types.size > 1 || formats.size > 1;
   const only_type = semantic_types.values().next().value;
   const number_format = mixed

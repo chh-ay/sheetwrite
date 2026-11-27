@@ -11,7 +11,7 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-// The other functions of the old matrix have Excel results in the engine's tests.
+// The engine's own tests check the other functions against Excel results.
 it("evaluates AVERAGE and ROUND(PI()) as Excel does, and recalculates them", () => {
   const store = new SheetwriteStore(makeWorkbook(12));
   store.applyTransaction({

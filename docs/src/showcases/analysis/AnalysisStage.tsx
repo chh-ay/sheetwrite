@@ -28,7 +28,7 @@ const KEYS = [
   { keys: ["Esc"], does: "Return to the grid" },
 ] as const;
 
-/** Props of {@link AnalysisStage}: the story's facts, read from the orders on the server. */
+/** The story's facts, read from the orders on the server. */
 export interface AnalysisStageProps {
   readonly workbookTitle: string;
   readonly dipRegion: string;

@@ -17,9 +17,6 @@ impl CellStore {
     /// `false`, and changes nothing, for a missing sheet, invalid pairs, or
     /// kept rows out of order or past the sheet.
     ///
-    /// It replaced `setHiddenRows`, which took the filtered rows as runs; the
-    /// new name lets a caller tell the two engines apart.
-    ///
     /// A change marks dirty every SUBTOTAL or AGGREGATE formula that can read
     /// the sheet; no other formula recalculates. Inside a mutation or a page
     /// load, `commitSources` recalculates them with the other edits of the

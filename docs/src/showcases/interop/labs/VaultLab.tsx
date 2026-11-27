@@ -578,7 +578,6 @@ function Boundaries() {
   const [selected_id, set_selected_id] = createSignal<string | undefined>(undefined);
   const [expanded, set_expanded] = createSignal<string | null>(null);
   onMount(() => {
-    // `?compatibility=<record id>` opens one record.
     const requested = new URLSearchParams(window.location.search).get("compatibility");
     const record = RECORDS.find((candidate) => candidate.id === requested);
     if (!record) return;

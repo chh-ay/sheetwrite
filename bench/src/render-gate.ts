@@ -76,7 +76,7 @@ function equal_values<T extends string | number>(
 }
 
 export interface RenderGateOptions extends ParseRenderOptions {
-  /** Controlled baseline generation deliberately uses >=10 rounds. */
+  /** Rounds the artifact must record, instead of the policy's count; controlled baselines need at least 10. */
   readonly rounds?: number;
 }
 

@@ -8,20 +8,25 @@ const ERROR_INDEX_BYTES: usize = size_of::<u32>() * 2;
 const MIXED_TAG_BYTES: usize = size_of::<u8>();
 const FLAT_INDEX_BYTES: usize = size_of::<u32>();
 
-/// Conservative payload weights include masks and sparse errors, not allocator metadata.
+/// The bytes that one output may still build. Each cell costs a conservative weight: its
+/// payload, its mask bytes and, for an error, its sparse error record. Allocator overhead is
+/// not counted.
 pub(crate) struct OutputBudget {
     remaining: usize,
 }
 
 impl OutputBudget {
-    /// The budget belongs to one output construction, never a retained query cache.
+    /// A budget of `limits.max_output_bytes` for one output. It is not kept after that output
+    /// is built.
     pub(crate) const fn new(limits: &Limits) -> Self {
         Self {
             remaining: limits.max_output_bytes,
         }
     }
 
-    /// Admission happens before a cell can grow any payload buffer.
+    /// Charge `value` to the budget, then push it to `column`. The charge comes first, so a
+    /// cell over the budget never grows a payload buffer. A number that is not finite becomes
+    /// a `conversion` error.
     pub(crate) fn push(&mut self, column: &mut Column, value: Value<'_>) -> Result<(), Diagnostic> {
         let admitted = if matches!(value, Value::Number(number) if !number.is_finite()) {
             Value::Error("conversion")
@@ -33,7 +38,9 @@ impl OutputBudget {
         column.push(admitted)
     }
 
-    /// Existing batches use the same weights as newly constructed outputs.
+    /// Charge one cell of type `kind`, or fail with a `limit` diagnostic. `push` uses this for
+    /// new cells, and `Batch::validate_budget` uses it for the cells of an existing batch, so
+    /// both use the same weights.
     pub(crate) fn admit(&mut self, kind: ColumnType, value: Value<'_>) -> Result<(), Diagnostic> {
         let mut weight = payload_bytes(kind, value)?
             .checked_add(MASK_BYTES_PER_CELL)

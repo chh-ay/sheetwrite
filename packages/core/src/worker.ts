@@ -1,7 +1,8 @@
-// Receives the transferred canvas and frames
-// from the main thread and paints off-thread via the shared `paintFrame`, so a
-// busy main thread can't stall scrolling. Custom (function) cell renderers do
-// not cross the worker boundary, so the registry here is always empty.
+// The paint worker. It receives the transferred canvas and the frames from the
+// main thread and paints them with the shared `paintFrame`, so a busy main
+// thread cannot stall scrolling. Custom (function) cell renderers do not cross
+// the worker boundary, so the renderer registry here (`NO_RENDERERS`) is
+// always empty.
 import { blitScroll, paintFrame, paintFreezeDivider, sidewaysBlitSafe } from "./canvas-paint.js";
 import { KIND_NUMBER, KIND_STRING, NO_STRING } from "./store/wire-tags.js";
 import type { CellScalar } from "./types/cell.js";
@@ -94,10 +95,10 @@ type WorkerMessage =
 const NO_RENDERERS: ReadonlyMap<string, CellRenderer> = new Map();
 
 /**
- * Hard cap on the worker's pool-id→string cache, tuned separately from the
- * window reader's cap on the main thread. A full-sheet sweep would otherwise
- * grow it to one entry per distinct string; at the cap it is dropped and
- * re-warmed from the frame's `stringPoolUpdate*` payload.
+ * Hard cap on the worker's pool-id→string cache. The window reader on the
+ * main thread has its own cap. Without a cap, a full-sheet sweep would grow
+ * the cache to one entry per distinct string; at the cap it is cleared and
+ * refilled from the frame's `stringPoolUpdate*` payload.
  */
 const STRING_CACHE_CAP = 65_536;
 
@@ -124,8 +125,6 @@ function unpack_packed_view(msg: PackedPaintData, state: WorkerRuntimeState): Vi
     state.stringCache.clear();
     state.stringPoolEpoch = msg.stringPoolEpoch;
   }
-  // Cap the pool-id→string cache before this frame's updates are folded in; the
-  // just-swept window re-warms from the update payload below.
   if (state.stringCache.size >= STRING_CACHE_CAP) state.stringCache.clear();
   if (update_ids && update_values) {
     for (let i = 0; i < update_ids.length; i++) {

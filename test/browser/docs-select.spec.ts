@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { siteUrl, waitForHydration } from "./fixtures.js";
+import { BOX_ROUNDING_PX, siteUrl, waitForHydration } from "./fixtures.js";
 
 // The engine filter on the formula reference exercises Select.tsx, the WAI-ARIA
 // select-only combobox that showcases also use. Its code loads on first use; a
@@ -90,8 +90,6 @@ function engine_filter(page: Page) {
 
 /** Too little room under the field for the open list. */
 const ROOM_BELOW_PX = 12;
-/** Layout rounds boxes to device pixels. */
-const BOX_ROUNDING_PX = 1;
 
 // Chromium only: the keys are handled in script, alike in every engine.
 test("the engine filter follows the select-only combobox pattern: state, keys, typeahead, closing, placement", async ({

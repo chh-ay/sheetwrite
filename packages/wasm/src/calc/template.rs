@@ -138,7 +138,6 @@ impl Drop for FormulaTemplatesHold {
     }
 }
 
-/// What a lookup found for a formula.
 enum Lookup {
     /// The formula's tree, built from a kept formula.
     Tree(Ast),

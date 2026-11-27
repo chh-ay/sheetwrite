@@ -35,13 +35,13 @@ import * as Charts from "@sheetwrite/charts";
 import * as FormulaAssist from "@sheetwrite/formula-assist";
 
 // Removed pre-release names must stay absent from packed declarations.
-// @ts-expect-error `Patch` was removed in favor of `DocumentOp`.
+// @ts-expect-error `Patch` is not exported; use `DocumentOp`.
 import type { Patch as RemovedPatch } from "@sheetwrite/core";
-// @ts-expect-error positional datasources were removed.
+// @ts-expect-error `LegacyDataSource` (positional datasources) is not exported.
 import type { LegacyDataSource as RemovedLegacyDataSource } from "@sheetwrite/core";
-// @ts-expect-error ambiguous table backend name was removed.
+// @ts-expect-error `XlsxBackend` is not exported; use `XlsxTableExportBackend`.
 import type { XlsxBackend as RemovedXlsxBackend } from "@sheetwrite/core";
-// @ts-expect-error ambiguous table import backend name was removed.
+// @ts-expect-error `XlsxImportBackend` is not exported; use `XlsxTableImportBackend`.
 import type { XlsxImportBackend as RemovedXlsxImportBackend } from "@sheetwrite/core";
 // @ts-expect-error use `toXlsxTable`.
 import type { toXlsx as removedToXlsx } from "@sheetwrite/core";
@@ -133,11 +133,11 @@ declare const event: ChangeEvent;
 // @ts-expect-error change events expose only their current transaction.
 void event.dirty;
 declare const store: Store;
-// @ts-expect-error the manual dirty queue was removed.
+// @ts-expect-error the store has no manual dirty queue; `SyncCoordinator` owns outgoing changes.
 void store.getDirty();
-// @ts-expect-error the manual dirty queue was removed.
+// @ts-expect-error the store has no manual dirty queue.
 store.markClean([]);
-// @ts-expect-error dirty tracking suspension was removed.
+// @ts-expect-error the store has no dirty-tracking suspension.
 store.suspendDirtyTracking();
 void positionalDatasource;
 void applicationOptions;

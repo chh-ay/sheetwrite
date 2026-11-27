@@ -3,8 +3,6 @@ export { type GhostOnScreen, type ShownSuggestion, shownSuggestion } from "./for
 export { openFormulaEdit } from "./formula-suggestions.js";
 export { suggestionWordEnds } from "./formula-words.js";
 
-// Test-environment helper (never import from production code).
-
 /**
  * The stub 2D context the canvas test stubs install: every method is a no-op
  * that counts its invocations in `calls`, so tests can assert paint activity

@@ -42,14 +42,13 @@ function RefreshStatus(props: { readonly snapshot: QueriesSnapshot | null }) {
   );
 }
 
-/** The queries showcase's island: the report workbook, its saved queries and refresh. */
-/** Props of {@link QueriesStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface QueriesStageProps {
   /** Orders each "new orders" press adds to the feed. */
   readonly batchRows: number;
   readonly rowsUsed: number;
 }
 
+/** The queries showcase's island: the report workbook, its saved queries and refresh. */
 export function QueriesStage(props: QueriesStageProps) {
   const live = createLiveScenario<QueriesScenario, QueriesSnapshot>(() =>
     import("./boot.js").then(

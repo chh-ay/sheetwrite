@@ -107,7 +107,7 @@ interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId> extends RowBr
 export interface RowBridgeRangeDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"range"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"range"`. */
   readonly kind: "range";
   /** The range the operation wrote. */
   readonly range: Range;
@@ -119,7 +119,7 @@ export interface RowBridgeRangeDelta<
 export interface RowBridgeClearDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"clear"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"clear"`. */
   readonly kind: "clear";
   /** The range the operation wrote. */
   readonly range: Range;
@@ -131,7 +131,7 @@ export interface RowBridgeClearDelta<
 export interface RowBridgePasteDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"paste"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"paste"`. */
   readonly kind: "paste";
   /** The range the operation wrote; `null` when the operation has no cell range. */
   readonly range: Range | null;
@@ -143,7 +143,7 @@ export interface RowBridgePasteDelta<
 export interface RowBridgeFillDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"fill"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"fill"`. */
   readonly kind: "fill";
   /** The range the operation wrote; `null` when the operation has no cell range. */
   readonly range: Range | null;
@@ -155,7 +155,7 @@ export interface RowBridgeFillDelta<
 export interface RowBridgeRowStructureDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"row-structure"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"row-structure"`. */
   readonly kind: "row-structure";
   /** Whether rows were inserted, deleted or moved. */
   readonly action: "insert" | "delete" | "move";
@@ -179,7 +179,7 @@ export interface RowBridgeRowStructureDelta<
 export interface RowBridgeMetadataDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"metadata"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"metadata"`. */
   readonly kind: "metadata";
   /** What kind of metadata changed, such as `"column"` or `"chart"`. */
   readonly metadata:
@@ -206,7 +206,7 @@ export interface RowBridgeMetadataDelta<
 export interface RowBridgeHostActionDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"host-action"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"host-action"`. */
   readonly kind: "host-action";
   /** The sheet-level change your app should mirror. */
   readonly action:
@@ -221,7 +221,7 @@ export interface RowBridgeHostActionDelta<
 export interface RowBridgeUnprojectableDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
-  /** Always `"unprojectable"`. */
+  /** Tag to `switch` on across `RowBridgeDelta` kinds; always `"unprojectable"`. */
   readonly kind: "unprojectable";
   /** Why the operation has no row-level meaning. */
   readonly reason: string;

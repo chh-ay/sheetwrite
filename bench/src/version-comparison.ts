@@ -1021,8 +1021,6 @@ function report(inputs: string[], output: string) {
   writeFileSync(output, `${lines.join("\n")}\n\n${machines.join("\n")}\n`);
 }
 
-// ---------------------------------------------------------------------------
-
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {

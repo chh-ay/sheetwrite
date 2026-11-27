@@ -33,8 +33,8 @@ interface PackageCommandProps {
 
 /**
  * A terminal with one install command in each package manager. Markdown install
- * fences become this component at build time (see `installCommandsAsTerminals`
- * in vite.config.ts); release pages render it for the upgrade command.
+ * fences become this component at build time (see `install_commands_as_terminals`
+ * in lib/mdx-pipeline.ts); release pages render it for the upgrade command.
  */
 export function PackageCommand(props: Readonly<PackageCommandProps>) {
   const [manager, set_manager] = createSignal<ManagerId>("npm");

@@ -1,12 +1,11 @@
 // Layout arithmetic of the dashboard grid, as plain data: where a moved or
 // resized box goes, and where a new item fits. The view and the Insert
-// commands use it; the store checks the result (#231).
+// commands use it; the store checks the result.
 
 import { boxesOverlap } from "../dashboard.js";
 import type { DashboardBox, DashboardItem } from "../types/dashboard.js";
 import type { Grid } from "../types/grid.js";
 
-/** Columns of the dashboard grid. */
 export const DASHBOARD_COLUMNS = 12;
 /** Height of one grid row, in CSS pixels. */
 export const DASHBOARD_ROW_HEIGHT = 48;
@@ -22,7 +21,7 @@ export function boxIsFree(
   return items.every((item) => item.id === ignore || !boxesOverlap(item.box, box));
 }
 
-/** `box` moved by whole cells, kept inside the columns and below row 0. */
+/** `box` moved by whole cells, kept inside the columns and never above row 0. */
 export function movedBox(box: DashboardBox, dx: number, dy: number): DashboardBox {
   return {
     ...box,

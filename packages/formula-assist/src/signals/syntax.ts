@@ -1,4 +1,4 @@
-// Signal 5 of #801, the formula's own syntax: a function name once the typed
+// The formula's own syntax: a function name once the typed
 // letters leave only one, a sheet name with its `!`, and the brackets that
 // close calls which have all the arguments they can take.
 
@@ -159,7 +159,6 @@ class Syntax implements Signal {
   }
 }
 
-/** Open the syntax signal of one edit. */
 export function openSyntax(edit: FormulaEdit): Signal {
   return new Syntax(edit);
 }

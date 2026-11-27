@@ -83,8 +83,8 @@ pub(super) const fn value_args(function: Function) -> ValueArgs {
     }
 }
 
-/// Functions whose arguments are number lists: a single-cell argument is a
-/// reference, so text and logical values in that cell are ignored.
+/// Functions whose arguments are number lists. See
+/// [`super::Family::reference_cells`] for what this changes.
 pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
     matches!(
         function,

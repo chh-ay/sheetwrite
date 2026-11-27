@@ -1,5 +1,8 @@
-//! Spill admission needs known-empty destinations as well as loaded inputs.
-//! Windowed datasources must request both beyond the visible window.
+//! The cells a window must load before its formulas can calculate: the
+//! cells their formulas read, the formula cells those reads reach, and the
+//! destinations of their spills. Spill admission needs known-empty
+//! destinations as well as loaded inputs, so a windowed data source must
+//! request both beyond the visible window.
 
 use std::collections::BTreeMap;
 
@@ -15,12 +18,13 @@ use crate::types::{cell_key, CellKey, CellRange};
 #[wasm_bindgen]
 impl CellStore {
     /// Same-sheet calculation prerequisites for `start_row..end_row` × `cols`,
-    /// as flat `[row_start, row_end, col_start, col_end)` rectangles.
+    /// as flat `row_start, row_end, col_start, col_end` rectangles with
+    /// exclusive ends.
     ///
     /// The walk follows each read into the formula cells it reaches, so for
     /// `H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`.
     /// Spill children follow their anchor; attempted spill destinations are also
-    /// prerequisites because admission must establish that source cells are empty.
+    /// prerequisites because admission must establish that those cells are empty.
     /// Reads of other sheets are skipped. `max_cells` bounds the walk: a read larger than
     /// the remaining budget is skipped, so one whole-column range cannot make a
     /// window demand the full column. Rectangles are disjoint and ascend by

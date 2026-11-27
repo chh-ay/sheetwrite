@@ -107,7 +107,6 @@ function read_rect(sheets: SheetLookup, range: ChartRange, all_rows = false): Re
   return { sheet, r0, r1, c0, c1, truncated };
 }
 
-/** Sheet metadata by ID. */
 type SheetLookup = (id: SheetId) => Sheet | undefined;
 
 /**
@@ -321,7 +320,7 @@ function request_pivot_views(store: Store): void {
  *
  * @param store - The store that holds the workbook, such as `grid.store`.
  * @param sheet - Stable ID of the sheet that holds the chart.
- * @param id - The chart's ID.
+ * @param id - The chart's `id`, unique on its sheet.
  * @returns The chart's resolved series, labels and settings, or `null`.
  */
 export function resolveChartView(store: Store, sheet: SheetId, id: string): ChartView | null {
@@ -787,7 +786,8 @@ class ChartTracker {
         // refresh also names them through pivotViewsChanged().
         for (const chart of index.pivotIndices) hits.add(chart);
       } else {
-        // Custom stores and bounded-report overflow keep the conservative contract.
+        // Without precise rectangles (a custom store, or an engine report that
+        // overflowed its bound), any chart may have changed.
         for (let chart = 0; chart < index.charts.length; chart++) hits.add(chart);
       }
     }
@@ -830,9 +830,9 @@ const TRACKERS = new WeakMap<Store, ChartTracker>();
  * Listen for commits that change any chart's `ChartView`. Edited rectangles are
  * matched against an index of series ranges, so edits outside every series
  * range cost no chart work. Recomputed formulas and changed spill/pivot cells
- * query the same index. Custom stores and report overflow refresh conservatively.
- * Returns an unsubscribe
- * function; the index is dropped with the last listener.
+ * query the same index. Custom stores, and commits whose engine report of
+ * recalculated rectangles overflowed, name every chart. The index is dropped
+ * with the last listener.
  *
  * @returns A function that removes `listener`.
  */

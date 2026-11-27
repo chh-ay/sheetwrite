@@ -1,4 +1,8 @@
-//! OOXML spelling belongs beside the lexer, not in the workbook transport.
+//! Formula text to and from XLSX (OOXML) spelling: the `_xlfn.`, `_xlws.`
+//! and `_xlpm.` prefixes, and `_xlfn.ANCHORARRAY(A1)` for the spill `A1#`;
+//! and the check of which formulas an XLSX file marks as dynamic arrays.
+//! The conversion works on the lexer's tokens, so it lives beside the
+//! lexer, not in the workbook transport.
 
 use crate::calc::{parse, parse_a1, Tok};
 use crate::eval::{ast_produces_array, Shapes};
@@ -205,7 +209,9 @@ fn is_qualified(tokens: &[Spanned<'_>], index: usize) -> bool {
         .is_some_and(|previous| matches!(tokens[previous].tok, Ok(Tok::Bang)))
 }
 
-/// Include a sheet qualifier without interpreting its spelling as a function.
+/// Where the cell reference at token `cell` starts, its sheet qualifier
+/// (`Sheet1!A1`) included, so the qualifier is copied as written and never
+/// read as a function name. `None` when the token is not a cell reference.
 fn reference_start(tokens: &[Spanned<'_>], cell: usize) -> Option<usize> {
     let token = tokens.get(cell)?;
     parse_a1(identifier(token)?)?;
@@ -232,8 +238,6 @@ fn anchor_reference(tokens: &[Spanned<'_>], function: usize) -> Option<(usize, u
     matches!(close.tok, Ok(Tok::RParen)).then_some((start, end.end, close.end))
 }
 
-/// Remove only identifier prefixes. Quoted text, sheet names and structured
-/// references are not function or parameter names and must remain unchanged.
 /// Append unchanged source text before a rewritten token, starting the output on the first change.
 fn changed_output<'a>(
     result: &'a mut Option<String>,
@@ -246,6 +250,10 @@ fn changed_output<'a>(
     output
 }
 
+/// Read XLSX spelling: remove the `_xlfn.`, `_xlws.` and `_xlpm.` prefixes
+/// of names, and write `_xlfn.ANCHORARRAY(A1)` as `A1#`. Quoted text, sheet
+/// names and structured references are not function or parameter names and
+/// must remain unchanged. `None` when nothing changes.
 fn changed_formula_from_xlsx(source: &str) -> Option<String> {
     let tokens = lex_tolerant(source);
     let mut result = None;

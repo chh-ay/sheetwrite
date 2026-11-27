@@ -177,7 +177,8 @@ export type ClipboardOutcome = "done" | "unsupported" | "blocked" | "empty" | "r
 /**
  * What Paste Special pastes, as Excel's Paste choices (`Range.PasteSpecial`'s
  * `XlPasteType`): everything, only formulas or values, only formats, only
- * notes, only data validation, everything but borders, only column widths,
+ * notes, only data validation, everything using the source theme (the same
+ * as everything here), everything but borders, only column widths,
  * formulas or values with their number formats, or everything with the
  * target's conditional formats kept beside the copied ones.
  */
@@ -672,9 +673,9 @@ export type ContextMenuActionName =
 export interface ContextMenuContext {
   /** Right-clicked cell, or null when the pointer is outside the cell body. */
   readonly cell: CellAddress | null;
-  /** Viewport-relative browser pointer coordinate. */
+  /** Pointer position in CSS pixels from the viewport's left edge. */
   readonly clientX: number;
-  /** Viewport-relative browser pointer coordinate. */
+  /** Pointer position in CSS pixels from the viewport's top edge. */
   readonly clientY: number;
 }
 
@@ -825,7 +826,8 @@ export type ContextMenuItems =
 
 /**
  * Toolbar / feature configuration. When `config` is set the built-in toolbar is
- * shown; control flags default to `true` except the opt-in `export` flag.
+ * shown; control flags default to `true` except the opt-in `export` and
+ * `keyboardSettings` flags.
  *
  * @example
  * ```ts
@@ -909,7 +911,7 @@ export interface GridConfig {
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**
-   * Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
+   * Built-in keyboard handling. `true` (default) keeps Excel's default
    * bindings. An object replaces individual action bindings; omitted actions
    * keep their defaults, and `null` disables an action's keys.
    * For example: `{ bindings: { copy: { key: "c", mod: true, shift: true } } }`.
@@ -1275,7 +1277,6 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
-  getCellInput(row: number, col: number): CellInputSnapshot | null;
   /**
    * Editable snapshot of the active cell, also when its row is hidden (see
    * {@link goToCell}); null without an active cell.
@@ -1549,8 +1550,8 @@ export interface Grid {
   /** Clear any active sort/filter view. */
   clearView(): void;
   /**
-   * Undo the last recorded cell edit. If the restored data is above the
-   * transaction resource limits, nothing changes: the Grid emits
+   * Undo the last change made through this grid. If the restored data is
+   * above the transaction resource limits, nothing changes: the Grid emits
    * `mutation-rejected` and removes that entry, so older edits stay undoable.
    *
    * @example
@@ -1565,7 +1566,7 @@ export interface Grid {
    * @see Grid.redo
    */
   undo(): void;
-  /** Redo the last undone cell edit. */
+  /** Redo the last undone change. */
   redo(): void;
   /**
    * Download the active sheet as CSV.
@@ -1625,11 +1626,12 @@ export interface Grid {
   clearSearch(): void;
   /**
    * Replace the active match with `replacement`, then advance to the next match
-   * (re-scanning against the new data). Only literal text/number cells are
-   * eligible; formula and ref cells are skipped (formula source is never
-   * rewritten). Honors the active {@link SearchOptions} (matchCase; `wholeCell`
-   * swaps the entire cell). The write flows through the grid's commit path as
-   * one undoable step. No-op when read-only or when there is no active match.
+   * (re-scanning against the new data). Formula text is rewritten unless
+   * `lookIn` is `"values"`, and note text when it is `"notes"`; reference
+   * cells and formulas the new text would break are skipped. Honors the active
+   * {@link SearchOptions} (matchCase; `wholeCell` swaps the entire cell). The
+   * write is one undoable step. No-op when read-only or when there is no
+   * active match.
    */
   replaceCurrent(replacement: string): SearchResult;
   /**
@@ -1802,7 +1804,7 @@ export interface Grid {
   setFrozen(rows: number, cols?: number): void;
   /** Content zoom factor (0.5–2): scales row/column geometry and fonts. */
   setZoom(zoom: number): void;
-  /** The current content zoom factor. */
+  /** The content zoom factor, from 0.5 to 2. */
   getZoom(): number;
   /**
    * Which renderer is actually active: `"worker"` when the OffscreenCanvas

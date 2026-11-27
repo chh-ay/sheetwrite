@@ -25,7 +25,7 @@ import type {
   HistoryVersion,
 } from "./types.js";
 
-/** A reader lease lasts five minutes and renews on each leased read. */
+/** Reader lease length. Each leased read renews the lease for this long. */
 const READER_LEASE_MS = 5 * 60 * 1000;
 
 /** Concurrent reader leases per document; each one pins a complete replay chain. */
@@ -40,10 +40,9 @@ const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 /** Ceiling for a log tail between two checkpoints; the cadence closes a tail far earlier. */
 const MAX_TAIL_TRANSACTIONS = 100_000;
 
-/** Ceiling for the records of one publication. */
 const MAX_PUBLICATION_RECORDS = 100_000;
 
-/** UTF-8 code units in an author ID, marker name or reader token. */
+/** UTF-16 code units (`string.length`) in an author ID, marker name or reader token. */
 const MAX_LABEL_LENGTH = 256;
 
 /** A record with the count of heads, markers, leases and records that refer to it. */
@@ -236,7 +235,10 @@ async function remove_version(
   await release(transaction, roots(version), manifest);
 }
 
-/** Copy and validate a publication before the first await, so later host edits cannot change it. */
+/**
+ * Copy a publication before the first await, so later host edits cannot
+ * change it, then validate the copy.
+ */
 async function admit_publication(input: HistoryPublishRequest): Promise<HistoryPublishRequest> {
   const payload_bytes = input.records.reduce((total, record) => total + record.bytes.length, 0);
   const too_large =
@@ -808,7 +810,7 @@ export class MemoryHistoryStorage extends AtomicHistoryStorage {
   private readonly documents = new Map<string, MemoryDocument>();
   private lock = Promise.resolve();
 
-  /** Runs `action` in one atomic transaction over the stored archive; a failure leaves it unchanged. */
+  /** Runs `action` once the adapter's previous transaction ends; checks `request.signal` before and after it. */
   protected async transact<T>(
     request: HistoryStorageRequest,
     action: (transaction: HistoryStorageTransaction) => Promise<T>,

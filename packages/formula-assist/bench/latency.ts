@@ -1,4 +1,4 @@
-// The latency budget of #801: a suggestion within 4 ms at the 95th
+// The latency budget of formula assist: a suggestion within 4 ms at the 95th
 // percentile per key on a 100,000-row sheet. Types 200 formulas spread over
 // such a sheet and times opening each edit and every `suggest` call.
 //
@@ -29,7 +29,7 @@ const DATA_ROWS = 100_000;
 const PRODUCTS = 50;
 const REGIONS = ["North", "South", "East", "West", "Central", "Export"];
 const TARGETS = 200;
-/** The budget per key at the 95th percentile, from #801. */
+/** The budget per key at the 95th percentile. */
 const BUDGET_MS = 4;
 const P50 = 0.5;
 const P95 = 0.95;

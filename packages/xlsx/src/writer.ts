@@ -131,13 +131,13 @@ function has_exact_border_width(style: CellStyle | undefined): boolean {
   );
 }
 
+/** See `PivotWrite.keptOutputs`. */
+type KeptOutputs = ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
+
 /**
  * Workbook metadata for the hidden sheet. The saved output of a native pivot
  * is left out: the worksheet holds it as the pivot's rendered cells.
  */
-/** The output written as cells for each pivot kept in metadata, by pivot ID. */
-type KeptOutputs = ReadonlyMap<string, NonNullable<PivotDefinition["savedOutput"]>>;
-
 function metadata_snapshot(
   snapshot: WorkbookSnapshot,
   native_pivots: ReadonlySet<string>,

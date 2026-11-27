@@ -25,7 +25,9 @@ export interface LiveScenarioState<Snapshot, Scenario> {
  * Creates a scenario in the host element once the host comes near the
  * viewport, follows its snapshot (when it has one), and disposes it with the
  * island. `load` imports the module with the scenario's factory, so the
- * engine, the workbook and the grid styles load only then.
+ * engine, the workbook and the grid styles load only then. For the same
+ * reason, the route passes an island the scenario's data as props: the
+ * island imports no scenario code before its grid loads.
  */
 export function createLiveScenario<Scenario extends StartedScenario, Snapshot = never>(
   load: () => Promise<(host: HTMLElement) => Scenario>,

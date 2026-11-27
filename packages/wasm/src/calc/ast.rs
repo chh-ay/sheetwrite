@@ -28,7 +28,6 @@ pub(crate) enum CmpOp {
 pub(crate) struct RefFlags(pub(super) u8);
 
 impl RefFlags {
-    /// Both axes `$`-fixed.
     pub(crate) const ABSOLUTE: Self = Self::new(true, true);
 
     pub(crate) const fn new(row_abs: bool, col_abs: bool) -> Self {
@@ -87,7 +86,6 @@ pub(crate) struct RangeFlags {
 }
 
 impl RangeFlags {
-    /// Every axis of both ends `$`-fixed.
     pub(crate) const ABSOLUTE: Self = Self {
         start: RefFlags::ABSOLUTE,
         end: RefFlags::ABSOLUTE,
@@ -148,7 +146,6 @@ impl NameId {
             .map(Self)
     }
 
-    /// The table entry's index.
     pub(crate) const fn index(self) -> usize {
         (self.0.get() - 1) as usize
     }
@@ -207,9 +204,8 @@ pub(crate) struct DetachedCellRef {
     pub(crate) flags: RefFlags,
 }
 
-/// A sheet-qualified range whose sheet is not one of this workbook's: an
-/// external link, a missing sheet, or standalone syntax. It keeps the
-/// written sheet text so the formula writes back exactly.
+/// A sheet-qualified range whose sheet is not one of this workbook's; see
+/// [`DetachedCellRef`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DetachedRangeRef {
     pub(crate) sheet: UnresolvedSheetRef,
@@ -355,10 +351,13 @@ pub(crate) enum Shape {
     Scalar,
     /// An array, wherever and whenever it is evaluated.
     Array,
-    /// Decided by the shape check when it is asked: the node reads a LAMBDA
-    /// parameter, a defined name, a structured or detached reference, a LET
-    /// name, a call whose result has no shape of its own (OFFSET, INDIRECT,
-    /// `A1#`, a LAMBDA call), or a node that binding can still change.
+    /// Decided by the shape check when it is asked. The node is a LAMBDA
+    /// parameter, a defined name, a structured reference, a detached range,
+    /// a 3-D reference, a LET name, a bare name that binding can still
+    /// change, or an unknown call such as a LAMBDA call. Or it is a call
+    /// whose result has no shape of its own (OFFSET, INDIRECT, `A1#`, a
+    /// function family with array hooks), or an operator or a call whose
+    /// shape follows such an operand.
     Dynamic,
 }
 
@@ -387,14 +386,12 @@ impl Shape {
 pub(crate) struct NodeShape(Shape);
 
 impl NodeShape {
-    /// The shape this node was built with.
     pub(crate) const fn get(self) -> Shape {
         self.0
     }
 }
 
 impl Ast {
-    /// A call of `func` with `args`, with its [`NodeShape`].
     pub(crate) fn call(func: Func, args: Box<[Self]>) -> Self {
         let shape = NodeShape(crate::eval::call_shape(func, &args));
         Self::Func(func, args, shape)
@@ -576,8 +573,8 @@ impl Ast {
         changed
     }
 
-    /// Heap payload owned below an inline AST root. The root itself is already
-    /// included in its formula hash-table bucket.
+    /// Heap payload owned below an inline AST root. The owner of the root
+    /// (a formula entry or a defined name) counts the root node itself.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]

@@ -58,7 +58,7 @@ it("tells formulas with their own numbers apart", async () => {
 });
 
 it("reads a neighbour holding a long run of digits in linear time", async () => {
-  // A digit run followed by a letter made the number check backtrack in quadratic time (#219).
+  // A digit run followed by a letter must not make the number check backtrack.
   const digits = "1".repeat(20_000);
   const started = performance.now();
   await reasons((row) => `=A${row}+${digits}E1`);

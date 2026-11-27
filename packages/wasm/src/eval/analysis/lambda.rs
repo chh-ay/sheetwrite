@@ -77,8 +77,8 @@ type Shape = (usize, usize, usize);
 pub(crate) enum Slot {
     /// A value every shape check sees as a scalar.
     Value(Value),
-    /// A blank or an error: one value to read, a one-cell array to shape
-    /// checks, as LAMBDA arguments have always been.
+    /// A blank or an error: one value to read, but a one-cell array to shape
+    /// checks.
     OneCell(Value),
     Array {
         rows: usize,
@@ -243,7 +243,6 @@ pub(crate) struct ShapeScope<'a> {
     kinds: &'a [Kind<'a>],
     /// Where the called LAMBDA was created.
     outer: Shapes<'a>,
-    /// The LAMBDA called.
     callee: &'a LambdaDefinition,
     /// The call whose body holds this call, while its shape is decided.
     caller: Option<&'a Self>,
@@ -273,7 +272,6 @@ impl<'a> Shapes<'a> {
         }
     }
 
-    /// The defined names the checked formula reads.
     pub(crate) const fn names(self) -> NameScope<'a> {
         self.names
     }
@@ -577,7 +575,6 @@ pub(in crate::eval) fn parameter_reference(
     }
 }
 
-/// The value a parameter use reads.
 pub(crate) fn parameter_value(
     store: &CellStore,
     frame: Option<&CallFrame>,
@@ -651,7 +648,7 @@ pub(in crate::eval) fn read_parameter_values(
 }
 
 /// Calls `read` with each value of an array-like slot in row-major order.
-/// A slot with no values to read is `#VALUE!`.
+/// A scalar, missing, closure or shape-only slot is `#VALUE!`.
 fn read_slot_values(
     store: &CellStore,
     slot: &Slot,
@@ -671,10 +668,10 @@ fn read_slot_values(
 }
 
 /// Folds every value of `args` into `fold` when each argument is a
-/// parameter bound to table rows (a measure's column in one pivot cell):
-/// the values [`read_slot_values`] passes to the accumulator, in the same
-/// order, and an error value returns at once, as it does there. `None`,
-/// having folded nothing, when an argument is anything else.
+/// parameter bound to table rows (a measure's column in one pivot cell).
+/// The values and their order are those [`read_slot_values`] reads. The
+/// first error value stops the fold and is returned. `None`, having folded
+/// nothing, when any argument is something else.
 pub(in crate::eval) fn fold_row_parameters(
     store: &CellStore,
     frame: Option<&CallFrame>,
@@ -1171,7 +1168,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(callee)
     }
 
-    /// A call's value as a scalar.
     fn call_value(&mut self, arguments: &[Ast]) -> Result<Value, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let value = self.scalar(&callee.definition.body);
@@ -1179,7 +1175,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(value)
     }
 
-    /// A call's value as an array.
     fn call_matrix(&mut self, arguments: &[Ast]) -> Result<EvalMatrix, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let matrix = self.matrix(&callee.definition.body);
@@ -1690,7 +1685,7 @@ mod tests {
             ("=LAMBDA(x,x)()", "#VALUE!"),
             ("=LAMBDA(f,f)(LAMBDA(x,x))", "#CALC!"),
             ("=LAMBDA(f,f(1))(2)", "#VALUE!"),
-            // Deep recursion still stops: by depth, and by the call budget.
+            // Deep recursion stops: by depth, and by the call budget.
             ("=LAMBDA(self,self(self))(LAMBDA(self,self(self)))", "#NUM!"),
             ("=LAMBDA(self,n,IF(n=0,0,self(self,n-1)+self(self,n-1)))(LAMBDA(self,n,IF(n=0,0,self(self,n-1)+self(self,n-1))),30)", "#NUM!"),
         ];

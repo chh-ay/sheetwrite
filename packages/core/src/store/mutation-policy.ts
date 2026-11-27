@@ -39,7 +39,10 @@ export interface MutationPolicyResult {
 /** Rendered pivot output rectangles on one sheet. */
 export type PivotOutputProvider = (sheet: SheetId) => ReadonlyArray<{ id: string; range: Range }>;
 
-/** Pure policy evaluation over workbook metadata; storage and events stay outside this owner. */
+/**
+ * Decides from workbook metadata which operations of a transaction may apply.
+ * It does not write to the store or emit events.
+ */
 export class StoreMutationPolicy {
   constructor(
     private readonly workbook: Workbook,

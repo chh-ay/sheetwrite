@@ -23,9 +23,9 @@ export interface RibbonFitStep {
 }
 
 /**
- * Reductions in the order Excel applies them: every group, taken in
- * `reduceOrder`, shrinks to medium before any group collapses, and the first
- * groups in the order shrink and collapse first.
+ * Reductions in the order Excel applies them: every group that can shrink,
+ * taken in `reduceOrder`, shrinks to medium before any group collapses, and
+ * the first groups in the order shrink and collapse first.
  */
 export function ribbonFitSteps(reduceOrder: readonly RibbonFitGroup[]): RibbonFitStep[] {
   const steps: RibbonFitStep[] = [];

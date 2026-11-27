@@ -18,7 +18,7 @@ test("each edit is recalculated, timed and painted", async ({ page }) => {
   await expect(page.getByTestId("recalc-lookups")).toHaveText(MEASURED);
   await expect(page.getByTestId("recalc-runs").locator("li")).toHaveCount(2);
 
-  // The merged engine showcase address opens this page.
+  // The engine showcase address forwards to this page.
   await page.goto("/showcases/engine/");
   await expect(page).toHaveURL(siteUrl("/showcases/recalculation/"));
 });

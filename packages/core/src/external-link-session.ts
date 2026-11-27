@@ -23,7 +23,6 @@ export type ExternalLinkResolver = (
 /** The resolver each grid's Edit Links panel uses for Update Values. */
 const RESOLVERS = new WeakMap<Grid, ExternalLinkResolver>();
 
-/** The resolver connected to `grid`, if any. */
 export function externalLinkResolverOf(grid: Grid): ExternalLinkResolver | undefined {
   return RESOLVERS.get(grid);
 }

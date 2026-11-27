@@ -1,8 +1,8 @@
-// Composes the leaf pieces (toolbar, name box, formula bar, tabs, status)
-// around exactly one grid, Google-Sheets style. The shell suppresses only the
-// grid's duplicate built-in toolbar/tabs; find, context menu, and keyboard
-// policy stay under the caller's `GridConfig` control, and the grid host
-// remains the single spreadsheet keyboard/focus authority.
+// Composes the leaf pieces (toolbar or ribbon, name box, formula bar, tabs,
+// status) around exactly one grid, Google-Sheets style. The shell suppresses
+// only the grid's duplicate built-in toolbar/tabs; find, context menu, and
+// keyboard policy stay under the caller's `GridConfig` control, and the grid
+// host remains the single spreadsheet keyboard/focus authority.
 
 import { focusInto } from "../focus-exit.js";
 import { createGridController, type GridController } from "../grid-controller.js";
@@ -89,7 +89,10 @@ function mount_toolbar(host: HTMLElement, grid: Grid, chrome: ShellChromeOptions
   });
 }
 
-/** The ribbon renders the same commands as the toolbar, which replaces it if its chunk fails. */
+/**
+ * Mount the ribbon. The toolbar shows the same commands, so it takes the
+ * ribbon's place if the ribbon's chunk fails.
+ */
 function mount_ribbon(
   host: HTMLElement,
   grid: Grid,
@@ -98,7 +101,8 @@ function mount_ribbon(
 ): ShellPiece {
   return mount_when_loaded(
     host,
-    // The ribbon spans its row, so the row's width decides its layout now.
+    // The ribbon spans its row, so the row's width at mount picks the layout
+    // whose height the row reserves.
     ribbonHeight(layout, host.clientWidth),
     async () => {
       const { createRibbon: create_ribbon } = await import("./ribbon-factory.js");
@@ -114,7 +118,7 @@ function mount_ribbon(
   );
 }
 
-/** Host elements and feature options used to create a spreadsheet shell. */
+/** Options for {@link createSpreadsheetShell}: its grid, chrome and event callbacks. */
 export interface SpreadsheetShellOptions {
   /** Options for the single grid the shell owns. `initSheetwrite` must already be awaited. */
   grid: GridOptions;
@@ -122,7 +126,7 @@ export interface SpreadsheetShellOptions {
   toolbar?: readonly ToolbarItem[];
   /** Use an Excel-style ribbon instead of the toolbar; an object sets its layout. */
   ribbon?: boolean | RibbonConfig;
-  /** Event callbacks forwarded from the owned grid. */
+  /** Called with each change event of the owned grid. */
   onChange?: (event: ChangeEvent) => void;
   /** Called when the grid's selection changes; `null` when nothing is selected. */
   onSelectionChange?: (selection: Selection | null) => void;
@@ -138,7 +142,7 @@ export interface SpreadsheetShell {
   readonly element: HTMLElement;
   /** Merge `theme` over the grid's theme; the shell's own chrome follows it. */
   setTheme(theme: Partial<Theme>): void;
-  /** Turn editing off or on for the grid and the shell's toolbar. */
+  /** Turn editing off or on for the grid, the formula bar and the sheet tabs. */
   setReadOnly(readOnly: boolean): void;
   /** Reconfigure the grid; the shell keeps its own toolbar/tabs suppressed. */
   setGridConfig(config: GridConfig | undefined): void;
@@ -156,9 +160,7 @@ function shell_grid_config(config: GridConfig | undefined): GridConfig {
 /**
  * Mount a complete spreadsheet shell into `host`: toolbar row, formula row
  * (name box + formula bar), the grid, and a bottom row with sheet tabs and a
- * selection status. The host must have a real size; the shell fills it. Returns
- * the shell handle; `destroy` tears down every piece, the grid, and the shell
- * DOM, and is safe to call twice.
+ * selection status. The host must have a real size; the shell fills it.
  *
  * @param host - Element the shell is appended to and fills; give it a size.
  * @param options - Options for the grid the shell creates, the toolbar or
@@ -227,7 +229,8 @@ export function createSpreadsheetShell(
 
   // The shell's own chrome honours the grid's glyph overrides and command
   // flags, like the grid's built-in chrome. The shell toolbar shows Export
-  // unless the config turns it off.
+  // unless the config turns it off; the ribbon shows it only when the config
+  // turns it on.
   const grid_config = options.grid.config ?? {};
   const chrome: ShellChromeOptions = {
     focusGrid: () => grid_host.focus(),

@@ -71,7 +71,10 @@ impl IterationLimits {
     }
 }
 
-/// Runtime cycle discovery is needed only while iteration is enabled.
+/// Runtime cycle discovery in an iterating pass: the formulas on the
+/// evaluation path, the formulas a back edge marked as one pending
+/// component, and the component being swept. Only an iterating pass has
+/// this state.
 #[derive(Default)]
 struct BackEdges {
     path: Vec<AbsCellKey>,
@@ -204,10 +207,13 @@ impl CellStore {
         })
     }
 
-    /// Before spill installation, settle cycles but leave ordinary readers
-    /// unevaluated: they may read spill cells that do not exist yet. The
-    /// depth walk's `#CYCLE!` results are still pulled, not written, so the
-    /// cells hold the values each component starts from.
+    /// Settles the formulas that the depth walk marked `#CYCLE!`. A circular
+    /// component of scalar formulas iterates; one with a spilling formula
+    /// keeps `#CYCLE!`. The formulas that only read a component run once,
+    /// when `evaluate_readers` is set. Before spill installation the caller
+    /// leaves them unevaluated: they may read spill cells that do not exist
+    /// yet. The depth walk's `#CYCLE!` results are still pulled, not written,
+    /// so the cells hold the values each component starts from.
     #[inline(never)]
     pub(super) fn settle_circular_references(
         &mut self,
@@ -221,7 +227,7 @@ impl CellStore {
         while let Some((id, _)) = results.pop_pulled() {
             cyclic_ids.insert(id);
         }
-        // Selection order, as the memo listed them.
+        // In the order `affected` selected them.
         let cyclic: Vec<AbsCellKey> = affected
             .ids()
             .filter(|&id| cyclic_ids.contains(id))
@@ -323,8 +329,10 @@ impl CellStore {
         });
     }
 
-    /// A runtime component settles as its head unwinds, before any downstream
-    /// reader returns. Discovery already evaluated each member once.
+    /// Ends the evaluation of `key`. When `key` heads a component that a
+    /// back edge found, the component iterates now, before any downstream
+    /// reader returns, and the result is the head's settled value.
+    /// Discovery already evaluated each member once. Otherwise `None`.
     pub(super) fn finish_runtime_formula(
         &self,
         key: AbsCellKey,

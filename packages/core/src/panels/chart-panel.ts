@@ -223,7 +223,6 @@ function render_chart_panel(
     });
   };
 
-  // Titles and legend.
   const text_section = panelSection("Titles");
   const title_field = text_field("Chart title", "title", (text) =>
     commit((chart) => with_optional(chart, "title", text === "" ? undefined : text)),

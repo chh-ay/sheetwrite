@@ -218,7 +218,11 @@ export function cellAlign(
     : "left";
 }
 
-/** Resolve the canvas font from the theme and cell style. */
+/**
+ * The canvas font of a cell style: the theme font with the style's weight,
+ * slant, size (times `zoom`) and family. A style that sets none of them gets
+ * `theme.font` itself. `cache` keeps one result per distinct style.
+ */
 export function fontFor(
   theme: Theme,
   style: Pick<CellStyle, "bold" | "italic" | "fontSize" | "fontFamily">,
@@ -353,8 +357,8 @@ class BreakUnits {
  * Lines break between graphemes, never inside an emoji or a cluster. Inside
  * a cluster a prefix can be wider than the whole (a half-built ZWJ sequence),
  * but across graphemes width grows with length, so each break is found by
- * search instead of measuring every prefix, which made a line of L characters
- * cost L measurements of growing strings. Joining scripts such as Arabic can
+ * search instead of measuring every prefix, which would cost L measurements
+ * of growing strings for a line of L characters. Joining scripts such as Arabic can
  * shrink slightly when a letter takes its final form; there the search may
  * pick a different break than a scan would, but every line it picks fits.
  * The search gallops forward from the previous line's length, then bisects,
@@ -1331,7 +1335,8 @@ function paint_cell(
       }
     }
 
-    // Unset or "middle" keeps the exact centered baseline for existing sheets.
+    // Unset or "middle" puts the line on the cell's exact middle; top and bottom
+    // place it as a one-line block, as wrapped text does.
     const cy =
       effective.verticalAlign === undefined || effective.verticalAlign === "middle"
         ? y + h / 2

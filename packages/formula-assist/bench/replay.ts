@@ -1,7 +1,7 @@
 // Types formulas key by key into formula edits and measures what a
 // suggester saves: keys pressed against characters typed, suggestions that
 // were wrong, and how often a suggestion helped. This is the quality
-// benchmark of #801; the CI gate and the per-signal reports run it.
+// benchmark of formula assist; the CI gate and the per-signal reports run it.
 //
 // The typist presses Tab when the suggestion is a prefix of the rest of the
 // formula, takes the leading words that agree with Ctrl+→ when that saves
@@ -56,7 +56,6 @@ interface ReplaySuggester {
   dispose(): void;
 }
 
-/** Attaches a suggester to the store of one workbook. */
 export type AttachReplay = (store: SheetwriteStore) => ReplaySuggester;
 
 /** What one signal's suggestions did. */
@@ -91,7 +90,6 @@ export interface ReplayCounts {
   readonly suggestMs: number[];
 }
 
-/** An empty set of counts. */
 export function emptyCounts(): ReplayCounts {
   return {
     formulas: 0,
@@ -141,7 +139,6 @@ function percentile(values: readonly number[], rank: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(rank * sorted.length))] ?? 0;
 }
 
-/** The rates of `counts`. */
 export function replayMetrics(counts: ReplayCounts): ReplayMetrics {
   return {
     formulas: counts.formulas,
@@ -413,7 +410,6 @@ export async function replayWorkbook(
   }
 }
 
-/** Replay every workbook of a set. */
 export async function replaySet(
   workbooks: Iterable<ReplayWorkbook> | AsyncIterable<ReplayWorkbook>,
   attach: AttachReplay,

@@ -128,7 +128,6 @@ export function mountGridWithData(rowCount = 50): {
   return { workbook, store, host, grid };
 }
 
-/** The grid's scroll container under `host`. */
 export function scrollerOf(host: HTMLElement): HTMLDivElement {
   const node = host.querySelector(".sheetwrite-scroller");
   if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");

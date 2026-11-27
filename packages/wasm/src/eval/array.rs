@@ -1,4 +1,8 @@
-//! Bounded dynamic-array evaluation for FILTER, SORT, UNIQUE, and direct ranges.
+//! Bounded dynamic-array evaluation: the dispatch for every array
+//! expression, the array functions (FILTER, SORT, UNIQUE, TAKE, DROP,
+//! CHOOSECOLS, CHOOSEROWS, TRANSPOSE, SEQUENCE and TRIMRANGE), spill
+//! references (`A1#`), and the shape and spill-budget checks made before
+//! evaluation.
 
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
@@ -1062,7 +1066,7 @@ impl CellStore {
         if filter_rows {
             return Ok(array.pick(selected.into_iter()));
         }
-        // Columns are picked by copying, as before.
+        // `ValueRows` picks only rows, so picked columns are copied.
         let matrix = array.into_matrix();
         let (rows, cols) = (matrix.rows, selected.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
@@ -1163,7 +1167,7 @@ impl CellStore {
             return Ok(array.pick(indices.into_iter()));
         }
 
-        // Columns are reordered by copying, as before.
+        // `ValueRows` picks only rows, so reordered columns are copied.
         let matrix = array.into_matrix();
         let mut values = Vec::with_capacity(matrix.values.len());
         for row in 0..matrix.rows {
@@ -1251,7 +1255,7 @@ impl CellStore {
             return Ok(array.pick(retained.into_iter()));
         }
 
-        // Columns are kept by copying, as before.
+        // `ValueRows` picks only rows, so kept columns are copied.
         let matrix = array.into_matrix();
         let (rows, cols) = (matrix.rows, retained.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
@@ -1288,7 +1292,7 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
-    /// TRIMRANGE(range, [`trim_rows`], [`trim_cols`]): the range without its
+    /// `TRIMRANGE(range, [trim_rows], [trim_cols])`: the range without its
     /// leading and trailing blank rows and columns. Each trim argument is 0
     /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
     /// with no value left is `#REF!`, as in Excel.
@@ -1473,7 +1477,7 @@ impl CellStore {
             return Ok(source.span(row_start, output_rows));
         }
 
-        // A column cut copies, as before.
+        // `ValueRows` spans only whole rows, so a column cut is copied.
         let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
@@ -1552,7 +1556,7 @@ impl CellStore {
             return Ok(source.pick(indices.into_iter().map(|row| row as usize)));
         }
 
-        // Columns are chosen by copying, as before.
+        // `ValueRows` picks only rows, so chosen columns are copied.
         let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
@@ -1639,7 +1643,10 @@ fn runtime_reference_bound(
     }
 }
 
-/// A row of a by-row array is one slice; a column is read value by value.
+/// The hash of UNIQUE item `item`: a row, or a column when `by_col`. A row
+/// is read as one slice, a column value by value. A number hashes `-0` as
+/// `0` and text hashes case-folded, so equal numbers and texts that differ
+/// only in case hash alike.
 fn item_hash(array: RowReader<'_>, item: usize, by_col: bool) -> u64 {
     let mut hasher = DefaultHasher::new();
     if by_col {

@@ -276,8 +276,8 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   },
   SHEET: { empty: "SHEET(C1)=1", mixed: "SHEET(C1)=1", boundary: "SHEET(C1)=1" },
   SHEETS: { empty: "SHEETS(C1)=1", mixed: "SHEETS(C1)=1", boundary: "SHEETS(C1)=1" },
-  // A function that takes one value runs once for each cell of a range
-  // (#1127): ACOS(1) is 0 and ACOS(2) is #NUM!, each in its own element.
+  // A function that takes one value runs once for each cell of a range:
+  // ACOS(1) is 0 and ACOS(2) is #NUM!, each in its own element.
   ACOS: {
     mixed: "ISERROR(ACOS(C1))",
     "range-array": "AND(INDEX(ACOS(C1:C2),1)=0,ISERROR(INDEX(ACOS(C1:C2),2)))",
@@ -353,7 +353,7 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
     "range-array": "AND(ROWS(RANDBETWEEN(C1:C2,6))=2,NOT(ISERROR(RANDBETWEEN(C1:C2,6))))",
   },
   // A range in the selecting argument or the lookup value gives one result
-  // for each cell (#1091, #1127).
+  // for each cell.
   IF: { "range-array": "AND(ROWS(IF(C1:C2,1,0))=2,NOT(ISERROR(IF(C1:C2,1,0))))" },
   IFNA: { "range-array": "AND(ROWS(IFNA(C1:C2,0))=2,NOT(ISERROR(IFNA(C1:C2,0))))" },
   IFS: { "range-array": "AND(ROWS(IFS(C1:C2,1))=2,NOT(ISERROR(IFS(C1:C2,1))))" },

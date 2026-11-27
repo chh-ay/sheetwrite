@@ -42,7 +42,7 @@ export const AGGREGATION_LABELS: readonly (readonly [PivotAggregation, string])[
 /** Most keep-list values a filter may hold; the pivot validator's bound. */
 export const MAX_FILTER_VALUES = 10_000;
 
-/** The source fields of one area, in area order. */
+/** The source fields of one area, in area order; a measure value shows as `-1`. */
 export function areaFields(pivot: PivotDefinition, area: PivotArea): number[] {
   switch (area) {
     case "rows":
@@ -181,10 +181,11 @@ export function placeField(
   return prune_sort(next);
 }
 
-/** Remove one entry from its area. */
+/** Remove one entry from its area, and the sort keys that named it. */
 export function removeField(pivot: PivotDefinition, placement: PivotPlacement): PivotDefinition {
-  // A measure value has no source field to carry anywhere, so removing it
-  // is the one edit it takes.
+  // `remove_placement` returns no moved field for a measure value, and the
+  // code below reads that as nothing removed, so a measure value is removed
+  // here.
   const value = placement.area === "values" ? pivot.values[placement.index] : undefined;
   if (value !== undefined && "measure" in value) {
     return { ...pivot, values: without_index(pivot.values, placement.index) };

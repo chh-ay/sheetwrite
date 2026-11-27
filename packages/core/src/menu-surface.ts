@@ -7,7 +7,6 @@ export const POPUP_VIEWPORT_MARGIN = 8;
 export interface PopupPlacement {
   /** Side tried first; the popup flips to the other side when it does not fit. */
   readonly side: "below" | "above";
-  /** Distance between the anchor and the popup. */
   readonly gap: number;
 }
 

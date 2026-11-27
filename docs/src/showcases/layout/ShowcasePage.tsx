@@ -44,7 +44,6 @@ export interface ShowcaseGuide {
   readonly label: string;
 }
 
-/** Props of {@link ShowcasePage}. */
 export interface ShowcasePageProps {
   /** The showcase's path segment, such as `spreadsheet`; marks Showcases in the top bar. */
   readonly id: string;

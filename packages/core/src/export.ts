@@ -207,7 +207,7 @@ export function toTsvStream(
  * Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,
  * bare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional
  * leading UTF-8 BOM. The synchronous API consumes an existing in-memory string
- * and returns an in-memory grid; it does not claim streaming. Scanning enforces
+ * and returns an in-memory grid; it does not stream. Scanning enforces
  * resource ceilings before materializing the next oversized field or record.
  *
  * @param text - The CSV file's text.

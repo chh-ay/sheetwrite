@@ -2,7 +2,9 @@
 
 use super::*;
 
-/// Rewrite resolved references by stable numeric handle and regenerate quoting metadata.
+/// Update the quote flag of each reference to the sheet with `handle` after
+/// that sheet is renamed to `name`. A bound reference holds the handle, not
+/// the name, so only its quoting changes. Returns whether any reference changed.
 pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool {
     match ast {
         Ast::AbsCell(sheet, _, _, flags) if sheet.handle == handle => {
@@ -80,7 +82,6 @@ pub(crate) type TableUse = Option<(u16, TableSection)>;
 
 /// Visit each table reference of `ast`: see [`TableUse`].
 pub(crate) fn for_each_table_ref(ast: &Ast, visit: &mut dyn FnMut(TableUse)) {
-    // Every other node holds table references only through its children.
     if let Ast::Structured(reference) = ast {
         visit(Some((reference.table, reference.section)));
     } else if let Ast::UnresolvedStructured(_) = ast {
@@ -93,9 +94,6 @@ pub(crate) fn for_each_table_ref(ast: &Ast, visit: &mut dyn FnMut(TableUse)) {
     }
 }
 
-/// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
-/// 3-D references are left to [`refresh_sheet_spans`]: removing one of their
-/// sheets shrinks the span instead.
 /// Point the references whose sheet name has the lookup `key` at `handle`,
 /// or back to unresolved sheet references when `handle` is `None`. Only the
 /// sheets of linked workbooks come and go this way; the text stays the same.
@@ -170,6 +168,10 @@ pub(crate) fn relink_sheet_refs(
     }
 }
 
+/// Replace every cell, range and table reference to the removed sheet with
+/// `handle` with `#REF!`. Returns whether any reference changed. 3-D
+/// references are left to [`refresh_sheet_spans`]: removing one of their
+/// sheets shrinks the span instead.
 pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     let invalid = matches!(
         ast,

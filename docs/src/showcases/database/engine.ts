@@ -404,8 +404,8 @@ export function createDatabaseEngine(host: HTMLElement): DatabaseEngine {
   };
 
   /**
-   * Boots one session at a time. A cancelled boot never reaches `sync.ready()`,
-   * so a second boot cannot restore and flush the same durable queue twice.
+   * Boots one session at a time, so a second boot cannot restore and flush the
+   * same durable queue twice.
    */
   const boot = (announce: string | null, recovered: string): Promise<void> => {
     const signal = mount.signal;

@@ -40,7 +40,6 @@ export function isCellNumberFormat(value: string): boolean {
   return true;
 }
 
-/** CSS pixels in one typographic point. */
 const PIXELS_PER_POINT = 96 / 72;
 /**
  * Smallest and largest cell font size, in CSS pixels: Excel accepts 1 to 409

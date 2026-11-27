@@ -408,8 +408,9 @@ impl CellStore {
     /// along one axis of one sheet: references follow that rule instead, and
     /// a deletion also empties the cells between where the block lands and
     /// where it starts.
-    /// Status: `0` success, `1` invalid block, `3` dirty-capacity rejection,
-    /// `4` a block that holds cells of a spill range without its formula.
+    /// Status: `0` success, `1` invalid block, `3` resource limit (dirty
+    /// capacity, or a cell write that failed), `4` a block that holds cells
+    /// of a spill range without its formula.
     #[wasm_bindgen(js_name = moveCells)]
     #[allow(
         clippy::too_many_arguments,
@@ -654,9 +655,8 @@ impl CellStore {
     }
 
     /// Read every column of the source block, then empty the source block and
-    /// write the target column by column through the writer that row and
-    /// column moves use, so blocks that overlap move whole and the block
-    /// writer is compiled once.
+    /// write the target column by column, so blocks that overlap move whole.
+    /// See [`CellStore::write_moved_column`] for why the writer is shared.
     fn move_block_cells(&mut self, edit: &CellMove, revision: Option<u64>) -> bool {
         let mut columns = Vec::with_capacity(edit.cols as usize);
         for col in 0..edit.cols {

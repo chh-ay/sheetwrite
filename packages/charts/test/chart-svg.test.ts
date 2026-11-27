@@ -168,7 +168,7 @@ describe("renderChartSvg", () => {
     });
   });
 
-  // #700: the value axis of a wide bar chart drew labels into each other.
+  // A wide bar chart keeps its value-axis labels apart.
   describe("value-axis labels", () => {
     /** The renderer's font size, and its estimate of a glyph's width as a share of it. */
     const FONT_SIZE = 11;

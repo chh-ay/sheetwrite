@@ -627,7 +627,10 @@ export class SyncCoordinator {
     }
   }
 
-  /** Public for transports that deliver responses independently of send promises. */
+  /**
+   * Applies a commit response that a transport delivers outside the promise
+   * of `send`. `requestedMutationId` names the mutation the response answers.
+   */
   handleResponse(response: PersistenceCommitResponse, requestedMutationId?: string): Promise<void> {
     if (this.destroyed) return Promise.resolve();
     return this.enqueue_inbound(async () => {

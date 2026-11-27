@@ -87,11 +87,7 @@ export interface WorkbenchCallbacks {
   onConflict(conflict: WorkbenchConflict | null): void;
   onPeers(peers: readonly PresenceMessage[]): void;
   onFeed(entry: WorkbenchFeedEntry): void;
-  /**
-   * Live width of the grid host at mount time. The workbook declares its
-   * columns wide enough to cover the stage, so the Grid never pads the view
-   * with empty positional columns beside the named ones.
-   */
+  /** Live width of the grid host at mount time. */
   measureHostWidth(): number | undefined;
   /** The island must recreate its grid from `mount` (durable queue restores on top). */
   onRemount(mount: WorkbenchMount, note: string): void;
@@ -297,9 +293,8 @@ export class SvelteWorkbenchSession {
   }
 
   /**
-   * Eager `data` loads the active sheet only, so the document's other sheets
-   * arrive as host records: one low-level store commit per generation, never a
-   * queued edit and never Grid history.
+   * Loads the other sheets as one low-level store commit per generation, never
+   * a queued edit and never Grid history.
    */
   private hydrate_secondary_sheets(grid: Grid): void {
     const patches = secondary_sheet_patches(this.base_snapshot, OFFLINE_SHEET_ID);
@@ -570,7 +565,7 @@ export class SvelteWorkbenchSession {
     }
   }
 
-  /** Snapshot the grid whenever it is fully synced; remounts hydrate from it. */
+  /** Snapshot the grid whenever it is fully synced. */
   private capture_base(link: GridLink, state: SyncStateSnapshot): void {
     if (state.pendingCount !== 0 || state.activity !== "idle" || this.conflict_context) return;
     this.base_snapshot = {
