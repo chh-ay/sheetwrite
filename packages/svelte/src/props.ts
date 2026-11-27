@@ -25,7 +25,7 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   rowBridge?: RowBridge<Id>;
   /** Lazy visible-row provider. */
   datasource?: GridOptions["datasource"];
-  /** Datasource storage policy. */
+  /** Allocation and cache policy for datasource storage. */
   datasourceStorage?: GridOptions["datasourceStorage"];
   /** Canvas or worker paint backend. */
   renderer?: GridOptions["renderer"];
@@ -47,15 +47,15 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   hyperlinkActivation?: GridOptions["hyperlinkActivation"];
   /** Settings for add-ons installed by `initSheetwrite`, keyed by add-on name; applied when the Grid is created. */
   addons?: GridOptions["addons"];
-  /** Named custom cell renderers. */
+  /** Named custom cell renderers, registered when the Grid is created. */
   renderers?: GridOptions["renderers"];
-  /** Named custom cell editors. */
+  /** Named custom cell editors, registered when the Grid is created. */
   editors?: GridOptions["editors"];
   /** Extra rows painted around the viewport. */
   overscan?: GridOptions["overscan"];
   /** Minimum column count with padding. */
   minColumns?: GridOptions["minColumns"];
-  /** Built-in UI control configuration. */
+  /** Built-in toolbar, menu, keyboard, find and tab controls. */
   config?: GridOptions["config"];
   /** Host height as pixels or a CSS length. */
   height?: number | string;
