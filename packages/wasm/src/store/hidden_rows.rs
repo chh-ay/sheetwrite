@@ -55,6 +55,16 @@ impl CellStore {
         }
         true
     }
+
+    /// Whether a formula may read the rows that views hide: a cell formula
+    /// that calls SUBTOTAL or AGGREGATE, or a conditional-format formula rule.
+    /// While none does, the host may hold back `setRowVisibility` and send
+    /// the rows once one does; a formula previewed with `previewFormula`
+    /// needs them sent first.
+    #[wasm_bindgen(js_name = readsRowVisibility)]
+    pub fn reads_row_visibility(&self) -> bool {
+        self.formula_slots.has_subtotals() || self.conditional_rules.has_formula_rules()
+    }
 }
 
 impl CellStore {

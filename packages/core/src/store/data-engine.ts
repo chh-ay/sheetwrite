@@ -1445,6 +1445,7 @@ export class StoreDataEngine {
 
   /** The result `text` would have in `cell`, read without changing the store. */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
+    this.send_held_hidden_rows();
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
     const result = this.wasm.previewFormula(target, text, fields);
@@ -1457,6 +1458,7 @@ export class StoreDataEngine {
    * validation custom formula checks a typed value with it before it is stored.
    */
   previewFormulaWith(cell: CellAddress, text: string, trial: CellScalar): FormulaPreview {
+    this.send_held_hidden_rows();
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
     const result = this.wasm.previewFormulaWith(
@@ -1468,6 +1470,11 @@ export class StoreDataEngine {
       fields,
     );
     return decodePreview(fields, result);
+  }
+
+  /** A previewed formula may call SUBTOTAL, so the rows held back until one does go first. */
+  private send_held_hidden_rows(): void {
+    if (this.view.hasQueuedHiddenRows()) this.view.flushHiddenRows();
   }
 
   private validation_reads_cache: StoreValidationReads | undefined;
@@ -3166,10 +3173,10 @@ export class StoreDataEngine {
     }
   }
 
-  /** Send the queued hidden rows, then close the mutation, even when the engine rejects the runs. */
+  /** Send the queued hidden rows a formula may read, then close the mutation, even when the engine rejects the runs. */
   private flush_hidden_rows_and_commit(): void {
     try {
-      this.view.flushHiddenRows();
+      this.view.flushHiddenRowsWhenRead();
     } finally {
       this.commit_engine_sources();
     }

@@ -98,6 +98,11 @@ export class StoreViewState {
     this.engine_hidden_rows.flush();
   }
 
+  /** {@link flushHiddenRows} once a formula may read hidden rows; until then they stay queued. */
+  flushHiddenRowsWhenRead(): void {
+    this.engine_hidden_rows.flushWhenRead();
+  }
+
   order(sheet: SheetId): Uint32Array | undefined {
     return this.order_by_sheet.get(sheet);
   }

@@ -21,6 +21,11 @@ interface SentRows {
  * lists the others. A view change only queues its sheet; {@link flush} sends
  * each queued sheet once per transaction, and only when its rows may have
  * changed, so hiding many rows costs one engine call, not one per row.
+ *
+ * Most workbooks have no formula that reads hidden rows, and a filter would
+ * still send its rows on every change. {@link flushWhenRead} keeps them
+ * queued until the engine holds a formula that may read them, then sends
+ * the latest rows.
  */
 export class EngineHiddenRows {
   private readonly kept_by_sheet = new Map<SheetId, Uint32Array>();
@@ -86,6 +91,32 @@ export class EngineHiddenRows {
     }
 
     this.pending.clear();
+  }
+
+  /**
+   * {@link flush} once the engine holds a formula that may read hidden
+   * rows. Until then the queued sheets wait, except the ones that would
+   * send nothing: they hide no row and the engine holds none for them.
+   */
+  flushWhenRead(): void {
+    if (this.wasm.readsRowVisibility()) {
+      this.flush();
+      return;
+    }
+
+    for (const sheet of this.pending) {
+      if (this.kept_by_sheet.has(sheet) || this.sent_by_sheet.has(sheet)) continue;
+
+      const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+      if (
+        meta &&
+        ((meta.hiddenRows?.size ?? 0) > 0 || meta.rowGroups?.some((group) => group.collapsed))
+      ) {
+        continue;
+      }
+
+      this.pending.delete(sheet);
+    }
   }
 
   removeSheet(sheet: SheetId): void {
