@@ -66,8 +66,8 @@ function norm(a: CellRef, b: CellRef): SelRect {
 /**
  * Backend-agnostic selection state: a stack of rectangular regions (cells, full
  * rows, full columns) plus the live anchor/focus that keyboard extension drives.
- * The renderer reads `forEachRect` to draw Layer-2 overlays; the grid reads
- * `focusCell` for navigation and `contains` for range clears.
+ * The overlay painter reads `forEachRect` to draw the Layer-2 selection; input
+ * handling reads `focusCell` to navigate and `contains` to test a cell.
  */
 export class SelectionModel {
   private regions: Region[] = [];

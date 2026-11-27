@@ -3187,7 +3187,7 @@ export class GridImpl implements Grid {
   }
 
   replaceTheme(theme: Partial<Theme> | undefined): void {
-    // Re-run construction-time resolution (grid.ts constructor): defaults,
+    // Resolve the theme as the constructor does: defaults,
     // then host CSS custom properties, then the new option value.
     this.base_theme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
     this.apply_zoomed_theme();
