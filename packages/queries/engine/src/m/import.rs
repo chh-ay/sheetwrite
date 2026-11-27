@@ -187,6 +187,8 @@ struct Source {
     locator: Option<String>,
     /// Column names fixed before typing, if the M lists them.
     names: Option<Vec<String>>,
+    /// The `Columns` option of `Csv.Document`: how many columns the document has.
+    width: Option<f64>,
 }
 
 /// The source, its declared columns, and the index of the binding that types them.
@@ -235,7 +237,6 @@ fn csv_source(arguments: &[Expr]) -> Outcome<Source> {
         }
     }
 
-    let _ = columns;
     Ok(Source {
         kind: MSourceKind::Csv {
             delimiter,
@@ -245,6 +246,7 @@ fn csv_source(arguments: &[Expr]) -> Outcome<Source> {
         source_id: locator.clone(),
         locator: Some(locator),
         names: None,
+        width: columns,
     })
 }
 
@@ -295,6 +297,7 @@ fn source(expression: &Expr) -> Outcome<Source> {
             source_id: locator.clone(),
             locator: Some(locator),
             names: None,
+            width: None,
         });
     }
 
@@ -304,6 +307,7 @@ fn source(expression: &Expr) -> Outcome<Source> {
             source_id: id.to_owned(),
             locator: None,
             names: None,
+            width: None,
         });
     }
 
@@ -939,6 +943,31 @@ fn declared_columns(
         .collect())
 }
 
+/// `Columns` fixes how many columns `Csv.Document` returns
+/// (<https://learn.microsoft.com/powerquery-m/csv-document>), but the import keeps only the
+/// declared columns. They must therefore be all of them; only a column selection after promoted
+/// headers may keep fewer.
+fn check_width(source: &Source, declared: usize) -> Outcome<()> {
+    let Some(width) = source.width else {
+        return Ok(());
+    };
+    let selected =
+        matches!(source.kind, MSourceKind::Csv { headers: true, .. }) && source.names.is_some();
+    let fits = u32::try_from(declared).map(f64::from).is_ok_and(|count| {
+        if selected {
+            count <= width
+        } else {
+            count == width
+        }
+    });
+
+    if fits {
+        Ok(())
+    } else {
+        fail("source", "Csv.Document Columns")
+    }
+}
+
 /// The bindings before typing: headers, column selection, blanks and the typed schema.
 fn typed_source(bindings: &[(String, Expr)]) -> Outcome<TypedSource> {
     let (first_name, first) = bindings.first().ok_or_else(|| miss("source", "let"))?;
@@ -1009,6 +1038,7 @@ fn typed_source(bindings: &[(String, Expr)]) -> Outcome<TypedSource> {
             }
             (_, "Table.TransformColumnTypes", [input, list, ..]) if is_previous(input) => {
                 let columns = declared_columns(source.names.as_deref(), list, &function)?;
+                check_width(&source, columns.len())?;
                 return Ok(TypedSource {
                     source,
                     columns,

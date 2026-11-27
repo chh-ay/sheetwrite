@@ -250,6 +250,13 @@ shared Unfiltered = let
     Merged = Table.RemoveColumns(Table.Sort(Table.Join(Table.AddIndexColumn(Typed, "Sheetwrite.LeftRow", 0, 1), {"Amount"}, Table.AddIndexColumn(Orders, "Sheetwrite.RightRow", 0, 1), {"Total"}, JoinKind.Inner), {{"Amount", Order.Ascending}}), {"Sheetwrite.LeftRow", "Sheetwrite.RightRow"})
 in
     Merged;
+
+shared Narrow = let
+    Source = Csv.Document(Web.Contents("https://example.test/wide.csv"), [Delimiter = ",", Columns = 3, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+    Named = Table.RenameColumns(Source, {{"Column1", "Region"}, {"Column2", "Amount"}}),
+    Typed = Table.TransformColumnTypes(Named, {{"Region", type text}, {"Amount", type number}})
+in
+    Typed;
 "#;
 
 #[test]
@@ -307,6 +314,7 @@ fn workbook_queries_from_m_documentation_forms_import() {
             ("Files", "source", "Folder.Files"),
             ("Lambda", "syntax", "syntax"),
             ("Unfiltered", "step", "Table.Join"),
+            ("Narrow", "source", "Csv.Document Columns"),
             ("Joined", "dependency", ""),
         ]
     );
