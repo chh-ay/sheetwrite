@@ -270,7 +270,7 @@ export function scanDelimitedText(
         );
       }
     }
-    // Most fields have no pieces; writing an array's length costs as much as a call.
+    // Most fields have no pieces, and writing an empty array's length is not free.
     if (field_parts.length !== 0) field_parts.length = 0;
     field_bytes = 0;
     field_present = false;
