@@ -43,7 +43,7 @@ const MAX_TAIL_TRANSACTIONS = 100_000;
 /** Ceiling for the records of one publication. */
 const MAX_PUBLICATION_RECORDS = 100_000;
 
-/** UTF-8 code units in an author ID, marker name or reader token. */
+/** UTF-16 code units (`string.length`) in an author ID, marker name or reader token. */
 const MAX_LABEL_LENGTH = 256;
 
 /** A record with the count of heads, markers, leases and records that refer to it. */
@@ -236,7 +236,10 @@ async function remove_version(
   await release(transaction, roots(version), manifest);
 }
 
-/** Copy and validate a publication before the first await, so later host edits cannot change it. */
+/**
+ * Copy a publication before the first await, so later host edits cannot
+ * change it, then validate the copy.
+ */
 async function admit_publication(input: HistoryPublishRequest): Promise<HistoryPublishRequest> {
   const payload_bytes = input.records.reduce((total, record) => total + record.bytes.length, 0);
   const too_large =
