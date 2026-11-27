@@ -9,7 +9,7 @@ use std::cell::Cell;
 
 use sheetwrite_wasm::CellStore;
 
-/// Patterns that each compile to a distinct program of several kilobytes.
+/// Patterns that each compile to a distinct program of about 33 KB.
 const PATTERNS: [&str; 3] = ["(alpha|beta){40}", "(gamma|delta){40}", "(kappa|sigma){40}"];
 
 struct CountingAllocator;
