@@ -401,6 +401,7 @@ mod tests {
 
     use crate::eval::range_reader::LITERAL_COLUMNS_OFF;
     use crate::store::CellStore;
+    use crate::tests::support::shown;
 
     const ROWS: usize = 24;
 
@@ -570,6 +571,66 @@ mod tests {
         let scanned = results(true);
         for ((source, walked), scanned) in sources.iter().zip(&walked).zip(&scanned) {
             assert_eq!(walked, scanned, "{source}");
+        }
+    }
+
+    /// A non-finite number reads as `#NUM!`: it meets an error or `<>`
+    /// criterion and no numeric comparison, and fails a sum, average or
+    /// extreme that includes it. Dense and paged storage give the same
+    /// results. A1:A10 hold 1 to 10 with an infinity in A3 and a negative
+    /// infinity in A7; B1:B10 hold 1 to 10.
+    #[test]
+    fn non_finite_numbers_read_as_errors_in_both_storage_modes() {
+        const CASES: &[(&str, &str)] = &[
+            ("=COUNTIF(A1:A10,\">0\")", "8"),
+            ("=COUNTIF(A1:A10,\">=5\")", "5"),
+            ("=COUNTIF(A1:A10,\"<0\")", "0"),
+            ("=COUNTIF(A1:A10,\"<>3\")", "10"),
+            ("=COUNTIF(A1:A10,\"#NUM!\")", "2"),
+            ("=COUNTIFS(A1:A10,\">0\",B1:B10,\">0\")", "8"),
+            ("=SUMIF(A1:A10,\">0\")", "45"),
+            ("=SUMIF(B1:B10,\">0\",A1:A10)", "#NUM!"),
+            ("=SUMIFS(B1:B10,A1:A10,\">0\")", "45"),
+            ("=AVERAGEIF(A1:A10,\">0\")", "5.625"),
+            ("=AVERAGEIFS(B1:B10,A1:A10,\"<0\")", "#DIV/0!"),
+            ("=MAXIFS(A1:A10,B1:B10,\">7\")", "10"),
+            ("=MINIFS(A1:A10,B1:B10,\">0\")", "#NUM!"),
+        ];
+        for paged in [false, true] {
+            let mut store = CellStore::new();
+            let sheet = if paged {
+                let sheet = store.add_paged_sheet(4, 20, 20, 0, 0);
+                store.begin_page_load();
+                sheet
+            } else {
+                store.add_sheet(4, 20)
+            };
+            for row in 0..10 {
+                store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+                store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+            }
+            store.set_number(sheet, 2, 0, f64::INFINITY, 0);
+            store.set_number(sheet, 6, 0, f64::NEG_INFINITY, 0);
+            store.commit_sources();
+            for (row, (formula, _)) in CASES.iter().enumerate() {
+                store.set_formula(sheet, row, 3, formula, 0);
+            }
+            store.commit_sources();
+            store.recompute(sheet);
+            let failures: Vec<String> = CASES
+                .iter()
+                .enumerate()
+                .filter_map(|(row, &(formula, expected))| {
+                    let actual = shown(&store, sheet, row, 3);
+                    (actual != expected)
+                        .then(|| format!("{formula}: expected {expected}, got {actual}"))
+                })
+                .collect();
+            assert!(
+                failures.is_empty(),
+                "paged={paged}\n{}",
+                failures.join("\n")
+            );
         }
     }
 }

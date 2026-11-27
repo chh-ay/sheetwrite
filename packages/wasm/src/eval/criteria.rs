@@ -142,7 +142,9 @@ impl Criterion {
     /// Counts the matches among numbers given as their `f64` bits, with the
     /// result of [`Self::matches`] on each number. `None` when the criterion
     /// is not a plain number: text and wildcard criteria need each cell's
-    /// value.
+    /// value. A stored infinity or NaN reads as `#NUM!`, which an ordering
+    /// criterion never meets; equality already fails for it and `<>` meets
+    /// it, as for any error.
     pub(super) fn count_numbers(&self, numbers: &[u64]) -> Option<usize> {
         let Value::Number(threshold) = self.operand else {
             return None;
@@ -155,10 +157,18 @@ impl Criterion {
         Some(match self.op {
             CmpOp::Eq => count_numbers_where(numbers, |number| number == threshold),
             CmpOp::Ne => count_numbers_where(numbers, |number| number != threshold),
-            CmpOp::Lt => count_numbers_where(numbers, |number| number < threshold),
-            CmpOp::Le => count_numbers_where(numbers, |number| number <= threshold),
-            CmpOp::Gt => count_numbers_where(numbers, |number| number > threshold),
-            CmpOp::Ge => count_numbers_where(numbers, |number| number >= threshold),
+            CmpOp::Lt => {
+                count_numbers_where(numbers, |number| number < threshold && number.is_finite())
+            }
+            CmpOp::Le => {
+                count_numbers_where(numbers, |number| number <= threshold && number.is_finite())
+            }
+            CmpOp::Gt => {
+                count_numbers_where(numbers, |number| number > threshold && number.is_finite())
+            }
+            CmpOp::Ge => {
+                count_numbers_where(numbers, |number| number >= threshold && number.is_finite())
+            }
         })
     }
 }
