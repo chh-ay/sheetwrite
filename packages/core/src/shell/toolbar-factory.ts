@@ -24,7 +24,7 @@ export interface ToolbarOptions {
  * shows the ribbon's commands on one row, with the same glyphs, state and
  * keyboard; commands that do not fit move into a "More commands" popup. Mouse
  * clicks never steal grid focus; Left/Right/Home/End move between controls and
- * Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
+ * Escape returns focus to the grid.
  *
  * @param host - Element the toolbar is appended to.
  * @param grid - The grid whose commands the toolbar runs.
