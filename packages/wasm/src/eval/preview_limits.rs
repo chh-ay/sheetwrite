@@ -202,7 +202,8 @@ pub(super) fn cell() -> Result<(), FormulaError> {
     }
 }
 
-/// Refuses an array of `cells` values before it is allocated.
+/// Refuses an array of more than [`PREVIEW_ARRAY_CELLS`] values before it is
+/// allocated.
 #[inline]
 pub(super) fn array(cells: usize) -> Result<(), FormulaError> {
     if active() && cells > PREVIEW_ARRAY_CELLS {
@@ -212,7 +213,7 @@ pub(super) fn array(cells: usize) -> Result<(), FormulaError> {
     }
 }
 
-/// Charges one LAMBDA call or step of helper work.
+/// Charges `steps` LAMBDA calls.
 #[cfg_attr(
     not(feature = "analysis"),
     allow(
@@ -229,7 +230,7 @@ pub(super) fn work(steps: usize) -> Result<(), FormulaError> {
     }
 }
 
-/// Charges `bytes` of text output before a text function writes it.
+/// Charges `bytes` of text against [`PREVIEW_TEXT_BYTES`].
 #[inline]
 pub(super) fn text(bytes: usize) -> Result<(), FormulaError> {
     if active() {
