@@ -20,7 +20,7 @@ use std::rc::Rc;
 use super::super::array::ast_produces_array;
 use super::super::functions::ReductionFold;
 use super::super::matrix::{
-    range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+    argument_range, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
 };
 use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
@@ -29,7 +29,9 @@ use crate::cells::payload_num;
 use crate::memory::MemoryOwnerStats;
 use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
-use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER};
+use crate::types::{
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER,
+};
 
 family_functions! {
     BYCOL,
@@ -82,6 +84,10 @@ pub(crate) enum Slot {
         rows: usize,
         cols: usize,
         values: Rc<[Value]>,
+        /// The range the argument named, when it was a range reference:
+        /// SUBTOTAL and AGGREGATE read it in place, so a LAMBDA's reference
+        /// parameter skips hidden rows as the range does.
+        reference: Option<CellRange>,
     },
     /// One table column at a list of its rows, read in place: a measure's
     /// column in one pivot cell. No rows read as one blank, as a range with
@@ -120,11 +126,12 @@ impl Slot {
         }
     }
 
-    pub(in crate::eval) fn array(mut matrix: EvalMatrix) -> Self {
+    pub(in crate::eval) fn array(mut matrix: EvalMatrix, reference: Option<CellRange>) -> Self {
         Self::Array {
             rows: matrix.rows,
             cols: matrix.cols,
             values: std::mem::take(&mut matrix.values).into(),
+            reference,
         }
     }
 }
@@ -548,6 +555,26 @@ pub(crate) fn parameter_count(
     names: NameScope<'_>,
 ) -> Result<usize, FormulaError> {
     definition(expression, names).map(|shared| shared.parameters.len())
+}
+
+/// The range a parameter use was bound to, when its argument was a range
+/// reference; `None` for any other argument or outside a call.
+pub(in crate::eval) fn parameter_reference(
+    frame: Option<&CallFrame>,
+    argument: &Ast,
+) -> Option<CellRange> {
+    let Ast::Parameter { depth, index, .. } = argument else {
+        return None;
+    };
+    match frame?.slot(*depth, *index)? {
+        Slot::Array { reference, .. } => *reference,
+        Slot::Value(_)
+        | Slot::OneCell(_)
+        | Slot::Rows { .. }
+        | Slot::Closure { .. }
+        | Slot::Missing
+        | Slot::Shaped { .. } => None,
+    }
 }
 
 /// The value a parameter use reads.
@@ -1091,7 +1118,10 @@ impl<'a, 'p> Context<'a, 'p> {
             });
         }
         if ast_produces_array(argument, self.shapes()) {
-            return self.matrix(argument).map(Slot::array);
+            let reference = argument_range(argument, self.names());
+            return self
+                .matrix(argument)
+                .map(|matrix| Slot::array(matrix, reference));
         }
         // An error argument is bound as a value, so the body can handle it
         // (`LAMBDA(x,IFERROR(x,0))(1/0)` is 0).
@@ -1365,6 +1395,7 @@ fn evaluate_with_context(
                     rows: if by_row { 1 } else { array.rows },
                     cols: if by_row { array.cols } else { 1 },
                     values: line,
+                    reference: None,
                 });
                 values.push(context.invoke(&callee, &mut slots)?);
             }

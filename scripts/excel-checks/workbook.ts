@@ -197,6 +197,8 @@ class CheckSheet {
   pivots: PivotDefinition[] = [];
   charts: ChartDefinition[] = [];
   result: ResultBlock | null = null;
+  /** Rows hidden by hand when the file opens. */
+  readonly hidden_rows: number[] = [];
 
   constructor(
     readonly id: string,
@@ -289,6 +291,14 @@ class CheckSheet {
       ...(this.tables.length > 0 ? { tables: this.tables } : {}),
       ...(this.pivots.length > 0 ? { pivots: this.pivots } : {}),
       ...(this.charts.length > 0 ? { charts: this.charts } : {}),
+      ...(this.hidden_rows.length > 0
+        ? {
+            rowMeta: this.hidden_rows.map((row): [number, { hidden: boolean }] => [
+              row,
+              { hidden: true },
+            ]),
+          }
+        : {}),
     };
   }
 }
@@ -1315,6 +1325,49 @@ function spill_export_check(): BuiltCheck {
   };
 }
 
+/** The defined name of the LAMBDA SUBTOTAL check, in the workbook's names. */
+const LAMBDA_SUBTOTAL_NAME = { name: "VisibleTotal", formula: "=LAMBDA(r,SUBTOTAL(109,r))" };
+const LAMBDA_SUBTOTAL_AMOUNTS = [10, 20, 40, 80];
+
+/** SUBTOTAL and AGGREGATE of a LAMBDA's range parameter skip hidden rows, as they do for the range. */
+function lambda_subtotal_check(): BuiltCheck {
+  const sheet = new CheckSheet("c-lambda-subtotal", "LAMBDA SUBTOTAL");
+  sheet.grid(INPUT_ROW, 0, [["Amount"], ...LAMBDA_SUBTOTAL_AMOUNTS.map((amount) => [amount])]);
+  const first_row = INPUT_ROW + 1;
+  const amounts = `A${first_row + 1}:A${first_row + LAMBDA_SUBTOTAL_AMOUNTS.length}`;
+  // The second amount, 20, is hidden: every row should total 130.
+  sheet.hidden_rows.push(first_row + 1);
+  sheet.results(INPUT_ROW, 2, [
+    { what: "SUBTOTAL of the range", excel: shown(`SUBTOTAL(109,${amounts})`) },
+    {
+      what: "LAMBDA called in place",
+      excel: shown(`LAMBDA(r,SUBTOTAL(109,r))(${amounts})`),
+    },
+    {
+      what: `Defined name ${LAMBDA_SUBTOTAL_NAME.name}`,
+      excel: shown(`${LAMBDA_SUBTOTAL_NAME.name}(${amounts})`),
+    },
+    {
+      what: "AGGREGATE in a LAMBDA",
+      excel: shown(`LAMBDA(r,AGGREGATE(9,5,r))(${amounts})`),
+    },
+  ]);
+  sheet.intro(
+    "SUBTOTAL and AGGREGATE of a LAMBDA's range parameter",
+    `${amounts} holds ${LAMBDA_SUBTOTAL_AMOUNTS.join(", ")}; row ${first_row + 2} (20) is hidden, so each result should be 130.`,
+    [],
+  );
+  return {
+    info: {
+      sheet: sheet.name,
+      check: "LAMBDA SUBTOTAL over hidden rows",
+      issues: "#625",
+      seconds: 0,
+    },
+    sheet,
+  };
+}
+
 // ---------------------------------------------------------------- Clipboard and AutoFill (#821, #827, #824)
 
 /** Check 17: Paste Special's operations on formulas and text. */
@@ -1548,6 +1601,7 @@ async function layout(sheetwrite: Sheetwrite, after_steps: boolean): Promise<Lay
       auto_fill_check(),
       group_by_blank_key_check(),
       spill_export_check(),
+      lambda_subtotal_check(),
     ],
     query: query.query,
   };
@@ -1578,6 +1632,7 @@ function workbook_snapshot(built: Layout, start: CheckSheet): WorkbookSnapshot {
         measures: MEASURES,
       },
       queries: [built.query],
+      namedRanges: [LAMBDA_SUBTOTAL_NAME],
       externalLinks: [
         {
           book: "Budget.xlsx",

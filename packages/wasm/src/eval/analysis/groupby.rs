@@ -431,6 +431,7 @@ impl Aggregator {
                 rows: column_values.len(),
                 cols: 1,
                 values: column_values,
+                reference: None,
             }
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;

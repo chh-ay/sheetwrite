@@ -154,7 +154,8 @@ fn push_data(
     values: &mut FuncAccumulator,
 ) -> Result<(), FormulaError> {
     let names = context.store.name_scope(context.sheet);
-    let range = range_from_ast(ast, names);
+    let range = range_from_ast(ast, names)
+        .or_else(|| super::lambda::parameter_reference(context.pass.results.call_frame(), ast));
     if range.is_none() && !super::super::array::ast_produces_array(ast, context.pass.shapes(names))
     {
         return Err(FormulaError::Value);

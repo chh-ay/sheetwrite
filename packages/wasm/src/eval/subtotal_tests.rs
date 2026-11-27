@@ -133,3 +133,38 @@ fn aggregate_odd_options_skip_rows_hidden_by_hand_or_by_a_filter() {
         ["143", "143", "143", "143", "303", "303", "120"]
     );
 }
+
+/// Excel passes a range to a LAMBDA as a reference, so SUBTOTAL and
+/// AGGREGATE of the parameter skip the rows a filter hides, named or not.
+#[cfg(feature = "analysis")]
+#[test]
+fn a_lambda_reads_a_range_parameter_without_its_hidden_rows() {
+    let formulas = [
+        "=Total(A1:A4)",
+        "=LAMBDA(r,SUBTOTAL(9,r))(A1:A4)",
+        "=LAMBDA(r,AGGREGATE(9,5,r))(A1:A4)",
+    ];
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 12);
+    assert!(store.set_named_formula("Total", -1, "=LAMBDA(r,SUBTOTAL(9,r))"));
+    for (row, value) in [120.0, 10.0, 150.0, 23.0].into_iter().enumerate() {
+        store.set_number(sheet, row, DATA_COLUMN, value, 0);
+    }
+    for (row, formula) in formulas.iter().enumerate() {
+        store.set_formula(sheet, row, FORMULA_COLUMN, formula, 0);
+    }
+    store.commit_sources();
+    assert_eq!(
+        results(&store, sheet, formulas.len()),
+        ["303", "303", "303"]
+    );
+    assert!(store.reads_row_visibility());
+
+    // The filter keeps rows 1 and 3: 120 and 150.
+    assert!(store.set_row_visibility(sheet, &[], Some(vec![0, 2])));
+
+    assert_eq!(
+        results(&store, sheet, formulas.len()),
+        ["270", "270", "270"]
+    );
+}
