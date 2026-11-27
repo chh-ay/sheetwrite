@@ -152,12 +152,12 @@ export function requestPanel(grid: Grid, open: (controller: PanelController) => 
   );
 }
 
-/** Formulas › Explain Formula: open its panel, loading the panels on first use. */
+/** Formulas › Explain Formula. */
 export function showFormulaExplanation(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openExplainPanel(grid));
 }
 
-/** Formulas › Defined Names › Name Manager: open its panel, loading the panels on first use. */
+/** Formulas › Defined Names › Name Manager. */
 export function showNameManager(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid));
 }
@@ -166,7 +166,7 @@ export function showDefineName(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
 }
 
-/** Data › Custom Sort: open the Sort panel, loading the panels on first use. */
+/** Data › Custom Sort. */
 export function showSortPanel(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openSortPanel(grid));
 }
@@ -208,8 +208,8 @@ export function pivotAt(
 }
 
 /**
- * Open the field list of the pivot under the focus cell, loading the panels on
- * first use. Does nothing when the focus cell is outside every pivot's output.
+ * Open the field list of the pivot under the focus cell. Does nothing when the
+ * focus cell is outside every pivot's output.
  */
 export function showPivotFields(grid: Grid): void {
   const cell = selectionCell(grid.getSelection());
