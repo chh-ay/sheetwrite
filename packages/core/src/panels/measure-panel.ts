@@ -3,6 +3,7 @@
 // `setMeasure` and `removeMeasure`, so undo, sync and the admission rules
 // (unique names, an existing home table) apply.
 
+import { SheetwriteStore } from "../store.js";
 import type { Measure, MeasureStatus } from "../types/data-model.js";
 import type { Grid, GridPanel } from "../types/grid.js";
 import type { WorkbookTable } from "../types/table.js";
@@ -105,7 +106,7 @@ export function measurePanel(grid: Grid): GridPanel {
       /** The ID of the measure the form edits; null for a new one. */
       let editing: string | null = null;
       // `SheetwriteStore` reports each measure's status; another store shows none.
-      const store = grid.store as { getMeasureStatus?: (id: string) => MeasureStatus };
+      const store = grid.store instanceof SheetwriteStore ? grid.store : null;
 
       const edit = (measure: Measure | null): void => {
         editing = measure?.id ?? null;
@@ -183,7 +184,7 @@ export function measurePanel(grid: Grid): GridPanel {
             source.textContent = measure.formula;
             row.append(source);
             const status = measure_status_text(
-              store.getMeasureStatus?.(measure.id) ?? { status: "ok" },
+              store?.getMeasureStatus(measure.id) ?? { status: "ok" },
             );
             if (status !== null) {
               const warning = document.createElement("p");

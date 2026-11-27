@@ -69,6 +69,7 @@ import {
   clonePivot,
   encodePivotPayload,
   encodeSavedPivotPayload,
+  isPivotShape,
   MAX_PIVOTS_PER_WORKBOOK,
   type PivotIssue,
   pivotOwner,
@@ -78,7 +79,6 @@ import {
   sheetPivotScope,
   uncomputedPivotResult,
   validatePivotReferences,
-  validatePivotShape,
 } from "../pivot.js";
 import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
@@ -1129,13 +1129,10 @@ export class StoreDataEngine {
 
   private pivot_issues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
     const issues: PivotIssue[] = [];
-    validatePivotShape(pivot, "pivot", issues);
-    if (issues.length > 0) return issues;
+    if (!isPivotShape(pivot, "pivot", issues)) return issues;
 
-    // `validatePivotShape` found no issues, so `pivot` has the shape of a
-    // `PivotDefinition`.
     validatePivotReferences(
-      pivot as PivotDefinition,
+      pivot,
       { rows: owner.rowCount, cols: owner.columns.length },
       sheetPivotScope(sheets),
       "pivot",

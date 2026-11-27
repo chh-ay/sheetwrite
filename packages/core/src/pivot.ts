@@ -381,6 +381,20 @@ export function validatePivotShape(value: unknown, path: string, issues: PivotIs
     validate_saved_output(saved_output, `${path}.savedOutput`, issues);
 }
 
+/**
+ * `validatePivotShape` as a type guard: whether it found no issue, which
+ * proves `value` has the pivot definition schema.
+ */
+export function isPivotShape(
+  value: unknown,
+  path: string,
+  issues: PivotIssue[],
+): value is PivotDefinition {
+  const found = issues.length;
+  validatePivotShape(value, path, issues);
+  return issues.length === found;
+}
+
 function validate_saved_output(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
     issue(issues, path, "savedOutput must be an object");
