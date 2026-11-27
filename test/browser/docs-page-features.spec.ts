@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { expect, test, waitForHydration } from "./fixtures.js";
+import { BOX_ROUNDING_PX, expect, test, waitForHydration } from "./fixtures.js";
 
 // The Try it playground on runnable examples (run, edit, error, reset), the
 // page actions and the changelog feed.
@@ -65,9 +65,6 @@ test("Try it runs the example, reruns an edit, reports an error at its line, and
   await expect(status).toHaveText(/^Ran in \d+ ms/, { timeout: RUN_TIMEOUT_MS });
   await expect(frame.locator("#grid canvas").first()).toBeAttached();
 });
-
-/** Layout rounds boxes to device pixels. */
-const BOX_ROUNDING_PX = 1;
 
 test("on a phone the editor wraps long lines in both layers, like the page's code block", async ({
   page,

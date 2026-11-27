@@ -122,10 +122,7 @@ describe("dynamic arrays in XLSX", () => {
     });
 
     // The covered cells A2:A3 keep no value: the spill fills them again.
-    const values = cellsOf(imported)
-      .filter(({ value }) => value.kind !== "literal" || value.value !== null)
-      .map(({ row, col, value }) => ({ row, col, value }));
-    expect(values).toEqual([
+    expect(filled_cells(imported)).toEqual([
       { row: 0, col: 0, value: formula("=SEQUENCE(3)") },
       { row: 0, col: 2, value: { kind: "literal", value: "=ROW(A1:A2)" } },
       { row: 1, col: 2, value: { kind: "literal", value: 2 } },
