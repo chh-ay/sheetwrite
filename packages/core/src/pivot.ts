@@ -16,11 +16,12 @@ import type {
   PivotSource,
   PivotValueField,
 } from "./types/pivot.js";
+import { DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS } from "./workbook-table.js";
 
 /** Most pivots one workbook may hold; each one owns an engine cache. */
 export const MAX_PIVOTS_PER_WORKBOOK = 1_000;
-/** Longest pivot ID. */
-const MAX_PIVOT_ID_LENGTH = 255;
+/** Longest pivot ID, in UTF-16 code units: the default table ID bound. */
+const MAX_PIVOT_ID_LENGTH = DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS.maxIdLength;
 /** Longest pivot or value-field caption. */
 const MAX_PIVOT_NAME_LENGTH = 255;
 /** Most entries in one of `rows`, `columns`, `values`, `filters` or `sort`. */
