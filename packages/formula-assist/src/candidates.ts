@@ -16,7 +16,6 @@ import type { WorkbookPatterns } from "./workbook-patterns.js";
  */
 export const SIGNALS = ["neighbours", "syntax", "column", "workbook"] as const;
 
-/** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];
 
 /** A formula a signal expects in the edited cell, and why. */
@@ -55,7 +54,6 @@ function typed_bucket(text: string): string {
   return typed >= MOST_TYPED ? `${MOST_TYPED}+` : String(typed);
 }
 
-/** The calibration key of a proposal after `text`. */
 export function calibrationKey(proposal: Proposal, text: string): string {
   return `${proposal.signal}|${proposal.reason}|${typed_bucket(text)}`;
 }
