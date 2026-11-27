@@ -211,6 +211,13 @@ fn exported_sections_import_to_the_same_plans() {
     assert!(reported(0, Some(1), "error-policy-scope"));
     assert!(reported(2, None, "host-source"));
     assert_eq!(section.members[0], "Sales_report");
+
+    // Query names that differ only in letter case clash in Excel, for every alphabet.
+    let cased = emit_section(&[
+        query("Ä", MSourceKind::Host, None, vec![], vec![]),
+        query("ä", MSourceKind::Host, None, vec![], vec![]),
+    ]);
+    assert_eq!(cased.members, ["Ä", "ä (2)"]);
 }
 
 /// Workbook queries in the forms the M documentation shows, plus members outside the subset.

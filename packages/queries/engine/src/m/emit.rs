@@ -711,8 +711,17 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     order
 }
 
-/// Member names for every query, unique when ASCII letter case is ignored, as Excel requires
-/// for query names. A name that had to change is reported as a difference.
+/// Whether two names are equal when letter case is ignored in every alphabet, as saved query
+/// names are compared (`toLowerCase` in core). Compares lowercase characters without building
+/// lowercase copies.
+fn same_ignoring_case(left: &str, right: &str) -> bool {
+    left.chars()
+        .flat_map(char::to_lowercase)
+        .eq(right.chars().flat_map(char::to_lowercase))
+}
+
+/// Member names for every query, unique when letter case is ignored, as Excel requires for
+/// query names. A name that had to change is reported as a difference.
 fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
     let mut members: Vec<String> = Vec::with_capacity(queries.len());
 
@@ -722,7 +731,7 @@ fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
         let mut suffix = 2;
         while members
             .iter()
-            .any(|name| name.eq_ignore_ascii_case(&candidate))
+            .any(|name| same_ignoring_case(name, &candidate))
         {
             candidate = format!("{base} ({suffix})");
             suffix += 1;
