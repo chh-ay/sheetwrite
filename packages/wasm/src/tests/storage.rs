@@ -48,7 +48,8 @@ fn public_api_bounds_checks_do_not_panic() {
         store.set_formula(sheet, 9, 0, "=A1", 0);
         store.add_rows(99, 0, 1);
         store.remove_rows(99, 0, 1);
-        // Empty edits and deletes past the last row or column change nothing.
+        // Empty edits and deletes past the last row or column change nothing:
+        // B2 keeps its value.
         store.set_number(sheet, 1, 1, 9.0, 0);
         store.add_rows(sheet, 1, 0);
         store.remove_rows(sheet, 2, 1);

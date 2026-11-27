@@ -114,7 +114,7 @@ fn an_order_that_is_not_a_permutation_changes_nothing() {
 
 /// Microsoft Support, "Dynamic array formulas and spilled array behavior":
 /// only the anchor of a spill holds its formula, so a sort cannot move part
-/// of the spill, nor a spill cell whose anchor is outside the rows.
+/// of the spill, nor a spill cell whose anchor is outside the rectangle.
 #[test]
 fn a_spill_over_several_rows_rejects_the_sort() {
     let (mut store, sheet) = sheet();

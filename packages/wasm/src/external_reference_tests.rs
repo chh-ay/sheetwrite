@@ -173,7 +173,7 @@ fn a_link_name_follows_its_values_and_its_removal() {
 }
 
 /// A rename rewrites only the references of the text: the names of a link
-/// stay as written (#491).
+/// stay as written.
 #[test]
 fn a_rename_keeps_the_link_names_of_a_formula() {
     let (mut store, report, _) = store_with_names();

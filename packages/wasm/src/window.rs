@@ -165,7 +165,7 @@ impl ConditionalRules {
         self.by_sheet.get(&sheet).map_or(&[], Vec::as_slice)
     }
 
-    /// A removed sheet handle never renders again.
+    /// Drops the rules of a removed sheet: its handle never renders again.
     pub(crate) fn remove_sheet(&mut self, sheet: usize) {
         self.by_sheet.remove(&sheet);
     }
@@ -202,6 +202,8 @@ impl CellStore {
     /// per rule; `nums` carries the numeric operand; `strs` the text/formula
     /// operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
     /// Formula strings are parsed once here, never once per visible cell.
+    /// Only the first 32 rules are read, and an unknown kind is skipped. A
+    /// formula longer than 8,192 bytes, or one that does not parse, never holds.
     #[wasm_bindgen(js_name = setConditionalRules)]
     pub fn set_conditional_rules(
         &mut self,
@@ -524,9 +526,10 @@ fn local_error_index(
 
 /// Per-cell conditional-format matches for one window: bit `i` set means rule
 /// `i` (capped at 32 rules) matched the cell's displayed value. Empty when the
-/// sheet has no rules, so rule-free windows pay nothing. Predicates evaluate
-/// against the window OUTPUT arrays — the same displayed values the host would
-/// otherwise re-derive in JS — including formula results and error sentinels.
+/// sheet has no rules or the window has no cells, so rule-free windows pay
+/// nothing. Value predicates read the window's output arrays: the displayed
+/// values, formula results and error sentinels included. Formula rules
+/// evaluate at each covered cell. A matched stop-if-true rule ends the cell.
 fn cond_matches_for_window<F: Fn(usize) -> u32>(
     store: &CellStore,
     sheet_index: usize,

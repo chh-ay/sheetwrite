@@ -1,4 +1,4 @@
-//! Key resolution for one-to-many table relationships (#229).
+//! Key resolution for one-to-many table relationships.
 //!
 //! A [`KeyIndex`] holds the non-blank keys of the one side, sorted, with the
 //! one-side row of each key. Building it also maps every many-side row to
@@ -292,9 +292,11 @@ impl KeyIndex {
         position.map_or(NO_MATCH, |found| self.rows[found])
     }
 
-    /// Branch-free lower bound: the loop has a fixed trip count and a
-    /// conditional move, so lookups in key order do not stall on
-    /// mispredicted branches. Keys are finite and sorted ascending.
+    /// The sorted position of `number`. A direct read of the dense table
+    /// when the index has one; otherwise a branch-free binary search: the
+    /// loop has a fixed trip count and a conditional move, so lookups in key
+    /// order do not stall on mispredicted branches. Keys are finite and sorted
+    /// ascending.
     fn search_number(&self, number: f64) -> Option<usize> {
         let keys = &self.numbers;
         if keys.is_empty() {
