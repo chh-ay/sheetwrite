@@ -146,6 +146,7 @@ interface InteractionDependencies {
   firstCol: () => number;
   lastCol: () => number;
   nextVisibleCol: (col: number, dir: 1 | -1) => number;
+  /** Visible column before `col`, or -1 when `col` is hidden or the first one. */
   previousVisibleColumn: (col: number) => number;
   colAtX: (contentX: number) => number;
   rowAtOffset: (contentY: number) => number;

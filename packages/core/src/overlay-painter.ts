@@ -255,6 +255,7 @@ export interface OverlayPainterDeps {
   fillHandleScreen: (contentTop: number, scrollLeft: number) => { x: number; y: number } | null;
   fillTip: () => FillTip | null;
   fillValuesArea: () => SelRect | null;
+  /** What a cell of `fillValuesArea` will show; null for a formula. */
   fillValueAt: (row: number, col: number) => { text: string; right: boolean } | null;
   /** The view row at a content offset, to start the painted rows at the first one on screen. */
   rowAtOffset: (contentY: number) => number;
