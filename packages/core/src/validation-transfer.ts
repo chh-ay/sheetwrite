@@ -2,8 +2,8 @@
  * The data validation rules a copy carries and a paste or fill lands. Excel's
  * Paste, Paste Special's All and Validation choices, and its fills give the
  * cells they cover the copied cells' rules in place of their own. This module
- * is the one path for that: the clipboard's paste, Paste Special (#821) and
- * the fill handle, Ctrl+D and Ctrl+R (#926) call `validationPastePatches`,
+ * is the one path for that: the clipboard's paste, Paste Special and the
+ * fill handle, Ctrl+D and Ctrl+R call `validationPastePatches`,
  * and the Data Validation command shares `clearedValidationPatches` with it.
  */
 

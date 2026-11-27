@@ -19,7 +19,7 @@ import type {
 
 /** Most pivots one workbook may hold; each one owns an engine cache. */
 export const MAX_PIVOTS_PER_WORKBOOK = 1_000;
-/** Longest pivot ID; matches the table ID bound. */
+/** Longest pivot ID. */
 const MAX_PIVOT_ID_LENGTH = 255;
 /** Longest pivot or value-field caption. */
 const MAX_PIVOT_NAME_LENGTH = 255;
@@ -381,6 +381,20 @@ export function validatePivotShape(value: unknown, path: string, issues: PivotIs
     validate_saved_output(saved_output, `${path}.savedOutput`, issues);
 }
 
+/**
+ * `validatePivotShape` as a type guard: whether it found no issue, which
+ * proves `value` has the pivot definition schema.
+ */
+export function isPivotShape(
+  value: unknown,
+  path: string,
+  issues: PivotIssue[],
+): value is PivotDefinition {
+  const found = issues.length;
+  validatePivotShape(value, path, issues);
+  return issues.length === found;
+}
+
 function validate_saved_output(value: unknown, path: string, issues: PivotIssueSink): void {
   if (!isPlainRecord(value)) {
     issue(issues, path, "savedOutput must be an object");
@@ -602,7 +616,11 @@ export interface PivotAxisEdit {
   readonly remap: (index: number) => number | null;
   /** Where an anchor moves when the edit deletes its row or column. */
   readonly anchorFallback: number;
-  /** Moves are not monotone: extrema may occur inside the original span. */
+  /**
+   * The new span of `[start, end]` after a move. Only moves set it: a move is
+   * not monotone, so the lowest and highest new index can come from inside
+   * the span, not from its ends.
+   */
   readonly span?: (start: number, end: number) => [number, number];
 }
 
@@ -1052,7 +1070,10 @@ const FILTER_NULL = 0;
 const FILTER_NUMBER = 1;
 const FILTER_TEXT = 2;
 const FILTER_BOOLEAN = 3;
-/** A saved measure ID occupies the field slot as a string index. */
+/**
+ * Aggregation code of a value field that names a measure; its field slot then
+ * holds the measure ID as a string index.
+ */
 const MEASURE_VALUE_CODE = 7;
 /** Flag bits in the engine payload. */
 const FLAG_ROW_TOTALS = 1;

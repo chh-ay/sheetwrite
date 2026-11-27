@@ -1,8 +1,9 @@
-// The part of the chart and pivot panels that every spreadsheet grid carries:
-// cheap event listeners that decide WHEN a panel is needed. The panels
-// themselves (panel-controller.ts and what it imports) load as their own
-// chunk on first use: an Insert command, Enter on a chart, or a cell selected
-// in a pivot's output. A grid that never does any of these never fetches it.
+// The part of the side panels that every spreadsheet grid carries: cheap
+// event listeners and commands that decide WHEN a panel is needed. The
+// panels themselves (panel-controller.ts and what it imports) load as their
+// own chunk on first use: a command that opens a panel, an activated chart,
+// or a cell selected in a pivot's output. A grid that never does any of
+// these never fetches it.
 
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
@@ -156,7 +157,7 @@ export function showFormulaExplanation(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openExplainPanel(grid));
 }
 
-/** Formulas › Defined Names loads the same optional panel chunk. */
+/** Formulas › Defined Names › Name Manager: open its panel, loading the panels on first use. */
 export function showNameManager(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid));
 }

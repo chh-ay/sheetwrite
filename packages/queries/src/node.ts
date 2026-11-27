@@ -19,7 +19,7 @@ async function artifact(options: QueryEngineOptions): Promise<QueryEngineOptions
   };
 }
 
-/** Node reads the optional artifact only on demand; source I/O still belongs to the host. */
+/** Node variant of `loadQueryEngine`; it reads the artifact from this package. Sources still come from the host. */
 export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
   return loadWithArtifact(await artifact(options));
 }

@@ -27,10 +27,9 @@ export function tabBarFont(font: string): string {
 
 /**
  * Custom properties the built-in widgets (find bar, toolbar, context menu) read
- * for their cosmetic styling. They are declared in `styles.css` via `var(...)`
- * and seeded here from the resolved {@link Theme} so the default look is
- * identical to the old hardcoded inline styles while remaining fully
- * restylable by host CSS.
+ * for their cosmetic styling. The stylesheet parts read them with `var(...)`.
+ * They are seeded here from the resolved {@link Theme}, so the default look
+ * follows the theme, and host CSS can still restyle every widget.
  */
 const WIDGET_THEME_VARS = {
   "--sheetwrite-widget-font": (t: Theme) => t.font,
@@ -54,8 +53,8 @@ const WIDGET_THEME_VARS = {
  * inline custom property set on the widget element itself would outrank any
  * author rule, but an *inherited* value is overridden by a rule matching the
  * widget directly. That is what lets a host `.sheetwrite-find { --sheetwrite-
- * widget-bg: … }` (or a bare cosmetic override like `background: …`, which now
- * lives in the stylesheet rather than inline) win without `!important`.
+ * widget-bg: … }` (or a bare cosmetic override like `background: …`, which the
+ * stylesheet sets, not an inline style) win without `!important`.
  *
  * Idempotent: every widget seeds the same theme-derived values, so calling it
  * from each constructor on the shared root simply reasserts them.

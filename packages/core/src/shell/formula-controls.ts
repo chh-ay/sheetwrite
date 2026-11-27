@@ -25,7 +25,7 @@ export interface ShellPiece {
   destroy(): void;
 }
 
-/** Host elements and callbacks used to bind a name box to a Grid. */
+/** Options for {@link createNameBox}. */
 export interface NameBoxOptions {
   /** Called after a successful Enter navigation so the grid regains focus. */
   focusGrid?: () => void;
@@ -192,7 +192,7 @@ export function createNameBox(
 
 const FORMULA_BAR_MIN_HEIGHT = 26;
 
-/** Host elements and callbacks used to bind a formula bar to a Grid. */
+/** Options for {@link createFormulaBar}. */
 export interface FormulaBarOptions {
   /** Called after Enter commits or Escape cancels, so the grid regains focus. */
   focusGrid?: () => void;

@@ -31,7 +31,11 @@ function button(label: string, run: () => void): HTMLButtonElement {
   return control;
 }
 
-/** Changes use document transactions, so the normal history and sync paths own them. */
+/**
+ * The Name Manager panel. With `define`, Refers to starts with the selection
+ * as an absolute reference. Changes use document transactions, so undo and
+ * sync apply to them.
+ */
 export function namePanel(grid: Grid, define = false): GridPanel {
   return {
     title: "Name Manager",

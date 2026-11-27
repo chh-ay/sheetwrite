@@ -36,7 +36,8 @@ export type {
 } from "./types.js";
 
 /**
- * Importing this package loads no WASM; only this explicit call loads query execution.
+ * Loads the query engine. Importing this package loads no WASM; this call,
+ * `loadPowerQueryCodec` and the queries add-on load it.
  *
  * @example
  * ```ts
@@ -58,7 +59,7 @@ export type {
  * @returns The engine, once its WASM is loaded.
  */
 export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
-  // The bridge also stays lazy: unused queries must not allocate text codecs.
+  // The bridge loads with the WASM, so a page that runs no query never loads it.
   const [wasm, { createEngine: create_engine }] = await Promise.all([
     import("../pkg/sheetwrite_queries.js"),
     import("./bridge.js"),

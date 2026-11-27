@@ -13,7 +13,10 @@ export class QueryError extends SheetwriteError {
   /** What failed and where: the step, column and row, never source values. */
   readonly diagnostic: QueryDiagnostic;
 
-  /** Diagnostic codes remain stable even when their human-readable context changes. */
+  /**
+   * Maps the `limit` diagnostic to `resource-limit` and every other diagnostic
+   * to `invalid-argument`. The message names only the stable diagnostic code.
+   */
   constructor(diagnostic: QueryDiagnostic) {
     super(
       diagnostic.code === LIMIT_DIAGNOSTIC ? "resource-limit" : "invalid-argument",

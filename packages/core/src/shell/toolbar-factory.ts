@@ -5,7 +5,7 @@ import { CommandToolbar } from "../ribbon/command-toolbar.js";
 import type { CommandFlags, Grid, IconOverrides, ToolbarItem } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
-/** Host element and configuration used to create the built-in toolbar. */
+/** Options for {@link createToolbar}. */
 export interface ToolbarOptions {
   /** Items to render; defaults to every command `flags` shows, in ribbon order. */
   items?: readonly ToolbarItem[];

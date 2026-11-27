@@ -69,6 +69,7 @@ import {
   clonePivot,
   encodePivotPayload,
   encodeSavedPivotPayload,
+  isPivotShape,
   MAX_PIVOTS_PER_WORKBOOK,
   type PivotIssue,
   pivotOwner,
@@ -78,7 +79,6 @@ import {
   sheetPivotScope,
   uncomputedPivotResult,
   validatePivotReferences,
-  validatePivotShape,
 } from "../pivot.js";
 import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
@@ -127,7 +127,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, RelationshipStatus, TableRelationship } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -1129,13 +1129,10 @@ export class StoreDataEngine {
 
   private pivot_issues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
     const issues: PivotIssue[] = [];
-    validatePivotShape(pivot, "pivot", issues);
-    if (issues.length > 0) return issues;
+    if (!isPivotShape(pivot, "pivot", issues)) return issues;
 
-    // `validatePivotShape` found no issues, so `pivot` has the shape of a
-    // `PivotDefinition`.
     validatePivotReferences(
-      pivot as PivotDefinition,
+      pivot,
       { rows: owner.rowCount, cols: owner.columns.length },
       sheetPivotScope(sheets),
       "pivot",
@@ -1954,6 +1951,17 @@ export class StoreDataEngine {
   /** Key status of the relationship with `id`, checked now from the cell values. */
   getRelationshipStatus(id: string): RelationshipStatus {
     const record = this.wasm.relationshipStatus?.(id);
+    if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
+    return relationship_status_of(record);
+  }
+
+  /**
+   * Key status of `relationship` before it is saved, checked now from the
+   * cell values; `unavailable` on an engine that does not check keys.
+   */
+  getRelationshipKeyStatus(relationship: TableRelationship): RelationshipStatus {
+    const { from, to } = relationship;
+    const record = this.wasm.relationshipKeyStatus?.(from.table, from.column, to.table, to.column);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
     return relationship_status_of(record);
   }
