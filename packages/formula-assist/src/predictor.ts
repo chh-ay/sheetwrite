@@ -1,6 +1,6 @@
 // The predictor: opens each signal for one formula edit and, on every key,
 // ranks their proposals into at most one suggestion. This module is the
-// add-on's lazy chunk; index.ts loads it.
+// add-on's lazy chunk; the add-on entry loads it when a grid mounts.
 
 import type { FormulaEdit, FormulaSuggestion, Store } from "@sheetwrite/core";
 import type { FormulaAnalysis } from "@sheetwrite/core/functions";

@@ -2,7 +2,8 @@
 // formula bar and shows it as dimmed text, accepted with Tab. This entry only
 // registers the add-on; the predictor is a chunk of its own that starts
 // loading when a grid with the add-on mounts, so it is there by the first
-// formula edit, and is never part of the page's first load.
+// formula edit, and is never part of the page's first load. Once it is there,
+// it counts the workbook's formulas when the page is idle.
 
 import type {
   FormulaEdit,
@@ -27,7 +28,7 @@ function load_predictor(): Promise<PredictorModule> {
   return loading;
 }
 
-/** Without the predictor the bar keeps Excel's behaviour. */
+/** Without the predictor the bar keeps Excel's behaviour; the next edit loads it again. */
 function report_load_failure(error: unknown): void {
   console.warn("Sheetwrite: formula assist could not load its predictor", error);
 }
@@ -64,7 +65,7 @@ function grid_suggester(store: Store): { suggester: FormulaSuggester; dispose():
     return predictor;
   };
   // An edit that opens before the chunk arrives suggests nothing until the next key, so
-  // fetch it now.
+  // fetch it now. A failed load is reported, and the first edit loads it again.
   load_predictor().then(attach, report_load_failure);
   return {
     suggester: { open: (edit) => predictor?.open(edit) ?? pending_session(edit, attach) },
