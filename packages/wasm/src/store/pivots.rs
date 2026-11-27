@@ -60,7 +60,7 @@ const TABLE_SOURCE_PADDING: usize = 4;
 const INVALID_SOURCE_PADDING: usize = 4;
 
 /// Numbers per pivot in a `pivotStatus` record; twin of
-/// `PIVOT_STATUS_STRIDE` in `packages/core/src/store/data-engine.ts`.
+/// `PIVOT_STATUS_STRIDE` in `packages/core/src/store/pivot-status.ts`.
 pub(super) const STATUS_STRIDE: usize = 7;
 
 const FILTER_NULL: u32 = 0;
@@ -704,11 +704,15 @@ impl PivotFields {
 #[wasm_bindgen]
 impl CellStore {
     /// Replaces every pivot anchored on `sheet` with the packed definitions,
-    /// concatenated per pivot: `[id, sourceKind (0 range, 1 table,
-    /// 2 invalid), sourceSheet | tableId, r0, c0, r1, c1, anchorRow,
+    /// concatenated per pivot: `[id, sourceKind, ...source, anchorRow,
     /// anchorCol, nRows, ...rowFields, nCols, ...colFields, nValues,
     /// ...(field, aggregation, name | -1), nFilters, ...(field, nValues,
     /// ...(kind, payload)), nSort, ...(axis, field, descending), flags]`.
+    /// `source` takes five slots for kind 0 (range: `sourceSheet, r0, c0, r1,
+    /// c1`), 1 (table: `tableId` and four unused slots) and 2 (invalid: an
+    /// absent-string marker and four unused slots). Kind 3 (model) is
+    /// `tableId, nFields, ...(table, column)`. A value field with aggregation
+    /// 7 shows a measure: its field slot is the text slot of the measure id.
     /// Text slots index `strings`. A pivot whose definition did not change
     /// keeps its cache. Output appears at the next recalculation. Returns
     /// `false`, changing nothing, for a malformed payload or a dead sheet.
@@ -1569,7 +1573,9 @@ impl CellStore {
     }
 }
 
-/// Records the source changes of one finished sheet in `pending`.
+/// Records in `pending` the changes to the source `rect`: the dirty seeds of
+/// its sheet when `capture_dirty` (the pass finished that sheet), and the
+/// formula results in `affected`.
 fn capture_source(
     data: &SheetData,
     rect: SourceRect,

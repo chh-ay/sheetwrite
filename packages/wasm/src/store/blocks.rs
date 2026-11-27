@@ -28,17 +28,18 @@ struct SparseLiteralBlock<'a> {
 
 impl SparseLiteralBlock<'_> {
     /// Counting-sort entry indexes by column while rejecting invalid or
-    /// repeated offsets. Repeats are found with an offset bitset while it is no
-    /// larger than the entries, else by sorting each column's offsets, so a
-    /// sparse paged block never allocates by its rectangle.
+    /// repeated offsets. Repeats are found with an offset bitset when it has
+    /// no more words than there are entries, else by sorting each column's
+    /// offsets, so a sparse paged block never allocates by its cell count.
     fn column_entries(&self) -> Option<SparseColumns> {
         let (rows, cols) = self.dimensions;
         let cells = rows * cols;
         let words = cells.div_ceil(u64::BITS as usize);
         let bitset = words <= self.offsets.len();
         let mut starts = vec![0u32; cols + 1];
-        // Two loops, so the bitset loop indexes a bitset of known length:
-        // one `get_mut` per offset cost a dense load ~3 instructions per cell.
+        // Two loops, so the bitset loop indexes a bitset of known length. A
+        // shared loop needs a `get_mut` per offset, which adds about three
+        // instructions per cell to a dense load.
         if bitset {
             let mut seen = vec![0u64; words];
             for &offset in self.offsets {
@@ -162,9 +163,11 @@ impl BlockInputOrder {
 #[wasm_bindgen]
 impl CellStore {
     /// Write one sparse mixed transaction/page/snapshot block without
-    /// allocating by logical rectangle size on paged sheets. Dense sheets use
-    /// a compact offset bitset. Inside `beginPageLoad`, dirty paged cells are
-    /// skipped; otherwise the whole sparse write is preflighted.
+    /// allocating by logical rectangle size on paged sheets. A literal-only
+    /// block finds repeated offsets with a compact bitset when the bitset is
+    /// no larger than the entry list. Inside `beginPageLoad`, dirty paged
+    /// cells are skipped; otherwise the whole sparse write is preflighted.
+    /// The status codes are those of [`Self::set_block_packed`].
     ///
     /// Text arrives packed, as in [`Self::set_block_packed`]: `text_buf` holds
     /// the UTF-8 bytes of every `KIND_STRING` entry in entry order, and the
@@ -247,8 +250,11 @@ impl CellStore {
             return BLOCK_SOURCE_INVALID;
         }
 
-        // Paged edits need dirty-overlay preflight; a page load does not, and
-        // keeps every edited cell. Spills need per-cell detachment.
+        // Literal-only blocks take the column-by-column path. Formulas and
+        // references need per-cell sources, spills need per-cell detachment,
+        // and an edit of a datasource-paged sheet needs the dirty-overlay
+        // preflight. A page load needs no preflight: it leaves edited cells
+        // alone.
         if !offsets.is_empty()
             && formula_offsets.is_empty()
             && reference_offsets.is_empty()
@@ -731,10 +737,11 @@ impl CellStore {
 }
 
 impl CellStore {
-    /// Writes a validated, spill-free literal block column by column: a dense
-    /// block, or a page load into a paged sheet. Formula retirement and dirty
-    /// seeds still describe only listed cells, and a page load leaves cells
-    /// with an unacknowledged edit, and their formulas, alone.
+    /// Writes a validated, spill-free literal block column by column: a block
+    /// on a dense or local sheet, or a page load into a datasource-paged sheet.
+    /// Formula retirement and dirty seeds still describe only listed cells,
+    /// and a page load leaves cells with an unacknowledged edit, and their
+    /// formulas, alone.
     #[inline(never)]
     fn write_sparse_columns(
         &mut self,
@@ -775,9 +782,11 @@ impl CellStore {
                 );
             }
         }
-        // As in `replace_cell_source`: only a remote edit seeds its cells,
-        // and even a one-cell block seeds that cell rather than a rectangle,
-        // so a batch of remote edits can fall back to recalculating the sheet.
+        // As in `replace_cell_source`: a snapshot or datasource page load
+        // marks the whole sheet dirty. A remote edit seeds each of its cells,
+        // never a rectangle, so a large batch of remote edits can fall back to
+        // recalculating the sheet. A local edit seeds the block rectangle when
+        // it lists every cell, else each listed cell.
         if hydrating && !self.remote_load {
             sheet_data.formulas.mark_all_dirty();
         } else if hydrating {
