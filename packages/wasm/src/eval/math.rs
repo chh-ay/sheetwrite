@@ -402,9 +402,10 @@ const fn gcd(mut left: u64, mut right: u64) -> u64 {
 pub(super) type SubtotalCode = Result<(i64, SkippedRows), FormulaError>;
 
 /// SUBTOTAL's running result for one function, fed the counted values in
-/// order. An error that reading a number gives is kept, and the result is
-/// that first error, so a later argument's error cell, which stops the
-/// evaluation as soon as it is read, still wins.
+/// order. The fold keeps the first error that reading a number gives,
+/// ignores the values after it, and finishes with that error. The caller
+/// goes on reading, so an error cell in a later argument still wins: it
+/// stops the evaluation as soon as it is read.
 pub(super) struct SubtotalFold {
     function: i64,
     count: usize,
