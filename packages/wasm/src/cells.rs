@@ -601,8 +601,8 @@ impl CellStorage {
     }
 
     /// Replaces source storage and invalidates its calculated slot. A revisioned
-    /// paged write must first reserve its overlay with `prepare_dirty_cells`
-    /// or `prepare_dirty_writes`.
+    /// paged write must first reserve its overlay with `prepare_dirty_cells`,
+    /// `prepare_dirty_rect` or `prepare_dirty_writes`.
     #[inline]
     pub(crate) fn write_cell(
         &mut self,
@@ -1392,7 +1392,7 @@ impl CellStorage {
         }
     }
 
-    /// Releases paged calculated pages that hold no result.
+    /// Releases the paged calculated blocks that hold no result.
     pub(crate) fn compact_calculated(&mut self) {
         if let Some(paged) = &mut self.paged {
             paged.compact_calculated();
@@ -1694,8 +1694,6 @@ mod local_paged_tests {
         Clear,
     }
 
-    /// One random cell write, style, calculated value or row or column edit,
-    /// applied to both sheets.
     fn random_edit(seed: &mut u32, dense: &mut CellStorage, local: &mut CellStorage) {
         let (row_count, n_cols) = (dense.row_count(), dense.n_cols());
         let at = (next(seed, row_count), next(seed, n_cols));

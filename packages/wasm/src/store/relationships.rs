@@ -48,7 +48,6 @@ pub(crate) struct Relationship {
 }
 
 impl Relationship {
-    /// Whether this record is a measure rather than a relationship.
     pub(crate) const fn is_measure(&self) -> bool {
         self.to.table.is_empty()
     }
