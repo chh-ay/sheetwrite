@@ -1339,19 +1339,13 @@ impl CellStore {
         if d_row == 0 {
             return self.data_edge(sheet, order[row] as usize, col, 0, d_col);
         }
-        // Literal kinds decide occupancy from the raw byte; only formula and
-        // calculated cells need the resolved kind with its error lookup.
-        let column = data.cells.dense_column(col);
+        // A cell is occupied as `dataEdge` decides: a formula is data whatever
+        // it returns, as in Excel.
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
                 let data_row = r as usize;
-                let index = col * data.cells.row_count() + data_row;
                 data_row < data.cells.row_count()
-                    && match column.map(|dense| dense.raw_kind(data_row)) {
-                        Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
-                        Some(KIND_EMPTY) => false,
-                        _ => resolved_kind(data, index, &self.formula_slots) != 0,
-                    }
+                    && data.cells.kind_at(col * data.cells.row_count() + data_row) != KIND_EMPTY
             })
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32

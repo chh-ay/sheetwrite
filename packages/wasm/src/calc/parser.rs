@@ -758,8 +758,8 @@ fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
     // Only ingest binds references, and only ingest meets long runs of
     // formulas of one shape, so only its parses look for a kept tree.
-    if sheets.is_some() && looks_for_shapes() {
-        return reuse_or_parse(body, || parse_body(body, sheets));
+    if let Some(binding) = sheets.filter(|_| looks_for_shapes()) {
+        return reuse_or_parse(body, binding.resolve, || parse_body(body, sheets));
     }
     parse_body(body, sheets)
 }

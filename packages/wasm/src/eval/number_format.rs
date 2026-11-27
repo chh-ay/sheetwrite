@@ -17,6 +17,9 @@ const SIGNIFICANT_DIGITS: u32 = 15;
 const PLAIN_EXPONENTS: std::ops::Range<i32> = -9..15;
 /// Scientific General output shows at least two exponent digits.
 const MIN_EXPONENT_DIGITS: usize = 2;
+/// Whole numbers below this have at most 15 digits, all significant and
+/// all in plain notation, so General writes them as integers.
+const PLAIN_INTEGER_LIMIT: f64 = 1e15;
 /// Thousands are grouped in threes.
 const GROUP_SIZE: usize = 3;
 const PERCENT_SCALE: f64 = 100.0;
@@ -267,6 +270,9 @@ const fn with_sign(magnitude: f64, number: f64) -> f64 {
 /// number: 15 significant digits, plain notation for exponents from -9 to 14
 /// and scientific notation outside them.
 pub(super) fn general_text(number: f64) -> String {
+    if number.fract() == 0.0 && number.abs() < PLAIN_INTEGER_LIMIT {
+        return (number as i64).to_string();
+    }
     let decimal = Decimal::of(number);
     if decimal.is_zero() {
         return "0".into();

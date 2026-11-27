@@ -20,15 +20,18 @@ use crate::types::{CellKey, FormulaError, KIND_EMPTY};
 pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
 const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
 // Bytes charged per owned cell: its share of the ownership metadata and its
-// calculated value. At this size, `MAX_SPILL_OWNER_CELLS` cells stay under
-// `MAX_SPILL_OWNER_BYTES`, so the cell limit is the one that applies.
+// calculated value.
 const SPILL_OWNER_ENTRY_BYTES: usize = 64;
+// The cell limit keeps the bytes under their budget, so only cells are
+// counted at run time.
+const _: () = assert!(
+    MAX_SPILL_OWNER_CELLS * SPILL_OWNER_ENTRY_BYTES <= MAX_SPILL_OWNER_BYTES,
+    "the spill cell limit keeps owned cells within their byte budget"
+);
 
-pub(crate) fn spill_ownership_within_budget(owner_cells: usize) -> bool {
+/// Whether the spills of a sheet may own `owner_cells` cells in all.
+pub(crate) const fn spill_ownership_within_budget(owner_cells: usize) -> bool {
     owner_cells <= MAX_SPILL_OWNER_CELLS
-        && owner_cells
-            .checked_mul(SPILL_OWNER_ENTRY_BYTES)
-            .is_some_and(|bytes| bytes <= MAX_SPILL_OWNER_BYTES)
 }
 
 /// What [`SpillState::vacate`] removed: the range a spill held and the value

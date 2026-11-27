@@ -672,6 +672,19 @@ impl CellStore {
             return false;
         }
 
+        // Reserve every write first: a write that failed part of the way
+        // through would leave the rectangle half cleared.
+        if let Some(revision) = dirty_revision {
+            if !s
+                .cells
+                .prepare_dirty_writes((r0, c0), (r1, c1), revision, |cells, row, col| {
+                    cells.is_loaded(row, col)
+                })
+            {
+                return false;
+            }
+        }
+
         if contents {
             if let Some(rect) = DirtyRect::new(r0, c0, r1, c1) {
                 prepare_rect_write(s, rect);
@@ -698,12 +711,8 @@ impl CellStore {
 
                 let next_style = if style { 0 } else { s.cells.style_at(index) };
                 let written = if contents {
-                    // Unloaded paged cells are skipped, so reserve per written
-                    // cell instead of over-reserving the whole rectangle.
-                    dirty_revision
-                        .is_none_or(|revision| s.cells.prepare_dirty_cells(&[(row, col)], revision))
-                        && s.cells
-                            .write_cell(row, col, kind, payload, next_style, dirty_revision)
+                    s.cells
+                        .write_cell(row, col, kind, payload, next_style, dirty_revision)
                 } else {
                     s.cells.write_style(row, col, next_style, dirty_revision)
                 };
@@ -843,6 +852,19 @@ impl CellStore {
             .copied()
             .zip(new_ids.iter().copied())
             .collect();
+        // Reserve every write first: a write that failed part of the way
+        // through would leave the rectangle half restyled.
+        if let Some(revision) = dirty_revision {
+            let remapped =
+                s.cells
+                    .prepare_dirty_writes((r0, c0), (r1, c1), revision, |cells, row, col| {
+                        cells.is_loaded(row, col)
+                            && mapping.contains_key(&cells.style_at(cells.idx(row, col)))
+                    });
+            if !remapped {
+                return false;
+            }
+        }
         for col in c0..=c1 {
             for row in r0..=r1 {
                 if !s.cells.is_loaded(row, col) {

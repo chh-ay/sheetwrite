@@ -7,7 +7,7 @@ use std::cell::Cell;
 
 use crate::store::names::NAME_READS;
 use crate::store::CellStore;
-use crate::tests::support::{number, string as text, tree_address};
+use crate::tests::support::{evaluations, number, string as text, tree_address};
 
 /// A store with one sheet, `Data`, holding 1, 2, 3 in A1:A3 and 10, 20, 30
 /// in B1:B3.
@@ -364,8 +364,9 @@ fn recursion_past_the_call_limit_is_a_num_error() {
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
 }
 
-/// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3 and `=Ratio+1`
-/// in D4, where `Total` is `=Rate*10` and `Ratio` is not defined yet.
+/// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3, `=Ratio+1` in D4
+/// and `=Step` in D5, where `Total` is `=Rate*10`, `Step` is a LET whose own
+/// variable is spelled `Rate`, and `Ratio` is not defined yet.
 fn name_users() -> (CellStore, usize) {
     let (mut store, sheet) = data_store();
     assert!(
@@ -376,10 +377,15 @@ fn name_users() -> (CellStore, usize) {
         store.set_named_formula("Total", -1, "=Rate*10"),
         "Total is set"
     );
+    assert!(
+        store.set_named_formula("Step", -1, "=LET(Rate,2,Rate+1)"),
+        "Step is set"
+    );
     store.set_formula(sheet, 0, 3, "=SUM(Rate)*A1", 0);
     store.set_formula(sheet, 1, 3, "=Total*2", 0);
     store.set_formula(sheet, 2, 3, "=B1*2", 0);
     store.set_formula(sheet, 3, 3, "=Ratio+1", 0);
+    store.set_formula(sheet, 4, 3, "=Step", 0);
     store.recompute(sheet);
     assert_eq!(number(&store, sheet, 0, 3), 10.0, "SUM(Rate)*A1");
     assert_eq!(number(&store, sheet, 1, 3), 200.0, "Total*2");
@@ -404,12 +410,16 @@ fn a_name_change_binds_only_the_formulas_that_use_it() {
         "SUM(Rate)*A1 and Total*2 have operands"
     );
 
-    // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too.
-    assert!(
-        store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
-        "Rate is B2"
-    );
-    store.recompute(sheet);
+    // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too. Step's
+    // LET reads its own `Rate`, so `=Step` is not bound again.
+    let recalculated = evaluations(|| {
+        assert!(
+            store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
+            "Rate is B2"
+        );
+        store.recompute(sheet);
+    });
+    assert_eq!(recalculated, 2, "only SUM(Rate)*A1 and Total*2 recalculate");
     assert_eq!(number(&store, sheet, 0, 3), 20.0, "SUM(Rate)*A1 reads B2");
     assert_eq!(number(&store, sheet, 1, 3), 400.0, "Total*2 reads B2");
     assert_eq!(tree_address(&store, sheet, 2, 3), unrelated, "B1*2 is kept");

@@ -564,6 +564,36 @@ impl CellStorage {
             .is_none_or(|paged| paged.prepare_dirty_rect(r0, c0, rows, cols, revision))
     }
 
+    /// Reserves room for the writes a range edit makes under `revision`: one
+    /// for each cell from `start` to `end` that `writes` selects. Once it
+    /// succeeds, none of those writes can fail, so the edit changes every
+    /// selected cell or, when this fails, none.
+    pub(crate) fn prepare_dirty_writes(
+        &mut self,
+        start: (usize, usize),
+        end: (usize, usize),
+        revision: u64,
+        writes: impl Fn(&Self, usize, usize) -> bool,
+    ) -> bool {
+        let Some(paged) = self.paged.as_ref().filter(|paged| !paged.local) else {
+            return true;
+        };
+
+        let (mut additional, mut written) = (0usize, 0usize);
+        for col in start.1..=end.1 {
+            for row in start.0..=end.0 {
+                if writes(self, row, col) {
+                    written += 1;
+                    additional += usize::from(!paged.is_dirty(row, col));
+                }
+            }
+        }
+
+        self.paged
+            .as_mut()
+            .is_some_and(|paged| paged.reserve_dirty(additional, written, revision))
+    }
+
     pub(crate) fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
         self.paged
             .as_mut()
@@ -571,7 +601,8 @@ impl CellStorage {
     }
 
     /// Replaces source storage and invalidates its calculated slot. A revisioned
-    /// paged write must first reserve its overlay with `prepare_dirty_cells`.
+    /// paged write must first reserve its overlay with `prepare_dirty_cells`
+    /// or `prepare_dirty_writes`.
     #[inline]
     pub(crate) fn write_cell(
         &mut self,
@@ -1052,14 +1083,6 @@ impl<'a> DenseColumn<'a> {
             .iter()
             .zip(self.payloads)
             .map(|(&kind, &payload)| dense_source(kind, payload))
-    }
-
-    /// The raw kind byte of `row`: a literal kind, empty, or a formula/empty
-    /// source carrying the calculated bit. Scans use it to classify literals
-    /// without loading the payload.
-    #[inline]
-    pub(crate) fn raw_kind(&self, row: usize) -> u8 {
-        self.kinds[row]
     }
 
     /// The raw kind bytes and payloads of the column, of equal length so a
@@ -1764,9 +1787,7 @@ mod local_paged_tests {
                 }
                 random_edit(&mut seed, &mut dense, &mut local);
             }
-            if convert_at < STEPS {
-                assert_same(&dense, &local, &format!("sheet {sheet}"));
-            }
+            assert_same(&dense, &local, &format!("sheet {sheet}"));
             local.acknowledge_revision(7);
             assert_same(
                 &dense,

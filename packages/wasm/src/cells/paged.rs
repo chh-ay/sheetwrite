@@ -1049,7 +1049,12 @@ impl PagedStorage {
 
     /// Reserves slot and revision-list room for `additional` new dirty cells
     /// and `written` writes under `revision`.
-    fn reserve_dirty(&mut self, additional: usize, written: usize, revision: u64) -> bool {
+    pub(super) fn reserve_dirty(
+        &mut self,
+        additional: usize,
+        written: usize,
+        revision: u64,
+    ) -> bool {
         if self.dirty_cells().saturating_add(additional) > self.max_dirty_cells
             || self.slots.try_reserve(additional).is_err()
         {
