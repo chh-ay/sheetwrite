@@ -7,8 +7,8 @@ import { initSheetwrite, SheetwriteStore } from "../src/index.js";
 import type { FormulaSuggester } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
-// Ghost text in the formula bar (#801): a formula suggester's suggestion,
-// drawn dimmed after the caret and taken with Tab, Ctrl+→ or dismissed with Esc.
+// Ghost text in the formula bar: a formula suggester's suggestion, drawn
+// dimmed after the caret, taken with Tab or Ctrl+→ and dismissed with Esc.
 
 /** Formula help loads its chunk and the function table asynchronously. */
 const LOAD_TIMEOUT_MS = 2_000;

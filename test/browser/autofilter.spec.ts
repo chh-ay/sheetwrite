@@ -2,9 +2,9 @@ import type { Page } from "@playwright/test";
 
 import { expect, nextFrames, test } from "./fixtures.js";
 
-// #735: Excel's AutoFilter, driven through the header buttons, the dropdown
-// and the keyboard, and the validation list and checkbox editors (#726), on
-// the Vue workbench's grid in one boot.
+// Excel's AutoFilter, driven through the header buttons, the dropdown and the
+// keyboard, and the validation list and checkbox editors, on the Vue
+// workbench's grid in one boot.
 
 const SHEET = "autofilter";
 const ROWS: (string | number)[][] = [
@@ -196,9 +196,9 @@ test("AutoFilter (values, Number Filters, search, Clear) and validation editors 
     });
     vue_grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
   });
-  // #726: Alt+Down opens a list rule's list, as in Excel (F2 edits a list
-  // cell's text). Typing filters the open list; Enter stores the item the
-  // text names and closes it.
+  // Alt+Down opens a list rule's list, as in Excel (F2 edits a list cell's
+  // text). Typing filters the open list; Enter stores the item the text names
+  // and closes it.
   await grid.press("Alt+ArrowDown");
   const choices = page.getByRole("listbox", { name: "Choices" });
   await expect(choices).toBeVisible();

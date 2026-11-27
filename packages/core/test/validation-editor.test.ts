@@ -94,7 +94,7 @@ describe("ValidationEditor", () => {
     list.editor.destroy();
   });
 
-  // #1095: Excel keeps the cell's value in sight while its list is open.
+  // Excel keeps the cell's value in sight while its list is open.
   it("leaves the cell in sight when opened without typing, until the first typed text", () => {
     const { editor, input } = open_list();
     const box = input.parentElement;

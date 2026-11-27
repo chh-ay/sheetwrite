@@ -10,9 +10,9 @@ const SHEETS = 4;
 const ROWS = 20_000;
 const WIDTH = 4;
 /**
- * Whether a compilation outlives the import depends on timing; before the fix
- * one fresh process in four freed the workbook in time. Three concurrent
- * processes miss the leak about once in sixty runs.
+ * Whether a compilation outlives the import depends on timing: with the leak
+ * present, about one fresh process in four still frees the workbook in time.
+ * Three concurrent processes miss the leak about once in sixty runs.
  */
 const PROBES = 3;
 
