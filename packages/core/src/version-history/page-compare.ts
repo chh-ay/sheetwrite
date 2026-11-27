@@ -90,7 +90,6 @@ function page_key(row: number, col: number): string {
   return `${row}:${col}`;
 }
 
-/** The sheet ID of a manifest sheet. */
 function sheet_id(sheet: CheckpointSheet): SheetId {
   const { id } = sheet.fields;
   if (typeof id !== "string") {

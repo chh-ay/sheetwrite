@@ -578,7 +578,6 @@ function plan_sheet_in_place(
     plan,
   );
 
-  // Dimensions, at the end only.
   if (historical.rowCount > current.rowCount) {
     plan.structure.push({
       op: "addRows",
