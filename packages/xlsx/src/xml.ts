@@ -430,7 +430,8 @@ interface OpenTag {
 /**
  * Parse an inflated part without retaining its bytes or decoded document. Only
  * the current token, open ancestors and one streamed child remain resident.
- * The tree parser above remains the path for the small, non-worksheet parts.
+ * `parseXml` above reads every other part, and worksheets small enough to
+ * parse from one buffer.
  */
 export async function parseXmlChunks(
   chunks: AsyncIterable<Uint8Array>,

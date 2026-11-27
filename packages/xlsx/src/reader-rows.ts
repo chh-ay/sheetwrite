@@ -333,7 +333,7 @@ export async function ingestWorksheetRows(
   const row_stream: XmlChildStream = {
     parent: "sheetData",
     parentIsRoot: false,
-    // The tree path read only `row` children; other children are skipped alike.
+    // Only `row` children of `sheetData` hold cells; other children are skipped.
     child: (row_element, root_element) => {
       if (xmlLocalName(row_element.name) === "row") process_row(row_element, root_element);
     },

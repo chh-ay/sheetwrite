@@ -26,9 +26,9 @@ import { assertResource, checkAbort, emitWarning, type XlsxCodecContext } from "
 import { ParsedStyles } from "./styles.js";
 
 /**
- * Copy a parsed style and its border records for one cell. `Object.assign`
- * onto a new object, not object spread: with spread, the per-cell copies raised
- * the import peak RSS of the bench corpus by about 20 MiB.
+ * Copy a parsed style and its border records for one cell. It uses
+ * `Object.assign` onto a new object, not object spread: on the bench corpus,
+ * per-cell copies made with spread raise the import peak RSS by about 20 MiB.
  */
 function copy_cell_style(source: CellStyle): CellStyle {
   const copy: CellStyle = Object.assign({}, source);
