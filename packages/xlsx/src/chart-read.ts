@@ -53,7 +53,7 @@ const DEFAULT_LEGEND = "right";
 const MODELLED_GROUPINGS: Readonly<Record<string, true>> = { standard: true, clustered: true };
 
 export interface ChartReadResult {
-  /** Chart and drawing parts now owned by `Sheet.charts`, so preservation skips them. */
+  /** Chart and drawing parts owned by `Sheet.charts`, so preservation skips them. */
   readonly modelled: ReadonlySet<string>;
   /** Drawing parts reduced to the anchors of charts the model cannot hold. */
   readonly replacements: ReadonlyMap<string, Uint8Array>;
