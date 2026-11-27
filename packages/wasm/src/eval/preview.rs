@@ -280,11 +280,10 @@ impl CellStore {
 
 impl CellStore {
     /// The result `source` (a formula with its leading `=`) would have in the
-    /// cell at `row` and `col` of `sheet`, without changing the store.
-    /// Referenced formulas give their stored results; nothing recalculates.
-    /// A formula that calls RAND, RANDBETWEEN or a host function is refused
-    /// before any of it runs, and one that needs more than the preview
-    /// limits returns `CostLimit` rather than a partial answer.
+    /// cell at `row` and `col` of `sheet`, without changing the store. The
+    /// module docs say what a preview reads and refuses. A formula that needs
+    /// more than the preview limits returns `CostLimit` rather than a partial
+    /// answer.
     pub(crate) fn preview_formula(
         &self,
         sheet: usize,

@@ -37,7 +37,6 @@ impl NumberStatistic {
     }
 }
 
-/// What a statistical function computes.
 enum Statistic {
     Numbers(NumberStatistic),
     CountBlank,
@@ -54,7 +53,6 @@ enum Statistic {
     },
 }
 
-/// The statistic `func` computes, or `None` for a function of another family.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
@@ -118,7 +116,6 @@ const fn statistic(func: Func) -> Option<Statistic> {
     })
 }
 
-/// The statistic of `func` that reads only numbers, if it is one.
 pub(super) const fn number_statistic(func: Func) -> Option<NumberStatistic> {
     match statistic(func) {
         Some(Statistic::Numbers(statistic)) => Some(statistic),
@@ -150,7 +147,6 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
     })
 }
 
-/// `statistic` of `values`.
 pub(super) fn apply_numbers(statistic: NumberStatistic, values: &mut StatisticArgs) -> EvalResult {
     aggregate_result(match statistic {
         NumberStatistic::Median => median(values),
@@ -485,7 +481,6 @@ fn geomean(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     }
 }
 
-/// The statistic a paired function computes.
 #[derive(Clone, Copy)]
 pub(super) enum PairedKind {
     Correlation,
@@ -493,7 +488,6 @@ pub(super) enum PairedKind {
     PopulationCovariance,
 }
 
-/// The running moments of a paired statistic.
 #[derive(Default)]
 pub(super) struct PairedMoments {
     count: usize,
@@ -549,7 +543,6 @@ pub(super) enum PairedCell {
 }
 
 impl PairedCell {
-    /// The cell holding `value`.
     pub(super) const fn of(value: &Value) -> Self {
         match value {
             Value::Number(number) => Self::Number(*number),

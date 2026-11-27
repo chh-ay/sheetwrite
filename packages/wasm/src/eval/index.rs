@@ -19,11 +19,8 @@ use super::matrix::{optional_ast, range_from_ast, EvalMatrix};
 use super::range_view::{ArrayView, RangeView, ValueRows};
 use super::EvalPass;
 
-/// The row argument is the second argument of INDEX.
 const ROW_ARG: usize = 1;
-/// The column argument is the third argument of INDEX.
 const COL_ARG: usize = 2;
-/// The area number is the fourth argument of INDEX.
 const AREA_ARG: usize = 3;
 const MIN_ARGS: usize = 2;
 const MAX_ARGS: usize = 4;

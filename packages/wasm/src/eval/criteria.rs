@@ -199,7 +199,6 @@ impl WildcardPattern {
         })
     }
 
-    /// Whether the text of a lookup candidate matches the pattern.
     pub(super) fn matches_text(&self, text: &str) -> bool {
         self.wildcard.matches(text)
     }
@@ -304,7 +303,8 @@ impl IfExtreme {
         }
     }
 
-    /// Folds one matched row.
+    /// Folds one matched row: an error or a non-finite number stops the walk,
+    /// and only finite numbers count.
     pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
         match value {
             Value::Number(number) if number.is_finite() => {
