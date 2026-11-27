@@ -60,9 +60,9 @@ export function isSafeExternalHyperlink(url: string): boolean {
 }
 
 /**
- * Whether an identifier is bounded, non-empty, trimmed, and free of control characters.
+ * Whether a hyperlink ID may be stored.
  *
- * @param id - A hyperlink ID.
+ * @param id - An ID from outside your code, such as a pasted hyperlink's.
  * @returns `true` when the ID is 1 to the maximum length, has no space at either end, and no control characters.
  */
 export function isValidHyperlinkId(id: string): boolean {
@@ -122,7 +122,7 @@ export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
  * Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers.
  *
  * @param value - A hyperlink from outside your code.
- * @returns `true` when `value` is a valid, safe hyperlink.
+ * @returns `true` when {@link sanitizeCellHyperlink} accepts `value`; nothing is copied.
  */
 export function isValidCellHyperlink(value: unknown): value is CellHyperlink {
   return sanitizeCellHyperlink(value) !== null;

@@ -89,7 +89,6 @@ export interface ClipboardControllerDeps {
   lastUndo: () => object | null;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
-  /** Load Paste Special's code. */
   loadPasteSpecial: () => Promise<PasteSpecialModule>;
   /** Ask with the Paste Special dialog; `ownCopy` is false for another application's cells. */
   askPasteSpecial: (ownCopy: boolean) => Promise<PasteSpecialOptions | null>;
@@ -854,7 +853,6 @@ export class ClipboardController {
   /** Last rich copy/cut and its unguessable in-memory provenance token. */
   private trusted: TrustedClipboard | null = null;
 
-  /** The cut that waits for a paste. */
   private pending_cut: PendingCut | null = null;
 
   /**
@@ -1142,7 +1140,6 @@ export class ClipboardController {
     return target;
   }
 
-  /** Paste what the clipboard holds. */
   private async read_and_paste(
     read: Scope,
     clipboard: Clipboard,
