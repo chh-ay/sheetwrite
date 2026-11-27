@@ -311,8 +311,9 @@ const SheetwriteGridComponent = defineComponent({
       onExportError: (event) => emit("export-error", event),
       onKeyBindingsChange: (event) => emit("key-bindings-change", event),
       onReady(event) {
-        // Vue's emit catches listener exceptions before the lifetime can retire
-        // the Grid. Readiness is a publication transaction, so deliver it here.
+        // A ready listener that throws must reach the controller, which then
+        // retires the Grid. Vue's `emit` catches listener errors, so this calls
+        // the `onReady` and `onReadyOnce` listeners from the vnode props itself.
         const listeners = instance?.vnode.props;
         const ready_listeners: unknown = listeners?.onReady;
 
@@ -342,7 +343,8 @@ const SheetwriteGridComponent = defineComponent({
         if (grid) return nextTick();
       },
       setInitializationState() {
-        // Fallback follows exposed Grid availability in Vue.
+        // No state to keep: the render function shows the fallback slot while
+        // no Grid is exposed.
       },
       reportConsumerFailure(thrown) {
         reportError(thrown);
