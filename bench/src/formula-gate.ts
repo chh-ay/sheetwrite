@@ -70,7 +70,7 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=text-lookup-many-edit;size=1000": 1.15,
   "workload=text-lookup-many-sorted;size=1000": 1.2,
   "workload=text-lookup-many-sorted-edit;size=1000": 1.2,
-  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Not yet resampled.
   "workload=paged-vlookup-many;size=1000": 1.2,
   "workload=paged-vlookup-many-edit;size=1000": 1.2,
   "workload=paged-xlookup-many;size=1000": 1.2,
@@ -86,7 +86,7 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=percentile-covariance;size=100000": 1.15,
   "workload=let-reuse-edit;size=100000": 1.15,
   "workload=let-repeat;size=100000": 1.2,
-  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Not yet resampled.
   "workload=let-many;size=10000": 1.2,
   "workload=let-many;size=100000": 1.2,
   "workload=round-many;size=10000": 1.2,
@@ -135,19 +135,19 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=pivotby-percentof;size=50000": 1.2,
   "workload=pivot-rebuild;size=100000": 1.2,
   "workload=getpivotdata-many;size=1000": 1.2,
-  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Not yet resampled.
   "workload=getpivotdata-source-edit;size=1000": 1.2,
   "workload=analysis-calls;size=10000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,
-  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Not yet resampled.
   "workload=spill-filter-same-range;size=100000": 1.2,
-  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Not yet resampled.
   "workload=conditional-format-window;size=10000": 1.2,
   "workload=conditional-format-window;size=100000": 1.2,
   "workload=take-sort-filter;size=100000": 1.2,
-  // Full engine only. Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  // Full engine only. Not yet resampled.
   "workload=map-lambda;size=10000": 1.2,
   "workload=map-lambda;size=100000": 1.2,
   "workload=reduce-lambda;size=10000": 1.2,

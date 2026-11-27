@@ -120,10 +120,9 @@ async function start(): Promise<void> {
   // writes the live counts of the weak references to the status element.
   //
   // The warm-up grids load the engine and the page-wide state that every grid
-  // shares. They also let V8 compile the grid code: compiled code, feedback
-  // vectors and inline caches are heap objects that V8 owns, and they grow for
-  // the first few dozen grids before they level off. The baseline holds all of
-  // them, so the measured loop shows only what the grids themselves keep.
+  // shares, and let V8 compile the grid code (see
+  // grid-lifetime-browser-bench.ts). The baseline holds both, so the measured
+  // loop shows only what the grids themselves keep.
   let phase: "warm-up" | "measure" | "count" = "warm-up";
   run_button.addEventListener("click", () => {
     run_button.disabled = true;
