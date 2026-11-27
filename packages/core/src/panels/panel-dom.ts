@@ -81,7 +81,7 @@ export function selectOf(
   return select;
 }
 
-/** A text input that commits once per change; `show` updates it from the model. */
+/** What {@link committingInput} returns. */
 export interface CommittingInput {
   readonly input: HTMLInputElement;
   /** Show the model's text, unless the user is typing a draft in this field. */

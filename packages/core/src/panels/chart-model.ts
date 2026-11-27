@@ -144,7 +144,7 @@ export function pivotValueCaptions(
   });
 }
 
-/** Whether a chart over a pivot plots the pivot's value `slot`. */
+/** Whether `chart` plots pivot value `slot`; without `pivotValues` it plots every value. */
 export function plotsPivotValue(chart: ChartDefinition, slot: number): boolean {
   return chart.pivotValues === undefined || chart.pivotValues.includes(slot);
 }

@@ -5,7 +5,7 @@ import { labelToCol, rangeA1 } from "../a1.js";
 import { sheetNameKey } from "../name-key.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 
-/** The sheet facts that parsing needs: the ID, the name and the size. */
+/** A sheet as parsing sees it; its size bounds the ranges it accepts. */
 export interface RangeTextSheet {
   readonly id: SheetId;
   readonly name: string;
