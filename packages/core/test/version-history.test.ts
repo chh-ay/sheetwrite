@@ -439,6 +439,15 @@ describe("history trust and cancellation", () => {
     const too_large = archive.listVersions({ maxEntries: 101 });
     await expect(too_large).rejects.toMatchObject({ code: "capacity" });
   });
+
+  it("bounds an author ID by its UTF-8 bytes, as sync does", async () => {
+    const archive = await initialized(new MemoryHistoryStorage());
+    // "é" takes two UTF-8 bytes, so 128 of them fill the 256-byte limit.
+    await archive.record({ ...change(1), authorId: "é".repeat(128) });
+
+    const over = archive.record({ ...change(2), authorId: "é".repeat(129) });
+    await expect(over).rejects.toMatchObject({ code: "invalid-history" });
+  });
 });
 
 describe("checkpoint content addressing", () => {
