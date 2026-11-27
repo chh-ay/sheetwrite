@@ -307,8 +307,6 @@ export class Ribbon {
       if (group !== undefined) reduce_order.push({ id, shrinks: group.spec.layout === "flow" });
     }
 
-    // When even the collapsed groups do not fit, the last ones fold into one
-    // labelled "More" button at the end, so no group is cut at an edge.
     const more = document.createElement("button");
     more.type = "button";
     more.className =

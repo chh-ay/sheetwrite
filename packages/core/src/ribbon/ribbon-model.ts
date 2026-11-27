@@ -346,10 +346,10 @@ const insert_pivot_chart_of =
   async (grid: Grid): Promise<boolean> =>
     (await loadPanels(grid)).insertPivotChart(grid, kind);
 
-/** Insert › Dashboard › KPI Card opens the measure picker; the panel code loads on first use. */
+/** Insert › Dashboard › KPI Card opens the measure picker. */
 const insert_kpi = async (grid: Grid): Promise<void> => (await loadPanels(grid)).openKpiPanel(grid);
 
-/** Insert › Filters › Slicer opens the Insert Slicers list; the panel code loads on first use. */
+/** Insert › Filters › Slicer opens the Insert Slicers list. */
 const insert_slicer = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openSlicerPanel(grid);
 
@@ -358,7 +358,7 @@ function active_sheet_is_dashboard(grid: Grid): boolean {
   return isDashboard(grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet));
 }
 
-/** Data › Data Tools opens the data model panel; the panel code loads on first use. */
+/** Data › Data Tools opens the data model panel. */
 const open_data_model = async (grid: Grid): Promise<void> =>
   (await loadPanels(grid)).openDataModelPanel(grid);
 
