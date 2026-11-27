@@ -1910,7 +1910,7 @@ function validate_sheet_shape(
     );
   }
   conditional_formats?.forEach((entry, index) => {
-    validate_conditional_format_shape(entry, `${path}.conditionalFormats[${index}]`, errors, true);
+    validate_conditional_format_shape(entry, `${path}.conditionalFormats[${index}]`, errors);
   });
 
   const validation_rules = optional_array(sheet, "validationRules", path, errors);
@@ -2161,16 +2161,13 @@ function validate_conditional_format_shape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
-  validate_stop_if_true = false,
 ): void {
   const format = record_at(entry, path, errors);
   if (!format) return;
   validate_range_shape(ownValue(format, "range"), `${path}.range`, errors);
   validate_conditional_predicate(ownValue(format, "when"), `${path}.when`, errors);
   validate_cell_style(ownValue(format, "style"), `${path}.style`, errors);
-  // Only snapshot validation checks `stopIfTrue`. Operation validation does not,
-  // so a `setSheetMeta` format with a non-boolean `stopIfTrue` passes.
-  if (validate_stop_if_true) optional_boolean(format, "stopIfTrue", path, errors);
+  optional_boolean(format, "stopIfTrue", path, errors);
 }
 
 function validate_validation_rule_shape(
