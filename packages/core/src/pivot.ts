@@ -1008,7 +1008,6 @@ export function applyPivotRewrites(
   }
 }
 
-/** Owner sheet of the pivot with `id`, if any sheet holds it. */
 export function pivotOwner(sheets: readonly Sheet[], id: string): Sheet | undefined {
   return sheets.find((sheet) => sheet.pivots?.some((pivot) => pivot.id === id));
 }
