@@ -124,6 +124,37 @@ describe("SUBTOTAL over hidden rows", () => {
       set_hidden_rows.mockRestore();
     }
   });
+
+  it("reads the rows a filter hides in a conditional-format rule, with no SUBTOTAL in a cell", () => {
+    const store = keep(new SheetwriteStore(makeWorkbook(ROWS), makeColumnarData(ROWS)));
+    store.applyTransaction({
+      patches: [
+        {
+          op: "setSheetMeta",
+          sheet: "s1",
+          patch: {
+            conditionalFormats: [
+              {
+                range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: ROWS - 1, col: 1 } },
+                when: { kind: "formula", source: "=SUBTOTAL(9,$B$1:$B$6)<100" },
+                style: { bold: true },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const first_shown_is_bold = (): boolean | undefined => {
+      const view = store.getVisibleWindow("s1", { start: 0, end: 1 }, [1]);
+      const [style_id] = view.styleIds;
+      return style_id === undefined ? undefined : view.styles[style_id]?.bold;
+    };
+    expect(first_shown_is_bold()).toBeUndefined();
+
+    // Keeps Phnom Penh and Tokyo, whose amounts add up to 82.
+    store.setColumnFilter("s1", 2, { kind: "values", values: ["Phnom Penh", "Tokyo"] });
+    expect(first_shown_is_bold()).toBe(true);
+  });
 });
 
 describe("saved view state at load", () => {
