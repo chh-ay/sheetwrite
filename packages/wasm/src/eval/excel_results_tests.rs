@@ -1472,6 +1472,12 @@ fn analysis_text_functions() {
             (r#"=TEXTBEFORE("","x")"#, ""),
             (r#"=TEXTBEFORE("a","x",,,, "missing")"#, "missing"),
             (r#"=TEXTAFTER("a-b","-",,,,1/0)"#, "b"),
+            // An array of delimiters: the first match of any of them counts.
+            (r#"=TEXTBEFORE("Jones, Bob",{", ",","})"#, "Jones"),
+            (r#"=TEXTAFTER("Jones,Bob",{", ",","})"#, "Bob"),
+            (r#"=TEXTBEFORE("a-b c",{" ","-"},2)"#, "a-b"),
+            (r#"=TEXTAFTER("a-b c",{" ","-"},-1)"#, "c"),
+            (r#"=TEXTAFTER("a-b c",{"x","y"},,,,"none")"#, "none"),
             ("=FIXED(1234.567,1)", "1,234.6"),
             ("=FIXED(1234.567,-1,TRUE)", "1230"),
             ("=DOLLAR(-1234.567,2)", "($1,234.57)"),
