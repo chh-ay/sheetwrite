@@ -99,7 +99,7 @@ impl Axis {
     pub(crate) fn apply(&mut self, op: AxisOp) -> bool {
         match op {
             AxisOp::Insert { at, count } => {
-                if count == 0 || at > self.len {
+                if count == 0 || at > self.len || self.len.checked_add(count).is_none() {
                     return false;
                 }
 

@@ -507,8 +507,12 @@ mod tests {
         kernel.insert_rows(sheet, 4, 1);
         kernel.move_rows(sheet, 0, 2, 2);
         kernel.move_rows(sheet, 0, 0, 0);
+        // A sheet as long as the u32 range has no room for another row.
+        let full = kernel.add_sheet(u32::MAX, 1, true);
+        kernel.insert_rows(full, 0, 1);
 
         assert_eq!(kernel.row_segments(sheet), vec![0, 3, 0]);
+        assert_eq!(kernel.row_segments(full), vec![0, u32::MAX, 0]);
         assert_eq!(
             (0..3)
                 .map(|row| kernel.cell_authors(sheet, row, 0))
