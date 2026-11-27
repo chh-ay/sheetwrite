@@ -418,7 +418,8 @@ fn parse_value(value: &Value) -> Result<(Complex, Option<char>), FormulaError> {
 }
 
 /// Reads `a`, `bi`, `a+bi` or `a-bi`, with `i` or `j`. A coefficient of 1
-/// may be left out: `i`, `-j`, `3+i`. Other text is `#NUM!`.
+/// may be left out: `i`, `-j`, `3+i`. Empty text is zero; other text is
+/// `#NUM!`.
 fn parse(text: &str) -> Result<(Complex, Option<char>), FormulaError> {
     if text.is_empty() {
         return Ok((Complex::ZERO, None));

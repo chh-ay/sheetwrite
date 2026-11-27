@@ -31,8 +31,8 @@ family_functions! {
 
 /// The arguments of `function` that take one value. The delimiter of
 /// TEXTBEFORE and TEXTAFTER is not lifted: Excel reads an array there as a
-/// list of delimiters to match any of, as in TEXTSPLIT. `before_after` reads
-/// it as one text value. ARRAYTOTEXT takes an array; REGEXEXTRACT and
+/// list of delimiters to match any of, as in TEXTSPLIT
+/// ([`Context::any_delimiter`]). ARRAYTOTEXT takes an array; REGEXEXTRACT and
 /// TEXTSPLIT return arrays of their own.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
@@ -296,7 +296,6 @@ fn before_after(
 ) -> Result<Value, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
-    // Excel matches any delimiter of an array; an empty one matches at once.
     let delimiter = context.any_delimiter(args)?;
     let delimiters = delimiter.as_slice();
     let instance = context.integer(args, 2, 1)?;
@@ -310,6 +309,7 @@ fn before_after(
         return Ok(Value::text(""));
     }
     let is_before = function == Function::TEXTBEFORE;
+    // An empty delimiter matches at once.
     if delimiters.iter().any(String::is_empty) {
         return text_value(if is_before == (instance > 0) {
             String::new()
