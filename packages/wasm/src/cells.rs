@@ -1085,14 +1085,6 @@ impl<'a> DenseColumn<'a> {
             .map(|(&kind, &payload)| dense_source(kind, payload))
     }
 
-    /// The raw kind byte of `row`: a literal kind, empty, or a formula/empty
-    /// source carrying the calculated bit. Scans use it to classify literals
-    /// without loading the payload.
-    #[inline]
-    pub(crate) fn raw_kind(&self, row: usize) -> u8 {
-        self.kinds[row]
-    }
-
     /// The raw kind bytes and payloads of the column, of equal length so a
     /// loop bounded by the kinds needs no bounds check on the payloads. A
     /// literal's raw kind is its kind; use [`source_kind`] for the others.
