@@ -227,21 +227,37 @@ impl<'a> RangeView<'a> {
     /// as a paired statistic reads two ranges of literal cells: an error of
     /// this view wins over any error of `other`, and `visit` gets each pair's
     /// numbers. `None`, before any cell is evaluated, when either view isn't
-    /// dense, when they differ in size, or when a cell holds a formula.
+    /// dense, when they differ in size, or when a cell holds a formula; the
+    /// preview charge of the two views is then put back, since the reader
+    /// that takes over charges them itself.
     pub(super) fn literal_pairs(
         &self,
         other: &Self,
-        mut visit: impl FnMut(Option<f64>, Option<f64>),
+        visit: impl FnMut(Option<f64>, Option<f64>),
     ) -> Option<Result<(), FormulaError>> {
         if self.rows * self.cols != other.rows * other.cols {
             return None;
         }
+        let charged = preview_limits::checkpoint();
         if let Err(error) = self
             .charge_preview(RangeRead::Typed)
             .and_then(|()| other.charge_preview(RangeRead::Typed))
         {
             return Some(Err(error));
         }
+        let read = self.read_literal_pairs(other, visit);
+        if read.is_none() {
+            preview_limits::rewind(charged);
+        }
+        read
+    }
+
+    /// [`Self::literal_pairs`] after the charge.
+    fn read_literal_pairs(
+        &self,
+        other: &Self,
+        mut visit: impl FnMut(Option<f64>, Option<f64>),
+    ) -> Option<Result<(), FormulaError>> {
         let (left_kinds, left_payloads) = LiteralSources::new(self.data, self.depth)?.sources.raw();
         let (right_kinds, right_payloads) =
             LiteralSources::new(other.data, other.depth)?.sources.raw();

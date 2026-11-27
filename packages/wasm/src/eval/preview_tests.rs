@@ -164,6 +164,23 @@ fn typed_range_reads_reach_a_million_cells_and_no_further() {
     }
 }
 
+/// CORREL reads two literal columns pair by pair, and leaves a range with a
+/// formula cell to the general reader. The read is charged once: 600,000
+/// typed cells fit the budget, twice that would not.
+#[test]
+fn a_paired_read_that_falls_back_is_charged_once() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 300_000);
+    let numbers: Vec<f64> = (0..300_000).map(f64::from).collect();
+    write_number_column(&mut store, sheet, 0, 0, &numbers);
+    write_number_column(&mut store, sheet, 1, 0, &numbers);
+    store.set_formula(sheet, 0, 1, "=0", 0);
+    store.commit_sources();
+
+    let correlation = number(&preview(&store, sheet, "=CORREL(A1:A300000,B1:B300000)"));
+    assert!(correlation > 0.999_999, "{correlation}");
+}
+
 /// Kind entries the typed scans of one preview of `source` read.
 fn kinds_scanned(store: &CellStore, sheet: usize, source: &str) -> (FormulaPreviewStatus, usize) {
     let scanned = &super::preview_limits::KINDS_SCANNED;
