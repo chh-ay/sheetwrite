@@ -535,9 +535,7 @@ export class SearchController {
     const engine = storeEngine(this.deps.store);
     const captured = engine?.captureCells(sheet, matches);
     const metadata = this.deps.sheet(sheet);
-    // One `set` per cell without an engine, or with validation rules, protected
-    // ranges or spill children: the mutation policy then reports each issue at its
-    // own cell's operation index, and a write into a spill child can be refused alone.
+    // One `set` per cell in the cases `StyleActions.applyStyle` explains.
     const scalar_writes =
       !engine ||
       Boolean(

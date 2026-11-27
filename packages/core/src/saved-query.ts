@@ -500,7 +500,6 @@ export function withoutQuery(
   return next.length > 0 ? next : undefined;
 }
 
-/** The saved query with `id`, if there is one. */
 export function findQuery(
   queries: readonly SavedQuery[] | undefined,
   id: string,

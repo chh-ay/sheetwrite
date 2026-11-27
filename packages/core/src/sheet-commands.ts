@@ -32,7 +32,6 @@ export function nextSheetName(sheets: readonly { readonly name: string }[]): str
   return `Sheet${number}`;
 }
 
-/** The rows and columns of an empty new sheet. */
 export function newSheetShape(): Pick<SheetSnapshot, "rowCount" | "columns"> {
   const columns: Column[] = [];
   for (let col = 0; col < NEW_SHEET_COLUMNS; col++) {
