@@ -218,6 +218,24 @@ fn exported_sections_import_to_the_same_plans() {
         query("ä", MSourceKind::Host, None, vec![], vec![]),
     ]);
     assert_eq!(cased.members, ["Ä", "ä (2)"]);
+
+    // A file source without a web locator is written as an error too, for a different reason.
+    let local = emit_section(&[query(
+        "Local",
+        MSourceKind::Csv {
+            delimiter: b',',
+            headers: true,
+            empty_is_null: false,
+        },
+        Some("sales.csv"),
+        vec![column("Region", ColumnType::Text)],
+        vec![],
+    )]);
+    assert!(local.losses.contains(&Loss {
+        query: 0,
+        step: None,
+        code: "source-locator",
+    }));
 }
 
 /// Workbook queries in the forms the M documentation shows, plus members outside the subset.

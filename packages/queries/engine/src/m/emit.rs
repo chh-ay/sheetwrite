@@ -531,8 +531,15 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
     let Some(locator) = web.filter(|_| !matches!(source.kind, MSourceKind::Host)) else {
         // A host source, or a file source without an http(s) locator, has no M connector.
         // The query evaluates to an error that names the source, and refresh in Excel
-        // reports it.
-        writer.loss(None, "host-source");
+        // reports it. The loss names which of the two causes applies.
+        writer.loss(
+            None,
+            if matches!(source.kind, MSourceKind::Host) {
+                "host-source"
+            } else {
+                "source-locator"
+            },
+        );
         bindings.push((String::from("Source"), host_source_error(&source.source_id)));
         typed_binding(writer, query, bindings);
         return;
