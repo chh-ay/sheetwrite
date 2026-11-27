@@ -62,7 +62,7 @@ function sort_by_view_row(rows: Int32Array, items: Uint32Array, length: number):
  * Ascending view-row index over a list of items (search matches, notes). A
  * repaint only needs the rows inside the painted band, so it binary-searches
  * this index instead of mapping every item on each frame. Items whose data row
- * the current view filters out are dropped, exactly as the inline mapping did.
+ * the current view filters out are dropped.
  */
 class ViewRowIndex {
   private rows = EMPTY_VIEW_ROWS;
@@ -524,8 +524,8 @@ export class OverlayPainter {
   /**
    * True when the current paint inputs match the previous pass exactly. Reads
    * each dependency once and compares against cached fields; caches are updated
-   * (and `false` returned) only when something differs, matching the old
-   * signature-plus-theme-identity skip.
+   * (and `false` returned) only when something differs. The theme is compared
+   * by identity.
    */
   private same_paint_state(
     content_top: number,
@@ -662,9 +662,8 @@ export class OverlayPainter {
 
   /**
    * Rebuild the match row index when the match set or the view order changed.
-   * The mapping is one `toViewRow` per match, the same work a single repaint
-   * used to do, but it now runs only on search, sort, filter and geometry
-   * changes instead of on every scroll step.
+   * The mapping is one `toViewRow` per match. It runs only on search, sort,
+   * filter and geometry changes, not on every scroll step.
    */
   private ensure_match_index(matches: SearchMatchSet, sheet: SheetId): void {
     const search_version = this.deps.searchVersion();
@@ -687,8 +686,8 @@ export class OverlayPainter {
   /**
    * Append the match rects the painted band covers: every match in a frozen row
    * plus the body rows between the freeze boundary and the viewport bottom. The
-   * band lookup is two binary searches, and the rects keep match order so a
-   * sorted view paints the same DOM order a full scan produced.
+   * band lookup is two binary searches. The rects keep match order, also when
+   * a view sort puts the matches out of view-row order.
    */
   private paint_search_matches(
     matches: SearchMatchSet,

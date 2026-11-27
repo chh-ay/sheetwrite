@@ -180,8 +180,8 @@ export class AriaMirror {
     aria.id = `sheetwrite-grid-${++aria_seq}`;
     aria.setAttribute("role", "grid");
     // `contain: strict` keeps the mirror's changes in every frame of a scroll
-    // from laying out and restyling the page around it; in Firefox that cut
-    // the layout and style time of a sideways scroll by a third. Screen
+    // from laying out and restyling the page around it. In Firefox this takes
+    // about a third off the layout and style time of a sideways scroll. Screen
     // readers still read the contained cells.
     aria.style.cssText =
       "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;contain:strict;";

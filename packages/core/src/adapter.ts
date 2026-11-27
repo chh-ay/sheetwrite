@@ -143,7 +143,12 @@ export interface GridAdapterEventHandlers<Id extends RowBridgeId = RowBridgeId> 
 
 /** Optional explicit WASM source and initialization error callback for adapters. */
 export interface SheetwriteInitializationProps {
-  /** Explicit source passed to process-wide WASM initialization; concurrent initialization is first-source-wins. */
+  /**
+   * Explicit source passed to process-wide WASM initialization. The first
+   * source wins: a different source after initialization is ignored with a
+   * warning, and a different source while initialization is in flight makes
+   * that call fail with `initialization-failed`.
+   */
   wasmSource?: BufferSource | URL | string | Request | WebAssembly.Module;
   /** Called when WASM initialization fails while the adapter is mounted. */
   onInitializationError?: (error: SheetwriteError) => void;
@@ -255,7 +260,10 @@ export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> {
   options: GridOptions;
   /** Turns grid changes into row changes; a different bridge creates a new grid. */
   rowBridge?: RowBridgeInstance<Id>;
-  /** Where to load the engine's WASM from; a different source initializes again. */
+  /**
+   * Where to load the engine's WASM from. A changed source runs
+   * initialization again, which keeps the module that loaded first.
+   */
   wasmSource?: SheetwriteInitializationProps["wasmSource"];
 }
 

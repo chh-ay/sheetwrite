@@ -535,7 +535,9 @@ export class SearchController {
     const engine = storeEngine(this.deps.store);
     const captured = engine?.captureCells(sheet, matches);
     const metadata = this.deps.sheet(sheet);
-    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    // One `set` per cell without an engine, or with validation rules, protected
+    // ranges or spill children: the mutation policy then reports each issue at its
+    // own cell's operation index, and a write into a spill child can be refused alone.
     const scalar_writes =
       !engine ||
       Boolean(
@@ -548,7 +550,7 @@ export class SearchController {
     let end_col = 0;
     for (const [index, addr] of matches.entries()) {
       const cell = captured?.[index];
-      // Custom stores without an engine retain their scalar read contract.
+      // A store without an engine captures no cells: plan from its own reads.
       const planned = !cell
         ? this.cell_replacement(addr, replacement)
         : cell.value.kind === "formula"

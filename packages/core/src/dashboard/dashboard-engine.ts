@@ -1,6 +1,6 @@
-// The link between a store's pivot views and its engine (#231, #487). The
-// dashboard view, the charts over pivots and the XLSX export all read pivot
-// results through it, so they see the same slicer filters and hidden pivots.
+// The link between a store's pivot views and its engine. The dashboard view,
+// the charts over pivots and the XLSX export all read pivot results through
+// it, so they see the same slicer filters and hidden pivots.
 
 import { isDashboard } from "../dashboard.js";
 import { scanColumnValues } from "../data-window-reads.js";

@@ -1,6 +1,6 @@
 // Insert › Filters › Slicer on a dashboard: Excel's Insert Slicers list. Each
 // checked table column becomes a slicer item in the next free place, all in
-// one transaction, so one undo removes them (#231).
+// one transaction, so one undo removes them.
 
 import { firstFreeBox } from "../dashboard/dashboard-layout.js";
 import type { SheetId } from "../types/coordinates.js";

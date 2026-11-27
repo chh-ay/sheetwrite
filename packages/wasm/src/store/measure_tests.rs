@@ -447,7 +447,7 @@ fn measure_errors_show_in_their_cells_and_a_missing_measure_at_the_anchor() {
     assert_ne!(fixture.store.pivot_status(fixture.output)[0], 0);
 }
 
-/// Measures with `CALCULATE` filters that only remove axis fields.
+/// Measures whose `CALCULATE` filters only remove fields with `ALL`.
 const CALCULATE_MEASURES: [&str; 5] = [
     "=CALCULATE(SUM(orders[qty]), ALL(orders[region]))",
     "=SUM(orders[qty])/CALCULATE(SUM(orders[qty]), ALL(orders[segment]))",

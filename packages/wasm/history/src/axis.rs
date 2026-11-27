@@ -35,7 +35,10 @@ pub(crate) struct Segment {
     pub origin: u32,
 }
 
-/// The map of one axis as a short list of segments: one per structural change.
+/// The map of one axis as a list of segments. The segments are in order of
+/// `start` and cover `0..len` without gaps. `renumber` joins neighbours that
+/// continue each other, so the list stays short: each structural change adds
+/// only a few segments.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Axis {
     segments: Vec<Segment>,
@@ -138,6 +141,7 @@ impl Axis {
     }
 
     /// Index of the segment that starts at `at`, splitting one segment if needed.
+    /// When `at` is the axis length, this is the end of the list.
     fn split(&mut self, at: u32) -> usize {
         let index = self
             .segments
@@ -168,7 +172,9 @@ impl Axis {
         index + 1
     }
 
-    /// Remove lines `at..at + count` and return their segments.
+    /// Remove lines `at..at + count` and return their segments. The `start` of
+    /// the remaining and returned segments is stale until the caller calls
+    /// `renumber`.
     fn take(&mut self, at: u32, count: u32) -> Vec<Segment> {
         let first = self.split(at);
         let last = self.split(at + count);
@@ -209,8 +215,10 @@ impl Axis {
     }
 }
 
-/// Lines `first..=last` after `op`, appended to `out`: none when they were
-/// removed, two pieces when lines were inserted inside them.
+/// The ranges that lines `first..=last` cover after `op`, appended to `out`.
+/// A removal can leave no range. An insertion inside the lines splits them in
+/// two. A move can split them into several ranges; the range of the moved
+/// lines comes first.
 pub(crate) fn transform(op: AxisOp, first: u32, last: u32, out: &mut Vec<(u32, u32)>) {
     match op {
         AxisOp::Insert { at, count } => {

@@ -9,7 +9,8 @@ export function sheetNameKey(name: string): string {
 }
 
 /**
- * Tables, columns and named ranges share the formula identifier namespace.
+ * NFC and locale-independent Unicode uppercase key used for formula-name
+ * identity. Tables, columns and named ranges share this namespace.
  *
  * @param name - A table, column or defined name.
  * @returns The name in NFC form and upper case.

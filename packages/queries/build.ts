@@ -18,5 +18,6 @@ process.stdout.write(
   ].join("\n"),
 );
 
-// Names are needed by the guard but do not belong in the shipped artifact.
+// The size check needs the function names; the shipped artifact does not.
+// `checkWasmFunctionSizes` returns the module without its name section.
 await writeFile(wasm_path, wasm);

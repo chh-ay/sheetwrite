@@ -163,6 +163,7 @@ const CASES: &[(&str, &str)] = &[
     ("=MATCH(2,H1:H3,0)", "#NUM!"),
     ("=XMATCH(2,H1:H3,0,-1)", "3"),
     ("=XMATCH(1,H1:H3,0,-1)", "#NUM!"),
+    // Lists of different shapes, and keys that are not found.
     ("=XLOOKUP(3,B1:B6,E1:E5)", "#VALUE!"),
     ("=MATCH(3,B1:C6,0)", "#N/A"),
     ("=XLOOKUP(99,B1:B6,E1:E6)", "#N/A"),

@@ -408,8 +408,9 @@ impl CellStore {
     /// along one axis of one sheet: references follow that rule instead, and
     /// a deletion also empties the cells between where the block lands and
     /// where it starts.
-    /// Status: `0` success, `1` invalid block, `3` dirty-capacity rejection,
-    /// `4` a block that holds cells of a spill range without its formula.
+    /// Status: `0` success, `1` invalid block, `3` resource limit (dirty
+    /// capacity, or a cell write that failed), `4` a block that holds cells
+    /// of a spill range without its formula.
     #[wasm_bindgen(js_name = moveCells)]
     #[allow(
         clippy::too_many_arguments,

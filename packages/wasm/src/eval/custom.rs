@@ -18,7 +18,8 @@ pub(crate) struct CustomArgument {
 }
 
 // The native build has no JavaScript adapter, so only the engine tests read
-// the shape; the WASM adapter reads it to build nested arrays.
+// these; the WASM adapter reads them to write each argument's shape and
+// values into the flat argument buffers.
 #[cfg_attr(
     not(target_arch = "wasm32"),
     allow(
@@ -53,7 +54,6 @@ pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 
 impl CellStore {
     /// Adds or replaces a host function and recalculates the workbook.
-    // Only the WASM adapter calls this outside the engine tests.
     #[cfg_attr(
         not(target_arch = "wasm32"),
         allow(
