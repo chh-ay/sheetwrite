@@ -177,6 +177,9 @@ fn complex_functions() {
         ("=COMPLEX(0,1)", "i"),
         ("=COMPLEX(1,0)", "1"),
         ("=IMABS(\"5+12i\")", "13"),
+        // Squaring parts past 1E154 overflows; the modulus does not.
+        ("=IMABS(\"3E+200+4E+200i\")", "~5.00000000000000E+200"),
+        ("=IMABS(\"3E-200+4E-200i\")", "~5.00000000000000E-200"),
         ("=IMAGINARY(\"3+4i\")", "4"),
         ("=IMAGINARY(\"0-j\")", "-1"),
         ("=IMAGINARY(4)", "0"),
