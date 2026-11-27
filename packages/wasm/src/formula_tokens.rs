@@ -10,8 +10,7 @@
 use crate::calc::{first_parse_error, lex_token, Tok};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-/// The `u32` fields of one token in the `formulaTokens` array: kind, start
-/// offset, end offset, and 1 when whitespace comes before the token.
+/// The `u32` fields per token; [`formula_tokens`] lists them.
 const TOKEN_FIELDS: usize = 4;
 
 /// What a token is. The numbers are the `kind` field of `formulaTokens`; the
@@ -42,7 +41,7 @@ pub(crate) enum TokenKind {
     RParen,
     LBrace,
     RBrace,
-    /// Text the lexer cannot read. An open quote or bracket runs to the end.
+    /// Text the lexer cannot read; see [`formula_tokens`].
     Bad,
 }
 

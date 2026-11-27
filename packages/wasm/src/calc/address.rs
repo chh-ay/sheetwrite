@@ -152,12 +152,12 @@ pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, 
     })
 }
 
-/// Whether a range spans every row of the sheet: a whole-column range.
+/// True for a whole-column range.
 pub(super) const fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
     row_start == 0 && row_end == SHEET_ROWS - 1
 }
 
-/// Whether a range spans every column of the sheet: a whole-row range.
+/// True for a whole-row range.
 pub(super) const fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
     col_start == 0 && col_end == SHEET_COLS - 1
 }

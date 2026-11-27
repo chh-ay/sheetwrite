@@ -61,7 +61,6 @@ pub(crate) fn bind_sheet_refs(
 }
 
 pub(crate) fn has_unresolved_local_sheets(ast: &Ast) -> bool {
-    // Other nodes hold sheet references only through their children.
     if let Ast::SheetCell(reference) = ast {
         return !is_external_sheet(&reference.sheet.name);
     }
@@ -75,7 +74,6 @@ pub(crate) fn has_unresolved_local_sheets(ast: &Ast) -> bool {
 }
 
 pub(crate) fn unresolved_sheet_names(ast: &Ast, out: &mut Vec<String>) {
-    // Other nodes hold sheet references only through their children.
     if let Ast::SheetCell(reference) = ast {
         out.push(sheet_name_key(&reference.sheet.name));
     } else if let Ast::SheetRange(reference) = ast {

@@ -47,9 +47,8 @@ use std::{borrow::Cow, cmp::Ordering, rc::Rc};
 /// expression traverses the complete precedence stack.
 const PARSE_RECURSION_LIMIT: usize = 64;
 
-/// The rows of a sheet: the last row is `1048576`.
 pub(crate) const SHEET_ROWS: u32 = 1_048_576;
-/// The columns of a sheet: the last column is `XFD`.
+/// The last column is `XFD`.
 pub(crate) const SHEET_COLS: u32 = 16_384;
 
 mod address;

@@ -82,7 +82,6 @@ pub(crate) type TableUse = Option<(u16, TableSection)>;
 
 /// Visit each table reference of `ast`: see [`TableUse`].
 pub(crate) fn for_each_table_ref(ast: &Ast, visit: &mut dyn FnMut(TableUse)) {
-    // Every other node holds table references only through its children.
     if let Ast::Structured(reference) = ast {
         visit(Some((reference.table, reference.section)));
     } else if let Ast::UnresolvedStructured(_) = ast {

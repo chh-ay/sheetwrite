@@ -715,7 +715,6 @@ pub(crate) fn is_external_sheet(name: &str) -> bool {
     name.contains(']')
 }
 
-/// The error for a token after a complete formula.
 fn trailing_token_error(tok: &Tok<'_>) -> String {
     if matches!(tok, Tok::RParen) {
         "This ) has no matching (.".into()
@@ -724,7 +723,7 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
     }
 }
 
-/// Parse a formula source (with or without a leading `=`) into an AST.
+/// The leading `=` is optional.
 pub(crate) fn parse(src: &str) -> Result<Ast, String> {
     parse_with_features(src).map(|(ast, _)| ast)
 }

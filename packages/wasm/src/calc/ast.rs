@@ -28,7 +28,6 @@ pub(crate) enum CmpOp {
 pub(crate) struct RefFlags(pub(super) u8);
 
 impl RefFlags {
-    /// Both axes `$`-fixed.
     pub(crate) const ABSOLUTE: Self = Self::new(true, true);
 
     pub(crate) const fn new(row_abs: bool, col_abs: bool) -> Self {
@@ -87,7 +86,6 @@ pub(crate) struct RangeFlags {
 }
 
 impl RangeFlags {
-    /// Every axis of both ends `$`-fixed.
     pub(crate) const ABSOLUTE: Self = Self {
         start: RefFlags::ABSOLUTE,
         end: RefFlags::ABSOLUTE,
@@ -148,7 +146,6 @@ impl NameId {
             .map(Self)
     }
 
-    /// The table entry's index.
     pub(crate) const fn index(self) -> usize {
         (self.0.get() - 1) as usize
     }
@@ -207,9 +204,8 @@ pub(crate) struct DetachedCellRef {
     pub(crate) flags: RefFlags,
 }
 
-/// A sheet-qualified range whose sheet is not one of this workbook's: an
-/// external link, a missing sheet, or standalone syntax. It keeps the
-/// written sheet text so the formula writes back exactly.
+/// A sheet-qualified range whose sheet is not one of this workbook's; see
+/// [`DetachedCellRef`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DetachedRangeRef {
     pub(crate) sheet: UnresolvedSheetRef,
@@ -390,14 +386,12 @@ impl Shape {
 pub(crate) struct NodeShape(Shape);
 
 impl NodeShape {
-    /// The shape this node was built with.
     pub(crate) const fn get(self) -> Shape {
         self.0
     }
 }
 
 impl Ast {
-    /// A call of `func` with `args`, with its [`NodeShape`].
     pub(crate) fn call(func: Func, args: Box<[Self]>) -> Self {
         let shape = NodeShape(crate::eval::call_shape(func, &args));
         Self::Func(func, args, shape)
