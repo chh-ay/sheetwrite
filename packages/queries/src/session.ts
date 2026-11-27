@@ -1,15 +1,16 @@
-import type {
-  ApplyTransactionResult,
-  DocumentOp,
-  Grid,
-  QueryCommands,
-  Range,
-  SavedQuery,
-  SavedQueryOutput,
-  SavedQuerySource,
-  Sheet,
-  Workbook,
-  WorkbookTable,
+import {
+  type ApplyTransactionResult,
+  type DocumentOp,
+  type Grid,
+  type QueryCommands,
+  type Range,
+  type SavedQuery,
+  type SavedQueryOutput,
+  type SavedQuerySource,
+  type Sheet,
+  SheetwriteError,
+  type Workbook,
+  type WorkbookTable,
 } from "@sheetwrite/core";
 
 import { sessionCommands } from "./commands.js";
@@ -98,7 +99,11 @@ export interface QuerySession {
   refresh(id: string, options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
   /** Refreshes every query with an output table, as one undoable change. */
   refreshAll(options?: QueryRefreshOptions): Promise<QueryRefreshResult>;
-  /** Aborts pending refreshes and removes the grid's query commands; later refreshes resolve `{ status: "aborted" }`. */
+  /**
+   * Aborts pending refreshes and removes the grid's query commands. Later
+   * refreshes resolve `{ status: "aborted" }`, and later `define` and
+   * `remove` calls throw a `SheetwriteError` with code `unavailable`.
+   */
   dispose(): void;
 }
 
@@ -488,8 +493,23 @@ export function createSessionWithEngine(
       : { status: "rejected", transaction };
   };
 
+  /** Throws once the session is disposed, so a definition change no longer reaches the grid. */
+  const assert_live = (): void => {
+    if (!lifetime.signal.aborted) return;
+
+    throw new SheetwriteError(
+      "unavailable",
+      "query",
+      "Sheetwrite: this query session was disposed",
+      {
+        retryable: false,
+      },
+    );
+  };
+
   const session: QuerySession = {
     define(query) {
+      assert_live();
       const diagnostic = check(query, saved_queries());
       if (diagnostic) return { status: "invalid", diagnostic };
 
@@ -497,6 +517,7 @@ export function createSessionWithEngine(
     },
 
     remove(id) {
+      assert_live();
       return grid.applyTransaction({ patches: [{ op: "removeQuery", id }] });
     },
 

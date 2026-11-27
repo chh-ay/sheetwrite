@@ -340,6 +340,15 @@ describe("query sources and definitions", () => {
     await expect(querySessionOf(grid)).rejects.toMatchObject({
       code: "optional-backend-unavailable",
     });
+
+    // The add-on's cleanup disposes the session, which then changes nothing.
+    expect(() => session.define(unfiltered)).toThrow(
+      expect.objectContaining({ code: "unavailable" }),
+    );
+    expect(() => session.remove(unfiltered.id)).toThrow(
+      expect.objectContaining({ code: "unavailable" }),
+    );
+    expect(grid.store.getWorkbook().queries).toBeUndefined();
   });
 
   it("gives a synced peer the exact refreshed values without fetching", async () => {
