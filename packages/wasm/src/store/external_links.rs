@@ -33,8 +33,8 @@ impl CellStore {
             return existing;
         }
 
-        // The tabs are the sheets in the explicit order, so the link
-        // sheet is left out of it.
+        // Fix the tab order as it is before the add: a link sheet is not a
+        // tab, so it must stay out of that order.
         let tabs = self.tab_order().into_owned();
         let handle = match self.try_add_sheet(n_cols, row_count) {
             Ok(handle) => handle,
