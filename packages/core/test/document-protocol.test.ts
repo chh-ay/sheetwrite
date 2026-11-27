@@ -672,6 +672,29 @@ describe("workbook document protocol", () => {
     }
   });
 
+  it("checks a conditional format's stopIfTrue in snapshots and operations alike", () => {
+    const format = {
+      range: { sheet: "sheet-a", start: { row: 0, col: 1 }, end: { row: 3, col: 1 } },
+      when: { kind: "greaterThan", value: 10 },
+      style: { color: "#ff0000" },
+      stopIfTrue: "yes",
+    };
+    const snapshot = validateWorkbookSnapshot(with_first_sheet({ conditionalFormats: [format] }));
+    expect(snapshot.ok).toBe(false);
+    if (snapshot.ok) throw new Error("a text stopIfTrue was accepted");
+    expect(snapshot.errors.map((error) => error.path)).toEqual([
+      "sheets[0].conditionalFormats[0].stopIfTrue",
+    ]);
+    const operation = {
+      op: "setSheetMeta",
+      sheet: "sheet-a",
+      patch: { conditionalFormats: [format] },
+    };
+    expect(validateDocumentOperationShape(operation).map((error) => error.path)).toEqual([
+      "operation.patch.conditionalFormats[0].stopIfTrue",
+    ]);
+  });
+
   it("enforces every snapshot resource boundary before normalization", () => {
     const snapshot = rich_snapshot();
     snapshot.documentId = '雪\u0000"\n\ud800';
