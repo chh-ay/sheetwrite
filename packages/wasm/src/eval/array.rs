@@ -1703,10 +1703,13 @@ fn items_equal(
     Ok(true)
 }
 
+/// Excel's UNIQUE keeps an empty cell apart from 0, "" and FALSE, which
+/// compare equal to it elsewhere; [`hash_item_value`] buckets it apart too.
 fn item_values_equal(left: &Value, right: &Value) -> Result<bool, FormulaError> {
     Ok(match (left, right) {
         (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
         (Value::Error(_), _) | (_, Value::Error(_)) => false,
+        (Value::Blank, other) | (other, Value::Blank) => matches!(other, Value::Blank),
         _ => compare_values(left, right)? == Ordering::Equal,
     })
 }
@@ -1757,6 +1760,37 @@ mod tests {
             (actual - expected).abs() < 1e-9,
             "expected {expected}, got {actual}"
         );
+    }
+
+    /// UNIQUE groups items by hash, then compares the items in a group. Two
+    /// values it calls equal must hash alike, or whether they merge depends
+    /// on a hash collision. An empty cell stays apart from 0, "" and FALSE.
+    #[test]
+    fn unique_equality_agrees_with_its_hash() {
+        use super::{hash_item_value, item_values_equal, DefaultHasher, Hasher};
+        use crate::types::Value;
+
+        let hash = |value: &Value| {
+            let mut hasher = DefaultHasher::new();
+            hash_item_value(Some(value), &mut hasher);
+            hasher.finish()
+        };
+        let values = [
+            Value::Blank,
+            Value::Number(0.0),
+            Value::Number(-0.0),
+            Value::text(""),
+            Value::Bool(false),
+            Value::text("a"),
+            Value::text("A"),
+        ];
+        for left in &values {
+            for right in &values {
+                if item_values_equal(left, right).unwrap() {
+                    assert_eq!(hash(left), hash(right), "{left:?} and {right:?}");
+                }
+            }
+        }
     }
 
     #[test]
