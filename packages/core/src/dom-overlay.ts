@@ -602,8 +602,8 @@ export class DomOverlay {
       failures.rethrow();
       this.sync_semantics(entry);
     }
-    // A legacy renderer whose node was not rebuilt keeps the semantics the last
-    // rebuild or creation installed: only the position moved.
+    // A renderer without `update` whose node was not rebuilt keeps the
+    // semantics the last rebuild or creation installed: only the position moved.
   }
 
   private position_entry(
