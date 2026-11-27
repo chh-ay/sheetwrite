@@ -97,7 +97,6 @@ impl FirstPeriodBond {
         }
     }
 
-    /// The first period is shorter than a normal period.
     fn short_first_price(&self, annual_yield: f64, period_days: f64) -> f64 {
         let coupons = Coupons::find(self.settlement, self.maturity, self.frequency).remaining;
         let coupon = FACE_VALUE * self.rate / self.frequency;
@@ -116,8 +115,8 @@ impl FirstPeriodBond {
         value - coupon * accrued_share
     }
 
-    /// The first period is longer than a normal period. It is split into
-    /// quasi-coupon periods that step back from the first coupon date.
+    /// The long first period is split into quasi-coupon periods that step
+    /// back from the first coupon date.
     fn long_first_price(&self, annual_yield: f64, period_days: f64, first_period: Coupons) -> f64 {
         let quasi_periods = Coupons::find(self.issue, self.first_coupon, self.frequency).remaining;
         let mut later = self.first_coupon;
