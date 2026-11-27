@@ -184,7 +184,7 @@ describe("Ctrl+Enter", () => {
 });
 
 describe("the cell editor", () => {
-  // #1107: Excel's in-cell editor keeps the cell's alignment and font.
+  // Excel's in-cell editor keeps the cell's alignment and font.
   it("keeps the cell's alignment and font while it edits", () => {
     const remove_styles = installCoreStyles();
     const set = (row: number, col: number, style: CellStyle) => ({

@@ -57,7 +57,7 @@ describe("parseCellInput", () => {
 });
 
 // A `general` column reads typed text as Excel's General format does, and
-// gives the cell the number format Excel gives it (#911).
+// gives the cell the number format Excel gives it.
 // https://support.microsoft.com/en-us/office/available-number-formats-in-excel-0afe8f52-97db-41f1-b972-4b46e9f1e8d2
 describe("typing into a general column", () => {
   const entry = (raw: string, locale?: string): [unknown, string | null] => {

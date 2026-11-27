@@ -8,7 +8,7 @@ import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, KeyboardOptions, Workbook } from "../src/types.js";
 
-// The Keyboard shortcuts panel (#802): the user rebinds the grid's built-in
+// The Keyboard shortcuts panel: the user rebinds the grid's built-in
 // commands. Each change applies at once and reaches the host as one
 // `key-bindings-change` event, which it stores and passes back through
 // `config.keyboard.bindings`.
