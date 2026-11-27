@@ -5,7 +5,7 @@ use crate::column::{compare, Batch, Value};
 use crate::plan::Diagnostic;
 use std::cmp::Ordering;
 
-/// Composite keys compare left-to-right; null equals null before any typed value.
+/// Composite keys compare left to right; null equals null and sorts before every other value.
 #[allow(
     clippy::too_many_arguments,
     reason = "the comparator of every key sort and merge; passing each side as a struct made \
@@ -68,7 +68,8 @@ pub(crate) fn sorted_rows(batch: &Batch, keys: &[u32]) -> Result<Vec<u32>, Diagn
     Ok(rows)
 }
 
-/// Duplicate references cannot create ambiguous output identities.
+/// The column index of each id, in order. An id listed twice is a `duplicate-column` error, so
+/// the output cannot hold two columns with one identity.
 pub(crate) fn indexes(batch: &Batch, ids: &[String]) -> Result<Vec<u32>, Diagnostic> {
     let columns = ids
         .iter()

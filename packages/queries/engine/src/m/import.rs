@@ -79,7 +79,8 @@ fn text(expression: &Expr) -> Option<&str> {
 }
 
 fn texts(expression: &Expr) -> Option<Vec<String>> {
-    // A single column name is also accepted where M takes `any`.
+    // M parameters typed `any`, such as the column list of `Table.SelectColumns`, also accept
+    // one name; a single text reads as a one-item list.
     if let Expr::Text(value) = expression {
         return Some(vec![value.clone()]);
     }
@@ -1111,7 +1112,8 @@ pub fn import_section(text: &str) -> Result<SectionImport, &'static str> {
         }
 
         if waiting.len() == before {
-            // The inputs of these members are unsupported, so they cannot refresh either.
+            // The inputs of these members are unsupported or wait on each other in a cycle, so
+            // these members cannot refresh either.
             for member in waiting {
                 unsupported.push(Unsupported {
                     member: member.name.clone(),

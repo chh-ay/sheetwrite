@@ -57,7 +57,8 @@ pub(crate) fn number(out: &mut String, value: f64) {
 }
 
 /// Section member names must not contain `.`, `"`, tabs or line breaks, nor
-/// leading or trailing blanks ([MS-QDEFF] 2.3.2); such characters become `_`.
+/// leading or trailing blanks ([MS-QDEFF] 2.3.2). Such characters become `_`
+/// and blanks are trimmed; a name with nothing left becomes `Query`.
 pub(crate) fn member_name(name: &str) -> String {
     let replaced: String = name
         .chars()

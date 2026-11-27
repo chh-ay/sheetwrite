@@ -130,7 +130,7 @@ fn record(reader: &mut Reader<'_>, target: &mut Target<'_>) -> Result<(), Diagno
     Ok(())
 }
 
-/// Nested arrays and objects are consumed and become conversion errors in typed columns.
+/// Nested arrays and objects are consumed and become `conversion` errors in any column.
 fn scalar(
     reader: &mut Reader<'_>,
     target: &mut Target<'_>,

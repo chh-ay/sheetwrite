@@ -5,7 +5,9 @@ use crate::buffers::{at, row_index, Bits, Texts};
 use crate::mixed::Mixed;
 use crate::plan::{ColumnSpec, ColumnType, Diagnostic};
 
-/// Owned transfer lanes move out once; row error codes index the packed code pool.
+/// The owned lanes of one column at the WASM seam; each lane moves out once. `error_rows` and
+/// `error_codes` are parallel, and each error code indexes the code pool that follows the
+/// identity and name in `metadata`.
 #[derive(Debug, Default)]
 pub(crate) struct ColumnBuffers {
     pub column_type: Option<ColumnType>,

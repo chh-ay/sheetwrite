@@ -62,7 +62,8 @@ impl QueryFailure {
     }
 }
 
-/// Invalid coordinates become a limit failure before crossing the host seam.
+/// Converts a diagnostic to a thrown `QueryFailure`. A step or row that does not fit a `u32`
+/// turns it into a plain `limit` failure.
 pub(crate) fn error(issue: Diagnostic) -> JsValue {
     let coordinates = issue
         .step
@@ -122,7 +123,7 @@ impl QueryColumn {
         mem::take(&mut self.buffers.metadata_offsets)
     }
 
-    /// Single-use packed mask; bit i is valid only for a non-null, non-error row.
+    /// Single-use packed mask; bit i is set only when row i is neither null nor an error.
     #[wasm_bindgen(js_name = takeValidity)]
     pub fn take_validity(&mut self) -> Vec<u8> {
         mem::take(&mut self.buffers.validity)
@@ -336,7 +337,8 @@ impl QueryBatch {
     }
 }
 
-/// Inputs have one execution lifetime; dropping the runner releases them without a cache.
+/// Limits and named input batches for any number of executions. Inputs live as long as the
+/// runner; dropping it frees them, and nothing is cached elsewhere.
 #[wasm_bindgen(js_name = QueryRunner)]
 #[derive(Debug)]
 #[allow(

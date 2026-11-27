@@ -30,7 +30,8 @@ pub enum Value<'a> {
 }
 
 impl Value<'_> {
-    /// Nulls and errors inherit their column's type rather than inventing one.
+    /// The column type that holds this value, or `None` for a null or an error, which fit a
+    /// column of any type.
     #[must_use]
     pub const fn column_type(self) -> Option<ColumnType> {
         match self {
@@ -265,7 +266,7 @@ impl Batch {
         at(&self.columns, column)?.value(physical)
     }
 
-    /// Resolves stable identity once during plan preparation.
+    /// The index of the column whose stable identity is `id`, or a `column` diagnostic.
     pub fn column_index(&self, id: &str) -> Result<usize, Diagnostic> {
         self.columns
             .iter()
@@ -307,7 +308,9 @@ impl Batch {
     }
 }
 
-/// Table-style output names must be unique even when the payload is empty.
+/// Every column needs a non-empty identity and a non-blank name. Identities must be unique,
+/// and names must be unique when ASCII letter case is ignored, as table headers require. This
+/// holds even when the batch has no rows.
 pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
     for (index, column) in columns.iter().enumerate() {
         if column.id().is_empty()
@@ -323,7 +326,8 @@ pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
     Ok(())
 }
 
-/// A total key order keeps joins and groups deterministic across source batches.
+/// A total key order keeps joins and groups deterministic across source batches. Values of
+/// different types order by type; text compares by UTF-16 code units.
 pub(crate) fn compare(left: Value<'_>, right: Value<'_>) -> Ordering {
     match (left, right) {
         (Value::Null, Value::Null) => Ordering::Equal,
@@ -363,7 +367,8 @@ const fn type_rank(value: Value<'_>) -> u8 {
 
 /// Display is the shortest decimal text that reads back to the same f64, with
 /// no exponent. The engine and the M writer share this one out-of-line copy,
-/// so the float formatter is linked once.
+/// so the float formatter is linked once. `#[inline(never)]` and the
+/// `--no-inline=*_family` wasm-opt flag in Cargo.toml keep it out of line.
 #[inline(never)]
 pub(crate) fn number_text_family(out: &mut String, value: f64) {
     // Writing to a String cannot fail.

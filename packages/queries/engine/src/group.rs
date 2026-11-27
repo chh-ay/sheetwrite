@@ -10,7 +10,8 @@ use std::cmp::Ordering;
 /// The input column index of each aggregate; row counts have none.
 type SourceColumns = Vec<Option<u32>>;
 
-/// Null keys form one group; numeric folds ignore null values but propagate errors.
+/// Null keys form one group. Every fold except `CountRows` skips null values, and an error
+/// value makes the result that error.
 pub(crate) fn group(
     batch: &Batch,
     ids: &[String],

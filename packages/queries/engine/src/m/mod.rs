@@ -69,7 +69,8 @@ pub struct MQuery {
     pub source: MSource,
     /// Steps applied to the source rows, in order.
     pub steps: Plan,
-    /// Output table name, written as the query's `FillTarget`.
+    /// Output table name, if any. Query-list lanes carry it; the M section text does not, so
+    /// `import_section` sets it to `None`.
     pub output: Option<String>,
 }
 

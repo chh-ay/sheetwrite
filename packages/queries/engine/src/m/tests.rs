@@ -117,7 +117,8 @@ fn sales_steps() -> Vec<Step> {
     ]
 }
 
-/// Queries whose identities equal their names, so an import must reproduce them exactly.
+/// Queries whose identities equal their names, so an import must reproduce their sources and
+/// steps exactly.
 fn fixtures() -> Vec<MQuery> {
     let regions = query(
         "Regions",
