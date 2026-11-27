@@ -105,7 +105,6 @@ describe("built-in widget styling", () => {
     expect(problems).toEqual([]);
   });
 
-  // A host rule on the widget wins over the value the root seeds, without !important.
   it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
     inject_style(coreStyles());
     const { host } = await make_grid();
@@ -122,8 +121,6 @@ describe("built-in widget styling", () => {
 });
 
 describe("stylesheet parts", () => {
-  // Warning deduplication lasts for the whole module lifetime. Each mode needs
-  // a fresh process, independent of widgets mounted by earlier tests.
   it.each([
     ["development", "1"],
     ["production", "0"],

@@ -173,7 +173,6 @@ describe("grid.setColumnWidth (public geometry API)", () => {
     grid.setColumnWidth(0, before + 80);
     expect(store.getWorkbook().sheets[0]!.columns[0]!.width).toBe(before + 80);
 
-    // Undoable: one undo restores the prior width.
     grid.undo();
     expect(store.getWorkbook().sheets[0]!.columns[0]!.width).toBe(before);
 

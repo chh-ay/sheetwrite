@@ -98,7 +98,6 @@ test("a link to #<lab> opens that lab; the evidence vault reports the served che
   await expect(figure).toContainText(
     `/ ${(test_set.totalTests - test_set.unsupported).toLocaleString("en-US")}`,
   );
-  // No known-difference count while there are none.
   if (test_set.knownDifferences === 0) await expect(figure).not.toContainText("known difference");
   for (const count of [test_set.formulaTests, test_set.editSequenceTests, test_set.workbookTests]) {
     await expect(vault_panel.locator(".sw-vault-kinds")).toContainText(

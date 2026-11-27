@@ -203,7 +203,7 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expectSame(document.activeElement, host);
 });
 
-// #731: a cell that takes its format from its column showed "General".
+// A cell with no number format of its own shows its column's, not "General".
 it("shows the format a cell displays, its column's when it has none of its own", async () => {
   const { grid, host, select } = await setup();
   grid.applyTransaction({

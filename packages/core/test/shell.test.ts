@@ -280,7 +280,6 @@ describe("createNameBox", () => {
     press(field, "Enter");
     expect(store.getCell(a3).resolved).toBe("x");
 
-    // Delete clears it.
     press(host, "Delete");
     expect(store.getCell(a3).resolved).toBeNull();
 
