@@ -1104,9 +1104,10 @@ impl CellStore {
                 if changed.contains(&key) {
                     continue;
                 }
-                let mut used = Vec::new();
-                used_names(&formula.ast, &mut used);
-                if used
+                let mut uses = NameUses::default();
+                used_names(&formula.ast, &mut uses);
+                if uses
+                    .names
                     .iter()
                     .any(|name| changed.contains(&workbook_name_key(name)))
                 {
@@ -1602,35 +1603,72 @@ fn reference_target(ast: &Ast, formula_sheet: u32, shift: (u32, u32)) -> Option<
     })
 }
 
-/// The names that `ast` writes: bare names, LET names and unknown functions.
+/// What [`used_names`] gathers: the names a formula uses, and the LET
+/// variables in scope at the node it walks.
+#[derive(Default)]
+struct NameUses<'a> {
+    names: Vec<&'a str>,
+    locals: Vec<&'a str>,
+}
+
+impl<'a> NameUses<'a> {
+    /// Adds `name` unless a LET variable in scope has its spelling: inside
+    /// its LET, a variable reads its own value whatever defined name is
+    /// spelled the same, as in Excel.
+    fn add(&mut self, name: &'a str) {
+        if !self
+            .locals
+            .iter()
+            .any(|local| local.eq_ignore_ascii_case(name))
+        {
+            self.names.push(name);
+        }
+    }
+}
+
+/// Adds to `uses` the names that `ast` uses, as a name or as a function it
+/// calls. A name's formula keeps its LET variables as names, so a LET's
+/// variables are in scope from the value after each one to the end of the
+/// LET, as the binder scopes them.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node uses no name"
 )]
-fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
+fn used_names<'a>(ast: &'a Ast, uses: &mut NameUses<'a>) {
     match ast {
-        Ast::Name(name) | Ast::LetName { name, .. } => names.push(name),
+        Ast::Name(name) => uses.add(name),
         Ast::UnknownFunc(call) => {
-            names.push(&call.name);
+            uses.add(&call.name);
             for arg in &call.args {
-                used_names(arg, names);
+                used_names(arg, uses);
             }
+        }
+        Ast::Func(crate::calc::Func::Let, args, _) if args.len() >= 3 && args.len() % 2 == 1 => {
+            let outer = uses.locals.len();
+            if let Some((body, bindings)) = args.split_last() {
+                for [binding, value] in bindings.as_chunks::<2>().0 {
+                    used_names(value, uses);
+                    if let Ast::Name(local) = binding {
+                        uses.locals.push(local);
+                    }
+                }
+                used_names(body, uses);
+            }
+            uses.locals.truncate(outer);
         }
         Ast::Func(_, args, _) => {
             for arg in args {
-                used_names(arg, names);
+                used_names(arg, uses);
             }
         }
         Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
-            used_names(left, names);
-            used_names(right, names);
+            used_names(left, uses);
+            used_names(right, uses);
         }
-        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
-            used_names(inner, names)
-        }
-        Ast::LetSlot { expression, .. } => used_names(expression, names),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => used_names(inner, uses),
+        Ast::LetSlot { expression, .. } => used_names(expression, uses),
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => used_names(&definition.body, names),
+        Ast::Lambda(definition) => used_names(&definition.body, uses),
         _ => {}
     }
 }
