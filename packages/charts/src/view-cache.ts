@@ -10,7 +10,7 @@ import {
 } from "@sheetwrite/core";
 
 /**
- * Resolved chart views for one store.
+ * Resolved chart views for one store, refreshed only by chart-change events.
  *
  * Listeners run after the changed charts are invalidated, so `get` inside a
  * listener always resolves the committed cell data.
