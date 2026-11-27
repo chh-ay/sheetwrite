@@ -1,6 +1,6 @@
 // The part of the dashboard view that every grid carries: it decides WHEN the
 // view is needed. The view (dashboard-view.ts and what it imports) loads as
-// its own chunk the first time a dashboard sheet is active (#231).
+// its own chunk the first time a dashboard sheet is active.
 
 import { isDashboard } from "../dashboard.js";
 import type { Grid } from "../types/grid.js";
