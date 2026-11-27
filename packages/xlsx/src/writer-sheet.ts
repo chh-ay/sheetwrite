@@ -402,7 +402,7 @@ function* write_sheet_rows(
   by_row: ReadonlyMap<number, AbsoluteCell[]>,
   row_metadata: ReadonlyMap<number, NonNullable<SheetSnapshot["rowMeta"]>[number][1]>,
   outlines: WorksheetOutlines,
-  /** Rows the AutoFilter hides. */
+  /** Rows the AutoFilter hides, which Excel stores hidden. */
   filtered: ReadonlySet<number>,
   hook: WorkbookWriteHook | undefined,
   arrays: SheetDynamicArrays,

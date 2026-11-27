@@ -1211,7 +1211,7 @@ interface Relationship {
 
 /** Native pivot parts of one save, and the places that must reference them. */
 export interface PivotWrite {
-  /** Pivot table relationships of a worksheet. */
+  /** Pivot table relationships of a worksheet; pivots have no worksheet element. */
   sheetRelationships(sheetId: string): readonly Relationship[];
   readonly workbookRelationships: readonly Relationship[];
   /** `<pivotCache>` elements for the workbook relationship ids of `workbookRelationships`. */
