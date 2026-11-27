@@ -18,6 +18,7 @@ import {
 } from "./ranges.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
+import { CELL_STATE_LOCAL_EDIT } from "./wire-tags.js";
 
 export interface PagedDirtyPreflightStats {
   ffiCalls: number;
@@ -353,7 +354,7 @@ export class PagedDirtyPreflight {
         state.existing?.has(key) ||
         (state.existing === null &&
           state.handle !== null &&
-          this.wasm.cellState(state.handle, row, col) === 3)
+          this.wasm.cellState(state.handle, row, col) === CELL_STATE_LOCAL_EDIT)
       ) {
         return null;
       }
