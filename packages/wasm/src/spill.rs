@@ -241,9 +241,7 @@ struct ColumnRuns {
     runs: Vec<OwnedRun>,
 }
 
-/// Vacated runs a sheet may always keep. Past this count,
-/// [`OwnerRuns::drop_vacant_runs`] drops them once they also outnumber the
-/// live runs.
+/// Vacated runs a sheet may always keep; see [`OwnerRuns::drop_vacant_runs`].
 const VACANT_RUN_SLACK: usize = 64;
 
 /// The cells installed spills own, by column (sorted, only columns that hold
@@ -431,8 +429,7 @@ impl OwnerRuns {
 
 #[derive(Default)]
 pub(crate) struct SpillState {
-    /// Attempted spill bounds remain registered even while obstructed so clearing
-    /// a blocker invalidates the owning anchor.
+    /// Attempted ranges by anchor, obstructed ones included ([`Self::admit`]).
     ranges: FxHashMap<CellKey, SpillRange>,
     /// The cells installed spills own ([`OwnerRuns`]). Boxed and created by
     /// the first installed spill, so a sheet without spills keeps one
@@ -466,8 +463,8 @@ impl SpillState {
         self.ranges.get(&anchor).copied()
     }
 
-    /// The range that `anchor` spills into. Attempts also keep blocked
-    /// ranges; only an installed spill owns its anchor cell.
+    /// The range that `anchor` spills into, if installed: only an installed
+    /// spill owns its anchor cell.
     pub(crate) fn installed(&self, anchor: CellKey) -> Option<SpillRange> {
         if self.owner(anchor) != Some(anchor) {
             return None;
@@ -479,7 +476,6 @@ impl SpillState {
         self.ranges.keys().copied()
     }
 
-    /// The ranges of the installed spills, each with the anchor that owns it.
     pub(crate) fn installed_ranges(&self) -> impl Iterator<Item = SpillRange> + '_ {
         self.ranges
             .values()
@@ -753,14 +749,14 @@ impl SpillState {
         self.compact(cells);
     }
 
-    /// Registers `range` as `anchor`'s attempt without filling it. A pivot
+    /// Registers `range` as the attempt of its anchor, without filling it. A pivot
     /// whose anchor shows an error keeps its anchor cell registered, so the
     /// error is spill state that a write there detaches.
     pub(crate) fn register_attempt(&mut self, range: SpillRange) {
         self.ranges.insert(range.anchor, range);
     }
 
-    /// Registers `range` as `anchor`'s attempt and checks that every
+    /// Registers `range` as the attempt of its anchor and checks that every
     /// destination is inside the sheet, unblocked, loaded and empty. An
     /// obstructed attempt stays registered so clearing the obstruction
     /// invalidates the anchor.
@@ -1059,7 +1055,6 @@ impl SpillState {
     }
 }
 
-/// The runs of column `col`, if it has any.
 fn runs_mut(columns: &mut [ColumnRuns], col: u32) -> Option<&mut Vec<OwnedRun>> {
     let at = columns
         .binary_search_by_key(&col, |column| column.col)
@@ -1130,9 +1125,7 @@ mod tests {
         assert_eq!(anchor(&store, sheet, 21, 0), (15, 0));
     }
 
-    /// A rectangle written over part of a wide spill detaches those cells and
-    /// obstructs the spill; clearing them lets it spill again over every
-    /// column.
+    /// The written cells obstruct the spill until they are cleared.
     #[test]
     fn writes_over_part_of_a_wide_spill_detach_and_clear_restores_it() {
         let mut store = CellStore::new();

@@ -105,8 +105,8 @@ impl FormulaError {
     }
 
     /// Dense index of the error, from 0 to `COUNT - 1`. A calculated error
-    /// result stores it as its payload, and [`FormulaEntry`] stores it plus
-    /// one in its flags.
+    /// result stores it as its payload, and [`FormulaEntry`] stores it in its
+    /// flags.
     pub(crate) const fn slot(self) -> usize {
         match self {
             Self::Cycle => 0,
@@ -431,7 +431,7 @@ fn ast_is_plain(ast: &Ast) -> bool {
 /// Whether `ast` calls a volatile function, in a formula that uses no
 /// defined name. It passes itself to `any_child` as a plain function: with
 /// no name scope to capture, the walk keeps no closure in memory. Inline,
-/// so the check of the top node costs no call in each rewrite of a formula.
+/// so the check of the top node costs no call in each parse of a formula.
 #[inline]
 fn ast_is_volatile(ast: &Ast) -> bool {
     calls_volatile(ast) || ast.any_child(&mut ast_is_volatile)
@@ -620,7 +620,6 @@ impl FormulaEntry {
     const TABLE_REFS: u16 = 1 << 10;
     /// The tree may use a defined name: a bare name or an unknown function.
     const NAME_REFS: u16 = 1 << 11;
-    /// The tree calls GETPIVOTDATA.
     #[cfg(feature = "analysis")]
     const CALLS_PIVOT_DATA: u16 = 1 << 12;
 
@@ -708,7 +707,7 @@ impl FormulaEntry {
         self.set_flag(Self::VOLATILE, volatile);
     }
 
-    /// Mark the formula as one reference (`=A1`, `=Sheet2!B3:C4`), as a
+    /// Mark the entry as a plain reference ([`Self::reference`]), as a
     /// transferred formula records it.
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) const fn set_reference(&mut self, reference: bool) {
@@ -959,8 +958,8 @@ impl FormulaEntry {
         true
     }
 
-    /// Bind only retained detached sheet references. Moves the tree and source
-    /// into its replacement, leaving the old read set for the graph edit.
+    /// Bind only retained detached sheet references. The text stays as typed;
+    /// [`Self::rebound`] builds the replacement.
     pub(crate) fn bind_sheets(
         &mut self,
         names: NameScope<'_>,
@@ -1143,8 +1142,8 @@ impl FormulaEntry {
     }
 }
 
-// The low nibble stores the error slot plus one, and zero means no error.
-// So the largest stored value is `COUNT`, and it must fit in the mask.
+// The largest stored error code is `COUNT` (see `FormulaEntry::flags`), so it
+// must fit in the mask.
 const _: () = assert!(
     FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize,
     "every formula error code fits in the error bits of FormulaEntry"

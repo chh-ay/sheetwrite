@@ -211,8 +211,7 @@ fn add_summary(store: &mut CellStore) -> usize {
     summary
 }
 
-/// A reference with no sheet in a workbook name reads the sheet of the
-/// formula that uses the name, also inside another name.
+/// This also holds for a name used inside another name.
 #[test]
 fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     let (mut store, data, other) = two_sheet_store();
@@ -248,8 +247,8 @@ fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     assert_eq!(number(&store, other, 5, 4), 15.0);
 }
 
-/// A workbook name that uses another name reads that sheet's own definition
-/// on a sheet that has one, and the workbook's once it is removed.
+/// Once the sheet's own name is removed, the workbook's applies on that sheet
+/// again.
 #[test]
 fn a_workbook_name_reads_a_sheets_own_name_on_that_sheet() {
     let (mut store, data, other) = two_sheet_store();
@@ -270,8 +269,6 @@ fn a_workbook_name_reads_a_sheets_own_name_on_that_sheet() {
     assert_eq!(number(&store, other, 1, 4), 10.0);
 }
 
-/// Formulas that used the names before a row and a column edit and formulas
-/// that use them after it read the same moved cells.
 #[test]
 fn names_follow_row_and_column_edits_for_formulas_before_and_after_them() {
     let (mut store, data) = data_store();
@@ -302,8 +299,7 @@ fn names_follow_row_and_column_edits_for_formulas_before_and_after_them() {
     assert_eq!(number(&store, summary, 1, 2), 30.0);
 }
 
-/// Formulas that used the names before a sheet rename or removal and
-/// formulas that use them after it give the same result.
+/// Formulas written before and after the edit give the same result.
 #[test]
 fn names_follow_a_sheet_rename_and_removal() {
     let (mut store, data) = data_store();
@@ -584,9 +580,9 @@ fn retained_bytes(store: &CellStore) -> f64 {
 /// some spare capacity that a rebuild would not. That growth comes with the
 /// first edit and stays flat after it: 50 edits that move `Rate` back and
 /// forth over the formulas that use it retain what the first one did. The
-/// index patches the reads of up to 256 changed formulas in place (or a
-/// quarter of all formulas, when that is more) and rebuilds past that, so
-/// 200 and 300 users take each path.
+/// index rebuilds instead of patching past 256 changed formulas
+/// ([`crate::graph::FormulaGraph::replace_entry`]), so 200 and 300 users take
+/// each path.
 #[test]
 fn name_edits_retain_bounded_index_capacity() {
     const EDITS: usize = 50;
