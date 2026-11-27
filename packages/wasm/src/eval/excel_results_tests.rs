@@ -618,6 +618,13 @@ fn discrete_distribution_functions() {
         ("=BINOM.DIST.RANGE(60,0.75,48)", "0.084±0.0005"),
         ("=BINOM.DIST.RANGE(60,0.75,45,50)", "0.524±0.0005"),
         ("=BINOM.INV(6,0.5,0.75)", "4"),
+        // Past 2^53 not every whole number is a double; the search for the
+        // smallest count still ends.
+        (
+            "=BINOM.INV(2^60,0.9999999999999999,0.5)",
+            "~1.15292150460685E+18",
+        ),
+        ("=CRITBINOM(2^60,1,0.5)", "~1.15292150460685E+18"),
         ("=HYPGEOM.DIST(1,4,8,20,TRUE)", "0.4654±0.00005"),
         ("=HYPGEOM.DIST(1,4,8,20,FALSE)", "0.3633±0.00005"),
         ("=NEGBINOM.DIST(10,5,0.25,TRUE)", "0.3135141±0.00000005"),
