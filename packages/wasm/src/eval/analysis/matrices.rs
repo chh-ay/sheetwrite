@@ -174,9 +174,11 @@ pub(crate) fn evaluate_matrix(
             check_work(rows, inner, cols)?;
             EvalMatrix::validate_shape(rows, cols, 1, 0)?;
             let mut product = zeros(rows * cols)?;
-            // Iterator sums start at -0.0. Keep that sign for zero products.
+            // Start at -0.0, as an iterator sum does, so a product whose terms are all zero
+            // keeps the sign a dot product would give.
             product.fill(-0.0);
-            // Read each right-hand row once. Keep the original sum order.
+            // Read each right-hand row once. Each cell still adds its terms in order of the
+            // inner index.
             for (left_row, product_row) in
                 left.chunks_exact(inner).zip(product.chunks_exact_mut(cols))
             {

@@ -1,11 +1,12 @@
 //! `CONVERT(number, from_unit, to_unit)`: measurement units in Excel's 13
 //! unit groups.
 //!
-//! Each factor is the exact definition of the unit in its group's SI unit:
-//! the international foot and pound, the U.S. survey foot, the IT calorie and
-//! BTU, the Julian year and the 2019 SI values of the electronvolt and the
-//! atomic mass unit. Metric units take decimal prefixes; `bit` and `byte`
-//! also take binary prefixes.
+//! Each factor is the unit's value in its group's SI unit, from the unit's
+//! definition: the international foot and pound, the U.S. survey foot, the
+//! IT calorie and BTU, the Julian year and the exact 2019 SI electronvolt.
+//! The atomic mass unit has no exact definition; its factor is the CODATA
+//! 2018 value. Metric units take decimal prefixes; `bit` and `byte` also
+//! take binary prefixes.
 
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
 use crate::types::{EvalResult, FormulaError, Value};

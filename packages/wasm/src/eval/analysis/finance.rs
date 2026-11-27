@@ -277,8 +277,8 @@ fn depreciation(arguments: &FuncAccumulator, is_fixed: bool) -> NumberResult {
     }
 }
 
-/// DOLLARDE and DOLLARFR(dollar, fraction). The fraction is truncated; a
-/// negative fraction is `#NUM!` and a fraction below 1 is `#DIV/0!`. The
+/// DOLLARDE and DOLLARFR(dollar, fraction). The fraction is truncated. A
+/// truncated fraction below 0 is `#NUM!`, and one of 0 is `#DIV/0!`. The
 /// fractional part is read and written as digits over the next power of 10
 /// at or above the fraction, so 1.02 with fraction 16 means 1 and 2/16.
 fn dollar_fraction(arguments: &FuncAccumulator, is_decimal: bool) -> NumberResult {
@@ -394,7 +394,8 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
         return Err(FormulaError::Num);
     }
     let date_count = (last_date - first_date) as usize + 1;
-    // Only cache dense date ranges: at least two cash flows per calendar day.
+    // Cache one power per day of the date span only when the span is dense, with at least
+    // two cash flows per day. Otherwise one power per cash flow costs less.
     let mut cached_powers = (date_count <= cash_flows.len() / 2).then(|| {
         let years = (0..date_count)
             .map(|days| days as f64 / DAYS_PER_YEAR)
@@ -441,7 +442,8 @@ fn discounted(
     let mut present = 0.0;
     let mut derivative = 0.0;
     for (cash_cell, date_cell) in cash_flows.iter().zip(dates) {
-        // Both slices have been validated before the iteration starts.
+        // `dated_return` checked both slices with `list_number`: only numbers and blanks
+        // remain, and a blank counts as 0.
         let cash = match &cash_cell.value {
             Value::Number(number) => *number,
             Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,

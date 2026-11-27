@@ -242,8 +242,9 @@ struct FrenchAsset {
 
 impl FrenchAsset {
     /// The depreciation of the first, partial period, and the number of
-    /// periods in the asset's life. A purchase on the first period's start
-    /// date depreciates a whole period and adds no period.
+    /// periods in the asset's life. When the basis counts no days from the
+    /// purchase to the end of the first period, the first period
+    /// depreciates a whole period at `rate` and adds no period.
     fn first_depreciation(&self, rate: f64, life: f64) -> (f64, f64) {
         let year_days = match self.basis {
             Basis::ActualActual if self.purchased.is_leap_year() => DAYS_PER_LEAP_YEAR,
@@ -310,7 +311,8 @@ impl FrenchAsset {
     }
 
     /// AMORDEGRC: a declining rate scaled by a coefficient for the asset
-    /// life, with half the remaining value in each of the last two years.
+    /// life. When two years of the life remain, the first of them takes half
+    /// the remaining value and the last takes the rest.
     fn degressive(&self, period: f64, rate: f64) -> f64 {
         let whole_life = (1.0 / rate).ceil();
 
