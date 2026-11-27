@@ -106,6 +106,24 @@ fn charge(update: impl FnOnce(&mut Budget) -> bool) -> Result<(), FormulaError> 
     })
 }
 
+/// The preview budget before a read is charged, for [`rewind`].
+pub(super) struct Checkpoint(Option<Budget>);
+
+/// Notes the preview budget before a read that may give up after its charge
+/// and leave its cells to another reader, which charges them again.
+#[inline]
+pub(super) fn checkpoint() -> Checkpoint {
+    Checkpoint(ACTIVE.with(Cell::get))
+}
+
+/// Puts back the budget of `checkpoint` when the read it was taken for read
+/// nothing, so the cells are charged once, by the reader that reads them.
+#[cold]
+#[inline(never)]
+pub(super) fn rewind(checkpoint: Checkpoint) {
+    ACTIVE.with(|active| active.set(checkpoint.0));
+}
+
 /// How a whole-range read reaches its cells.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum RangeRead {
