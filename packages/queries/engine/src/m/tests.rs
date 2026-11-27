@@ -360,4 +360,25 @@ fn query_lists_round_trip_through_host_lanes() {
     )
     .unwrap_err();
     assert_eq!(issue.code, "definition");
+
+    // A list longer than any saved plan may be is refused before it is read, as a plan is.
+    let fixture_copies_past_the_code_bound = 4_000;
+    let many: Vec<MQuery> = std::iter::repeat_with(fixtures)
+        .take(fixture_copies_past_the_code_bound)
+        .flatten()
+        .collect();
+    let mut long = super::PlanWriter::default();
+    super::encode_queries(&many, &mut long);
+    let long_lanes = long.finish();
+    let oversized = super::decode_queries(
+        crate::plan_wire::PlanWire {
+            codes: &long_lanes.codes,
+            numbers: &long_lanes.numbers,
+            text: &long_lanes.text,
+            offsets: &long_lanes.offsets,
+        },
+        &crate::plan::Limits::default(),
+    )
+    .unwrap_err();
+    assert_eq!(oversized.code, "limit");
 }
