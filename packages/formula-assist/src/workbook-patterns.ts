@@ -80,7 +80,6 @@ interface SheetCount {
 /** How the count runs: in idle slices in a browser, or at once for a benchmark or a test. */
 export type BuildMode = "idle" | "now";
 
-/** Runs `work` when the page is idle. */
 function when_idle(work: () => void): void {
   if (typeof requestIdleCallback === "function") requestIdleCallback(work);
   else setTimeout(work, 0);

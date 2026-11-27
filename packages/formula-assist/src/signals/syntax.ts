@@ -159,7 +159,6 @@ class Syntax implements Signal {
   }
 }
 
-/** Open the syntax signal of one edit. */
 export function openSyntax(edit: FormulaEdit): Signal {
   return new Syntax(edit);
 }
