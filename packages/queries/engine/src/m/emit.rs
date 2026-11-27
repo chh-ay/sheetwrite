@@ -33,7 +33,7 @@ pub struct Loss {
     pub code: &'static str,
 }
 
-/// The section text, each query's member name, and every reported difference.
+/// The output of [`emit_section`].
 #[derive(Debug)]
 pub struct Section {
     /// The whole `section Section1;` document.
@@ -397,7 +397,6 @@ impl Writer<'_> {
         }
         grouped.push_str("})");
 
-        // Table.Group does not promise an order; the engine emits groups in key order.
         Self::sort(out, &grouped, &key_refs);
         self.columns = next;
     }
@@ -475,7 +474,6 @@ impl Writer<'_> {
     }
 }
 
-/// The M name of a join kind.
 const fn join_kind_name(join: JoinKind) -> &'static str {
     match join {
         JoinKind::Inner => "JoinKind.Inner",
