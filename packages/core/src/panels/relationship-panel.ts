@@ -222,6 +222,8 @@ export function relationshipPanel(grid: Grid): GridPanel {
 
         // As in Excel, the panel does not keep a relationship whose keys
         // cannot resolve; the API admits one, because cells change later.
+        // The engine reports key status only for a relationship in the
+        // workbook, so the panel applies it first and undoes it on failure.
         const status = storeEngine(grid.store)?.getRelationshipStatus(relationship.id);
         if (status !== undefined && status.status !== "ok" && status.status !== "unavailable") {
           grid.undo();
