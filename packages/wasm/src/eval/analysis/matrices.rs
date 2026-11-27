@@ -237,7 +237,6 @@ fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
     Some(dimension_from_number(number))
 }
 
-/// The value of a number literal, `None` for any other node.
 const fn number_literal(ast: &Ast) -> Option<f64> {
     match ast {
         Ast::Num(number) => Some(*number),

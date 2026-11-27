@@ -34,12 +34,10 @@ family_functions! {
     OCT2HEX,
 }
 
-/// Binary, octal and hexadecimal numbers have at most 10 digits. A number
-/// with all 10 digits and its highest bit set is negative, in two's
-/// complement.
+/// Binary, octal and hexadecimal numbers have at most 10 digits.
 const MAX_DIGITS: usize = 10;
 
-/// Bit functions accept integers from 0 to 2^48 - 1.
+/// 2^48, one above the largest argument of a bit function.
 const BIT_LIMIT: f64 = 281_474_976_710_656.0;
 
 /// The largest shift that `BITLSHIFT` and `BITRSHIFT` accept.
@@ -226,7 +224,8 @@ fn digits(mut number: i64, base: u32) -> String {
     reversed.iter().rev().collect()
 }
 
-/// An argument of a bit function: an integer from 0 to 2^48 - 1.
+/// An argument of a bit function: an integer from 0 to 2^48 - 1. Any other
+/// number is `#NUM!`.
 fn bit_argument(values: &FuncAccumulator, index: usize) -> Result<u64, FormulaError> {
     let number = number_arg(values, index, None)?;
 

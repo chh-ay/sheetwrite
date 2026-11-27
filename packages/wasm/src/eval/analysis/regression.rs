@@ -496,8 +496,8 @@ fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix
             }
         }
     }
-    // Sort positions by value. The sort is stable, so each run of equal values
-    // starts at its first occurrence.
+    // The sort is stable, so each run of equal values starts at its first
+    // occurrence.
     let positions = super::sorted_positions(numbers.len(), &mut |left, right| {
         numbers[left].total_cmp(&numbers[right])
     });
