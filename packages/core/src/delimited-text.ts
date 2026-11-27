@@ -270,7 +270,8 @@ export function scanDelimitedText(
         );
       }
     }
-    field_parts.length = 0;
+    // Most fields have no pieces; writing an array's length costs as much as a call.
+    if (field_parts.length !== 0) field_parts.length = 0;
     field_bytes = 0;
     field_present = false;
     cells = next_cells;
