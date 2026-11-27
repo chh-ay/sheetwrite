@@ -188,7 +188,8 @@ export function resolveTransactionResourceLimits(
  * without constructing a JSON string. Compact operation ranges are measured by
  * their serialized fields; their logical cell area is deliberately irrelevant.
  *
- * @param operations - The transaction's operations.
+ * @param operations - The operations to measure; they are read, not changed. A
+ *   value JSON cannot carry gives an `invalid-operation` issue.
  * @param limits - The limits to check against; defaults to the built-in limits.
  * @throws SheetwriteError with code `invalid-operations` when `operations` is not an array.
  */
@@ -451,7 +452,6 @@ export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> 
   maxSerializedBytes: 64 * 1024 * 1024,
   // Bound logical sheet area even when paged storage defers physical allocation.
   maxLogicalCellsPerSheet: 0xffff_ffff,
-  // Bound eager dense allocation across the workbook.
   maxDenseCells: ENGINE_STORAGE_CEILINGS.maxDenseCells,
   // Bound local pages, which a full sheet fills at about 13 bytes a cell.
   maxLocalPagedCells: ENGINE_STORAGE_CEILINGS.maxLocalPagedCells,

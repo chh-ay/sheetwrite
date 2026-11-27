@@ -75,13 +75,10 @@ export const DEFAULT_SYNC_COORDINATOR_LIMITS: Readonly<SyncCoordinatorLimits> = 
   maxVersionPayloadBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes,
   // Bound version-gap recovery distance before requiring a snapshot reload.
   maxFutureVersionDistance: 1_024,
-  // Bound future-version retention along count, operation, and byte dimensions.
   maxBufferedVersions: 256,
   maxBufferedOperations: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations * 4,
   maxBufferedBytes: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxEncodedBytes * 4,
-  // Retain a finite echo-deduplication window.
   maxRecentAcknowledgements: 4_096,
-  // Bound durable offline work independently of any single transaction.
   maxPendingCommits: 10_000,
   maxPendingOperations: 100_000,
   maxPendingEncodedBytes: 128 * 1024 * 1024,
