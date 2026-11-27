@@ -78,10 +78,14 @@ class JsonWalkStop {
 }
 
 /**
- * Thrown by a built walk that does not track ancestors when it nests deeper
- * than `UNTRACKED_DEPTH_LIMIT`; `measureJson` then walks again with tracking.
+ * Thrown by a walk that keeps no path or ancestors: a built walk nested deeper
+ * than `UNTRACKED_DEPTH_LIMIT`, or the quick exact walk at its first issue.
+ * `measureJson` then walks again with tracking, which reports the issue.
  */
-class JsonWalkTooDeep {}
+class JsonWalkRetry {}
+
+/** The quick exact walk carries no report, so one instance serves every throw. */
+const RETRY_WITH_TRACKING = new JsonWalkRetry();
 
 /**
  * Nesting a built walk allows before it looks for cycles. A workbook snapshot
@@ -117,12 +121,16 @@ export function measureJson(
   limit: number,
   options: JsonMeasureOptions = {},
 ): JsonMeasure {
-  if (!options.builtByCaller) return run_walk(value, limit, options, true);
   try {
+    if (!options.builtByCaller) {
+      return {
+        bytes: quick_exact_json_bytes(value, limit, options.omitUndefinedProperties === true, 0),
+      };
+    }
     const untracked = run_walk(value, limit, options, false);
     if (untracked.issue === undefined) return untracked;
-  } catch (deep) {
-    if (!(deep instanceof JsonWalkTooDeep)) throw deep;
+  } catch (retry) {
+    if (!(retry instanceof JsonWalkRetry)) throw retry;
   }
   // Deep, cyclic or refused: the tracked walk reports what it always did, so
   // a cycle is reported as a cycle even when going round it passed the limit.
@@ -304,7 +312,14 @@ function visit_json_array(walk: JsonWalk, array: unknown[]): void {
   if (Object.getPrototypeOf(array) !== Array.prototype) {
     stop_invalid(walk, "Arrays with custom prototypes are not JSON-safe");
   }
-  if (owned_arrays.get(array) === owned_generation && add_owned_scalar_array(walk, array)) return;
+  const owned_bytes =
+    owned_arrays.get(array) === owned_generation
+      ? owned_scalar_array_bytes(array, walk.limit - walk.bytes)
+      : undefined;
+  if (owned_bytes !== undefined) {
+    walk.bytes += owned_bytes;
+    return;
+  }
 
   for (const key in array) {
     if (!Object.hasOwn(array, key)) continue;
@@ -341,7 +356,7 @@ function visit_built_json(walk: JsonWalk, value: unknown): void {
     if (walk.ancestors.has(record)) stop_invalid(walk, "JSON values cannot contain cycles");
     walk.ancestors.add(record);
   } else if (walk.segments.length > UNTRACKED_DEPTH_LIMIT) {
-    throw new JsonWalkTooDeep();
+    throw RETRY_WITH_TRACKING;
   }
   if (Array.isArray(record)) {
     if (Object.getPrototypeOf(record) !== Array.prototype) {
@@ -408,13 +423,12 @@ export function releaseOwnedArrays(): void {
 }
 
 /**
- * Measure an owned array whose entries are all JSON scalars in one pass.
- * Returns false without counting anything at the first entry that is not a
- * finite number, string, boolean or null, or when the array would pass the
- * byte limit; the general walk then measures it and reports the exact issue.
+ * Bytes of an owned array whose entries are all JSON scalars, measured in one
+ * pass. Undefined at the first entry that is not a finite number, string,
+ * boolean or null, or when the array passes `budget`; the general walk then
+ * measures it and reports the exact issue.
  */
-function add_owned_scalar_array(walk: JsonWalk, array: readonly unknown[]): boolean {
-  const budget = walk.limit - walk.bytes;
+function owned_scalar_array_bytes(array: readonly unknown[], budget: number): number | undefined {
   let bytes = DELIMITER_PAIR_BYTES + Math.max(0, array.length - 1);
   // Repeated text is common in a block, so one measurement covers each run.
   let previous_text: string | undefined;
@@ -423,7 +437,7 @@ function add_owned_scalar_array(walk: JsonWalk, array: readonly unknown[]): bool
     const value = array[index];
     switch (typeof value) {
       case "number":
-        if (!Number.isFinite(value)) return false;
+        if (!Number.isFinite(value)) return undefined;
         bytes += jsonNumberLength(value);
         break;
       case "string":
@@ -437,14 +451,11 @@ function add_owned_scalar_array(walk: JsonWalk, array: readonly unknown[]): bool
         bytes += value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES;
         break;
       default:
-        if (value !== null) return false;
+        if (value !== null) return undefined;
         bytes += FOUR_LETTER_LITERAL_BYTES;
     }
   }
-  if (bytes > budget) return false;
-
-  walk.bytes += bytes;
-  return true;
+  return bytes > budget ? undefined : bytes;
 }
 
 function visit_json_object(walk: JsonWalk, record: object): void {
@@ -474,6 +485,101 @@ function visit_json_object(walk: JsonWalk, record: object): void {
     visit_json(walk, descriptor.value);
     walk.segments.pop();
   }
+}
+
+/**
+ * The exact walk's checks without the path and ancestors it keeps for its
+ * report: bytes of `value`, or `RETRY_WITH_TRACKING` at the first issue, past
+ * `budget` or nested past `UNTRACKED_DEPTH_LIMIT` (a cycle nests without end).
+ * Most values pass, and the bookkeeping cost more than the checks on the
+ * small operations of an edit.
+ */
+function quick_exact_json_bytes(
+  value: unknown,
+  budget: number,
+  omit_undefined: boolean,
+  depth: number,
+): number {
+  switch (typeof value) {
+    case "string": {
+      const bytes = json_string_bytes(value, budget);
+      if (bytes > budget) throw RETRY_WITH_TRACKING;
+      return bytes;
+    }
+    case "number":
+      if (!Number.isFinite(value)) throw RETRY_WITH_TRACKING;
+      return jsonNumberLength(value);
+    case "boolean":
+      return value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES;
+    case "object":
+      if (value === null) return FOUR_LETTER_LITERAL_BYTES;
+      if (depth > UNTRACKED_DEPTH_LIMIT || Object.getOwnPropertySymbols(value).length > 0) {
+        throw RETRY_WITH_TRACKING;
+      }
+      return Array.isArray(value)
+        ? quick_array_bytes(value, budget, omit_undefined, depth)
+        : quick_object_bytes(value, budget, omit_undefined, depth);
+    default:
+      throw RETRY_WITH_TRACKING;
+  }
+}
+
+function quick_array_bytes(
+  array: unknown[],
+  budget: number,
+  omit_undefined: boolean,
+  depth: number,
+): number {
+  if (Object.getPrototypeOf(array) !== Array.prototype) throw RETRY_WITH_TRACKING;
+  if (owned_arrays.get(array) === owned_generation) {
+    const owned_bytes = owned_scalar_array_bytes(array, budget);
+    if (owned_bytes !== undefined) return owned_bytes;
+  }
+
+  let bytes = DELIMITER_PAIR_BYTES + Math.max(0, array.length - 1);
+  for (let index = 0; index < array.length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(array, index);
+    if (!descriptor?.enumerable || !("value" in descriptor)) throw RETRY_WITH_TRACKING;
+    bytes += quick_exact_json_bytes(descriptor.value, budget - bytes, omit_undefined, depth + 1);
+    if (bytes > budget) throw RETRY_WITH_TRACKING;
+  }
+
+  // Every index is an own enumerable field, so one more own enumerable key
+  // is a named field or an index past the end.
+  let own_keys = 0;
+  for (const key in array) {
+    if (Object.hasOwn(array, key)) own_keys += 1;
+  }
+  if (own_keys !== array.length) throw RETRY_WITH_TRACKING;
+  return bytes;
+}
+
+function quick_object_bytes(
+  record: object,
+  budget: number,
+  omit_undefined: boolean,
+  depth: number,
+): number {
+  if (Object.getPrototypeOf(record) !== Object.prototype) throw RETRY_WITH_TRACKING;
+
+  let bytes = DELIMITER_PAIR_BYTES;
+  let is_first_field = true;
+  for (const key in record) {
+    // An inherited key has no own descriptor and is skipped.
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    if (descriptor === undefined) continue;
+    if (!descriptor.enumerable || !("value" in descriptor)) throw RETRY_WITH_TRACKING;
+
+    const field: unknown = descriptor.value;
+    if (field === undefined && omit_undefined) continue;
+    if (!is_first_field) bytes += 1;
+    is_first_field = false;
+    // The key's quotes and the colon after it.
+    bytes += json_string_bytes(key, budget - bytes) + 1;
+    bytes += quick_exact_json_bytes(field, budget - bytes, omit_undefined, depth + 1);
+    if (bytes > budget) throw RETRY_WITH_TRACKING;
+  }
+  return bytes;
 }
 
 /**
