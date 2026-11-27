@@ -107,6 +107,16 @@ impl Context<'_, '_> {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(Vec::new());
         };
+        let delimiters = self.delimiter_list(ast)?;
+        if delimiters.iter().any(String::is_empty) {
+            return Err(FormulaError::Value);
+        }
+        Ok(delimiters)
+    }
+
+    /// The texts of a delimiter argument: one value, or an array or range
+    /// of delimiters to match any of.
+    fn delimiter_list(&mut self, ast: &Ast) -> Result<Vec<String>, FormulaError> {
         let matrix = self.matrix(ast)?;
         let mut delimiters = Vec::new();
         let mut bytes = 0usize;
@@ -117,9 +127,6 @@ impl Context<'_, '_> {
                 .ok_or(FormulaError::Num)?;
             if bytes > MAX_TEXT_BYTES {
                 return Err(FormulaError::Num);
-            }
-            if delimiter.is_empty() {
-                return Err(FormulaError::Value);
             }
             delimiters.push(delimiter);
         }
@@ -180,6 +187,21 @@ fn delimiter_length(
     Ok(Some(end))
 }
 
+/// The length of the first of `delimiters` that `text` starts with.
+fn first_delimiter_length(
+    text: &str,
+    delimiters: &[String],
+    insensitive: bool,
+    work: &mut usize,
+) -> Result<Option<usize>, FormulaError> {
+    for delimiter in delimiters {
+        if let Some(length) = delimiter_length(text, delimiter, insensitive, work)? {
+            return Ok(Some(length));
+        }
+    }
+    Ok(None)
+}
+
 fn split_parts<'a>(
     text: &'a str,
     delimiters: &[String],
@@ -214,14 +236,9 @@ fn split_parts<'a>(
     let mut start = 0;
     let mut offset = 0;
     while offset < text.len() {
-        let mut matched = None;
-        for delimiter in delimiters {
-            if let Some(length) = delimiter_length(&text[offset..], delimiter, insensitive, work)? {
-                matched = Some(length);
-                break;
-            }
-        }
-        if let Some(length) = matched {
+        if let Some(length) =
+            first_delimiter_length(&text[offset..], delimiters, insensitive, work)?
+        {
             if !ignore_empty || start != offset {
                 parts.push(&text[start..offset]);
             }
@@ -248,7 +265,11 @@ fn before_after(
 ) -> Result<Value, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
-    let delimiter = context.text(args, 1, "")?;
+    // Excel matches any delimiter of an array; an empty one matches at once.
+    let delimiters = match optional_ast(args, 1) {
+        Some(ast) => context.delimiter_list(ast)?,
+        None => Vec::new(),
+    };
     let instance = context.integer(args, 2, 1)?;
     let insensitive = mode(context, args, 3)?;
     let match_end = mode(context, args, 4)?;
@@ -260,7 +281,7 @@ fn before_after(
         return Ok(Value::text(""));
     }
     let is_before = function == Function::TEXTBEFORE;
-    if delimiter.is_empty() {
+    if delimiters.is_empty() || delimiters.iter().any(String::is_empty) {
         return text_value(if is_before == (instance > 0) {
             String::new()
         } else {
@@ -273,7 +294,7 @@ fn before_after(
     if instance > 0 {
         while offset < text.len() {
             if let Some(length) =
-                delimiter_length(&text[offset..], &delimiter, insensitive, &mut work)?
+                first_delimiter_length(&text[offset..], &delimiters, insensitive, &mut work)?
             {
                 matches.push((offset, offset + length));
                 offset += length;
@@ -291,9 +312,9 @@ fn before_after(
     } else {
         let mut boundary = text.len();
         for (position, _) in text.char_indices().rev() {
-            if let Some(length) = delimiter_length(
+            if let Some(length) = first_delimiter_length(
                 &text[position..boundary],
-                &delimiter,
+                &delimiters,
                 insensitive,
                 &mut work,
             )? {
