@@ -6,7 +6,6 @@ import { boxesOverlap } from "../dashboard.js";
 import type { DashboardBox, DashboardItem } from "../types/dashboard.js";
 import type { Grid } from "../types/grid.js";
 
-/** Columns of the dashboard grid. */
 export const DASHBOARD_COLUMNS = 12;
 /** Height of one grid row, in CSS pixels. */
 export const DASHBOARD_ROW_HEIGHT = 48;
