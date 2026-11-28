@@ -179,6 +179,8 @@ function typed_text(event: Event): boolean {
  */
 export class EditController {
   private readonly host: HTMLElement;
+  /** Takes the focus when an edit that holds it closes; without one it leaves for the page. */
+  private readonly focus_home: HTMLElement | null;
   private textarea: HTMLTextAreaElement | null = null;
   private opts: BeginEditOptions | null = null;
   private composing = false;
@@ -207,9 +209,10 @@ export class EditController {
   /** Measures the edited line's width without laying the page out; see {@link reveal_line_end}. */
   private measure_context: CanvasRenderingContext2D | null | undefined;
 
-  constructor(host: HTMLElement, assist?: AssistDeps) {
+  constructor(host: HTMLElement, assist?: AssistDeps, focusHome?: HTMLElement) {
     this.host = host;
     this.assist = assist ? new FormulaAssist(assist) : null;
+    this.focus_home = focusHome ?? null;
   }
 
   get isEditing(): boolean {
@@ -556,7 +559,7 @@ export class EditController {
   }
 
   destroy(): void {
-    this.teardown();
+    this.teardown(false);
   }
 
   private readonly on_composition_start = (): void => {
@@ -655,7 +658,13 @@ export class EditController {
     this.commit("none");
   };
 
-  private teardown(): void {
+  /**
+   * Close the open edit. With `return_focus`, focus the editor holds goes to
+   * the grid before the editor leaves the page: removing a focused element
+   * makes the browser update the page's style at once, and the grid takes
+   * the focus back after every commit and cancel anyway.
+   */
+  private teardown(return_focus = true): void {
     const ta = this.textarea;
     if (!ta) return;
     this.tearing_down = true;
@@ -667,6 +676,9 @@ export class EditController {
     ta.removeEventListener("focus", this.on_focus);
     ta.removeEventListener("blur", this.on_blur);
     ta.removeEventListener("input", this.on_input);
+    if (return_focus && this.focus_home !== null && document.activeElement === ta) {
+      this.focus_home.focus({ preventScroll: true });
+    }
     ta.remove();
     this.textarea = null;
     this.opts = null;

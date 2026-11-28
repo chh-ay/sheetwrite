@@ -161,6 +161,11 @@ interface InteractionDependencies {
   zoom: () => number;
   rowCount: () => number;
   contentTop: () => number;
+  /**
+   * Where the scroller is: from the last paint while that still holds, else
+   * read from its layout.
+   */
+  viewOrigin: () => { readonly contentTop: number; readonly scrollLeft: number };
   viewportH: () => number;
   /** Left content-X of a visible column (for boundary hit-testing). */
   colLeftOf: (col: number) => number;
@@ -271,12 +276,16 @@ export class InteractionSessions {
 
   constructor(deps: InteractionDependencies) {
     this.deps = deps;
-    this.editor = new EditController(deps.viewportEl, {
-      highlightCells: deps.highlightCells,
-      sheet: deps.activeSheet,
-      cell: () => this.editing_address,
-      store: deps.store,
-    });
+    this.editor = new EditController(
+      deps.viewportEl,
+      {
+        highlightCells: deps.highlightCells,
+        sheet: deps.activeSheet,
+        cell: () => this.editing_address,
+        store: deps.store,
+      },
+      deps.host,
+    );
     this.validation_editor = new ValidationEditor(deps.viewportEl);
     this.custom_editor = new CustomEditorController(deps.viewportEl);
     this.fills = new FillController({
@@ -572,9 +581,18 @@ export class InteractionSessions {
     this.editing_address = null;
     this.active_editor = null;
     this.report_cell_mode();
-    this.deps.host.focus();
+    this.focus_grid();
     this.deps.scheduleRender();
     this.deps.editDraft.end();
+  }
+
+  /**
+   * Give the grid the focus back, where the user left the page. Focusing
+   * makes the browser lay the page out, so a grid that has the focus already
+   * is left alone, and no scroll into view adds to that.
+   */
+  private focus_grid(): void {
+    if (document.activeElement !== this.deps.host) this.deps.host.focus({ preventScroll: true });
   }
 
   private cancel_editor(): void {
@@ -808,7 +826,7 @@ export class InteractionSessions {
         this.number_format_of(cell.style, column),
         column.numberLocale,
       );
-    const content_top = this.deps.contentTop();
+    const origin = this.deps.viewOrigin();
 
     this.cancel_pointer();
     this.deps.onEditStart();
@@ -868,12 +886,7 @@ export class InteractionSessions {
         initialInput: initial,
         selectAll: select_all || initial === undefined,
         label: this.editor_label(edit_cell.row, edit_cell.col),
-        rect: this.editor_rect(
-          edit_cell.row,
-          edit_cell.col,
-          content_top,
-          this.deps.scroller.scrollLeft,
-        ),
+        rect: this.editor_rect(edit_cell.row, edit_cell.col, origin.contentTop, origin.scrollLeft),
         onCommit: (value, navigate) => this.finish_edit(data_addr, value, navigate),
         onCancel: () => this.end_editor(),
       });
@@ -904,8 +917,8 @@ export class InteractionSessions {
         rect: this.deps.screenRect(
           edit_cell.row,
           edit_cell.col,
-          content_top,
-          this.deps.scroller.scrollLeft,
+          origin.contentTop,
+          origin.scrollLeft,
         ),
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
@@ -929,12 +942,7 @@ export class InteractionSessions {
       rect: this.text_box(
         edit_cell.row,
         edit_cell.col,
-        this.deps.screenRect(
-          edit_cell.row,
-          edit_cell.col,
-          content_top,
-          this.deps.scroller.scrollLeft,
-        ),
+        this.deps.screenRect(edit_cell.row, edit_cell.col, origin.contentTop, origin.scrollLeft),
       ),
       label: this.editor_label(edit_cell.row, edit_cell.col),
       theme: this.deps.theme(),
@@ -1039,7 +1047,7 @@ export class InteractionSessions {
       }
       this.move_after_commit(view_row, address.col, navigate);
     }
-    this.deps.host.focus();
+    this.focus_grid();
     this.deps.scheduleRender();
   }
 
@@ -1850,10 +1858,6 @@ export class InteractionSessions {
     const from = e.shiftKey ? (selection.extentCell ?? focus) : focus;
     const jump = mod || end_mode;
     const theme = this.deps.theme();
-    const page_rows = Math.max(
-      1,
-      Math.floor((this.deps.viewportH() - theme.headerHeight) / theme.rowHeight),
-    );
 
     switch (e.key) {
       case "ArrowDown":
@@ -1907,12 +1911,16 @@ export class InteractionSessions {
         break;
 
       case "PageDown":
-        this.navigate(from, (from?.row ?? 0) + page_rows, undefined, e.shiftKey);
+      case "PageUp": {
+        // Only the keys that page read the page height: the read lays the page out.
+        const page_rows = Math.max(
+          1,
+          Math.floor((this.deps.viewportH() - theme.headerHeight) / theme.rowHeight),
+        );
+        const step = e.key === "PageDown" ? page_rows : -page_rows;
+        this.navigate(from, (from?.row ?? 0) + step, undefined, e.shiftKey);
         break;
-
-      case "PageUp":
-        this.navigate(from, (from?.row ?? 0) - page_rows, undefined, e.shiftKey);
-        break;
+      }
 
       case "Home":
         if (mod) this.navigate(from, 0, this.deps.firstCol(), e.shiftKey);

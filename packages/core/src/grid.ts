@@ -81,6 +81,7 @@ import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/pa
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import {
   type PaintedCells,
+  type PaintedView,
   type PaintedWindowTransform,
   ReadWindowController,
 } from "./read-window-controller.js";
@@ -743,7 +744,10 @@ export class GridImpl implements Grid {
     this.schedule_render();
   };
 
-  private readonly on_scroll = () => this.schedule_render();
+  private readonly on_scroll = () => {
+    this.read_windows.noteViewportMoved();
+    this.schedule_render();
+  };
   private readonly dispose_store: () => void;
   private readonly object_layer: ObjectLayer;
   private readonly panel_host: HTMLDivElement;
@@ -1158,6 +1162,7 @@ export class GridImpl implements Grid {
       rowAtOffset: (content_y) => this.geometry.rowAtOffset(content_y),
       rowCount: () => this.geometry.rowCount,
       contentTop: () => this.geometry.toContent(this.scroller.scrollTop),
+      viewOrigin: () => this.read_windows.paintedView() ?? this.measured_view(),
       viewportH: () => this.viewport_h(),
       colLeftOf: (col) => this.col_left_of(col),
       rowTop: (row) => this.geometry.rowOffset(row),
@@ -1381,6 +1386,8 @@ export class GridImpl implements Grid {
       datasourceColumnCount: () => this.sheet_by_id(this.active_sheet)?.columns.length ?? 0,
       scrollTop: () => this.scroller.scrollTop,
       scrollLeft: () => this.scroller.scrollLeft,
+      scrollerWidth: () => this.scroller.clientWidth,
+      scrollerHeight: () => this.scroller.clientHeight,
       repositionEditor: (content_top, scroll_left) =>
         this.reposition_editor(content_top, scroll_left),
       emitScroll: (event) => {
@@ -1525,6 +1532,7 @@ export class GridImpl implements Grid {
         this.selection.clear();
         this.emit_selection();
         this.scroller.scrollTop = 0;
+        this.read_windows.noteViewportMoved();
         this.read_windows.invalidateData();
       }
     }
@@ -2057,6 +2065,8 @@ export class GridImpl implements Grid {
     );
     this.sizer.style.width = `${size.width}px`;
     this.sizer.style.height = `${size.height}px`;
+    // A new size can add or drop a classic scrollbar, which resizes the scroller.
+    this.read_windows.noteViewportMoved();
   }
 
   /** The gutter tracks the active sheet's digit count; identity when unchanged. */
@@ -3028,6 +3038,7 @@ export class GridImpl implements Grid {
     }
     this.scroller.scrollTop = view?.top ?? 0;
     this.scroller.scrollLeft = view?.left ?? 0;
+    this.read_windows.noteViewportMoved();
 
     this.object_layer.sync();
     this.apply_layout();
@@ -3104,52 +3115,79 @@ export class GridImpl implements Grid {
   scrollToCell(addr: CellAddress): void {
     if (addr.sheet !== this.active_sheet) this.setActiveSheet(addr.sheet);
 
-    // A scroll into view moves by whole rows and columns, as in Excel: going
-    // down or right it stops at the first row or column boundary that shows
-    // the target whole, so the first row and column on screen start at their
-    // gridlines. A target larger than the body aligns its own top or left edge.
-    // Cells inside the frozen bands are always visible on their pinned axis.
-    const fr = this.frozen_row_count();
-    const frozen_h = this.frozen_height();
-    if (addr.row >= fr) {
-      const top = this.geometry.rowOffset(addr.row);
-      const bottom = top + this.geometry.rowHeight(addr.row);
-      const body_height = Math.max(0, this.scroller.clientHeight - this.theme.headerHeight);
-      const content_top = this.geometry.toContent(this.scroller.scrollTop);
-
-      // Visible body band in content space: [content_top + frozen_h, content_top + body_height).
-      let target = content_top;
-      if (top < content_top + frozen_h) target = top - frozen_h;
-      else if (bottom > content_top + body_height) {
-        target =
-          Math.min(top, this.geometry.rowStartFrom(bottom - body_height + frozen_h)) - frozen_h;
-      }
-      if (target !== content_top) {
-        this.scroller.scrollTop = this.geometry.toScroll(Math.max(0, target));
+    // Most moves stay on screen, which the last paint tells without reading
+    // the scroller's layout; it is read only when the last paint may be stale
+    // or the cell is not wholly in it.
+    const painted = this.read_windows.paintedView();
+    if (painted === null || this.scroll_target(addr, painted) !== null) {
+      const target = this.scroll_target(addr, this.measured_view());
+      if (target !== null) {
+        if (target.top !== null) this.scroller.scrollTop = this.geometry.toScroll(target.top);
+        if (target.left !== null) this.scroller.scrollLeft = target.left;
+        this.read_windows.noteViewportMoved();
       }
     }
-
-    this.ensure_column_visible(addr.col);
     this.schedule_render();
   }
 
-  private ensure_column_visible(col: number): void {
-    if (this.frozen_col_count() > 0 && col < this.first_body_col()) return;
+  /** Where the scroller is and how big, read from its layout. */
+  private measured_view(): PaintedView {
+    return {
+      contentTop: this.geometry.toContent(this.scroller.scrollTop),
+      scrollLeft: this.scroller.scrollLeft,
+      scrollerWidth: this.scroller.clientWidth,
+      scrollerHeight: this.scroller.clientHeight,
+    };
+  }
 
-    const left = this.col_left_of(col);
-    const width = (this.sheet().columns[col]?.width ?? 0) * this.zoom;
-    const frozen_w = this.frozen_width();
-    const view_left = this.scroller.scrollLeft + frozen_w;
-    const cell_width = Math.max(
-      0,
-      this.scroller.clientWidth - this.theme.rowHeaderWidth - frozen_w,
-    );
-    const view_right = view_left + cell_width;
-    if (left < view_left) this.scroller.scrollLeft = Math.max(0, left - frozen_w);
-    else if (left + width > view_right) {
-      const start = Math.min(left, this.geometry.columnStartFrom(left + width - cell_width));
-      this.scroller.scrollLeft = Math.max(0, start - frozen_w);
+  /**
+   * The scroll from `view` that shows the cell at `addr` whole: null when it
+   * shows already, else the content top and the left to go to, each null on
+   * an axis that stays. A scroll into view moves by whole rows and columns,
+   * as in Excel: going down or right it stops at the first row or column
+   * boundary that shows the target whole, so the first row and column on
+   * screen start at their gridlines. A target larger than the body aligns its
+   * own top or left edge. Cells inside the frozen bands are always visible on
+   * their pinned axis.
+   */
+  private scroll_target(
+    addr: CellAddress,
+    view: PaintedView,
+  ): { top: number | null; left: number | null } | null {
+    let top: number | null = null;
+    if (addr.row >= this.frozen_row_count()) {
+      const frozen_h = this.frozen_height();
+      const row_top = this.geometry.rowOffset(addr.row);
+      const row_bottom = row_top + this.geometry.rowHeight(addr.row);
+      const body_height = Math.max(0, view.scrollerHeight - this.theme.headerHeight);
+      // Visible body band in content space: [contentTop + frozen_h, contentTop + body_height).
+      let target = view.contentTop;
+      if (row_top < view.contentTop + frozen_h) target = row_top - frozen_h;
+      else if (row_bottom > view.contentTop + body_height) {
+        target =
+          Math.min(row_top, this.geometry.rowStartFrom(row_bottom - body_height + frozen_h)) -
+          frozen_h;
+      }
+      if (target !== view.contentTop) top = Math.max(0, target);
     }
+
+    let left: number | null = null;
+    if (this.frozen_col_count() === 0 || addr.col >= this.first_body_col()) {
+      const frozen_w = this.frozen_width();
+      const cell_left = this.col_left_of(addr.col);
+      const width = (this.sheet().columns[addr.col]?.width ?? 0) * this.zoom;
+      const view_left = view.scrollLeft + frozen_w;
+      const cell_width = Math.max(0, view.scrollerWidth - this.theme.rowHeaderWidth - frozen_w);
+      if (cell_left < view_left) left = Math.max(0, cell_left - frozen_w);
+      else if (cell_left + width > view_left + cell_width) {
+        const start = Math.min(
+          cell_left,
+          this.geometry.columnStartFrom(cell_left + width - cell_width),
+        );
+        left = Math.max(0, start - frozen_w);
+      }
+    }
+    return top === null && left === null ? null : { top, left };
   }
 
   getSelection(): Selection | null {
@@ -5150,6 +5188,7 @@ export class GridImpl implements Grid {
   }
 
   private on_resize(): void {
+    this.read_windows.noteViewportMoved();
     this.sync_sizer();
     this.render();
   }
