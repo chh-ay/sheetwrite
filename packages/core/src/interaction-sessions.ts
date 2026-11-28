@@ -271,16 +271,12 @@ export class InteractionSessions {
 
   constructor(deps: InteractionDependencies) {
     this.deps = deps;
-    this.editor = new EditController(
-      deps.viewportEl,
-      {
-        highlightCells: deps.highlightCells,
-        sheet: deps.activeSheet,
-        cell: () => this.editing_address,
-        store: deps.store,
-      },
-      deps.host,
-    );
+    this.editor = new EditController(deps.viewportEl, {
+      highlightCells: deps.highlightCells,
+      sheet: deps.activeSheet,
+      cell: () => this.editing_address,
+      store: deps.store,
+    });
     this.validation_editor = new ValidationEditor(deps.viewportEl);
     this.custom_editor = new CustomEditorController(deps.viewportEl);
     this.fills = new FillController({

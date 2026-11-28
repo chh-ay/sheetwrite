@@ -769,6 +769,55 @@ test("the cell editor and the formula bar: result preview, one shared draft, mul
   expect(opened).toEqual({ caretAtEnd: true, endInView: true, scrolled: true });
   await cell_editor.press("Escape");
 
+  // Every edit reuses one cell editor, so no edit may reach an earlier one's
+  // text. Ctrl+Z undoes only what was typed in this edit, even on the cell
+  // the last edit stored.
+  await select(page, "G4");
+  await page.keyboard.press("F2");
+  await page.keyboard.type(" again");
+  await page.keyboard.press("Enter");
+  await expect(cell_editor).toHaveCount(0);
+  const stored_again = `${long_entry} again`;
+  await select(page, "G4");
+  await page.keyboard.press("F2");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(cell_editor).toHaveValue(stored_again);
+  await page.keyboard.type("!");
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(cell_editor).toHaveValue(stored_again);
+  await cell_editor.press("Escape");
+
+  // An IME may commit a composition into the editor after its edit closed,
+  // some IMEs a while later. None of that text may reach the next edit.
+  // Playwright drives no IME in Firefox and WebKit, so the composition comes
+  // as its events. Moving into the formula bar keeps the edit, and Escape
+  // there cancels it in the middle of the composition.
+  await select(page, "G4");
+  await page.keyboard.press("F2");
+  const composing_field = await cell_editor.elementHandle();
+  if (composing_field === null) throw new Error("The cell editor did not open");
+  await composing_field.evaluate((field) =>
+    field.dispatchEvent(new CompositionEvent("compositionstart")),
+  );
+  await bar.click();
+  await page.keyboard.press("Escape");
+  await expect(cell_editor).toHaveCount(0);
+  await select(page, "G5");
+  await page.keyboard.press("F2");
+  const opened_text = await cell_editor.inputValue();
+  await composing_field.evaluate((field) => {
+    if (!(field instanceof HTMLTextAreaElement))
+      throw new Error("The cell editor is not a textarea");
+    field.setRangeText("にほん", field.value.length, field.value.length, "end");
+    field.dispatchEvent(new CompositionEvent("compositionend", { data: "にほん" }));
+    field.dispatchEvent(
+      new InputEvent("input", { inputType: "insertCompositionText", data: "にほん", bubbles: true }),
+    );
+  });
+  await expect(cell_editor).toHaveValue(opened_text);
+  await cell_editor.press("Escape");
+
   // Pick From Drop-down List under the Region column, with the real Alt (Option
   // on a Mac) and arrow keys; the header is a text entry too, as in Excel.
   await select(page, "B50");

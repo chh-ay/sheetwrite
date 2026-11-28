@@ -182,8 +182,6 @@ function typed_text(event: Event): boolean {
  */
 export class EditController {
   private readonly host: HTMLElement;
-  /** Gets the focus back when an edit that has it closes; without one the focus leaves for the page. */
-  private readonly focus_home: HTMLElement | null;
   /** The field every edit reuses; null until the first edit and after a composition was cut off. */
   private field: HTMLTextAreaElement | null = null;
   /** The field while an edit is open. */
@@ -217,10 +215,9 @@ export class EditController {
   /** Measures the edited line's width without laying the page out; see {@link reveal_line_end}. */
   private measure_context: CanvasRenderingContext2D | null | undefined;
 
-  constructor(host: HTMLElement, assist?: AssistDeps, focusHome?: HTMLElement) {
+  constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
     this.assist = assist ? new FormulaAssist(assist) : null;
-    this.focus_home = focusHome ?? null;
   }
 
   get isEditing(): boolean {
@@ -541,6 +538,7 @@ export class EditController {
     }
     this.teardown();
     opts.onCommit(value, navigate);
+    this.release_focus(ta);
     return true;
   }
 
@@ -580,13 +578,25 @@ export class EditController {
 
   cancel(): void {
     const opts = this.opts;
-    if (!opts) return;
+    const ta = this.textarea;
+    if (!opts || !ta) return;
     this.teardown();
     opts.onCancel();
+    this.release_focus(ta);
+  }
+
+  /**
+   * A closed field hides with the focus it had: the grid takes it back once
+   * the commit or cancel is through, after its own layout reads. When nothing
+   * took it, it leaves for the page, as it did when each edit's field was
+   * removed.
+   */
+  private release_focus(ta: HTMLTextAreaElement): void {
+    if (document.activeElement === ta && this.textarea !== ta) ta.blur();
   }
 
   destroy(): void {
-    this.teardown(false);
+    this.teardown();
     if (this.field !== null) this.drop_field(this.field);
   }
 
@@ -690,30 +700,21 @@ export class EditController {
     this.commit("none");
   };
 
-  /**
-   * Close the open edit. The field hides and stays for the next edit; with
-   * `return_focus`, focus it held goes to the grid first, so the field never
-   * holds the focus hidden.
-   */
-  private teardown(return_focus = true): void {
+  /** Close the open edit. The field hides and stays for the next edit. */
+  private teardown(): void {
     const ta = this.textarea;
     if (!ta) return;
     this.tearing_down = true;
     this.detach_assist();
     this.opts?.complete?.close();
-    // An IME may still commit an unfinished composition into the field after
-    // the edit has closed, some of them a while later: that field is dropped,
-    // so none of its text can reach the next edit.
-    const composing = this.composing;
-    if (return_focus && document.activeElement === ta) {
-      if (this.focus_home) this.focus_home.focus();
-      else ta.blur();
-    }
     // Hidden, the field takes no focus and screen readers skip it; without
     // its class, `.sheetwrite-editor` finds only an open editor.
     ta.className = "";
     ta.style.display = "none";
-    if (composing) this.drop_field(ta);
+    // An IME may still commit an unfinished composition into the field after
+    // the edit has closed, some of them a while later: that field is dropped,
+    // so none of its text can reach the next edit.
+    if (this.composing) this.drop_field(ta);
     this.edit++;
     this.textarea = null;
     this.opts = null;
