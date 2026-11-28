@@ -1,6 +1,7 @@
 //! Whole-column queries: sort, filter, find, distinct values, data edges and
 //! aggregates, as cache-local scans of the column-major cell storage.
 
+use std::borrow::Cow;
 use std::cell::{Cell, OnceCell};
 use std::cmp::Ordering;
 use std::ops::Range;
@@ -304,15 +305,23 @@ impl<'a> FilterInput<'a> {
                     numbers,
                     texts,
                 },
-                FILTER_CONTAINS => FilterRule::Contains {
-                    needle: self
+                FILTER_CONTAINS => {
+                    let needle = self
                         .value_texts
                         .get(text_offset)
                         .map(String::as_str)
-                        .unwrap_or_default(),
-                    case_insensitive: flag == 0,
-                    cache: Box::new(MatchCache::new()),
-                },
+                        .unwrap_or_default();
+                    let case_insensitive = flag == 0;
+                    FilterRule::Contains {
+                        needle: if case_insensitive {
+                            Cow::Owned(needle.to_lowercase())
+                        } else {
+                            Cow::Borrowed(needle)
+                        },
+                        case_insensitive,
+                        cache: Box::new(MatchCache::new()),
+                    }
+                }
                 FILTER_COMPARE => FilterRule::Compare {
                     op: flag,
                     value: self.nums.get(i).copied().unwrap_or_default(),
@@ -348,10 +357,11 @@ enum FilterRule<'a> {
         numbers: &'a [f64],
         texts: &'a [String],
     },
-    /// Text that contains `needle`. The cache is boxed: it is large and the
-    /// other rules are small.
+    /// Text that contains `needle`. A match that ignores case gets `needle`
+    /// lowercased, as [`matches_needle`] expects and `filterRows` passes it.
+    /// The cache is boxed: it is large and the other rules are small.
     Contains {
-        needle: &'a str,
+        needle: Cow<'a, str>,
         case_insensitive: bool,
         cache: Box<MatchCache>,
     },
