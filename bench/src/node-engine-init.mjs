@@ -8,34 +8,34 @@ import { initSheetwrite } from "@sheetwrite/core";
 
 const engine = process.argv[2];
 if (engine !== "default" && engine !== "full") throw new Error("Expected default or full engine");
-const packageName = engine === "full" ? "formulas" : "wasm";
+const package_name = engine === "full" ? "formulas" : "wasm";
 const root = process.env.SHEETWRITE_BENCH_ENGINE_ROOT;
-const engineDirectory =
+const engine_directory =
   root === undefined
-    ? new URL(`../../packages/${packageName}/`, import.meta.url)
-    : pathToFileURL(`${resolve(root, `packages/${packageName}`)}/`);
-const wasmBytes = readFileSync(new URL("pkg/sheetwrite_wasm_bg.wasm", engineDirectory));
-const wasmSha256 = createHash("sha256").update(wasmBytes).digest("hex");
-const manifest = JSON.parse(readFileSync(new URL("package.json", engineDirectory), "utf8"));
+    ? new URL(`../../packages/${package_name}/`, import.meta.url)
+    : pathToFileURL(`${resolve(root, `packages/${package_name}`)}/`);
+const wasm_bytes = readFileSync(new URL("pkg/sheetwrite_wasm_bg.wasm", engine_directory));
+const wasm_sha256 = createHash("sha256").update(wasm_bytes).digest("hex");
+const manifest = JSON.parse(readFileSync(new URL("package.json", engine_directory), "utf8"));
 // SHEETWRITE_BENCH_BASELINE_VERSION names the older release the root holds (see gate-protocol.ts).
-const baselineVersion = process.env.SHEETWRITE_BENCH_BASELINE_VERSION;
-if (root !== undefined && baselineVersion !== undefined) {
-  if (manifest.version !== baselineVersion) {
+const baseline_version = process.env.SHEETWRITE_BENCH_BASELINE_VERSION;
+if (root !== undefined && baseline_version !== undefined) {
+  if (manifest.version !== baseline_version) {
     throw new Error(
-      `Baseline Node initialization loaded ${manifest.version}, not ${baselineVersion}`,
+      `Baseline Node initialization loaded ${manifest.version}, not ${baseline_version}`,
     );
   }
-  const currentBytes = readFileSync(
-    new URL(`../../packages/${packageName}/pkg/sheetwrite_wasm_bg.wasm`, import.meta.url),
+  const current_bytes = readFileSync(
+    new URL(`../../packages/${package_name}/pkg/sheetwrite_wasm_bg.wasm`, import.meta.url),
   );
-  if (wasmSha256 === createHash("sha256").update(currentBytes).digest("hex")) {
+  if (wasm_sha256 === createHash("sha256").update(current_bytes).digest("hex")) {
     throw new Error("Baseline Node initialization loaded the current WASM");
   }
 }
 // The selected checkout is only known at runtime; core remains the current harness.
-const provider = await import(new URL("loader-node.mjs", engineDirectory).href);
+const provider = await import(new URL("loader-node.mjs", engine_directory).href);
 const started = performance.now();
 await initSheetwrite({ engine: provider });
 process.stdout.write(
-  `${JSON.stringify({ elapsedMs: performance.now() - started, node: process.version, wasmSha256 })}\n`,
+  `${JSON.stringify({ elapsedMs: performance.now() - started, node: process.version, wasmSha256: wasm_sha256 })}\n`,
 );

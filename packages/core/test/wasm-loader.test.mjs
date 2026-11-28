@@ -74,12 +74,12 @@ describe("WASM loader lifecycle", () => {
         [process.execPath, new URL("./published-module-probe.mjs", import.meta.url).pathname, name],
         { stdout: "pipe", stderr: "pipe" },
       );
-      const [stdout, stderr, exitCode] = await Promise.all([
+      const [stdout, stderr, exit_code] = await Promise.all([
         new Response(probe.stdout).text(),
         new Response(probe.stderr).text(),
         probe.exited,
       ]);
-      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expect(exit_code, `${stdout}\n${stderr}`).toBe(0);
       expect(stdout).toContain(`${name}: published exports keep the first adopted module`);
     });
   }

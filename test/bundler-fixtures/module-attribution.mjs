@@ -11,7 +11,7 @@ const BASE64 = Object.fromEntries(
 );
 const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
 
-function compressedSizes(data) {
+function compressed_sizes(data) {
   return {
     rawBytes: data.byteLength,
     gzipBytes: gzipSync(data, { level: 9, mtime: 0 }).byteLength,
@@ -25,7 +25,7 @@ function compressedSizes(data) {
   };
 }
 
-function decodeVlq(segment) {
+function decode_vlq(segment) {
   const values = [];
   let value = 0;
   let shift = 0;
@@ -47,54 +47,54 @@ function decodeVlq(segment) {
   return values;
 }
 
-function decodedMappings(map) {
+function decoded_mappings(map) {
   if (map.version !== 3 || !Array.isArray(map.sources) || typeof map.mappings !== "string") {
     throw new Error("Module attribution requires a non-indexed source map v3");
   }
   const lines = [];
-  let sourceIndex = 0;
-  for (const encodedLine of map.mappings.split(";")) {
-    let generatedColumn = 0;
+  let source_index = 0;
+  for (const encoded_line of map.mappings.split(";")) {
+    let generated_column = 0;
     const mappings = [];
-    for (const encodedSegment of encodedLine.split(",")) {
-      if (encodedSegment.length === 0) continue;
-      const fields = decodeVlq(encodedSegment);
+    for (const encoded_segment of encoded_line.split(",")) {
+      if (encoded_segment.length === 0) continue;
+      const fields = decode_vlq(encoded_segment);
       if (fields.length !== 1 && fields.length !== 4 && fields.length !== 5) {
         throw new Error(`Unsupported source-map segment width ${fields.length}`);
       }
-      generatedColumn += fields[0];
+      generated_column += fields[0];
       let source;
       if (fields.length >= 4) {
-        sourceIndex += fields[1];
-        source = map.sources[sourceIndex];
+        source_index += fields[1];
+        source = map.sources[source_index];
         if (typeof source !== "string") {
-          throw new Error(`Source-map segment references missing source ${sourceIndex}`);
+          throw new Error(`Source-map segment references missing source ${source_index}`);
         }
       }
-      mappings.push({ generatedColumn, source });
+      mappings.push({ generatedColumn: generated_column, source });
     }
     lines.push(mappings);
   }
   return lines;
 }
 
-function normalizeSource(source, bundler) {
+function normalize_source(source, bundler) {
   const decoded = decodeURIComponent(source).replaceAll("\\", "/").split("!").at(-1).split("?")[0];
-  const nodeModules = decoded.lastIndexOf("/node_modules/");
-  if (nodeModules >= 0) {
-    const packagePath = decoded
-      .slice(nodeModules + "/node_modules/".length)
+  const node_modules = decoded.lastIndexOf("/node_modules/");
+  if (node_modules >= 0) {
+    const package_path = decoded
+      .slice(node_modules + "/node_modules/".length)
       .replace(/^\.pnpm\/[^/]+\/node_modules\//, "");
-    const segments = packagePath.split("/").filter(Boolean);
-    const packageName = segments[0]?.startsWith("@")
+    const segments = package_path.split("/").filter(Boolean);
+    const package_name = segments[0]?.startsWith("@")
       ? `${segments[0]}/${segments[1] ?? "missing"}`
       : (segments[0] ?? "missing");
-    return { id: packagePath, owner: packageName };
+    return { id: package_path, owner: package_name };
   }
-  const workspaceCore = decoded.lastIndexOf("/packages/core/");
-  if (workspaceCore >= 0) {
+  const workspace_core = decoded.lastIndexOf("/packages/core/");
+  if (workspace_core >= 0) {
     return {
-      id: `@sheetwrite/core/${decoded.slice(workspaceCore + "/packages/core/".length)}`,
+      id: `@sheetwrite/core/${decoded.slice(workspace_core + "/packages/core/".length)}`,
       owner: "@sheetwrite/core",
     };
   }
@@ -105,13 +105,13 @@ function normalizeSource(source, bundler) {
       owner: "fixture",
     };
   }
-  const sourceIndex = decoded.lastIndexOf("/src/");
-  if (sourceIndex >= 0) {
-    return { id: `fixture${decoded.slice(sourceIndex)}`, owner: "fixture" };
+  const source_index = decoded.lastIndexOf("/src/");
+  if (source_index >= 0) {
+    return { id: `fixture${decoded.slice(source_index)}`, owner: "fixture" };
   }
-  const stableFixture = decoded.replace(/^webpack:\/\/[^/]*\//, "").replace(/^\.\//, "");
-  if (stableFixture.startsWith("app/")) {
-    return { id: `fixture/${stableFixture}`, owner: "fixture" };
+  const stable_fixture = decoded.replace(/^webpack:\/\/[^/]*\//, "").replace(/^\.\//, "");
+  if (stable_fixture.startsWith("app/")) {
+    return { id: `fixture/${stable_fixture}`, owner: "fixture" };
   }
   const stable = decoded
     .replace(/^webpack:\/\/[^/]*\//, "")
@@ -130,22 +130,22 @@ function normalizeSource(source, bundler) {
   };
 }
 
-async function sourceMapFor(assetPath, source) {
+async function source_map_for(asset_path, source) {
   const match = source.match(/\n?\/\/[#@] sourceMappingURL=([^\s]+)\s*$/);
-  const mapPath =
+  const map_path =
     match === null || match[1].startsWith("data:")
-      ? `${assetPath}.map`
-      : resolve(dirname(assetPath), decodeURIComponent(match[1]));
+      ? `${asset_path}.map`
+      : resolve(dirname(asset_path), decodeURIComponent(match[1]));
   try {
-    return JSON.parse(await readFile(mapPath, "utf8"));
+    return JSON.parse(await readFile(map_path, "utf8"));
   } catch (error) {
-    throw new Error(`Module attribution requires an external source map for ${assetPath}`, {
+    throw new Error(`Module attribution requires an external source map for ${asset_path}`, {
       cause: error,
     });
   }
 }
 
-function appendSpan(spans, identity, text) {
+function append_span(spans, identity, text) {
   if (text.length === 0) return;
   const key = `${identity.owner}\0${identity.id}`;
   const previous = spans.get(key);
@@ -153,34 +153,35 @@ function appendSpan(spans, identity, text) {
   else previous.parts.push(text);
 }
 
-function attributeSource(source, map, bundler) {
+function attribute_source(source, map, bundler) {
   const spans = new Map();
-  const mappingLines = decodedMappings(map);
-  const generatedLines = source.split("\n");
+  const mapping_lines = decoded_mappings(map);
+  const generated_lines = source.split("\n");
   const runtime = { id: `${bundler}:runtime`, owner: `${bundler}:runtime` };
-  for (let lineIndex = 0; lineIndex < generatedLines.length; lineIndex++) {
-    const line = generatedLines[lineIndex] + (lineIndex + 1 < generatedLines.length ? "\n" : "");
-    const contentLength = generatedLines[lineIndex].length;
-    const mappings = mappingLines[lineIndex] ?? [];
+  for (let line_index = 0; line_index < generated_lines.length; line_index++) {
+    const line =
+      generated_lines[line_index] + (line_index + 1 < generated_lines.length ? "\n" : "");
+    const content_length = generated_lines[line_index].length;
+    const mappings = mapping_lines[line_index] ?? [];
     let cursor = 0;
     let owner = runtime;
     for (const mapping of mappings) {
-      if (mapping.generatedColumn < cursor || mapping.generatedColumn > contentLength) {
-        throw new Error(`Source-map generated column escapes line ${lineIndex + 1}`);
+      if (mapping.generatedColumn < cursor || mapping.generatedColumn > content_length) {
+        throw new Error(`Source-map generated column escapes line ${line_index + 1}`);
       }
-      appendSpan(spans, owner, line.slice(cursor, mapping.generatedColumn));
+      append_span(spans, owner, line.slice(cursor, mapping.generatedColumn));
       owner =
         mapping.source === undefined
           ? runtime
-          : normalizeSource(`${map.sourceRoot ?? ""}${mapping.source}`, bundler);
+          : normalize_source(`${map.sourceRoot ?? ""}${mapping.source}`, bundler);
       cursor = mapping.generatedColumn;
     }
-    appendSpan(spans, owner, line.slice(cursor));
+    append_span(spans, owner, line.slice(cursor));
   }
   return spans;
 }
 
-function mergeSpans(target, source) {
+function merge_spans(target, source) {
   for (const [key, identity] of source) {
     const previous = target.get(key);
     if (previous === undefined) target.set(key, identity);
@@ -207,29 +208,32 @@ export async function attributeEntry({
   }
   if (selected.length === 0) throw new Error(`${bundler} ${name} has no initial JavaScript assets`);
   const spans = new Map();
-  let generatedBytes = 0;
-  const attributedAssets = [];
+  let generated_bytes = 0;
+  const attributed_assets = [];
   for (const file of selected) {
     if (!file.endsWith(".js")) throw new Error(`Cannot attribute non-JavaScript asset ${file}`);
-    const assetPath = resolve(root, file);
-    if (assetPath !== root && !assetPath.startsWith(`${root}${sep}`)) {
+    const asset_path = resolve(root, file);
+    if (asset_path !== root && !asset_path.startsWith(`${root}${sep}`)) {
       throw new Error(`Attribution asset escapes fixture output: ${file}`);
     }
-    const content = await readFile(assetPath);
+    const content = await readFile(asset_path);
     const source = content.toString("utf8");
-    generatedBytes += content.byteLength;
-    attributedAssets.push({
-      path: relative(repositoryRoot, assetPath).replaceAll("\\", "/"),
+    generated_bytes += content.byteLength;
+    attributed_assets.push({
+      path: relative(repositoryRoot, asset_path).replaceAll("\\", "/"),
       sha256: createHash("sha256").update(content).digest("hex"),
     });
     if (opaque.has(file)) {
-      appendSpan(
+      append_span(
         spans,
         { id: `${bundler}:opaque/${file}`, owner: `${bundler}:opaque-framework` },
         source,
       );
     } else {
-      mergeSpans(spans, attributeSource(source, await sourceMapFor(assetPath, source), bundler));
+      merge_spans(
+        spans,
+        attribute_source(source, await source_map_for(asset_path, source), bundler),
+      );
     }
   }
   const modules = [...spans.values()]
@@ -237,24 +241,24 @@ export async function attributeEntry({
       id,
       owner,
       attribution: owner === `${bundler}:opaque-framework` ? "opaque-asset" : "source-map",
-      ...compressedSizes(Buffer.from(parts.join(""))),
+      ...compressed_sizes(Buffer.from(parts.join(""))),
     }))
     .filter((module) => module.rawBytes > 0)
     .sort(
       (left, right) => left.id.localeCompare(right.id) || left.owner.localeCompare(right.owner),
     );
-  const attributedBytes = modules.reduce((sum, module) => sum + module.rawBytes, 0);
-  if (attributedBytes !== generatedBytes) {
+  const attributed_bytes = modules.reduce((sum, module) => sum + module.rawBytes, 0);
+  if (attributed_bytes !== generated_bytes) {
     throw new Error(
-      `${bundler} ${name} attributed ${attributedBytes} of ${generatedBytes} generated bytes`,
+      `${bundler} ${name} attributed ${attributed_bytes} of ${generated_bytes} generated bytes`,
     );
   }
   return {
     name,
     entry,
     eagerImports: [...new Set(eagerImports)].sort(),
-    assets: attributedAssets,
-    generatedBytes,
+    assets: attributed_assets,
+    generatedBytes: generated_bytes,
     modules,
   };
 }

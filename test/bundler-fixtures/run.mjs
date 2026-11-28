@@ -9,10 +9,10 @@ import { chromium } from "@playwright/test";
 
 import { installCanonicalTarballs } from "../../scripts/release-lock-integrity.mjs";
 
-const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));
-const repositoryRoot = resolve(fixturesRoot, "../..");
-const tarballRoot = join(fixturesRoot, ".packed");
-const packageDirectories = [
+const fixtures_root = fileURLToPath(new URL(".", import.meta.url));
+const repository_root = resolve(fixtures_root, "../..");
+const tarball_root = join(fixtures_root, ".packed");
+const package_directories = [
   "packages/wasm",
   "packages/core",
   "packages/xlsx",
@@ -23,35 +23,35 @@ const packageDirectories = [
   "packages/svelte",
 ];
 // The fixtures use every release package except @sheetwrite/formulas and @sheetwrite/formula-assist.
-const RELEASE_PACKAGE_COUNT = packageDirectories.length + 2;
-const sourceManifests = await Promise.all(
-  packageDirectories.map(async (directory) =>
-    JSON.parse(await readFile(join(repositoryRoot, directory, "package.json"), "utf8")),
+const RELEASE_PACKAGE_COUNT = package_directories.length + 2;
+const source_manifests = await Promise.all(
+  package_directories.map(async (directory) =>
+    JSON.parse(await readFile(join(repository_root, directory, "package.json"), "utf8")),
   ),
 );
 
-function optionValue(name) {
+function option_value(name) {
   const inline = process.argv.find((argument) => argument.startsWith(`${name}=`));
   if (inline !== undefined) return inline.slice(name.length + 1);
   const index = process.argv.indexOf(name);
   return index < 0 ? undefined : process.argv[index + 1];
 }
 
-const artifactDirectory = optionValue("--artifacts");
-const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
-if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
+const artifact_directory = option_value("--artifacts");
+const required_artifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
+if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifact_directory === undefined) {
   throw new Error("Artifact-only bundler verification requires --artifacts");
 }
 if (
-  requiredArtifacts !== undefined &&
-  (artifactDirectory === undefined ||
-    resolve(repositoryRoot, artifactDirectory) !== resolve(requiredArtifacts))
+  required_artifacts !== undefined &&
+  (artifact_directory === undefined ||
+    resolve(repository_root, artifact_directory) !== resolve(required_artifacts))
 ) {
   throw new Error("Bundler artifact input differs from the canonical artifact set");
 }
 
 function run(command, args, cwd) {
-  return new Promise((resolveRun, reject) => {
+  return new Promise((resolve_run, reject) => {
     const child = spawn(command, args, {
       cwd,
       env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
@@ -59,7 +59,7 @@ function run(command, args, cwd) {
     });
     child.on("error", reject);
     child.on("exit", (code, signal) => {
-      if (code === 0) resolveRun();
+      if (code === 0) resolve_run();
       else
         reject(
           new Error(`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}`),
@@ -68,19 +68,19 @@ function run(command, args, cwd) {
   });
 }
 
-async function withStaticServer(root, runWithOrigin) {
+async function with_static_server(root, run_with_origin) {
   const server = createServer(async (request, response) => {
     try {
-      const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-      const pathname = decodeURIComponent(requestUrl.pathname);
-      const relativePath = pathname.endsWith("/") ? `${pathname}index.html` : pathname;
-      const file = resolve(root, `.${relativePath}`);
+      const request_url = new URL(request.url ?? "/", "http://127.0.0.1");
+      const pathname = decodeURIComponent(request_url.pathname);
+      const relative_path = pathname.endsWith("/") ? `${pathname}index.html` : pathname;
+      const file = resolve(root, `.${relative_path}`);
       if (file !== root && !file.startsWith(`${root}${sep}`)) {
         response.writeHead(403).end();
         return;
       }
       const bytes = await readFile(file);
-      const contentType =
+      const content_type =
         extname(file) === ".html"
           ? "text/html; charset=utf-8"
           : extname(file) === ".js"
@@ -92,7 +92,7 @@ async function withStaticServer(root, runWithOrigin) {
                 : extname(file) === ".svg"
                   ? "image/svg+xml"
                   : "application/octet-stream";
-      response.writeHead(200, { "content-type": contentType }).end(bytes);
+      response.writeHead(200, { "content-type": content_type }).end(bytes);
     } catch {
       response.writeHead(404).end();
     }
@@ -107,7 +107,7 @@ async function withStaticServer(root, runWithOrigin) {
     throw new Error("Fixture static server did not publish a TCP port");
   }
   try {
-    await runWithOrigin(`http://127.0.0.1:${address.port}`);
+    await run_with_origin(`http://127.0.0.1:${address.port}`);
   } finally {
     const closed = Promise.withResolvers();
     server.close(closed.resolve);
@@ -115,8 +115,8 @@ async function withStaticServer(root, runWithOrigin) {
   }
 }
 
-async function assertLifecyclePages(browser, root, pages) {
-  await withStaticServer(root, async (origin) => {
+async function assert_lifecycle_pages(browser, root, pages) {
+  await with_static_server(root, async (origin) => {
     for (const [path, expected] of pages) {
       const page = await browser.newPage();
       const errors = [];
@@ -149,17 +149,17 @@ async function assertLifecyclePages(browser, root, pages) {
   });
 }
 
-async function assertQueryPage(browser, root) {
-  await withStaticServer(root, async (origin) => {
+async function assert_query_page(browser, root) {
+  await with_static_server(root, async (origin) => {
     const page = await browser.newPage();
     const errors = [];
-    const wasmRequests = [];
+    const wasm_requests = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
     page.on("request", (request) => {
-      if (new URL(request.url()).pathname.endsWith(".wasm")) wasmRequests.push(request.url());
+      if (new URL(request.url()).pathname.endsWith(".wasm")) wasm_requests.push(request.url());
     });
 
     try {
@@ -167,7 +167,7 @@ async function assertQueryPage(browser, root) {
       await page.waitForFunction(
         () => document.querySelector("#load-queries")?.getAttribute("data-ready") === "false",
       );
-      if (wasmRequests.length !== 0) throw new Error("Unused query page fetched WASM");
+      if (wasm_requests.length !== 0) throw new Error("Unused query page fetched WASM");
 
       const button = page.locator("#load-queries");
       await button.click();
@@ -183,7 +183,7 @@ async function assertQueryPage(browser, root) {
         throw new Error("The bundled query did not return one row with total 3");
       }
 
-      if (wasmRequests.length !== 1)
+      if (wasm_requests.length !== 1)
         throw new Error("Query initialization did not fetch WASM once");
       if (errors.length > 0) throw new Error(`Query browser errors:\n${errors.join("\n")}`);
     } catch (error) {
@@ -194,78 +194,78 @@ async function assertQueryPage(browser, root) {
   });
 }
 
-await rm(tarballRoot, { recursive: true, force: true });
-await rm(join(repositoryRoot, "test-results/bundlers"), {
+await rm(tarball_root, { recursive: true, force: true });
+await rm(join(repository_root, "test-results/bundlers"), {
   recursive: true,
   force: true,
 });
-await mkdir(tarballRoot, { recursive: true });
-let artifactManifestDigest;
-const canonicalTarballs = new Map();
-if (artifactDirectory === undefined) {
+await mkdir(tarball_root, { recursive: true });
+let artifact_manifest_digest;
+const canonical_tarballs = new Map();
+if (artifact_directory === undefined) {
   await run(
     "bun",
-    ["scripts/release-artifacts.ts", "pack", "--output", tarballRoot],
-    repositoryRoot,
+    ["scripts/release-artifacts.ts", "pack", "--output", tarball_root],
+    repository_root,
   );
-  for (const manifest of sourceManifests) {
+  for (const manifest of source_manifests) {
     const filename = `${manifest.name.replace(/^@/, "").replaceAll("/", "-")}-${manifest.version}.tgz`;
-    canonicalTarballs.set(manifest.name, join(tarballRoot, filename));
+    canonical_tarballs.set(manifest.name, join(tarball_root, filename));
   }
 } else {
-  const artifactRoot = resolve(repositoryRoot, artifactDirectory);
-  const releaseManifestBytes = await readFile(join(artifactRoot, "release-artifacts.json"));
-  const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
-  artifactManifestDigest = `sha512-${createHash("sha512").update(releaseManifestBytes).digest("base64")}`;
+  const artifact_root = resolve(repository_root, artifact_directory);
+  const release_manifest_bytes = await readFile(join(artifact_root, "release-artifacts.json"));
+  const release_manifest = JSON.parse(release_manifest_bytes.toString("utf8"));
+  artifact_manifest_digest = `sha512-${createHash("sha512").update(release_manifest_bytes).digest("base64")}`;
   if (
-    !Array.isArray(releaseManifest.packages) ||
-    releaseManifest.packages.length !== RELEASE_PACKAGE_COUNT
+    !Array.isArray(release_manifest.packages) ||
+    release_manifest.packages.length !== RELEASE_PACKAGE_COUNT
   ) {
     throw new Error(
       `Canonical release manifest must contain exactly ${RELEASE_PACKAGE_COUNT} packages`,
     );
   }
-  for (const sourceManifest of sourceManifests) {
-    const artifact = releaseManifest.packages.find((entry) => entry.name === sourceManifest.name);
-    if (artifact === undefined || artifact.version !== sourceManifest.version) {
-      throw new Error(`Missing canonical artifact for ${sourceManifest.name}`);
+  for (const source_manifest of source_manifests) {
+    const artifact = release_manifest.packages.find((entry) => entry.name === source_manifest.name);
+    if (artifact === undefined || artifact.version !== source_manifest.version) {
+      throw new Error(`Missing canonical artifact for ${source_manifest.name}`);
     }
-    await cp(join(artifactRoot, artifact.path), join(tarballRoot, artifact.path));
-    canonicalTarballs.set(sourceManifest.name, join(tarballRoot, artifact.path));
+    await cp(join(artifact_root, artifact.path), join(tarball_root, artifact.path));
+    canonical_tarballs.set(source_manifest.name, join(tarball_root, artifact.path));
   }
 }
 
 for (const fixture of ["vite", "webpack", "next"]) {
-  const cwd = join(fixturesRoot, fixture);
-  const lockPath = join(cwd, "package-lock.json");
-  const originalLock = await readFile(lockPath, "utf8");
+  const cwd = join(fixtures_root, fixture);
+  const lock_path = join(cwd, "package-lock.json");
+  const original_lock = await readFile(lock_path, "utf8");
   await rm(join(cwd, "node_modules"), { recursive: true, force: true });
   console.log(`\n=== ${fixture} bundler fixture ===`);
   try {
     // Copies each tarball to its version-free name in `.packed` and fills the lock.
-    await installCanonicalTarballs(lockPath, canonicalTarballs);
+    await installCanonicalTarballs(lock_path, canonical_tarballs);
     await run("npm", ["run", "build"], cwd);
   } finally {
-    await writeFile(lockPath, originalLock);
+    await writeFile(lock_path, original_lock);
   }
 }
 
 const browser = await chromium.launch({ headless: true });
 try {
-  await assertLifecyclePages(browser, join(fixturesRoot, "vite/dist"), [
+  await assert_lifecycle_pages(browser, join(fixtures_root, "vite/dist"), [
     ["/react.html", "react ready/edit/reset/unmount passed"],
     ["/vue.html", "vue ready/edit/reset/unmount passed"],
     ["/svelte.html", "svelte ready/edit/reset/unmount passed"],
   ]);
-  await assertQueryPage(browser, join(fixturesRoot, "vite/dist"));
-  await assertLifecyclePages(browser, join(fixturesRoot, "next/out"), [
+  await assert_query_page(browser, join(fixtures_root, "vite/dist"));
+  await assert_lifecycle_pages(browser, join(fixtures_root, "next/out"), [
     ["/", "next ready/edit/reset/unmount passed"],
   ]);
 } finally {
   await browser.close();
 }
 
-if (artifactManifestDigest !== undefined) {
-  console.log(`\nArtifact manifest SHA-512: ${artifactManifestDigest}`);
+if (artifact_manifest_digest !== undefined) {
+  console.log(`\nArtifact manifest SHA-512: ${artifact_manifest_digest}`);
 }
 console.log("\nAll bundler fixtures passed");

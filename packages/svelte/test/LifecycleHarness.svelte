@@ -8,39 +8,39 @@
     fallbackLabel: string;
   };
 
-  let { initialProps }: { initialProps: HarnessProps } = $props();
-  let currentProps = $state.raw(initialProps);
-  let publishedGrid: Grid | undefined;
-  const publishedAtReady: Array<Grid | null | undefined> = [];
-  let gridProps = $derived.by(() => {
-    const { fallbackLabel: _fallbackLabel, ...props } = currentProps;
+  let { initialProps: initial_props }: { initialProps: HarnessProps } = $props();
+  let current_props = $state.raw(initial_props);
+  let published_grid: Grid | undefined;
+  const published_at_ready: Array<Grid | null | undefined> = [];
+  let grid_props = $derived.by(() => {
+    const { fallbackLabel: _fallback_label, ...props } = current_props;
     return props;
   });
 
   export function update(nextProps: HarnessProps): void {
-    currentProps = nextProps;
+    current_props = nextProps;
   }
 
   export function getGrid(): Grid | undefined {
-    return publishedGrid;
+    return published_grid;
   }
 
   export function getPublishedAtReady(): Array<Grid | null | undefined> {
-    return publishedAtReady;
+    return published_at_ready;
   }
 
-  function setGrid(value: Grid | undefined): void {
-    publishedGrid = value;
+  function set_grid(value: Grid | undefined): void {
+    published_grid = value;
   }
 
-  function handleReady(event: Parameters<NonNullable<typeof gridProps.onReady>>[0]): void {
-    publishedAtReady.push(untrack(() => publishedGrid));
-    gridProps.onReady?.(event);
+  function handle_ready(event: Parameters<NonNullable<typeof grid_props.onReady>>[0]): void {
+    published_at_ready.push(untrack(() => published_grid));
+    grid_props.onReady?.(event);
   }
 </script>
 
 {#snippet fallback()}
-  <span data-lifecycle-fallback>{currentProps.fallbackLabel}</span>
+  <span data-lifecycle-fallback>{current_props.fallbackLabel}</span>
 {/snippet}
 
-<SheetwriteGrid {...gridProps} bind:grid={getGrid, setGrid} {fallback} onReady={handleReady} />
+<SheetwriteGrid {...grid_props} bind:grid={getGrid, set_grid} {fallback} onReady={handle_ready} />
