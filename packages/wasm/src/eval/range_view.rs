@@ -535,9 +535,10 @@ impl BaseRows {
 }
 
 /// Rows of computed or shared values, in output order: what a row step
-/// returns and what a spill installs. It borrows no sheet. A whole computed
-/// matrix stays a matrix, so passing one costs what passing the matrix
-/// does; picked rows and shared constants keep their base behind one box.
+/// returns and what the next row step reads. A spill reads a matrix instead,
+/// through `eval_dynamic_array`. It borrows no sheet. A whole computed matrix
+/// stays a matrix, so passing one costs what passing the matrix does; picked
+/// rows and shared constants keep their base behind one box.
 #[derive(Debug)]
 pub(super) enum ValueRows {
     Matrix(EvalMatrix),
