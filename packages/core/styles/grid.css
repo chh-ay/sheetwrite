@@ -93,10 +93,9 @@
   z-index: 3;
   /* A long line scrolls with the caret, as Excel's in-cell editor does,
      without a scrollbar: a classic one would cover the line, and making room
-     for it means reading the editor's layout on every open (editor.ts). More
-     than eight lines scroll vertically. */
-  overflow-x: hidden;
-  overflow-y: auto;
+     for it means reading the editor's layout on every open. Text past eight
+     lines scrolls vertically (editor.ts). */
+  overflow: hidden;
   white-space: pre;
 }
 
