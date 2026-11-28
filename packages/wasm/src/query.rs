@@ -38,9 +38,6 @@ const STAMP_WORDS_INITIAL: usize = 64;
 /// One bit per string-pool id, so a scan that only lists values dedupes
 /// dictionary-encoded text without hashing or comparing a single character,
 /// in a 32nd of the memory [`PoolIdSlots`] zero-fills.
-///
-/// Words are zero-filled when the marks grow. Growth doubles the current word
-/// count (with an initial floor) or reaches the requested id, whichever is larger.
 struct PoolIdStamps {
     words: Vec<u64>,
 }
@@ -67,7 +64,6 @@ impl PoolIdStamps {
         fresh
     }
 
-    /// Whether `id` is marked.
     #[inline]
     fn contains(&self, id: u32) -> bool {
         let index = id as usize;
@@ -92,9 +88,6 @@ const SLOTS_INITIAL: usize = 4_096;
 /// that is already dictionary-encoded dedupes and counts without hashing or
 /// comparing a single character. 0 marks an id the scan has not met; slot
 /// `s` is stored as `s + 1`.
-///
-/// Slots are zero-filled when they grow. Growth doubles the current length
-/// (with an initial floor) or reaches the requested id, whichever is larger.
 struct PoolIdSlots {
     slots: Vec<u32>,
 }
@@ -155,8 +148,7 @@ const VALUE_SET_TRUE_BIT: u8 = 2;
 /// picked value: numeric picks use binary search and text picks use a hash set.
 /// A literal text cell is answered by its pool id alone: the pool holds each
 /// text once, so the cell holds a picked text exactly when its id is one of
-/// the picked texts' ids. `Linear` keeps the scan for lists short enough that
-/// a lookup costs more than it saves.
+/// the picked texts' ids. `Linear` keeps the scan up to [`VALUE_SET_LINEAR_MAX`].
 enum ValueSet<'a> {
     Linear,
     Lookup {
@@ -327,8 +319,7 @@ impl<'a> FilterInput<'a> {
                 },
                 FILTER_EMPTY => FilterRule::Empty,
                 FILTER_NON_EMPTY => FilterRule::NonEmpty,
-                // Each text of a custom filter is a COUNTIF criterion. One that
-                // does not parse makes `rules` return `None`.
+                // Each text of a custom filter is a COUNTIF criterion.
                 FILTER_CUSTOM => FilterRule::Custom {
                     any: flag & 1 != 0,
                     criteria: texts
@@ -364,8 +355,7 @@ enum FilterRule<'a> {
         case_insensitive: bool,
         cache: Box<MatchCache>,
     },
-    /// Numbers compared with `value`; `op` is 0 `>`, 1 `>=`, 2 `<`, 3 `<=`,
-    /// 4 `=` and anything else `<>`.
+    /// Numbers compared with `value`; [`compare_number`] maps the `op` code.
     Compare {
         op: u8,
         value: f64,
@@ -593,7 +583,7 @@ fn keep_all_rows(row_count: usize, mut keeps: impl FnMut(usize) -> bool) -> Vec<
 const FILTER_CASE_INSENSITIVE: bool = true;
 const FILTER_WHOLE_CELL: bool = false;
 
-/// `aggregate` op codes. Op 4, and any unknown op, counts the numbers.
+/// `aggregate` op codes; [`CellStore::aggregate`] lists every op.
 const AGGREGATE_SUM: u8 = 0;
 const AGGREGATE_AVERAGE: u8 = 1;
 const AGGREGATE_MIN: u8 = 2;
@@ -646,7 +636,8 @@ impl CellStore {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
     }
 
-    /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.
+    /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max;
+    /// 4, or any other op, counts.
     #[wasm_bindgen(js_name = aggregate)]
     pub fn aggregate(&self, sheet: usize, col: usize, op: u8) -> f64 {
         let Some(s) = self.sheets.get(sheet) else {
@@ -1024,11 +1015,9 @@ impl CellStore {
     /// row at position `p` is `k * rows.len() + p`.
     fn ranked_row_keys(&self, data: &SheetData, cols: &[u32], rows: &[u32]) -> SortKeys {
         let row_count = rows.len();
-        // Decorate-sort-undecorate per key, as the one-key path does: a
-        // comparator that built both operands would rebuild each key about
-        // 2·n·log2(n) times, and a text key costs a scattered pool read every
-        // time. Keys are stored key-major, so the first key, which orders
-        // nearly every row, stays contiguous.
+        // Decorate-sort-undecorate per key, for the reason `sort_rows` gives.
+        // Keys are stored key-major, so the first key, which orders nearly
+        // every row, stays contiguous.
         let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
         for &col in cols {
             let base = col as usize * data.cells.row_count();
@@ -1250,8 +1239,8 @@ impl CellStore {
     /// - 0, a value list: its next `num_counts[i]` numbers in `value_nums` and
     ///   next `text_counts[i]` texts in `value_texts` (booleans as `\0TRUE` and
     ///   `\0FALSE`); the low bit of `flags[i]` also keeps empty cells.
-    /// - 1, text that contains its one text in `value_texts`; `flags[i]` 1
-    ///   matches case.
+    /// - 1, text that contains its one text in `value_texts`; a nonzero
+    ///   `flags[i]` matches case.
     /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
     ///   3 `<=`, 4 `=`, anything else `<>`.
     /// - 3, empty cells; 4, cells that are not empty.
@@ -1430,9 +1419,8 @@ enum Met<'a> {
     Key(DistinctKey<'a>),
 }
 
-/// How far a distinct scan reads: it lists at most `values` values (0 lists
-/// them all), and with `counted` it reads on past them so each listed value's
-/// count covers every row.
+/// How far a distinct scan reads: `limit` and `counted` of
+/// [`CellStore::distinct_values_in_rows`].
 #[derive(Clone, Copy)]
 struct DistinctLimit {
     values: usize,
@@ -1474,8 +1462,7 @@ impl<'a> DistinctScan<'a> {
 
     /// Meets the cell at `index`, of resolved `kind`, as `met`; true when it
     /// lists a new value. A counted scan counts a value it met before once
-    /// more. A new value is listed unless the list is full; a value first met
-    /// once the list is full is not listed.
+    /// more. A new value is listed unless the list is full.
     #[inline]
     fn meet(&mut self, index: usize, kind: u8, met: Met<'a>) -> bool {
         match met {
@@ -1558,7 +1545,7 @@ impl<'a> DistinctScan<'a> {
     }
 
     /// [`Self::meet`] for the cell at `index`, resolved first. `None` for text
-    /// without a pool id, which has to meet pooled text by content.
+    /// without a pool id, as [`met_at`] gives.
     #[inline(never)]
     fn meet_cell(&mut self, index: usize) -> Option<bool> {
         let (kind, met) = met_at(self.store, self.data, index, true)?;
@@ -1618,12 +1605,11 @@ fn met_at<'a>(
     Some((kind, met))
 }
 
-/// The distinct resolved values of `col` over `rows`, in first-seen order. A
-/// `counted` scan also gives the style of each one's first cell and how many
-/// of the rows read hold it, and keeps each pool id's slot to count it. A
-/// scan that only lists stops at `limit` values and marks pool ids with one
-/// bit, so it never zero-fills four bytes per id of the string pool.
-/// [`distinct_dense`] does the same over a row range of a dense column.
+/// The distinct resolved values of `col` over `rows`, in first-seen order, as
+/// far as `reach` reads. A counted scan also gives the style of each one's
+/// first cell and how many of the rows read hold it. [`DistinctScan`] says
+/// how it marks pool ids. [`distinct_dense`] does the same over a row range
+/// of a dense column.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,

@@ -332,8 +332,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
-            // The shape is known only after evaluation, so the pending loop
-            // charges the spill budget with the evaluated size instead.
+            // The shape is known only after evaluation; see `UNKNOWN_SIZE_PRECHARGE`.
             Ast::Func(Func::Offset | Func::Indirect, ..) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
             Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..)
                 if ast_produces_array(ast, pass.shapes(self.name_scope(formula_sheet))) =>
@@ -705,9 +704,7 @@ impl CellStore {
                 self.eval_trim_range(args, sheet, pass, depth + 1)
             }
             Ast::Func(Func::Sequence, args, _) => self.eval_sequence(args, sheet, pass, depth + 1),
-            // One out-of-line call: the check that IF and the other branch
-            // functions produce an array stays in the family, out of the
-            // evaluator this dispatch is inlined into.
+            // Out of line; `eval_branches_family` says why.
             Ast::Func(
                 Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
                 ..,
@@ -715,8 +712,7 @@ impl CellStore {
             Ast::Func(Func::Index, args, _) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }
-            // One out-of-line call, as for the branch functions: the check
-            // that a function taking one value is lifted stays in the family.
+            // Out of line; `eval_lifted_family` says why.
             Ast::Func(..) => self.eval_lifted_family(ast, sheet, pass, depth + 1)?,
             _ => return None,
         };
@@ -750,8 +746,8 @@ impl CellStore {
     }
 
     /// The shape of an array expression before it is evaluated. `pass` is the
-    /// pass that asks; the full engine's shape hooks share its compiled regex
-    /// programs, and the default engine only passes it on.
+    /// pass that asks: a LET name reads its binding from the pass's LET frame,
+    /// and the full engine's shape hooks share its compiled regex programs.
     #[cfg_attr(
         not(feature = "analysis"),
         allow(
@@ -1354,7 +1350,7 @@ impl CellStore {
         ))
     }
 
-    /// A TRIMRANGE trim argument: a whole number from 0 to 3, 3 when omitted.
+    /// A TRIMRANGE trim argument, truncated to a whole number. `#VALUE!` outside 0 to 3.
     fn trim_mode(
         &self,
         mode_arg: Option<&Ast>,
@@ -1576,14 +1572,14 @@ impl CellStore {
 }
 
 /// The form an array dispatch returns, each checked against the array byte
-/// budget: a matrix for callers that read every value, or rows of one base
-/// for a row step's argument and for a spill.
+/// budget: a matrix for callers that read every value, a spill included, or
+/// rows of one base for a row step's argument.
 trait ArrayResult: Sized {
     /// A matrix a function computed.
     fn computed(matrix: EvalMatrix) -> Result<Self, FormulaError>;
     /// The rows a row step kept.
     fn rows(rows: ValueRows) -> Result<Self, FormulaError>;
-    /// An array constant's `values`, `cols` per row.
+    /// `values` of an array constant or a LAMBDA array argument, `cols` per row.
     fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError>;
 }
 
@@ -1613,7 +1609,7 @@ impl ArrayResult for ValueRows {
         Ok(rows)
     }
 
-    /// Shared with the formula tree, so nothing is copied or counted.
+    /// Shared with the formula tree or the call frame, so nothing is copied or counted.
     fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError> {
         Ok(Self::shared(rows, cols, Rc::clone(values)))
     }
@@ -1627,8 +1623,7 @@ pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Optio
 
 /// A LAMBDA body or array helper argument that calls OFFSET or INDIRECT has
 /// no shape before evaluation, so a shape query reports `#VALUE!`. Such a
-/// formula is charged like a bare runtime reference: a precharge now, and
-/// whatever its result holds beyond it once the pending loop evaluates it.
+/// formula is charged like a bare runtime reference: [`UNKNOWN_SIZE_PRECHARGE`].
 #[cfg(feature = "analysis")]
 fn runtime_reference_bound(
     ast: &Ast,
@@ -1722,8 +1717,7 @@ fn item_values_equal(left: &Value, right: &Value) -> Result<bool, FormulaError> 
     })
 }
 
-/// TRIMRANGE trims leading blanks for mode 1, trailing blanks for mode 2
-/// and both for mode 3.
+/// TRIMRANGE trim mode bits; [`CellStore::eval_trim_range`] gives the modes.
 const TRIM_LEADING: u8 = 1;
 const TRIM_TRAILING: u8 = 2;
 const TRIM_BOTH: u8 = TRIM_LEADING | TRIM_TRAILING;
@@ -1772,7 +1766,7 @@ mod tests {
 
     /// UNIQUE groups items by hash, then compares the items in a group. Two
     /// values it calls equal must hash alike, or whether they merge depends
-    /// on a hash collision. An empty cell stays apart from 0, "" and FALSE.
+    /// on a hash collision.
     #[test]
     fn unique_equality_agrees_with_its_hash() {
         use super::{hash_item_value, item_values_equal, DefaultHasher, Hasher};
@@ -1919,8 +1913,7 @@ mod tests {
             store.set_number(sheet, row, 1, row as f64, 0);
         }
 
-        // UNIQUE and FILTER return fewer rows than their range; SORT and
-        // UNIQUE read the rows they return, not the rows of the range.
+        // UNIQUE and FILTER return fewer rows than their range.
         for (formula, expected) in [
             ("=SORT(UNIQUE(A1:A6))", vec!["a", "b", "c", "d"]),
             ("=SORT(FILTER(A1:A6,B1:B6<3),1,-1)", vec!["b", "b", "a"]),
