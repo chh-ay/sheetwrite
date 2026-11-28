@@ -665,6 +665,11 @@ impl FormulaStore {
         !self.volatile.is_empty()
     }
 
+    /// Whether any formula calls SUBTOTAL or AGGREGATE.
+    pub(crate) fn has_subtotals(&self) -> bool {
+        !self.subtotals.is_empty()
+    }
+
     /// Select edit-barrier seeds without walking the formula syntax tree.
     pub(crate) fn is_volatile(&self, id: FormulaId) -> bool {
         self.volatile.contains(id)

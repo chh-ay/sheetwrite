@@ -170,6 +170,14 @@ impl ConditionalRules {
         self.by_sheet.remove(&sheet);
     }
 
+    /// Whether a rule is a formula, which may call SUBTOTAL or AGGREGATE.
+    pub(crate) fn has_formula_rules(&self) -> bool {
+        self.by_sheet
+            .values()
+            .flatten()
+            .any(|rule| matches!(rule.pred, CondPred::Formula(_)))
+    }
+
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         metadata
