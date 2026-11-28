@@ -7,7 +7,7 @@ import type {
   WorkbookSnapshot,
   WorkbookTable,
 } from "@sheetwrite/core";
-import { sheetNameKey } from "@sheetwrite/core/codec";
+import { sheetNameKey, workbookTableNameKey } from "@sheetwrite/core/codec";
 
 import { columnWidthCharacters, columnWidthPixels } from "./format.js";
 import { snapshotAutoFilter } from "./reader-autofilter.js";
@@ -218,11 +218,10 @@ function snapshot_tables(
     const meta_table =
       meta?.tables?.find(
         (candidate) =>
-          candidate.name.normalize("NFC").toUpperCase() ===
-          native_table.name.normalize("NFC").toUpperCase(),
+          workbookTableNameKey(candidate.name) === workbookTableNameKey(native_table.name),
       ) ?? meta?.tables?.[table_index];
     const table_id = meta_table?.id ?? native_table.id;
-    const table_name_key = native_table.name.normalize("NFC").toUpperCase();
+    const table_name_key = workbookTableNameKey(native_table.name);
     if (used_table_ids.has(table_id) || used_table_names.has(table_name_key)) {
       return readerFailure(`workbook table ${native_table.name} has a duplicate identity or name`);
     }

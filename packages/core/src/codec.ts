@@ -39,6 +39,7 @@ export {
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validateWorkbookTableName,
   validWorkbookTableXmlElement,
+  workbookTableNameKey,
 } from "./workbook-table.js";
 export { withXlsxFormulaEngine } from "./xlsx-formulas.js";
 export { DEFAULT_XLSX_RESOURCE_LIMITS, XlsxResourceError } from "./xlsx-resource-limits.js";

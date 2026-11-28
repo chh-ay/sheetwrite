@@ -562,6 +562,7 @@
     "@sheetwrite/core#./codec#validateWorkbookSnapshot": "fd6e7f3774b6",
     "@sheetwrite/core#./codec#validateWorkbookTableName": "279ebfb37c11",
     "@sheetwrite/core#./codec#withXlsxFormulaEngine": "ec79dc026071",
+    "@sheetwrite/core#./codec#workbookTableNameKey": "be0ed76caa08",
     "@sheetwrite/core#./external-links#ExternalLinkRequest": "33b564eb8c40",
     "@sheetwrite/core#./external-links#ExternalLinkResolver": "327441989c1a",
     "@sheetwrite/core#./external-links#ExternalLinkUpdate": "de5fee13436b",
