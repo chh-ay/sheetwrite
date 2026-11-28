@@ -89,6 +89,53 @@ fn data_edge_stops_at_a_formula_with_a_blank_result_in_any_order() {
     );
 }
 
+/// A query, what it returned, and what it should return.
+type QueryCase<'a> = (&'a str, Vec<u32>, &'a [u32]);
+
+/// A formula whose result is blank shows nothing, so every query reads it as
+/// an empty cell: no text query finds the 0 behind it, and the Empty filter
+/// keeps it. Each row is a query and the rows or cells it returns.
+#[test]
+fn a_formula_with_a_blank_result_queries_as_an_empty_cell() {
+    const CONTAINS: u8 = 1;
+    const EMPTY: u8 = 3;
+    const NON_EMPTY: u8 = 4;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 1);
+    store.set_formula(sheet, 0, 0, "=C1", 0);
+    store.recompute(sheet);
+    let filter = |kind: u8, texts: &[&str]| {
+        let owned_texts = texts.iter().map(|&text| text.to_owned()).collect();
+        store.filter_rows_multi(sheet, &[0], &[kind], &[0], &[], &[], &[], &[], owned_texts)
+    };
+
+    let cases: [QueryCase<'_>; 7] = [
+        ("Contains filter", filter(CONTAINS, &["0"]), &[]),
+        ("text filter", store.filter_rows(sheet, 0, "0"), &[]),
+        ("Empty filter", filter(EMPTY, &[]), &[0]),
+        ("NonEmpty filter", filter(NON_EMPTY, &[]), &[]),
+        (
+            "Find in part of a cell",
+            store.search(sheet, &[0], "0", true, false, false),
+            &[],
+        ),
+        (
+            "Find the whole cell",
+            store.search(sheet, &[0], "0", true, true, false),
+            &[],
+        ),
+        (
+            "wildcard Find",
+            store.search(sheet, &[0], "0*", true, true, false),
+            &[],
+        ),
+    ];
+    for (query, found, expected) in cases {
+        assert_eq!(found, expected, "{query}");
+    }
+}
+
 #[test]
 fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     let mut store = CellStore::new();
