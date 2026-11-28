@@ -1,9 +1,5 @@
-import {
-  cellA1,
-  type ExternalLink,
-  type ExternalLinkValue,
-  MAX_EXTERNAL_SHEET_AREA,
-} from "@sheetwrite/core";
+import type { ExternalLink, ExternalLinkValue } from "@sheetwrite/core";
+import { cellA1, MAX_EXTERNAL_SHEET_AREA } from "@sheetwrite/core/codec";
 import {
   externalSheetText,
   formulaCallsExternalData,

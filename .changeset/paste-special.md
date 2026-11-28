@@ -1,0 +1,5 @@
+---
+"@sheetwrite/core": minor
+---
+
+Paste Special, as in Excel: Ctrl+Alt+V (Ctrl+Cmd+V on a Mac), Home › Paste › Paste Special… and the context menu open its dialog, with every Paste choice (All, Formulas, Values, Formats, Comments and Notes, Validation, All using Source theme, All except borders, Column widths, Formulas and number formats, Values and number formats, All merging conditional formats), Operation (None, Add, Subtract, Multiply, Divide), Skip blanks, Transpose and Paste Link, each with its letter key. Home › Paste and the context menu's Paste Options row offer Values, Formulas, Formatting, Transpose and Paste Link in one click. New `grid.actions.pasteSpecial(options)`, keyboard action `pasteSpecial`, context-menu actions `pasteValues`, `pasteFormulas`, `pasteFormatting`, `pasteTranspose`, `pasteLink` and `pasteSpecial`, `ContextMenuItem.inline` for a row of icon buttons, and six glyphs. A paste of cells copied in the same grid now also brings their notes and conditional formats, as Excel's Paste does.

@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/formula-assist",
-  "version": "0.7.0",
+  "version": "0.6.1",
   "type": "module",
   "description": "Optional formula bar add-on for Sheetwrite that suggests the rest of a formula, accepted with Tab.",
   "license": "MIT",

@@ -1,5 +1,5 @@
 import type { WorkbookSnapshot } from "@sheetwrite/core";
-import { DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS, validateSheetName } from "@sheetwrite/core";
+import { DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS, validateSheetName } from "@sheetwrite/core/codec";
 
 import { dynamicArrayCellMetadata } from "./dynamic-array.js";
 import { readExternalLinks, type ImportedExternalLinks } from "./external-links.js";

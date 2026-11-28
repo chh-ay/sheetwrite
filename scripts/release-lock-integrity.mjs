@@ -44,40 +44,40 @@ export function versionFreeTarballName(packageName) {
  * @returns {Promise<string[]>} the installed package names
  */
 export async function installCanonicalTarballs(lockPath, tarballs) {
-  const fixtureRoot = dirname(lockPath);
+  const fixture_root = dirname(lockPath);
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   if (lock === null || typeof lock !== "object" || typeof lock.packages !== "object") {
     throw new Error(`${lockPath} has no npm package graph`);
   }
   const installed = [];
-  for (const [packagePath, placeholder] of Object.entries(lock.packages)) {
-    if (!packagePath.startsWith(SHEETWRITE_ENTRY)) continue;
-    const packageName = packagePath.slice("node_modules/".length);
-    const tarballPath = tarballs.get(packageName);
-    if (tarballPath === undefined) {
-      throw new Error(`${lockPath} installs ${packageName}, which has no canonical tarball`);
+  for (const [package_path, placeholder] of Object.entries(lock.packages)) {
+    if (!package_path.startsWith(SHEETWRITE_ENTRY)) continue;
+    const package_name = package_path.slice("node_modules/".length);
+    const tarball_path = tarballs.get(package_name);
+    if (tarball_path === undefined) {
+      throw new Error(`${lockPath} installs ${package_name}, which has no canonical tarball`);
     }
     const resolved = placeholder?.resolved;
     if (
       Object.keys(placeholder).join() !== "resolved" ||
       typeof resolved !== "string" ||
       !resolved.startsWith("file:") ||
-      !resolved.endsWith(`/${versionFreeTarballName(packageName)}`)
+      !resolved.endsWith(`/${versionFreeTarballName(package_name)}`)
     ) {
       throw new Error(
-        `${lockPath} ${packagePath} must be a placeholder with only a version-free resolved path`,
+        `${lockPath} ${package_path} must be a placeholder with only a version-free resolved path`,
       );
     }
-    const target = join(fixtureRoot, resolved.slice("file:".length));
+    const target = join(fixture_root, resolved.slice("file:".length));
     await mkdir(dirname(target), { recursive: true });
-    await copyFile(tarballPath, target);
+    await copyFile(tarball_path, target);
     const [bytes, { stdout }] = await Promise.all([
-      readFile(tarballPath),
-      run("tar", ["-xOzf", tarballPath, "package/package.json"], { maxBuffer: 1 << 20 }),
+      readFile(tarball_path),
+      run("tar", ["-xOzf", tarball_path, "package/package.json"], { maxBuffer: 1 << 20 }),
     ]);
     const manifest = JSON.parse(stdout);
-    if (manifest.name !== packageName) {
-      throw new Error(`${tarballPath} holds ${manifest.name}, expected ${packageName}`);
+    if (manifest.name !== package_name) {
+      throw new Error(`${tarball_path} holds ${manifest.name}, expected ${package_name}`);
     }
     const entry = {
       version: manifest.version,
@@ -87,8 +87,8 @@ export async function installCanonicalTarballs(lockPath, tarballs) {
     for (const field of LOCKED_MANIFEST_FIELDS) {
       if (manifest[field] !== undefined) entry[field] = manifest[field];
     }
-    lock.packages[packagePath] = entry;
-    installed.push(packageName);
+    lock.packages[package_path] = entry;
+    installed.push(package_name);
   }
   await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
   return installed;

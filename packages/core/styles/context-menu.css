@@ -41,16 +41,17 @@
   outline: none;
 }
 
-.sheetwrite-context-menu-item:is(:hover, :focus-visible, :focus):not(
-    .sheetwrite-context-menu-item-disabled
-  ),
+.sheetwrite-context-menu-item:hover:not(.sheetwrite-context-menu-item-disabled),
+.sheetwrite-context-menu-item:focus-visible:not(.sheetwrite-context-menu-item-disabled),
+.sheetwrite-context-menu-item:focus:not(.sheetwrite-context-menu-item-disabled),
 .sheetwrite-context-menu-item[aria-expanded="true"] {
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
 }
 
 /* High Contrast drops backgrounds; an outline keeps the active row visible. */
 @media (forced-colors: active) {
-  .sheetwrite-context-menu-item:is(:focus, [aria-expanded="true"]) {
+  .sheetwrite-context-menu-item:focus,
+  .sheetwrite-context-menu-item[aria-expanded="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }
@@ -126,8 +127,8 @@
   padding: 0;
 }
 
-.sheetwrite-context-menu-inline
-  :is(.sheetwrite-context-menu-label, .sheetwrite-context-menu-shortcut) {
+.sheetwrite-context-menu-inline .sheetwrite-context-menu-label,
+.sheetwrite-context-menu-inline .sheetwrite-context-menu-shortcut {
   display: none;
 }
 
@@ -171,7 +172,8 @@
   cursor: pointer;
 }
 
-.sheetwrite-autofilter-command:is(:hover, :focus-visible):not(:disabled),
+.sheetwrite-autofilter-command:hover:not(:disabled),
+.sheetwrite-autofilter-command:focus-visible:not(:disabled),
 .sheetwrite-autofilter-command[aria-expanded="true"] {
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
   outline: none;
@@ -195,7 +197,8 @@
 }
 
 .sheetwrite-autofilter-search,
-.sheetwrite-autofilter-condition :is(select, input) {
+.sheetwrite-autofilter-condition select,
+.sheetwrite-autofilter-condition input {
   min-height: 26px;
   margin: 4px 0;
   padding: 0 6px;

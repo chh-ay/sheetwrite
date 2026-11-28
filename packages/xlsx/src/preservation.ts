@@ -6,7 +6,7 @@ import type {
   XlsxSourcePart,
   XlsxSourceSnapshot,
 } from "@sheetwrite/core";
-import { XlsxResourceError } from "@sheetwrite/core";
+import { XlsxResourceError } from "@sheetwrite/core/codec";
 import { inflateSync } from "fflate";
 
 import type { DrawingChart } from "./chart-write.js";

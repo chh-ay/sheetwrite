@@ -1,16 +1,18 @@
+import type {
+  SnapshotValidationOptions,
+  WorkbookSnapshot,
+  XlsxResourceLimits,
+  XlsxWorkbookOptions,
+  XlsxWorkbookWarning,
+} from "@sheetwrite/core";
 import {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   isSheetwriteError,
   SheetwriteError,
-  type SnapshotValidationOptions,
+  validateBuiltWorkbookSnapshot,
   validateWorkbookSnapshot,
-  type WorkbookSnapshot,
   XlsxResourceError,
-  type XlsxResourceLimits,
-  type XlsxWorkbookOptions,
-  type XlsxWorkbookWarning,
-} from "@sheetwrite/core";
-import { validateBuiltWorkbookSnapshot } from "@sheetwrite/core/codec";
+} from "@sheetwrite/core/codec";
 
 export interface XlsxCodecContext {
   readonly operation: "import" | "export";

@@ -15,7 +15,8 @@ type Codec = Awaited<ReturnType<typeof import_codec>>;
 /**
  * Backends that load the codec on their first call. Once it loads, the
  * codec's own backends replace them, which also turns on the check of kept
- * parts when a store loads a snapshot.
+ * parts when a store loads a snapshot. A failed load rejects the call that
+ * started it and is not kept, so the next call loads the codec again.
  */
 function lazy_backends(context: SheetwriteAddonContext): {
   workbook: XlsxWorkbookBackend;
@@ -25,14 +26,20 @@ function lazy_backends(context: SheetwriteAddonContext): {
   let pending: Promise<Codec> | undefined;
 
   const codec = (): Promise<Codec> => {
-    pending ??= import_codec().then((loaded) => {
-      context.xlsx({
-        workbook: loaded.sheetwriteWorkbookBackend,
-        tableImport: loaded.sheetwriteTableImportBackend,
-        tableExport: loaded.sheetwriteTableExportBackend,
-      });
-      return loaded;
-    });
+    pending ??= import_codec().then(
+      (loaded) => {
+        context.xlsx({
+          workbook: loaded.sheetwriteWorkbookBackend,
+          tableImport: loaded.sheetwriteTableImportBackend,
+          tableExport: loaded.sheetwriteTableExportBackend,
+        });
+        return loaded;
+      },
+      (error: unknown) => {
+        pending = undefined;
+        throw error;
+      },
+    );
     return pending;
   };
 

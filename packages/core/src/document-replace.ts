@@ -4,6 +4,7 @@ import { SheetwriteError } from "./errors.js";
 import type { ReadWindowController } from "./read-window-controller.js";
 import type { Scope } from "./scope.js";
 import type { SheetwriteStore } from "./store.js";
+import { resolveActiveSheet } from "./store/ranges.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
@@ -52,14 +53,7 @@ export async function replaceDocument(
     host.closeFind();
 
     const workbook = host.grid.store.getWorkbook();
-    const active_sheet =
-      workbook.sheets.find(
-        (sheet) =>
-          sheet.id === workbook.activeSheet && (sheet.visibility ?? "visible") === "visible",
-      )?.id ??
-      workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
-      workbook.activeSheet;
-    host.activate(workbook, active_sheet);
+    host.activate(workbook, resolveActiveSheet(workbook.sheets, workbook.activeSheet));
     host.grid.clearSearch();
     host.grid.openPanel(null);
     host.grid.highlightCells(null);

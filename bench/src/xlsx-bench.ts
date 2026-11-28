@@ -16,7 +16,7 @@ const FIXTURE_BYTES = 1_038_346;
 const FIXTURE_SHA256 = "2633e51a4a3caa8d34b2e2147b997c6ebdd0cf514be6e6c60663a0f7659e6e00";
 const GENERATOR_SHA256 = "a00a25851cbb8479a13472ef07ad3a133f8901505ea89da8f967041d4b9f4fb2";
 const BASELINE_COMMIT = "87fadb72397947ea8c6ba576682925c7879579b8";
-const PROTOCOL = "sheetwrite-xlsx-codec-v2";
+const PROTOCOL = "sheetwrite-xlsx-codec-v3";
 const MAX_BASELINE_RATIO = 1.25;
 const MAX_REJECTION_WALL_MS = 1_000;
 const MAX_REJECTION_RSS_BYTES = 256 * 1024 * 1024;
@@ -71,6 +71,11 @@ export interface XlsxRawSample {
   readonly inputBytes: number;
   readonly outputBytes: number;
   readonly checksum: string;
+  /**
+   * Heap and ArrayBuffer growth across the operation in a second worker run
+   * with the collector off, so every byte the operation allocates is counted.
+   */
+  readonly allocatedBytes: number;
   readonly rejection?: string;
 }
 
@@ -88,7 +93,7 @@ export interface XlsxScenarioSummary {
   readonly durationMs: XlsxFiniteSummary;
   readonly processWallMs: XlsxFiniteSummary;
   readonly maxRssBytes: XlsxFiniteSummary & { readonly max: number };
-  readonly returnAllocationDeltaBytes: XlsxFiniteSummary & {
+  readonly allocatedBytes: XlsxFiniteSummary & {
     readonly max: number;
   };
   readonly retainedAfterGcDeltaBytes: XlsxFiniteSummary & {
@@ -166,18 +171,11 @@ function exact_matrix(expected: readonly string[], actual: readonly string[]): v
   }
 }
 
-function return_allocation(sample: XlsxRawSample): number {
-  return (
-    Math.max(0, sample.heapAfterBytes - sample.heapBeforeBytes) +
-    Math.max(0, sample.arrayBuffersAfterBytes - sample.arrayBuffersBeforeBytes)
-  );
-}
-
 function summary_for(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
   const first = samples[0];
   if (!first) throw new Error("cannot summarize an empty XLSX sample");
   const rss = samples.map((sample) => sample.maxRssBytes);
-  const allocated = samples.map(return_allocation);
+  const allocated = samples.map((sample) => sample.allocatedBytes);
   const retained = samples.map(
     (sample) =>
       Math.max(0, sample.heapRetainedBytes - sample.heapBeforeBytes) +
@@ -190,7 +188,7 @@ function summary_for(samples: readonly XlsxRawSample[]): XlsxScenarioSummary {
     durationMs: summarizeFinite(samples.map((sample) => sample.durationMs)),
     processWallMs: summarizeFinite(samples.map((sample) => sample.processWallMs)),
     maxRssBytes: { ...summarizeFinite(rss), max: Math.max(...rss) },
-    returnAllocationDeltaBytes: {
+    allocatedBytes: {
       ...summarizeFinite(allocated),
       max: Math.max(...allocated),
     },
@@ -239,13 +237,22 @@ function baseline_commit(root: string): string {
   return result.stdout.toString().trim();
 }
 
-async function run_worker(
-  round: number,
-  engine: XlsxEngine,
-  scenario: Scenario,
-  mode: XlsxBenchmarkMode,
-  root: string,
-): Promise<XlsxRawSample> {
+/** What one worker process reports; the bench adds the round, wall time and allocation. */
+type WorkerReport = Omit<XlsxRawSample, "round" | "processWallMs" | "allocatedBytes">;
+
+interface WorkerRun {
+  readonly engine: XlsxEngine;
+  readonly scenario: Scenario;
+  readonly mode: XlsxBenchmarkMode;
+  readonly root: string;
+}
+
+/** One fresh worker process; `collector_off` turns JavaScriptCore's garbage collector off in it. */
+async function spawn_worker(
+  run: WorkerRun,
+  collector_off: boolean,
+): Promise<{ report: WorkerReport; wall_ms: number }> {
+  const { engine, scenario, mode, root } = run;
   const started = performance.now();
   const child = Bun.spawn(
     [
@@ -264,23 +271,57 @@ async function run_worker(
       "--fixture",
       scenario.fixture,
     ],
-    { cwd: root, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: collector_off ? { ...process.env, BUN_JSC_useGC: "0" } : process.env,
+    },
   );
   const [stdout, stderr, exit_code] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  const process_wall_ms = performance.now() - started;
+  const wall_ms = performance.now() - started;
   if (exit_code !== 0) {
     throw new Error(
       `${engine} ${scenario.operation}:${scenario.name} exited ${exit_code}: ${stderr.trim()}`,
     );
   }
-  const lines = stdout.trim().split("\n");
-  if (lines.length !== 1) throw new Error(`XLSX worker returned ${lines.length} output lines`);
-  const parsed = JSON.parse(lines[0]!) as Omit<XlsxRawSample, "round" | "processWallMs">;
-  return { ...parsed, round, processWallMs: process_wall_ms };
+  const [line, ...extra] = stdout.trim().split("\n");
+  if (line === undefined || extra.length > 0) {
+    throw new Error(`XLSX worker returned ${extra.length + 1} output lines`);
+  }
+  return { report: JSON.parse(line) as WorkerReport, wall_ms };
+}
+
+async function run_worker(
+  round: number,
+  engine: XlsxEngine,
+  scenario: Scenario,
+  mode: XlsxBenchmarkMode,
+  root: string,
+): Promise<XlsxRawSample> {
+  const run = { engine, scenario, mode, root };
+  const { report, wall_ms } = await spawn_worker(run, false);
+  // Without collections, the heap and ArrayBuffer growth across the operation is every byte it
+  // allocated; in the timed run it would also depend on when the last collection happened.
+  const { report: uncollected } = await spawn_worker(run, true);
+  // The baseline codec stamps the export time into its output, so only the current one compares.
+  if (engine === "current" && uncollected.checksum !== report.checksum) {
+    throw new Error(
+      `${engine} ${scenario.operation}:${scenario.name} changed its output with the collector off`,
+    );
+  }
+  return {
+    ...report,
+    round,
+    processWallMs: wall_ms,
+    allocatedBytes:
+      Math.max(0, uncollected.heapAfterBytes - uncollected.heapBeforeBytes) +
+      Math.max(0, uncollected.arrayBuffersAfterBytes - uncollected.arrayBuffersBeforeBytes),
+  };
 }
 
 function expected_matrix(rounds: number, compared: boolean): string[] {
@@ -369,6 +410,7 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
       "arrayBuffersRetainedBytes",
       "inputBytes",
       "outputBytes",
+      "allocatedBytes",
     ] as const) {
       finite_non_negative(sample[metric], `samples[${index}].${metric}`);
     }
@@ -521,7 +563,7 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
       memory:
         "Peak RSS is Linux /proc/self/status VmHWM (or process.resourceUsage maxRSS fallback) from the same fresh worker process; reported gate value is the largest raw peak.",
       allocation:
-        "Return allocation delta is max(0, heapUsed after-before) plus max(0, arrayBuffers after-before), with GC only before the operation; it includes uncollected garbage and is not total allocation or peak heap. Retained-after-GC delta uses the same formula after clearing completed operation frames and forcing a second GC; output checksums are retained, but operation results are released.",
+        "Allocated bytes is max(0, heapUsed after-before) plus max(0, arrayBuffers after-before) in a second fresh worker per sample that runs the same operation with JavaScriptCore's collector off (BUN_JSC_useGC=0), so it counts every byte the operation allocates and does not depend on when the last collection ran; time, RSS and retained bytes come from the first worker. Retained-after-GC delta uses the same formula in the first worker, between a forced GC before the operation and a second forced GC after clearing completed operation frames; output checksums are retained, but operation results are released.",
     },
     scenarios: [
       ...PERFORMANCE_SCENARIOS.map((scenario) => `${scenario.operation}:${scenario.name}`),

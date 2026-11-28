@@ -1,13 +1,9 @@
 import type { CellBorder, CellStyle, CellVerticalAlign, SheetSnapshot } from "@sheetwrite/core";
-import { isCellFontFamily } from "@sheetwrite/core";
+import { isCellFontFamily } from "@sheetwrite/core/codec";
 
 import { DRAWINGML_NAMESPACES, MAIN_NAMESPACES, MAIN_NS } from "./format.js";
-import {
-  assertResource,
-  boundedErrorText,
-  emitWarning,
-  type XlsxCodecContext,
-} from "./resources.js";
+import { readerFailure } from "./reader-values.js";
+import { assertResource, emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   assertXmlRoot,
   escapeXml,
@@ -715,9 +711,7 @@ function integer_attribute(element: XmlElement, name: string, fallback = 0): num
   if (raw === undefined) return fallback;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {
-    throw new TypeError(
-      boundedErrorText(`Sheetwrite: invalid XLSX style ${name}=${JSON.stringify(raw)}`),
-    );
+    return readerFailure(`style attribute ${name}=${JSON.stringify(raw)} is invalid`);
   }
   return value;
 }
@@ -842,7 +836,7 @@ export class ParsedStyles {
       const id = integer_attribute(format, "numFmtId", -1);
       const code = xmlAttribute(format, "formatCode");
       if (id < 0 || code === undefined) {
-        throw new TypeError("Sheetwrite: invalid XLSX custom number format");
+        readerFailure("a custom number format has no valid numFmtId or formatCode");
       }
       formats.set(id, code);
     }
@@ -905,8 +899,8 @@ export class ParsedStyles {
       const fill = fills[fill_id];
       const border = borders[border_id];
       if (!font || !fill || !border) {
-        throw new TypeError(
-          `Sheetwrite: invalid XLSX style ${style_index} references font ${font_id}, fill ${fill_id}, or border ${border_id}`,
+        return readerFailure(
+          `style ${style_index} references font ${font_id}, fill ${fill_id}, or border ${border_id}, which does not exist`,
         );
       }
       const style: CellStyle = {};
@@ -1042,7 +1036,7 @@ export class ParsedStyles {
 
   at(index: number): ParsedCellStyle {
     const style = this.#styles[index];
-    if (!style) throw new TypeError(`Sheetwrite: XLSX cell style index ${index} is out of range`);
+    if (!style) return readerFailure(`cell style index ${index} is out of range`);
     return style;
   }
 

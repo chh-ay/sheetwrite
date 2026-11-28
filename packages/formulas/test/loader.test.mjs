@@ -4,8 +4,8 @@ import { describe, expect, it } from "bun:test";
 describe("full engine package loaders", () => {
   for (const entry of ["node", "browser"]) {
     it(`loads the ${entry} entry and evaluates analysis and default formulas`, async () => {
-      const loaderUrl = new URL(`../loader-${entry}.mjs`, import.meta.url).href;
-      const binaryUrl = new URL("../pkg/sheetwrite_wasm_bg.wasm", import.meta.url).href;
+      const loader_url = new URL(`../loader-${entry}.mjs`, import.meta.url).href;
+      const binary_url = new URL("../pkg/sheetwrite_wasm_bg.wasm", import.meta.url).href;
       const child = Bun.spawn(
         [
           "node",
@@ -13,10 +13,10 @@ describe("full engine package loaders", () => {
           "-e",
           `import { strict as assert } from "node:assert";
            import { readFile } from "node:fs/promises";
-           import * as engine from ${JSON.stringify(loaderUrl)};
+           import * as engine from ${JSON.stringify(loader_url)};
            assert.equal(engine.isLoaded(), false);
            const source = ${JSON.stringify(entry)} === "browser"
-             ? await readFile(new URL(${JSON.stringify(binaryUrl)})) : undefined;
+             ? await readFile(new URL(${JSON.stringify(binary_url)})) : undefined;
            await Promise.all([engine.load(source), engine.load(source)]);
            assert.equal(engine.isLoaded(), true);
            const store = new engine.CellStore();
@@ -37,12 +37,16 @@ describe("full engine package loaders", () => {
         ],
         { stdout: "pipe", stderr: "pipe" },
       );
-      const [stdout, stderr, exitCode] = await Promise.all([
+      const [stdout, stderr, exit_code] = await Promise.all([
         new Response(child.stdout).text(),
         new Response(child.stderr).text(),
         child.exited,
       ]);
-      expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
+      expect({ exitCode: exit_code, stdout, stderr }).toEqual({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+      });
     });
   }
 });

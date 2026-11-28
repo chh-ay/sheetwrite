@@ -1,4 +1,4 @@
-import type { CellScalar, Grid, GridOptions } from "@sheetwrite/core";
+import { type CellScalar, type Grid, type GridOptions, isSheetwriteReady } from "@sheetwrite/core";
 import {
   type AdapterGridController,
   type AdapterGridInput,
@@ -30,6 +30,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 const use_commit_layout_effect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -37,6 +38,11 @@ const use_commit_layout_effect = typeof window === "undefined" ? useEffect : use
 function publish_grid(ref: ForwardedRef<Grid>, grid: Grid | null): void {
   if (typeof ref === "function") ref(grid);
   else if (ref) ref.current = grid;
+}
+
+/** Readiness changes only inside the controller, which reports it through its own state. */
+function subscribe_to_readiness(): () => void {
+  return () => undefined;
 }
 
 type GridAdapterEventHandlerName =
@@ -156,6 +162,14 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
     const [initialization_state, set_initialization_state] = useState<
       "loading" | "ready" | "error"
     >("loading");
+    // On a page whose WASM is already initialized there is nothing to wait for and
+    // initialization cannot fail, so the fallback never shows. The server has no WASM,
+    // so hydration starts from the server's fallback and then removes it.
+    const is_ready_at_render = useSyncExternalStore(
+      subscribe_to_readiness,
+      isSheetwriteReady,
+      () => false,
+    );
 
     const handlers = useRef<GridAdapterEventHandlers | null>(null);
     use_commit_layout_effect(() => {
@@ -279,7 +293,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
     const host_style = { ...style, ...sizing };
     return (
       <div {...host_attributes} ref={host_ref} className={host_class_name} style={host_style}>
-        {initialization_state === "ready" ? null : fallback}
+        {initialization_state === "ready" || is_ready_at_render ? null : fallback}
       </div>
     );
   },

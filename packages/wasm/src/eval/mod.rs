@@ -298,6 +298,31 @@ pub(crate) fn calculated_slot(strings: &mut StringStorage, value: &Value) -> (u8
     }
 }
 
+/// The value a formula's cell holds for the formula's result. In Excel a
+/// formula cell is never blank: a result that ends in an empty cell (`=C1`,
+/// `INDEX` or a lookup that finds one, a gap in a spilled range) is the
+/// number 0, and only `""` shows nothing. Functions that take the reference
+/// as an argument (`ISBLANK(C1)`, `COUNTBLANK`) still see the blank, so this
+/// applies only where a result becomes a cell's value.
+#[inline]
+pub(crate) fn cell_value(result: Value) -> Value {
+    match result {
+        Value::Blank => Value::Number(0.0),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Error(_) => result,
+    }
+}
+
+/// [`calculated_slot`] of a spilled element, which [`cell_value`] turns from
+/// an empty cell into 0.
+fn spilled_slot(strings: &mut StringStorage, value: &Value) -> (u8, u64) {
+    match value {
+        Value::Blank => (KIND_NUMBER, encode_num(0.0)),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Error(_) => {
+            calculated_slot(strings, value)
+        }
+    }
+}
+
 /// A cell's value as a formula reads it between passes: its literal source,
 /// or the stored result of its formula or of the spill that covers it.
 #[cfg(feature = "analysis")]
@@ -1297,7 +1322,7 @@ impl CellStore {
                         if data.spill.attempt(local).is_some() {
                             data.spill.forget(local, &mut data.cells);
                         }
-                        pass.results.pull(id, matrix.into_first());
+                        pass.results.pull(id, cell_value(matrix.into_first()));
                         Vec::new()
                     }
                     result => self.install_spill_result(key, result, &vacated_spill, pass.results),
@@ -1536,10 +1561,10 @@ impl CellStore {
             return Vec::new();
         }
 
-        let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
+        let first = cell_value(matrix.values.first().cloned().unwrap_or(Value::Blank));
         results.pull(id, first);
         let strings = &mut self.strings;
-        let value_at = |offset: usize| calculated_slot(strings, &matrix.values[offset]);
+        let value_at = |offset: usize| spilled_slot(strings, &matrix.values[offset]);
         if vacated.owned_cells() == 0 {
             data.spill.install(range, &mut data.cells, value_at)
         } else {
@@ -1881,7 +1906,7 @@ impl CellStore {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);
-                    if entry.has_spill_refs() {
+                    let result = if entry.has_spill_refs() {
                         let resolved = self.resolve_spill_refs(ast, sheet, pass, depth + 1);
                         if range_from_ast(&resolved, self.name_scope(sheet)).is_some() {
                             self.eval_matrix_arg(&resolved, sheet, pass, depth + 1)
@@ -1892,7 +1917,8 @@ impl CellStore {
                         }
                     } else {
                         self.eval_ast(ast, sheet, pass, depth + 1)
-                    }
+                    };
+                    cell_value(result)
                 }
                 None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
             },

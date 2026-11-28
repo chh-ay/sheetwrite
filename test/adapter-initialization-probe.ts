@@ -168,6 +168,34 @@ try {
   assert.equal(currentFailures.length, 2);
   await current.mounted.unmount();
   assert.equal(current.mounted.getPublishedGrid() ?? null, null);
+
+  // On a page whose WASM is already initialized there is nothing to wait for, so a new
+  // mount never renders its fallback, not even before its grid is created.
+  const selector = "[data-lifecycle-fallback]";
+  const fallbackInsertions: Element[] = [];
+  const recordFallbacks = (records: MutationRecord[]): void => {
+    for (const record of records) {
+      // A framework can insert the host with the fallback inside it and remove the
+      // fallback before the observer runs; the removal then shows that it was rendered.
+      for (const node of [...record.addedNodes, ...record.removedNodes]) {
+        if (!(node instanceof Element)) continue;
+        if (node.matches(selector) || node.querySelector(selector)) fallbackInsertions.push(node);
+      }
+    }
+  };
+  const observer = new MutationObserver(recordFallbacks);
+  observer.observe(document.body, { childList: true, subtree: true });
+  const lateReady: GridReadyEvent[] = [];
+  const late = await mountAdapter({
+    workbook,
+    fallbackLabel: "loading",
+    onReady: (event) => lateReady.push(event),
+  });
+  await waitFor(() => lateReady.length === 1, "a mount after initialization did not become ready");
+  recordFallbacks(observer.takeRecords());
+  observer.disconnect();
+  assert.equal(fallbackInsertions.length, 0, "a mount after initialization rendered its fallback");
+  await late.unmount();
 } finally {
   restoreCanvas();
 }

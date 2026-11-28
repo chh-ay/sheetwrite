@@ -2268,7 +2268,7 @@ fn with_formula_source<R>(
 
 /// Calls `visit` with the text a value search compares for the cell at
 /// `index`, the same text [`cell_matches_text`] reads, or returns `None`
-/// when the cell is empty.
+/// when the cell is empty or shows a formula's blank result.
 fn with_value_text<R>(
     sheet: &SheetData,
     store: &CellStore,
@@ -2287,6 +2287,8 @@ fn with_value_text<R>(
                 Some(visit(error.sentinel()))
             } else if sheet.cells.str_id_at(index) != NO_STRING {
                 string_from_pool_ref(&store.strings, sheet.cells.str_id_at(index)).map(visit)
+            } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
+                None
             } else {
                 Some(visit(NumberText::of(sheet.cells.num_at(index)).as_str()))
             }
@@ -2333,6 +2335,8 @@ pub(crate) fn cell_matches_text(
                     case_insensitive,
                     whole_cell,
                 )
+            } else if sheet.cells.formula_value_kind(index) == FormulaValueKind::Blank {
+                false
             } else {
                 number_matches_text(
                     sheet.cells.num_at(index),

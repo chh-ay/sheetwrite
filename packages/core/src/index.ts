@@ -108,7 +108,6 @@ export {
 } from "./export.js";
 export { MAX_EXTERNAL_SHEET_AREA } from "./external-link.js";
 export {
-  DEFAULT_XLSX_RESOURCE_LIMITS,
   fromXlsxTable,
   fromXlsxWorkbookFile,
   fromXlsxWorkbook,
@@ -116,8 +115,8 @@ export {
   toXlsxTableStream,
   toXlsxWorkbook,
   toXlsxWorkbookStream,
-  XlsxResourceError,
 } from "./xlsx-bridge.js";
+export { DEFAULT_XLSX_RESOURCE_LIMITS, XlsxResourceError } from "./xlsx-resource-limits.js";
 
 export { withXlsxFormulaEngine, type XlsxFormulaEngine } from "./xlsx-formulas.js";
 

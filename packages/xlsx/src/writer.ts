@@ -15,7 +15,7 @@ import {
   DEFAULT_MAX_ITERATIONS,
   sheetNameKey,
   validateSheetName,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/codec";
 
 import { type DrawingChart, type PivotChartData } from "./chart-write.js";
 import { staticDashboard, warnStaticDashboards } from "./dashboard.js";

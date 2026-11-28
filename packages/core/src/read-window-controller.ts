@@ -53,6 +53,16 @@ export class PaintedCells {
   }
 }
 
+/** Where the last paint showed the sheet, in the units `scrollToCell` compares. */
+export interface PaintedView {
+  /** The scroller's top, in content space. */
+  readonly contentTop: number;
+  readonly scrollLeft: number;
+  /** The scroller's client area, which leaves out classic scrollbars. */
+  readonly scrollerWidth: number;
+  readonly scrollerHeight: number;
+}
+
 /** Turns a window the store read into the window the grid paints. */
 export type PaintedWindowTransform = (view: VisibleWindowView) => VisibleWindowView;
 
@@ -81,6 +91,9 @@ export interface ReadWindowControllerOptions {
   datasourceColumnCount?: () => number;
   scrollTop: () => number;
   scrollLeft: () => number;
+  /** The scroller's client area, read with the viewport size when a frame paints. */
+  scrollerWidth: () => number;
+  scrollerHeight: () => number;
   repositionEditor: (contentTop: number, scrollLeft: number) => void;
   emitScroll: (event: {
     scrollTop: number;
@@ -123,6 +136,10 @@ export class ReadWindowController {
   private last_paint_frozen_height = 0;
   private last_paint_frozen_width = 0;
   private last_paint_zoom = 0;
+  private last_paint_scroller_width = 0;
+  private last_paint_scroller_height = 0;
+  /** The scroller scrolled or resized since the last paint. */
+  private viewport_moved = true;
   private last_paint_view: VisibleWindowView | null = null;
   private cached_pane_views: VisibleWindowView[] = [];
   private readonly pane_value_pools: CellScalar[][] = [];
@@ -175,15 +192,29 @@ export class ReadWindowController {
     return this.paint_invalidation_epoch + this.data_invalidation_epoch;
   }
 
-  /** View rows are mapped to backing rows, so reordered views compare correctly. */
+  /**
+   * View rows are mapped to backing rows, so reordered views compare
+   * correctly. The window is the last paint's: a frame that shows other rows
+   * or columns reads their data again anyway, so a change outside the last
+   * painted window never needs a repaint, and no layout is read for it.
+   */
   paintedCells(): PaintedCells {
     const { geometry } = this.options;
     const theme = this.options.theme();
+    const painted = this.last_paint_view !== null;
     const window = geometry.paintWindow(
-      geometry.toContent(this.options.scrollTop()),
-      this.options.scrollLeft(),
-      Math.max(0, this.options.viewportHeight() - theme.headerHeight),
-      Math.max(0, this.options.viewportWidth() - theme.rowHeaderWidth),
+      painted ? this.last_paint_content_top : geometry.toContent(this.options.scrollTop()),
+      painted ? this.last_paint_scroll_left : this.options.scrollLeft(),
+      Math.max(
+        0,
+        (painted ? this.last_paint_client_height : this.options.viewportHeight()) -
+          theme.headerHeight,
+      ),
+      Math.max(
+        0,
+        (painted ? this.last_paint_client_width : this.options.viewportWidth()) -
+          theme.rowHeaderWidth,
+      ),
       this.options.overscan(),
     );
 
@@ -205,6 +236,32 @@ export class ReadWindowController {
     }
 
     return new PaintedCells(this.options.activeSheet(), rows.sort(), cols.sort());
+  }
+
+  /**
+   * Where the last paint showed the sheet while that still holds: nothing
+   * scrolled, resized or invalidated the layout since. Null otherwise, and
+   * the caller reads the layout.
+   */
+  paintedView(): PaintedView | null {
+    if (
+      this.last_paint_view === null ||
+      this.viewport_moved ||
+      this.paint_invalidation_epoch !== this.last_paint_invalidation_epoch
+    ) {
+      return null;
+    }
+    return {
+      contentTop: this.last_paint_content_top,
+      scrollLeft: this.last_paint_scroll_left,
+      scrollerWidth: this.last_paint_scroller_width,
+      scrollerHeight: this.last_paint_scroller_height,
+    };
+  }
+
+  /** The scroller scrolled or resized: the last paint no longer shows where it is. */
+  noteViewportMoved(): void {
+    this.viewport_moved = true;
   }
 
   /** Invalidates pixel/layout paint state without discarding stable data windows. */
@@ -296,6 +353,8 @@ export class ReadWindowController {
     const { geometry } = this.options;
     const client_height = this.options.viewportHeight();
     const client_width = this.options.viewportWidth();
+    const scroller_width = this.options.scrollerWidth();
+    const scroller_height = this.options.scrollerHeight();
     const theme = this.options.theme();
     const body_height = Math.max(0, client_height - theme.headerHeight);
     const content_top = geometry.toContent(this.options.scrollTop());
@@ -499,6 +558,9 @@ export class ReadWindowController {
     this.last_paint_frozen_height = frozen_height;
     this.last_paint_frozen_width = frozen_width;
     this.last_paint_zoom = zoom;
+    this.last_paint_scroller_width = scroller_width;
+    this.last_paint_scroller_height = scroller_height;
+    this.viewport_moved = false;
 
     if (refresh_data) this.options.ariaMirror.bumpVersion();
     // Inserts, deletes, filters and sheet switches all change the displayed rows.

@@ -64,10 +64,14 @@ const by_region: PivotDefinition = {
   values: [{ field: 1, aggregation: "SUM" }],
 };
 
-/** Orders and Customers tables on Data, with `data_model` and `pivots` when given. */
+/**
+ * Orders and Customers tables on Data, with `data_model` and `pivots` when given;
+ * `customers_name` renames the Customers table.
+ */
 function authored(
   data_model?: WorkbookSnapshot["workbook"]["dataModel"],
   pivots: PivotDefinition[] = [],
+  customers_name = "Customers",
 ): WorkbookSnapshot {
   return book(
     [
@@ -78,7 +82,7 @@ function authored(
             ["customer", "Customer"],
             ["amount", "Amount"],
           ]),
-          table("customers", "Customers", 3, [
+          table("customers", customers_name, 3, [
             ["id", "ID"],
             ["region", "Region"],
           ]),
@@ -215,30 +219,36 @@ const connection = (name: string, source: string, id: number) =>
   `<connection id="${id}" name="${name}" type="102" refreshedVersion="6" minRefreshableVersion="5"><extLst><ext uri="{DE250136-89BD-433C-8126-D09CA5730AF9}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:connection id=""><x15:rangePr sourceName="${source}"/></x15:connection></ext></extLst></connection>`;
 
 it("imports Excel's active relationships between worksheet tables and reports the rest", async () => {
-  // An Excel data model that relates the worksheet tables, as Excel writes it.
-  const saved = editParts(await toXlsxWorkbook(authored()), {
-    "xl/workbook.xml": (xml) => xml.replace("</workbook>", `${DATA_MODEL_EXTENSION}</workbook>`),
-    "xl/connections.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><connections xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${connection("WorksheetConnection_Orders", "Orders", 1)}${connection("WorksheetConnection_Customers", "Customers", 2)}</connections>`,
-    "xl/_rels/workbook.xml.rels": (xml) =>
-      xml.replace(
-        "</Relationships>",
-        '<Relationship Id="rIdModel1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" Target="connections.xml"/></Relationships>',
-      ),
-    "[Content_Types].xml": (xml) =>
-      xml.replace(
-        "</Types>",
-        '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/></Types>',
-      ),
-  });
-  const { warnings, onWarning: on_warning } = collectWarnings();
-  const reopened = await fromXlsxWorkbook(saved, { onWarning: on_warning });
+  // The connection names the worksheet table, also in another case and Unicode form.
+  for (const [table_name, source_name] of [
+    ["Customers", "Customers"],
+    ["\u00C4rzte", "A\u0308RZTE"],
+  ] as const) {
+    // An Excel data model that relates the worksheet tables, as Excel writes it.
+    const saved = editParts(await toXlsxWorkbook(authored(undefined, [], table_name)), {
+      "xl/workbook.xml": (xml) => xml.replace("</workbook>", `${DATA_MODEL_EXTENSION}</workbook>`),
+      "xl/connections.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><connections xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${connection("WorksheetConnection_Orders", "Orders", 1)}${connection("WorksheetConnection_Customers", source_name, 2)}</connections>`,
+      "xl/_rels/workbook.xml.rels": (xml) =>
+        xml.replace(
+          "</Relationships>",
+          '<Relationship Id="rIdModel1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" Target="connections.xml"/></Relationships>',
+        ),
+      "[Content_Types].xml": (xml) =>
+        xml.replace(
+          "</Types>",
+          '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/></Types>',
+        ),
+    });
+    const { warnings, onWarning: on_warning } = collectWarnings();
+    const reopened = await fromXlsxWorkbook(saved, { onWarning: on_warning });
 
-  // The model table "Clients" loads the worksheet table "Customers" through its connection.
-  expect(reopened.workbook.dataModel).toEqual({
-    relationships: [{ ...orders_to_customers, id: "excel-relationship-1" }],
-  });
-  expect(warnings.map((warning) => warning.message)).toEqual([
-    "Excel data model relationship Orders[Amount] → Clients[Region] was not imported because it would join two tables a second time",
-    "Excel data model relationship Orders[Customer] → Calendar[Date] was not imported because a table is not a worksheet table",
-  ]);
+    // The model table "Clients" loads the worksheet table through its connection.
+    expect(reopened.workbook.dataModel).toEqual({
+      relationships: [{ ...orders_to_customers, id: "excel-relationship-1" }],
+    });
+    expect(warnings.map((warning) => warning.message)).toEqual([
+      "Excel data model relationship Orders[Amount] → Clients[Region] was not imported because it would join two tables a second time",
+      "Excel data model relationship Orders[Customer] → Calendar[Date] was not imported because a table is not a worksheet table",
+    ]);
+  }
 });

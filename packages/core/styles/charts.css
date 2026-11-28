@@ -96,12 +96,14 @@
   bottom: -4px;
 }
 
-.sheetwrite-object-handle:is([data-handle="n"], [data-handle="s"]) {
+.sheetwrite-object-handle[data-handle="n"],
+.sheetwrite-object-handle[data-handle="s"] {
   left: calc(50% - 4px);
   cursor: ns-resize;
 }
 
-.sheetwrite-object-handle:is([data-handle="e"], [data-handle="w"]) {
+.sheetwrite-object-handle[data-handle="e"],
+.sheetwrite-object-handle[data-handle="w"] {
   top: calc(50% - 4px);
   cursor: ew-resize;
 }
@@ -114,10 +116,12 @@
   right: -4px;
 }
 
-.sheetwrite-object-handle:is([data-handle="nw"], [data-handle="se"]) {
+.sheetwrite-object-handle[data-handle="nw"],
+.sheetwrite-object-handle[data-handle="se"] {
   cursor: nwse-resize;
 }
 
-.sheetwrite-object-handle:is([data-handle="ne"], [data-handle="sw"]) {
+.sheetwrite-object-handle[data-handle="ne"],
+.sheetwrite-object-handle[data-handle="sw"] {
   cursor: nesw-resize;
 }
