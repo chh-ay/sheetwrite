@@ -545,7 +545,8 @@ function validate_xlsx_artifact(value: Record<string, unknown>): XlsxEvidence | 
   const artifact = value as unknown as Partial<XlsxEvidence>;
   if (
     (artifact.protocol !== "sheetwrite-xlsx-codec-v1" &&
-      artifact.protocol !== "sheetwrite-xlsx-codec-v2") ||
+      artifact.protocol !== "sheetwrite-xlsx-codec-v2" &&
+      artifact.protocol !== "sheetwrite-xlsx-codec-v3") ||
     artifact.mode !== "full"
   ) {
     return "artifact is not a full-mode XLSX codec capture";

@@ -44,6 +44,7 @@ function sample(operation: XlsxRawSample["operation"], scenario: string): XlsxRa
     inputBytes: 10,
     outputBytes: 20,
     checksum: "a".repeat(64),
+    allocatedBytes: 40,
     ...(limit
       ? { rejection: `XlsxResourceError:Sheetwrite: XLSX import ${limit} limit exceeded` }
       : {}),
@@ -69,13 +70,7 @@ function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
         durationMs: summarizeFinite(values.map((value) => value.durationMs)),
         processWallMs: summarizeFinite(values.map((value) => value.processWallMs)),
         maxRssBytes: with_max(values.map((value) => value.maxRssBytes)),
-        returnAllocationDeltaBytes: with_max(
-          values.map(
-            (value) =>
-              growth(value.heapBeforeBytes, value.heapAfterBytes) +
-              growth(value.arrayBuffersBeforeBytes, value.arrayBuffersAfterBytes),
-          ),
-        ),
+        allocatedBytes: with_max(values.map((value) => value.allocatedBytes)),
         retainedAfterGcDeltaBytes: with_max(
           values.map(
             (value) =>
@@ -98,7 +93,7 @@ function compared_artifact(import_ratio = 1): XlsxBenchmarkArtifact {
     .map((value) => ({ ...value, engine: "baseline" as const, durationMs: 1 }));
   const samples = [...current, ...baseline];
   return {
-    protocol: "sheetwrite-xlsx-codec-v2",
+    protocol: "sheetwrite-xlsx-codec-v3",
     mode: "full",
     metadata: {
       commit: "test",
