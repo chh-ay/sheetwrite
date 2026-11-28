@@ -10,27 +10,27 @@ import type { Grid, WorkbookSnapshot } from "../src/types.js";
 import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
 import { elementAdded, keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
 
+const IMPORTED_SHEET: WorkbookSnapshot["sheets"][number] = {
+  id: "new",
+  name: "Imported",
+  order: 0,
+  rowCount: 1,
+  columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
+  cells: [
+    {
+      startRow: 0,
+      startCol: 0,
+      rowCount: 1,
+      colCount: 1,
+      cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 42 } }],
+    },
+  ],
+};
+
 const IMPORTED: WorkbookSnapshot = {
   schemaVersion: 1,
   workbook: { activeSheet: "new" },
-  sheets: [
-    {
-      id: "new",
-      name: "Imported",
-      order: 0,
-      rowCount: 1,
-      columns: [{ key: "value", header: "Value", width: 100, type: "number" }],
-      cells: [
-        {
-          startRow: 0,
-          startCol: 0,
-          rowCount: 1,
-          colCount: 1,
-          cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 42 } }],
-        },
-      ],
-    },
-  ],
+  sheets: [IMPORTED_SHEET],
 };
 
 let grid: Grid;
@@ -55,9 +55,14 @@ afterEach(() => {
   restore_xlsx_slots();
 });
 
-it.each(["new", "s1"])(
+it.each([
+  ["new", ["new"], "new"],
+  ["s1", ["s1"], "s1"],
+  // A hidden active sheet hands over to its nearest visible neighbour.
+  ["hidden", ["left", "hidden", "right"], "right"],
+] as const)(
   "replaces the document on sheet %s in the same grid and clears history",
-  async (id) => {
+  async (active, ids, expected) => {
     grid.applyTransaction({
       patches: [
         {
@@ -71,13 +76,19 @@ it.each(["new", "s1"])(
     const viewport = host.querySelector(".sheetwrite-viewport");
     await grid.importWorkbook({
       ...IMPORTED,
-      workbook: { activeSheet: id },
-      sheets: IMPORTED.sheets.map((sheet) => ({ ...sheet, id })),
+      workbook: { activeSheet: active },
+      sheets: ids.map((id, order) => ({
+        ...IMPORTED_SHEET,
+        id,
+        name: id,
+        order,
+        ...(id === "hidden" && { visibility: "hidden" as const }),
+      })),
     });
 
-    expect(grid.getActiveSheet()).toBe(id);
-    expect(grid.store.getCell({ sheet: id, row: 0, col: 0 }).resolved).toBe(42);
-    expect(grid.exportSnapshot().sheets.map((sheet) => sheet.id)).toEqual([id]);
+    expect(grid.getActiveSheet()).toBe(expected);
+    expect(grid.store.getCell({ sheet: expected, row: 0, col: 0 }).resolved).toBe(42);
+    expect(grid.exportSnapshot().sheets.map((sheet) => sheet.id)).toEqual([...ids]);
     expect(grid.getCellInput(1, 0)).toBeNull();
     expectSame(host.querySelector(".sheetwrite-viewport"), viewport);
     expect(grid.getCommandState("undo").disabled).toBe(true);
