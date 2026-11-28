@@ -12,6 +12,7 @@ import type {
   Theme,
   Workbook,
 } from "@sheetwrite/core";
+import { isSheetwriteReady } from "@sheetwrite/core";
 import {
   type AdapterGridInput,
   assertGridSize,
@@ -252,6 +253,9 @@ const SheetwriteGridComponent = defineComponent({
   setup(props, { attrs, emit, expose, slots }) {
     const host = ref<HTMLDivElement | null>(null);
     const exposed_grid = shallowRef<Grid | null>(null);
+    // On a page whose WASM is already initialized there is nothing to wait for and
+    // initialization cannot fail, so the fallback never shows.
+    const is_ready_at_setup = isSheetwriteReady();
 
     const instance = getCurrentInstance();
     let ready_once_delivered = false;
@@ -321,7 +325,7 @@ const SheetwriteGridComponent = defineComponent({
       },
       setInitializationState() {
         // No state to keep: the render function shows the fallback slot while
-        // no Grid is exposed.
+        // no Grid is exposed, unless the page was ready when this component was set up.
       },
       reportConsumerFailure(thrown) {
         reportError(thrown);
@@ -356,7 +360,7 @@ const SheetwriteGridComponent = defineComponent({
       return h(
         "div",
         { ...attrs, ref: host, class: ["sheetwrite", attrs.class], style },
-        exposed_grid.value ? undefined : slots.fallback?.(),
+        exposed_grid.value || is_ready_at_setup ? undefined : slots.fallback?.(),
       );
     };
   },
