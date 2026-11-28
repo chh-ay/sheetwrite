@@ -107,7 +107,7 @@ const SCENARIOS: &[Scenario] = &[
         expected: "C1=2 C2=4 C3=6 D1=12 D2=3 #5|C1=2 C2=10 C3=12 D1=24 D2=3 #4",
     },
     Scenario {
-        name: "text, logical and blank results read by later formulas",
+        name: "text, logical, empty-cell and empty-text results read by later formulas",
         iterate: false,
         numbers: &[("A1", 4.0)],
         formulas: &[
@@ -121,7 +121,7 @@ const SCENARIOS: &[Scenario] = &[
         ],
         edit: ("A1", 1.0),
         shown: &["B1", "B2", "B3", "C1", "C2", "C3", "C4"],
-        expected: "B1=big B2=TRUE B3= C1=big! C2=FALSE C3=x C4=4 #7|B1=small B2=FALSE B3= C1=small! C2=TRUE C3=x C4=6 #7",
+        expected: "B1=big B2=TRUE B3=0 C1=big! C2=FALSE C3=0x C4=4 #7|B1=small B2=FALSE B3= C1=small! C2=TRUE C3=x C4=6 #7",
     },
     Scenario {
         name: "errors flow to readers in reading order",

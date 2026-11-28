@@ -189,7 +189,7 @@ describe("external link commands", () => {
     });
     expect([shown(grid, 0), shown(grid, 2), shown(grid, 3)]).toEqual([7, 8, 9]);
 
-    // Same sheets and extent: A1 becomes an error, A2 is left out, A3 changes.
+    // Same sheets and extent: A1 becomes an error, A2 is left out and reads as 0, A3 changes.
     expect(
       refresh([
         budget([
@@ -201,7 +201,7 @@ describe("external link commands", () => {
     ).toBe("applied");
     expect([shown(grid, 0), shown(grid, 2), shown(grid, 3), shown(grid, 1)]).toEqual([
       "#N/A",
-      null,
+      0,
       19,
       10,
     ]);
@@ -226,6 +226,6 @@ describe("external link commands", () => {
         : entry,
     );
     grid.applyTransaction({ patches: [{ op: "setExternalLinks", links: grown }] });
-    expect([shown(grid, 0), shown(grid, 2)]).toEqual([null, 4]);
+    expect([shown(grid, 0), shown(grid, 2)]).toEqual([0, 4]);
   });
 });

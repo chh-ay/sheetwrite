@@ -342,7 +342,7 @@ impl CellStore {
         };
 
         let resolved = self.resolve_spill_refs(ast, sheet, &mut pass, 0);
-        let (status, value, shape) =
+        let (status, result, shape) =
             if ast_produces_array(&resolved, pass.shapes(self.name_scope(sheet))) {
                 match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
                     // A one-cell array, such as a one-cell OFFSET, shows as its value.
@@ -359,6 +359,8 @@ impl CellStore {
                 let value = self.eval_ast(&resolved, sheet, &mut pass, 0);
                 (FormulaPreviewStatus::Value, value, (1, 1))
             };
+        // The preview shows what the cell would show: 0 for a reference to an empty cell.
+        let value = super::cell_value(result);
 
         if value == Value::Error(FormulaError::Loading) {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
