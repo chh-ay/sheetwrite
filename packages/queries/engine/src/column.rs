@@ -3,7 +3,9 @@
 use crate::budget::OutputBudget;
 use crate::buffers::{at, flat_index, row_index, Bits, Texts};
 use crate::mixed::Mixed;
+use crate::name_key::{nfc, same_upper};
 use crate::plan::{ColumnSpec, ColumnType, Diagnostic, Limits};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::Write;
 
@@ -309,16 +311,29 @@ impl Batch {
 }
 
 /// Every column needs a non-empty identity and a non-blank name. Identities must be unique,
-/// and names must be unique when letter case is ignored in every alphabet, as table headers
-/// require. This holds even when the batch has no rows.
+/// and names must be unique as table headers require: compared in NFC with letter case ignored
+/// in every alphabet, as core's `workbookTableNameKey` compares them. This holds even when the
+/// batch has no rows.
 pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
+    // Plain names are their own NFC form, so only a list with another name normalizes copies.
+    let normalized: Vec<Cow<'_, str>> = if columns.iter().all(|column| column.name().is_ascii()) {
+        Vec::new()
+    } else {
+        columns.iter().map(|column| nfc(column.name())).collect()
+    };
+
     for (index, column) in columns.iter().enumerate() {
+        let name = header(&normalized, column, index);
         if column.id().is_empty()
             || column.name().trim().is_empty()
             || columns
                 .iter()
+                .enumerate()
                 .take(index)
-                .any(|prior| prior.id() == column.id() || same_header(prior.name(), column.name()))
+                .any(|(prior_index, prior)| {
+                    prior.id() == column.id()
+                        || same_upper(header(&normalized, prior, prior_index), name)
+                })
         {
             return Err(Diagnostic::new("duplicate-column"));
         }
@@ -327,13 +342,12 @@ pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
     Ok(())
 }
 
-/// Whether two header names clash in a table: equal in upper case. Core's
-/// `workbookTableNameKey` also normalizes both names to NFC first; this check does not.
-/// Compares uppercase characters without building uppercase copies.
-fn same_header(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_uppercase)
-        .eq(right.chars().flat_map(char::to_uppercase))
+/// The name of `column`, the one at `index`, as headers compare it: its NFC form when
+/// `normalized` holds the list's NFC names, else the name itself.
+fn header<'a>(normalized: &'a [Cow<'_, str>], column: &'a Column, index: usize) -> &'a str {
+    normalized
+        .get(index)
+        .map_or_else(|| column.name(), |name| name)
 }
 
 /// A total key order keeps joins and groups deterministic across source batches. Values of
