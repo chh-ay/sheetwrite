@@ -458,6 +458,9 @@ async function interface_signature(
     const name = (member as Partial<NamedElement>).name?.getText(source_file);
     if (name !== undefined) seen.add(name.replace(/^["']|["']$/g, ""));
   }
+  // The checker lists inherited members in an order that moves with unrelated edits to
+  // the declaring file, so they are sorted by name; declared members keep source order.
+  const inherited: { name: string; text: string }[] = [];
   for (const property of await checker.getPropertiesOfType(
     await checker.getDeclaredTypeOfSymbol(symbol),
   )) {
@@ -470,8 +473,10 @@ async function interface_signature(
     if (member_declaration.getSourceFile().fileName.includes("node_modules")) continue;
     seen.add(name);
     const text = normalize_text(member_declaration.getText());
-    members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
+    inherited.push({ name, text: text.endsWith(";") || text.endsWith(",") ? text : `${text};` });
   }
+  inherited.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+  members.push(...inherited.map((member) => member.text));
 
   const modifiers = declaration.modifiers?.map((modifier) => modifier.getText(source_file)) ?? [];
   const type_parameters =
