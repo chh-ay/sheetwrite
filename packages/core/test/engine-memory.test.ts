@@ -142,6 +142,22 @@ describe("explicit engine memory release", () => {
     });
   }
 
+  it("frees the engine of a snapshot that fails after its sheets are installed", () => {
+    const free = spyOn(getEngine().CellStore.prototype, "free");
+    // A reference to a missing sheet fails in the columnar load, the last step.
+    const data = {
+      rowCount: 1,
+      columns: { name: [{ kind: "ref" as const, target: { sheet: "missing", row: 0, col: 0 } }] },
+    };
+
+    try {
+      expect(() => new SheetwriteStore(makeWorkbook(1), data)).toThrow();
+      expect(free).toHaveBeenCalledTimes(1);
+    } finally {
+      free.mockRestore();
+    }
+  });
+
   it("rejects a transfer that declares an array larger than engine memory", () => {
     // Store transfer tag, one pooled string, and that string's byte length.
     const STORE_TAG = 0x32524d53;

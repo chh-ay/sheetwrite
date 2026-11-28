@@ -44,7 +44,12 @@ import {
   type SnapshotResourceLimits,
   storedCalculationSettings,
 } from "../document-protocol.js";
-import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
+import {
+  ENGINE_LOAD_HINT,
+  getEngine,
+  isEngineLoaded as isLoaded,
+  isEngineTrap,
+} from "../engine.js";
 import {
   datasourceFailure,
   SheetwriteError,
@@ -827,120 +832,119 @@ export class StoreDataEngine {
     this.sheets = new SheetRegistry(workbook);
     this.storage_options = options;
     this.wasm = new (getEngine().CellStore)();
-    // A new engine starts with the default limits, the engine's ceilings.
-    if (
-      storageLimits.maxDenseCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ||
-      storageLimits.maxLocalPagedCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells
-    ) {
-      this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
-      this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
-    }
-    this.view = new StoreViewState(this.wasm, this.sheets);
-    this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
-    this.snapshot_codec = new StoreSnapshotCodec(
-      workbook,
-      this.window_reader,
-      this.sheet_ids_by_handle,
-    );
-    this.paged_dirty_preflight =
-      options.storage === "paged"
-        ? new PagedDirtyPreflight(
-            this.wasm,
-            this.sheets,
-            this.sheet_ids_by_handle,
-            this.range_mutation_stats,
-            this.boundary_accounting,
-            options.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
-            options.referenceSimulationLimit ?? MAX_PAGED_REFERENCE_SIMULATION_ENTRIES,
-          )
-        : null;
-
-    for (const sheet of workbook.sheets) {
-      const handle = this.allocate_sheet(sheet.columns.length, sheet.rowCount);
-      this.boundary_accounting.record(
-        this.resource_operation ?? "startup",
-        "js-to-wasm",
-        (sheet.id.length + sheet.name.length) * 2,
-        "scalar",
+    // Every failure from here on frees the new engine before it propagates.
+    try {
+      // A new engine starts with the default limits, the engine's ceilings.
+      if (
+        storageLimits.maxDenseCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ||
+        storageLimits.maxLocalPagedCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells
+      ) {
+        this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
+        this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+      }
+      this.view = new StoreViewState(this.wasm, this.sheets);
+      this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
+      this.snapshot_codec = new StoreSnapshotCodec(
+        workbook,
+        this.window_reader,
+        this.sheet_ids_by_handle,
       );
-      if (!this.wasm.setSheetName(handle, sheet.id, sheet.name)) {
-        this.wasm.free();
-        throw store_failure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
-          sheet: sheet.id,
-        });
+      this.paged_dirty_preflight =
+        options.storage === "paged"
+          ? new PagedDirtyPreflight(
+              this.wasm,
+              this.sheets,
+              this.sheet_ids_by_handle,
+              this.range_mutation_stats,
+              this.boundary_accounting,
+              options.dirtyCellLimit ?? DEFAULT_PAGED_DIRTY_CELL_LIMIT,
+              options.referenceSimulationLimit ?? MAX_PAGED_REFERENCE_SIMULATION_ENTRIES,
+            )
+          : null;
+
+      for (const sheet of workbook.sheets) {
+        const handle = this.allocate_sheet(sheet.columns.length, sheet.rowCount);
+        this.boundary_accounting.record(
+          this.resource_operation ?? "startup",
+          "js-to-wasm",
+          (sheet.id.length + sheet.name.length) * 2,
+          "scalar",
+        );
+        if (!this.wasm.setSheetName(handle, sheet.id, sheet.name)) {
+          throw store_failure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
+            sheet: sheet.id,
+          });
+        }
+
+        this.sheets.handles.set(sheet.id, handle);
+        this.sheet_ids_by_handle[handle] = sheet.id;
+        if (
+          (sheet.merges?.length ?? 0) > 0 ||
+          (sheet.protectedRanges?.length ?? 0) > 0 ||
+          (sheet.validationRules?.length ?? 0) > 0
+        )
+          this.sync_spill_blockers(sheet);
+        if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
+          this.view.queueHiddenRows(sheet.id);
       }
 
-      this.sheets.handles.set(sheet.id, handle);
-      this.sheet_ids_by_handle[handle] = sheet.id;
-      if (
-        (sheet.merges?.length ?? 0) > 0 ||
-        (sheet.protectedRanges?.length ?? 0) > 0 ||
-        (sheet.validationRules?.length ?? 0) > 0
-      )
-        this.sync_spill_blockers(sheet);
-      if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
-        this.view.queueHiddenRows(sheet.id);
-    }
+      // Before any formula is loaded, so formulas find the links they read.
+      if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
+        throw store_failure("invalid-snapshot", "invalid external link values");
+      }
 
-    // Before any formula is loaded, so formulas find the links they read.
-    if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
-      this.wasm.free();
-      throw store_failure("invalid-snapshot", "invalid external link values");
-    }
+      // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
+      this.view.flushHiddenRows();
+      for (const sheet of workbook.sheets) {
+        for (const table of sheet.tables ?? []) {
+          if (!this.sync_table(table)) {
+            throw store_failure("invalid-snapshot", `invalid workbook table: ${table.id}`, {
+              table: table.id,
+            });
+          }
+        }
+      }
 
-    // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
-    this.view.flushHiddenRows();
-    for (const sheet of workbook.sheets) {
-      for (const table of sheet.tables ?? []) {
-        if (!this.sync_table(table)) {
-          this.wasm.free();
-          throw store_failure("invalid-snapshot", `invalid workbook table: ${table.id}`, {
-            table: table.id,
+      for (const named_range of workbook.namedRanges ?? []) {
+        if (!this.sync_named_range(named_range)) {
+          throw store_failure("invalid-snapshot", `invalid named range: ${named_range.name}`, {
+            name: named_range.name,
           });
         }
       }
-    }
 
-    for (const named_range of workbook.namedRanges ?? []) {
-      if (!this.sync_named_range(named_range)) {
-        this.wasm.free();
-        throw store_failure("invalid-snapshot", `invalid named range: ${named_range.name}`, {
-          name: named_range.name,
-        });
+      // A new engine holds no relationships or measures.
+      const model = workbook.dataModel;
+      if (
+        ((model?.relationships?.length ?? 0) > 0 || (model?.measures?.length ?? 0) > 0) &&
+        !this.sync_relationships(model)
+      ) {
+        throw store_failure("invalid-snapshot", "invalid data model");
       }
+
+      this.load_pivots();
+
+      // Before any cell is loaded, so formulas compute once under the stored limits.
+      // Defaults need no engine call and are dropped to keep snapshots unchanged.
+      const calculation = storedCalculationSettings(workbook.calculation);
+      if (calculation === undefined) delete workbook.calculation;
+      else if (this.sync_calculation(calculation)) workbook.calculation = calculation;
+      else throw store_failure("invalid-snapshot", "invalid calculation settings");
+
+      if (data) {
+        this.withResourceOperation("ingest", () => this.load_columnar(workbook.activeSheet, data));
+      } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
+        this.commit_engine_sources();
+      }
+
+      // After the cells, because filters and sort keys read cell values.
+      for (const sheet of workbook.sheets) this.view.sheetLoaded(sheet.id);
+      if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
+    } catch (error) {
+      // A trap leaves the engine borrowed, so `free` would throw and hide the trap.
+      if (!isEngineTrap(error)) this.wasm.free();
+      throw error;
     }
-
-    // A new engine holds no relationships or measures.
-    const model = workbook.dataModel;
-    if (
-      ((model?.relationships?.length ?? 0) > 0 || (model?.measures?.length ?? 0) > 0) &&
-      !this.sync_relationships(model)
-    ) {
-      this.wasm.free();
-      throw store_failure("invalid-snapshot", "invalid data model");
-    }
-
-    this.load_pivots();
-
-    // Before any cell is loaded, so formulas compute once under the stored limits.
-    // Defaults need no engine call and are dropped to keep snapshots unchanged.
-    const calculation = storedCalculationSettings(workbook.calculation);
-    if (calculation === undefined) delete workbook.calculation;
-    else if (this.sync_calculation(calculation)) workbook.calculation = calculation;
-    else {
-      this.wasm.free();
-      throw store_failure("invalid-snapshot", "invalid calculation settings");
-    }
-
-    if (data) {
-      this.withResourceOperation("ingest", () => this.load_columnar(workbook.activeSheet, data));
-    } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
-      this.commit_engine_sources();
-    }
-
-    // After the cells, because filters and sort keys read cell values.
-    for (const sheet of workbook.sheets) this.view.sheetLoaded(sheet.id);
-    if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
 
     this.resource_operation = null;
   }
@@ -1109,7 +1113,7 @@ export class StoreDataEngine {
       for (const [index, pivot] of (sheet.pivots ?? []).entries()) {
         const issues = this.pivot_issues(pivot, sheet, this.workbook.sheets);
         if (ids.has(pivot.id) || ids.size >= MAX_PIVOTS_PER_WORKBOOK || issues.length > 0) {
-          this.wasm.free();
+          // The constructor frees the engine when this throws.
           const reason = issues[0]?.message ?? "Pivot IDs must be unique within the limit";
           throw store_failure(
             "invalid-snapshot",
