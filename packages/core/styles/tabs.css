@@ -236,10 +236,8 @@
 /* While an edge of the strip hides tabs, the cut tab text fades out over
    16 px before that edge's arrow, then a 4 px gap of the bar's background
    (sheet-tabs.ts sets the data attributes). */
-:is(
-  [data-tabs-cut-start] > .sheetwrite-tab-scroll-previous,
-  [data-tabs-cut-end] > .sheetwrite-tab-end
-)::before {
+[data-tabs-cut-start] > .sheetwrite-tab-scroll-previous::before,
+[data-tabs-cut-end] > .sheetwrite-tab-end::before {
   content: "";
   position: absolute;
   top: 0;
@@ -368,7 +366,8 @@
   cursor: pointer;
 }
 
-:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) {
+.sheetwrite-tab-unhide-menu,
+.sheetwrite-tab-list {
   position: absolute;
   z-index: 6;
   right: 0;
@@ -384,18 +383,21 @@
   box-shadow: var(--sheetwrite-menu-shadow, 0 8px 24px rgb(60 64 67 / 20%));
 }
 
-:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[popover] {
+.sheetwrite-tab-unhide-menu[popover],
+.sheetwrite-tab-list[popover] {
   position: fixed;
   right: auto;
   bottom: auto;
   margin: 0;
 }
 
-:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list)[hidden] {
+.sheetwrite-tab-unhide-menu[hidden],
+.sheetwrite-tab-list[hidden] {
   display: none;
 }
 
-:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button {
+.sheetwrite-tab-unhide-menu button,
+.sheetwrite-tab-list button {
   padding: 0.45rem 0.55rem;
   border: 0;
   border-radius: 4px;
@@ -407,7 +409,10 @@
   cursor: pointer;
 }
 
-:is(.sheetwrite-tab-unhide-menu, .sheetwrite-tab-list) button:is(:hover, :focus-visible) {
+.sheetwrite-tab-unhide-menu button:hover,
+.sheetwrite-tab-unhide-menu button:focus-visible,
+.sheetwrite-tab-list button:hover,
+.sheetwrite-tab-list button:focus-visible {
   background: var(--sheetwrite-menu-hover, #f1f3f4);
 }
 

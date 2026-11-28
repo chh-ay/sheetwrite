@@ -33,7 +33,8 @@
    must fill the row. If they sized to their content, folded groups and the
    toolbar's More commands list would never unfold. Their look comes from
    styles.css. */
-.sheetwrite-shell-toolbar-row > :is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) {
+.sheetwrite-shell-toolbar-row > .sheetwrite-ribbon,
+.sheetwrite-shell-toolbar-row > .sheetwrite-command-toolbar {
   flex: 1 1 auto;
   min-width: 0;
 }

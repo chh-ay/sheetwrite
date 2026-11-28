@@ -210,7 +210,10 @@
   background: var(--sheetwrite-widget-selection, #2563eb22);
 }
 
-.sheetwrite-panel-icon > :is(svg, .sheetwrite-icon) {
+/* `:where(svg):not(.sheetwrite-icon)` matches a host's <svg> icon with the
+   specificity of a class, and files the rule under svg: see ribbon.css. */
+.sheetwrite-panel-icon > .sheetwrite-icon,
+.sheetwrite-panel-icon > :where(svg):not(.sheetwrite-icon) {
   --sheetwrite-icon-size: 24px;
   width: 24px;
   height: 24px;
