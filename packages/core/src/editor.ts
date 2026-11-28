@@ -21,6 +21,28 @@ export type { AssistDeps };
 /** Room the caret takes past a line's last glyph, in CSS pixels. */
 const CARET_WIDTH = 2;
 
+/** Attributes the field keeps between edits; any other an edit left goes when the next one opens. */
+const FIELD_ATTRIBUTES: Readonly<Record<string, true>> = {
+  class: true,
+  style: true,
+  inputmode: true,
+  spellcheck: true,
+  wrap: true,
+  "aria-multiline": true,
+  "aria-label": true,
+};
+
+/** Inline declarations an edit may leave on the field that the next one does not write over. */
+const EDIT_STYLE_PROPERTIES = [
+  "visibility",
+  "font",
+  "color",
+  "text-align",
+  "text-decoration",
+  "--sheetwrite-cell-pad",
+  "overflow-y",
+] as const;
+
 /**
  * Where the active cell goes after a commit. Enter (`down`, `up`) and Tab
  * (`right`, `left`) move within a selection of several cells; an arrow key
@@ -186,6 +208,8 @@ export class EditController {
   private field: HTMLTextAreaElement | null = null;
   /** The field while an edit is open. */
   private textarea: HTMLTextAreaElement | null = null;
+  /** The field scrolled since an edit last opened, so it may keep an offset. */
+  private field_scrolled = false;
   /** Counts opened and closed edits, so a callback of one edit never acts on the next. */
   private edit = 0;
   private opts: BeginEditOptions | null = null;
@@ -250,17 +274,19 @@ export class EditController {
     this.edit++;
 
     const ta = (this.field ??= this.make_field());
-    // Every edit starts from a bare field: no attribute, inline style or ARIA
-    // that an earlier edit, its formula help or its AutoComplete left on it.
-    for (const name of ta.getAttributeNames()) ta.removeAttribute(name);
+    // Each edit starts from the field as made: what an earlier edit, its
+    // formula help or its AutoComplete put on it goes. Only what may differ
+    // is written, as every write costs the style recalculation of the open.
+    for (const name of ta.getAttributeNames()) {
+      if (!Object.hasOwn(FIELD_ATTRIBUTES, name)) ta.removeAttribute(name);
+    }
+    for (const property of EDIT_STYLE_PROPERTIES) ta.style.removeProperty(property);
     ta.className = "sheetwrite-editor";
     // Setting the value also clears the browser's undo history of the field,
     // so Ctrl+Z in this edit never brings back an earlier edit's text.
     ta.value = opts.initial;
-    ta.inputMode = opts.type === "number" || opts.type === "currency" ? "decimal" : "text";
-    ta.spellcheck = false;
-    ta.wrap = "off";
-    ta.setAttribute("aria-multiline", "true");
+    const input_mode = opts.type === "number" || opts.type === "currency" ? "decimal" : "text";
+    if (ta.inputMode !== input_mode) ta.inputMode = input_mode;
     if (opts.type === "date") ta.placeholder = "yyyy-mm-dd";
     ta.setAttribute("aria-label", opts.label);
     // Cosmetics live in styles.css (`.sheetwrite-editor`). The effective theme
@@ -278,8 +304,8 @@ export class EditController {
     if (opts.look !== undefined) write_look(ta.style, opts.look, opts.theme);
 
     if (ta.parentNode !== this.host) this.host.appendChild(ta);
-    // The previous edit closed without moving the focus on (a validation
-    // alert follows it): a draft shown from another surface takes no focus.
+    // A draft shown from another surface takes no focus, not even focus the
+    // previous edit left on the field.
     if (!opts.focus && document.activeElement === ta) ta.blur();
     this.textarea = ta;
     this.opts = opts;
@@ -287,10 +313,13 @@ export class EditController {
     this.position(opts.rect);
 
     if (opts.focus) ta.focus();
-    // The browser keeps a hidden field's scroll offsets. Focusing has just
-    // laid the field out, so reading them then costs nothing.
-    if (ta.scrollTop !== 0) ta.scrollTop = 0;
-    if (ta.scrollLeft !== 0) ta.scrollLeft = 0;
+    // A hidden field keeps its scroll offsets. Only one that scrolled is set
+    // back; focusing has just laid it out, so that costs little.
+    if (this.field_scrolled) {
+      this.field_scrolled = false;
+      ta.scrollTop = 0;
+      ta.scrollLeft = 0;
+    }
     if (opts.selectAll) {
       ta.select();
     } else {
@@ -304,17 +333,28 @@ export class EditController {
     this.report_mode();
   }
 
-  /** The field, with the listeners every edit shares; each checks that an edit is open. */
+  /**
+   * The field, with what every edit shares: its fixed attributes and its
+   * listeners, each of which checks that an edit is open.
+   */
   private make_field(): HTMLTextAreaElement {
     const ta = document.createElement("textarea");
+    ta.spellcheck = false;
+    ta.wrap = "off";
+    ta.setAttribute("aria-multiline", "true");
     ta.addEventListener("compositionstart", this.on_composition_start);
     ta.addEventListener("compositionend", this.on_composition_end);
     ta.addEventListener("keydown", this.on_key_down);
     ta.addEventListener("focus", this.on_focus);
     ta.addEventListener("blur", this.on_blur);
     ta.addEventListener("input", this.on_input);
+    ta.addEventListener("scroll", this.on_scroll, { passive: true });
     return ta;
   }
+
+  private readonly on_scroll = (): void => {
+    this.field_scrolled = true;
+  };
 
   /**
    * Scroll the editor so the caret at the end of a last line wider than the
@@ -538,7 +578,7 @@ export class EditController {
     }
     this.teardown();
     opts.onCommit(value, navigate);
-    this.release_focus(ta);
+    this.hide_field(ta);
     return true;
   }
 
@@ -582,17 +622,22 @@ export class EditController {
     if (!opts || !ta) return;
     this.teardown();
     opts.onCancel();
-    this.release_focus(ta);
+    this.hide_field(ta);
   }
 
   /**
-   * A closed field hides with the focus it had: the grid takes it back once
-   * the commit or cancel is through, after its own layout reads. When nothing
-   * took it, it leaves for the page, as it did when each edit's field was
-   * removed.
+   * Hide the field of a closed edit once its commit or cancel is through:
+   * the grid has read its layout and taken the focus back by then, so hiding
+   * adds no style recalculation to either. Focus that nothing took leaves for
+   * the page, as it did when each edit's field was removed. Hidden, the field
+   * takes no focus and screen readers skip it; under its idle class,
+   * `.sheetwrite-editor` finds only an open editor.
    */
-  private release_focus(ta: HTMLTextAreaElement): void {
-    if (document.activeElement === ta && this.textarea !== ta) ta.blur();
+  private hide_field(ta: HTMLTextAreaElement): void {
+    if (this.textarea === ta) return;
+    if (document.activeElement === ta) ta.blur();
+    ta.className = "sheetwrite-editor-idle";
+    ta.style.visibility = "hidden";
   }
 
   destroy(): void {
@@ -700,17 +745,16 @@ export class EditController {
     this.commit("none");
   };
 
-  /** Close the open edit. The field hides and stays for the next edit. */
+  /**
+   * Close the open edit. The field stays laid out for the next edit, which
+   * then shows it with a style change instead of making a new layout box.
+   */
   private teardown(): void {
     const ta = this.textarea;
     if (!ta) return;
     this.tearing_down = true;
     this.detach_assist();
     this.opts?.complete?.close();
-    // Hidden, the field takes no focus and screen readers skip it; without
-    // its class, `.sheetwrite-editor` finds only an open editor.
-    ta.className = "";
-    ta.style.display = "none";
     // An IME may still commit an unfinished composition into the field after
     // the edit has closed, some of them a while later: that field is dropped,
     // so none of its text can reach the next edit.
@@ -738,6 +782,7 @@ export class EditController {
     ta.removeEventListener("focus", this.on_focus);
     ta.removeEventListener("blur", this.on_blur);
     ta.removeEventListener("input", this.on_input);
+    ta.removeEventListener("scroll", this.on_scroll);
     ta.remove();
     if (this.field === ta) this.field = null;
   }

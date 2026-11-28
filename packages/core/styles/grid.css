@@ -74,7 +74,10 @@
   touch-action: pan-x pan-y;
 }
 
-.sheetwrite-editor {
+/* Between edits the editor's field stays laid out, hidden, under its idle
+   class (src/editor.ts): showing it again costs less than a new field. */
+.sheetwrite-editor,
+.sheetwrite-editor-idle {
   position: absolute;
   margin: 0;
   border: 2px solid var(--sheetwrite-selection-border);
