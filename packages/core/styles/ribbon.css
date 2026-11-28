@@ -1,8 +1,19 @@
 /* @sheetwrite/core/styles/ribbon.css: the ribbon, the toolbar, and their
-   menus, palettes and forms. Their command icons need icons.css. */
+   menus, palettes and forms. Their command icons need icons.css.
+
+   Selectors here end in a class wherever the element has one. Browsers file
+   a rule under the last part of its selector; a rule that ends in a
+   multi-part :is() or in a bare pseudo-class lands in the list every
+   restyled element checks, the cell editor included. So lists are spelled
+   out instead of :is(), except an :is() before the last part whose entries
+   differ in specificity. A host's icon override is an <svg> without our
+   class: `:where(svg):not(.sheetwrite-icon)` files that half under svg, with
+   the same specificity as `:is(svg, .sheetwrite-icon)`. */
 
 /* Development builds read this to warn once when this part is missing. */
-:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar, .sheetwrite-ribbon-popup) {
+.sheetwrite-ribbon,
+.sheetwrite-command-toolbar,
+.sheetwrite-ribbon-popup {
   --sheetwrite-ribbon-ready: 1;
 }
 
@@ -48,24 +59,43 @@
 }
 
 /* One row: large ribbon buttons render small, and labels are names only. */
-:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
-  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+.sheetwrite-command-toolbar .sheetwrite-ribbon-button[data-large],
+.sheetwrite-command-toolbar .sheetwrite-ribbon-split[data-large],
+.sheetwrite-command-toolbar-overflow .sheetwrite-ribbon-button[data-large],
+.sheetwrite-command-toolbar-overflow .sheetwrite-ribbon-split[data-large] {
   flex-direction: row;
   height: 24px;
   max-width: none;
   padding: 0 4px;
 }
 
-:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
+.sheetwrite-command-toolbar .sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-button,
+.sheetwrite-command-toolbar .sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-split-arrow,
+.sheetwrite-command-toolbar-overflow
   .sheetwrite-ribbon-split[data-large]
-  > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
+  > .sheetwrite-ribbon-button,
+.sheetwrite-command-toolbar-overflow
+  .sheetwrite-ribbon-split[data-large]
+  > .sheetwrite-ribbon-split-arrow {
   height: 24px;
 }
 
-:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow)
+.sheetwrite-command-toolbar
   .sheetwrite-ribbon-button[data-large]
   > .sheetwrite-ribbon-icon
-  > :is(svg, .sheetwrite-icon) {
+  > .sheetwrite-icon,
+.sheetwrite-command-toolbar
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :where(svg):not(.sheetwrite-icon),
+.sheetwrite-command-toolbar-overflow
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > .sheetwrite-icon,
+.sheetwrite-command-toolbar-overflow
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :where(svg):not(.sheetwrite-icon) {
   --sheetwrite-icon-size: 16px;
   width: 16px;
   height: 16px;
@@ -75,7 +105,8 @@
    medium, small or collapsed as the ribbon narrows (see ribbon-fit.ts). The
    tab row and panel heights are mirrored in ribbon-metrics.ts for the grid's
    layout. The toolbar shares the ribbon's palette and control rules. */
-:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) {
+.sheetwrite-ribbon,
+.sheetwrite-command-toolbar {
   --sheetwrite-ribbon-hover: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
   --sheetwrite-ribbon-pressed: var(--sheetwrite-widget-selection, #2563eb22);
   --sheetwrite-ribbon-line: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
@@ -87,7 +118,8 @@
   user-select: none;
 }
 
-:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) :focus-visible {
+.sheetwrite-ribbon :focus-visible,
+.sheetwrite-command-toolbar :focus-visible {
   outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
   outline-offset: -2px;
 }
@@ -239,7 +271,8 @@
    run now, also inside a popup that borrows a group. It must beat every
    layout rule, compact ones included, which set display with higher
    specificity. */
-:is(.sheetwrite-ribbon, .sheetwrite-ribbon-popup) [hidden] {
+.sheetwrite-ribbon [hidden],
+.sheetwrite-ribbon-popup [hidden] {
   display: none !important;
 }
 
@@ -379,7 +412,8 @@
   box-sizing: border-box;
 }
 
-:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow):hover:not(:disabled) {
+.sheetwrite-ribbon-button:hover:not(:disabled),
+.sheetwrite-ribbon-split-arrow:hover:not(:disabled) {
   background: var(--sheetwrite-ribbon-hover);
 }
 
@@ -395,12 +429,28 @@
   border-color: var(--sheetwrite-ribbon-line);
 }
 
-:is(.sheetwrite-ribbon, .sheetwrite-command-toolbar) :disabled {
+/* One selector per element that can be :disabled, so each lands under its
+   tag; :where() keeps the specificity of `.sheetwrite-ribbon :disabled`. */
+.sheetwrite-ribbon :where(button):disabled,
+.sheetwrite-ribbon :where(input):disabled,
+.sheetwrite-ribbon :where(select):disabled,
+.sheetwrite-ribbon :where(textarea):disabled,
+.sheetwrite-ribbon :where(fieldset):disabled,
+.sheetwrite-ribbon :where(optgroup):disabled,
+.sheetwrite-ribbon :where(option):disabled,
+.sheetwrite-command-toolbar :where(button):disabled,
+.sheetwrite-command-toolbar :where(input):disabled,
+.sheetwrite-command-toolbar :where(select):disabled,
+.sheetwrite-command-toolbar :where(textarea):disabled,
+.sheetwrite-command-toolbar :where(fieldset):disabled,
+.sheetwrite-command-toolbar :where(optgroup):disabled,
+.sheetwrite-command-toolbar :where(option):disabled {
   opacity: var(--sheetwrite-menu-disabled-opacity, 0.45);
   cursor: default;
 }
 
-.sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+.sheetwrite-ribbon-icon > .sheetwrite-icon,
+.sheetwrite-ribbon-icon > :where(svg):not(.sheetwrite-icon) {
   display: block;
   width: 16px;
   height: 16px;
@@ -409,7 +459,8 @@
 
 /* Labels show beside small buttons in flow groups, never in dense rows. */
 .sheetwrite-ribbon-row .sheetwrite-ribbon-label,
-:is(.sheetwrite-command-toolbar, .sheetwrite-command-toolbar-overflow) .sheetwrite-ribbon-label {
+.sheetwrite-command-toolbar .sheetwrite-ribbon-label,
+.sheetwrite-command-toolbar-overflow .sheetwrite-ribbon-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -418,7 +469,8 @@
   white-space: nowrap;
 }
 
-:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+.sheetwrite-ribbon-button[data-large],
+.sheetwrite-ribbon-split[data-large] {
   grid-row: span 3;
 }
 
@@ -435,7 +487,10 @@
   line-height: 1.15;
 }
 
-.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > .sheetwrite-icon,
+.sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :where(svg):not(.sheetwrite-icon) {
   --sheetwrite-icon-size: 32px;
   width: 32px;
   height: 32px;
@@ -443,7 +498,9 @@
 
 /* Medium: large buttons fall back to a small icon with the label beside it. */
 :is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
-  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  .sheetwrite-ribbon-button[data-large],
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
+  .sheetwrite-ribbon-split[data-large] {
   grid-row: auto;
 }
 
@@ -460,7 +517,11 @@
 :is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
   .sheetwrite-ribbon-button[data-large]
   > .sheetwrite-ribbon-icon
-  > :is(svg, .sheetwrite-icon) {
+  > .sheetwrite-icon,
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :where(svg):not(.sheetwrite-icon) {
   --sheetwrite-icon-size: 16px;
   width: 16px;
   height: 16px;
@@ -534,7 +595,10 @@
 
 :is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
   .sheetwrite-ribbon-split[data-large]
-  > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
+  > .sheetwrite-ribbon-button,
+:is(.sheetwrite-ribbon-group[data-size="medium"], .sheetwrite-ribbon-group-popup)
+  .sheetwrite-ribbon-split[data-large]
+  > .sheetwrite-ribbon-split-arrow {
   height: 24px;
 }
 
@@ -680,7 +744,10 @@
   padding: 4px 10px;
 }
 
-:is(.sheetwrite-ribbon-menu-item, .sheetwrite-ribbon-option):is(:hover, :focus) {
+.sheetwrite-ribbon-menu-item:hover,
+.sheetwrite-ribbon-menu-item:focus,
+.sheetwrite-ribbon-option:hover,
+.sheetwrite-ribbon-option:focus {
   outline: none;
   background: var(--sheetwrite-menu-hover, #eeeeee);
 }
@@ -689,7 +756,8 @@
   background: var(--sheetwrite-widget-selection, #2563eb22);
 }
 
-.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > :is(svg, .sheetwrite-icon) {
+.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > .sheetwrite-icon,
+.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > :where(svg):not(.sheetwrite-icon) {
   width: 16px;
   height: 16px;
 }
@@ -725,7 +793,8 @@
   cursor: pointer;
 }
 
-.sheetwrite-ribbon-swatch:is(:hover, :focus) {
+.sheetwrite-ribbon-swatch:hover,
+.sheetwrite-ribbon-swatch:focus {
   outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
   outline-offset: 1px;
 }
@@ -895,7 +964,11 @@ textarea.sheetwrite-ribbon-field {
 .sheetwrite-ribbon[data-mode="compact"]
   .sheetwrite-ribbon-group-button[data-large]
   > .sheetwrite-ribbon-icon
-  > :is(svg, .sheetwrite-icon) {
+  > .sheetwrite-icon,
+.sheetwrite-ribbon[data-mode="compact"]
+  .sheetwrite-ribbon-group-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > :where(svg):not(.sheetwrite-icon) {
   --sheetwrite-icon-size: 16px;
   width: 16px;
   height: 16px;
