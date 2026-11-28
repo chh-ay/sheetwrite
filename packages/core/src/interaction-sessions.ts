@@ -271,12 +271,16 @@ export class InteractionSessions {
 
   constructor(deps: InteractionDependencies) {
     this.deps = deps;
-    this.editor = new EditController(deps.viewportEl, {
-      highlightCells: deps.highlightCells,
-      sheet: deps.activeSheet,
-      cell: () => this.editing_address,
-      store: deps.store,
-    });
+    this.editor = new EditController(
+      deps.viewportEl,
+      {
+        highlightCells: deps.highlightCells,
+        sheet: deps.activeSheet,
+        cell: () => this.editing_address,
+        store: deps.store,
+      },
+      deps.host,
+    );
     this.validation_editor = new ValidationEditor(deps.viewportEl);
     this.custom_editor = new CustomEditorController(deps.viewportEl);
     this.fills = new FillController({
@@ -572,9 +576,18 @@ export class InteractionSessions {
     this.editing_address = null;
     this.active_editor = null;
     this.report_cell_mode();
-    this.deps.host.focus();
+    this.focus_grid();
     this.deps.scheduleRender();
     this.deps.editDraft.end();
+  }
+
+  /**
+   * Give the grid the focus back, where the user left the page. Focusing
+   * makes the browser lay the page out, so a grid that has the focus already
+   * is left alone, and no scroll into view adds to that.
+   */
+  private focus_grid(): void {
+    if (document.activeElement !== this.deps.host) this.deps.host.focus({ preventScroll: true });
   }
 
   private cancel_editor(): void {
@@ -1039,7 +1052,7 @@ export class InteractionSessions {
       }
       this.move_after_commit(view_row, address.col, navigate);
     }
-    this.deps.host.focus();
+    this.focus_grid();
     this.deps.scheduleRender();
   }
 
