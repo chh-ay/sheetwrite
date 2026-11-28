@@ -5,6 +5,7 @@ import {
   DEFAULT_MAX_ITERATIONS,
   MAX_ITERATIONS,
   sheetNameKey,
+  workbookTableNameKey,
 } from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
@@ -181,11 +182,11 @@ export function reconcileDefinedNames(
   context: XlsxCodecContext,
 ): void {
   const defined_name_keys = new Map(
-    (namedRanges ?? []).map((named) => [named.name.normalize("NFC").toUpperCase(), named.name]),
+    (namedRanges ?? []).map((named) => [workbookTableNameKey(named.name), named.name]),
   );
   for (const sheet of sheets) {
     const tables = sheet.tables?.filter((table) => {
-      const collision = defined_name_keys.get(table.name.normalize("NFC").toUpperCase());
+      const collision = defined_name_keys.get(workbookTableNameKey(table.name));
       if (collision === undefined) return true;
       emitWarning(context, {
         code: "invalid-metadata",

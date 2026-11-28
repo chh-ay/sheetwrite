@@ -9,7 +9,7 @@
     LIFECYCLE_WORKBOOK,
   } from "./fixture.js";
 
-  let wasmSource = $state.raw<Uint8Array | undefined>(INVALID_WASM_SOURCE);
+  let wasm_source = $state.raw<Uint8Array | undefined>(INVALID_WASM_SOURCE);
   let data = $state.raw(LIFECYCLE_DATA);
   let mounted = $state(true);
   let status = $state<"loading" | "error" | "ready">("loading");
@@ -18,19 +18,19 @@
 
   function retry(): void {
     status = "loading";
-    wasmSource = undefined;
+    wasm_source = undefined;
   }
 
-  function resetInput(): void {
+  function reset_input(): void {
     data = LIFECYCLE_RESET_DATA;
   }
 
-  function handleInitializationError(): void {
+  function handle_initialization_error(): void {
     errors += 1;
     status = "error";
   }
 
-  function handleReady(event: GridReadyEvent): void {
+  function handle_ready(event: GridReadyEvent): void {
     ready = `${event.generation}:${event.reason}`;
     status = "ready";
   }
@@ -42,7 +42,7 @@
 
 <main data-framework-lifecycle="svelte">
   <button type="button" data-lifecycle-retry onclick={retry}>Retry Svelte</button>
-  <button type="button" data-lifecycle-reset onclick={resetInput}>Reset Svelte input</button>
+  <button type="button" data-lifecycle-reset onclick={reset_input}>Reset Svelte input</button>
   <button type="button" data-lifecycle-unmount onclick={() => (mounted = false)}
     >Unmount Svelte</button
   >
@@ -54,10 +54,10 @@
       workbook={LIFECYCLE_WORKBOOK}
       {data}
       height={320}
-      {wasmSource}
+      wasmSource={wasm_source}
       {fallback}
-      onInitializationError={handleInitializationError}
-      onReady={handleReady}
+      onInitializationError={handle_initialization_error}
+      onReady={handle_ready}
     />
   {/if}
 </main>

@@ -93,6 +93,23 @@ export function visibleSheetNeighbor(
   return null;
 }
 
+function is_visible_sheet(sheet: { visibility?: SheetVisibility }): boolean {
+  return (sheet.visibility ?? "visible") === "visible";
+}
+
+/**
+ * The sheet to show for `active`: itself when it is in `sheets` and visible,
+ * else its nearest visible neighbour. With no visible sheet it stays `active`.
+ */
+export function resolveActiveSheet(
+  sheets: readonly { id: SheetId; visibility?: SheetVisibility }[],
+  active: SheetId,
+): SheetId {
+  const sheet = sheets.find((candidate) => candidate.id === active);
+  if (sheet && is_visible_sheet(sheet)) return active;
+  return visibleSheetNeighbor(sheets, active) ?? active;
+}
+
 export function normalizedRange(range: Range): Range {
   return {
     sheet: range.sheet,

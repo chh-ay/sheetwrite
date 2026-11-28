@@ -12,7 +12,7 @@ export * from "./pkg/sheetwrite_wasm.js";
  * pool for each of its open, size, read and close steps, which takes longer
  * than the read itself.
  */
-function readBundledEngine() {
+function read_bundled_engine() {
   return readFileSync(new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url));
 }
 
@@ -22,7 +22,7 @@ const loader = createLoader(async (source) => {
     return;
   }
 
-  initSync({ module: readBundledEngine() });
+  initSync({ module: read_bundled_engine() });
 });
 
 export const { load, isLoaded } = loader;
@@ -32,7 +32,7 @@ export async function createEngine(source) {
   const engine = createInstance();
 
   if (source === undefined) {
-    engine.initSync({ module: readBundledEngine() });
+    engine.initSync({ module: read_bundled_engine() });
   } else {
     await engine.init({ module_or_path: source });
   }

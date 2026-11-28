@@ -2,10 +2,10 @@ import { rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export const deferredModule = "@sheetwrite/core/dist/clipboard-controller.js";
-const originalName = "clipboard-controller.js";
-const deferredName = "clipboard-controller.first-interaction.js";
+const original_name = "clipboard-controller.js";
+const deferred_name = "clipboard-controller.first-interaction.js";
 
-const proxySource = `const loadEvent = "sheetwrite:first-interaction-module";
+const proxy_source = `const loadEvent = "sheetwrite:first-interaction-module";
 
 function publish(detail) {
   globalThis.dispatchEvent?.(new CustomEvent(loadEvent, { detail }));
@@ -24,7 +24,7 @@ export class ClipboardController {
   async #load() {
     if (this.#controller === undefined) {
       publish({ module: ${JSON.stringify(deferredModule)}, state: "loading" });
-      this.#controller = import("./${deferredName}")
+      this.#controller = import("./${deferred_name}")
         .then(({ ClipboardController: DeferredClipboardController }) => {
           publish({ module: ${JSON.stringify(deferredModule)}, state: "loaded" });
           return new DeferredClipboardController(this.#deps);
@@ -64,9 +64,9 @@ export class ClipboardController {
 `;
 
 export async function installFixtureOnlyCandidate(corePackageRoot) {
-  const coreDist = resolve(corePackageRoot, "dist");
-  const originalPath = resolve(coreDist, originalName);
-  const deferredPath = resolve(coreDist, deferredName);
-  await rename(originalPath, deferredPath);
-  await writeFile(originalPath, proxySource);
+  const core_dist = resolve(corePackageRoot, "dist");
+  const original_path = resolve(core_dist, original_name);
+  const deferred_path = resolve(core_dist, deferred_name);
+  await rename(original_path, deferred_path);
+  await writeFile(original_path, proxy_source);
 }

@@ -13,7 +13,7 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { cellA1, sheetNameKey } from "@sheetwrite/core/codec";
+import { cellA1, sheetNameKey, workbookTableNameKey } from "@sheetwrite/core/codec";
 
 import { type CellRect, parseCellRect, rectA1 } from "./cell-reference.js";
 import { staticCell } from "./dashboard.js";
@@ -101,11 +101,6 @@ const CUSTOM_SUBTOTAL_FLAGS = [
   "varPSubtotal",
 ] as const;
 
-/** Defined and table names compare case-insensitively after NFC normalization. */
-function name_key(name: string): string {
-  return name.normalize("NFC").toUpperCase();
-}
-
 /** Excel's pivot item order: numbers, text, logical values, then blanks. */
 function scalar_rank(value: CellScalar): number {
   if (typeof value === "number") return 0;
@@ -165,13 +160,13 @@ function read_source(cache: XmlElement, snapshot: WorkbookSnapshot): ResolvedRea
 
   const name = xmlAttribute(worksheet, "name");
   if (name !== undefined) {
-    const key = name_key(decodeXstring(name));
+    const key = workbookTableNameKey(decodeXstring(name));
     for (const sheet of snapshot.sheets) {
-      const table = sheet.tables?.find((candidate) => name_key(candidate.name) === key);
+      const table = sheet.tables?.find((candidate) => workbookTableNameKey(candidate.name) === key);
       if (table) return { source: { table: table.id }, width: table.columns.length };
     }
     const named = snapshot.workbook.namedRanges?.find(
-      (candidate) => candidate.scope === undefined && name_key(candidate.name) === key,
+      (candidate) => candidate.scope === undefined && workbookTableNameKey(candidate.name) === key,
     );
     if (named?.range === undefined)
       return "its source name is neither a table nor a workbook range";
@@ -934,8 +929,9 @@ function field_names(plan: WritePlan): string[] | string {
   const seen = new Set<string>();
   return names.map((header) => {
     let name = header;
-    for (let suffix = 2; seen.has(name_key(name)); suffix++) name = `${header}${suffix}`;
-    seen.add(name_key(name));
+    for (let suffix = 2; seen.has(workbookTableNameKey(name)); suffix++)
+      name = `${header}${suffix}`;
+    seen.add(workbookTableNameKey(name));
     return name;
   });
 }

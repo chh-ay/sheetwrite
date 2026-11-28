@@ -113,6 +113,7 @@ import {
   movedBlock,
   rangeContains,
   removeRowGroup,
+  resolveActiveSheet,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import {
@@ -815,14 +816,7 @@ export class GridImpl implements Grid {
     this.overscan = opts.overscan ?? DEFAULT_OVERSCAN;
     this.base_theme = { ...DEFAULT_THEME, ...resolveThemeFromCss(host), ...opts.theme };
 
-    const requested_active = opts.workbook.activeSheet;
-    const requested_sheet = workbook.sheets.find((sheet) => sheet.id === requested_active);
-    this.active_sheet =
-      requested_sheet && (requested_sheet.visibility ?? "visible") === "visible"
-        ? requested_active
-        : (visibleSheetNeighbor(workbook.sheets, requested_active) ??
-          workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
-          requested_active);
+    this.active_sheet = resolveActiveSheet(workbook.sheets, opts.workbook.activeSheet);
 
     this.session_sheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
     this.displayed_hidden_rows = new Set(this.sheet().hiddenRows);
@@ -1677,11 +1671,7 @@ export class GridImpl implements Grid {
     }
 
     const sheets = this.store.getWorkbook().sheets;
-    const reconciled = sheets.find((sheet) => sheet.id === session_active);
-    if (!reconciled || (reconciled.visibility ?? "visible") !== "visible") {
-      session_active =
-        sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ?? session_active;
-    }
+    session_active = resolveActiveSheet(sheets, session_active);
 
     if (session_active !== this.active_sheet) this.setActiveSheet(session_active);
     this.session_sheets = sheets.map(({ id, visibility }) => ({ id, visibility }));

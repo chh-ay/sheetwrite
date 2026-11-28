@@ -9,27 +9,29 @@ type Props = SheetwriteProps<Row, Id>;
 
 let {
   columns,
-  defaultRows,
-  sheetName,
-  getRowId,
-  createRowId,
+  defaultRows: default_rows,
+  sheetName: sheet_name,
+  getRowId: get_row_id,
+  createRowId: create_row_id,
   grid = $bindable(),
   ...props
 }: Props = $props();
-let input = $derived(createSimpleGridInput({ columns, defaultRows, sheetName }));
-let rowBridge = $derived(
+let input = $derived(
+  createSimpleGridInput({ columns, defaultRows: default_rows, sheetName: sheet_name }),
+);
+let row_bridge = $derived(
   createSimpleRowBridge({
     columns,
-    defaultRows,
-    ...(getRowId === undefined ? {} : { getRowId }),
-    ...(createRowId === undefined ? {} : { createRowId }),
+    defaultRows: default_rows,
+    ...(get_row_id === undefined ? {} : { getRowId: get_row_id }),
+    ...(create_row_id === undefined ? {} : { createRowId: create_row_id }),
   }),
 );
-let resolvedProps = $derived.by(() => {
+let resolved_props = $derived.by(() => {
   assertGridSize({ height: props.height, fill: props.fill });
-  const forwarded = { ...props, ...input, rowBridge };
+  const forwarded = { ...props, ...input, rowBridge: row_bridge };
   return forwarded as unknown as SheetwriteGridProps;
 });
 </script>
 
-<GridComponent {...resolvedProps} bind:grid />
+<GridComponent {...resolved_props} bind:grid />

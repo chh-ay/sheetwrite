@@ -1,4 +1,5 @@
 import type { DataModel, SheetSnapshot, TableRelationship, WorkbookTable } from "@sheetwrite/core";
+import { workbookTableNameKey } from "@sheetwrite/core/codec";
 
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 import { decodeXstring, type XmlElement, xmlAttribute, xmlChild, xmlChildren } from "./xml.js";
@@ -86,7 +87,9 @@ export function readExcelDataModel(
   const sources = connection_sources(connections);
   const worksheet_tables = new Map<string, WorkbookTable>();
   for (const sheet of sheets) {
-    for (const table of sheet.tables ?? []) worksheet_tables.set(table.name.toUpperCase(), table);
+    for (const table of sheet.tables ?? []) {
+      worksheet_tables.set(workbookTableNameKey(table.name), table);
+    }
   }
 
   // A model table names its worksheet table through its connection; without
@@ -97,7 +100,7 @@ export function readExcelDataModel(
     const connection = xmlAttribute(element, "connection");
     if (name === undefined) continue;
     const source = connection === undefined ? undefined : sources.get(decodeXstring(connection));
-    const table = worksheet_tables.get((source ?? decodeXstring(name)).toUpperCase());
+    const table = worksheet_tables.get(workbookTableNameKey(source ?? decodeXstring(name)));
     if (table !== undefined) model_tables.set(decodeXstring(name), table);
   }
 

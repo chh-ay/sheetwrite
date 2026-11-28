@@ -11,44 +11,44 @@ const DIFFERENT_SOURCE_AFTER_INIT =
 export function createLoader(initialize) {
   let ready = false;
   /** @type {Promise<void> | null} */
-  let inFlight = null;
+  let in_flight = null;
   /** @type {unknown} */
-  let selectedSource;
+  let selected_source;
 
   /**
    * @param {BufferSource | URL | string | Request | WebAssembly.Module} [source]
    */
   async function load(source) {
     if (ready) {
-      if (source !== undefined && source !== selectedSource) {
+      if (source !== undefined && source !== selected_source) {
         console.warn(DIFFERENT_SOURCE_AFTER_INIT);
       }
 
       return;
     }
 
-    if (inFlight) {
-      if (source !== undefined && source !== selectedSource) {
+    if (in_flight) {
+      if (source !== undefined && source !== selected_source) {
         throw new Error(DIFFERENT_SOURCE_IN_FLIGHT);
       }
 
-      return inFlight;
+      return in_flight;
     }
 
-    selectedSource = source;
-    inFlight = initialize(source);
+    selected_source = source;
+    in_flight = initialize(source);
 
     try {
-      await inFlight;
+      await in_flight;
       ready = true;
     } catch (error) {
-      inFlight = null;
-      selectedSource = undefined;
+      in_flight = null;
+      selected_source = undefined;
       throw error;
     }
   }
 
-  function isLoaded() {
+  function is_loaded() {
     return ready;
   }
 
@@ -60,9 +60,9 @@ export function createLoader(initialize) {
    * @param {() => void} publish
    */
   async function adopt(source, publish) {
-    if (inFlight) {
+    if (in_flight) {
       try {
-        await inFlight;
+        await in_flight;
       } catch {
         // A failed load() leaves the loader free for this instance to adopt.
       }
@@ -71,9 +71,9 @@ export function createLoader(initialize) {
     if (ready) return;
 
     publish();
-    selectedSource = source;
+    selected_source = source;
     ready = true;
   }
 
-  return { load, isLoaded, adopt };
+  return { load, isLoaded: is_loaded, adopt };
 }
