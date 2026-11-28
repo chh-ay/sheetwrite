@@ -171,7 +171,8 @@ export class DocumentController {
       });
     } else {
       if (captured) this.dispose_inverses(captured);
-      // Replay rebases history only when every stored record has applied.
+      // A replay rebases history in its `commit` callback, once every stored
+      // record has applied. Any other applied transaction rebases it now.
       if (outcome.status === "applied") this.rebase_history_for(outcome.transaction.patches);
     }
 
@@ -308,7 +309,7 @@ export class DocumentController {
     return this.history.canUndo;
   }
 
-  /** The newest undo entry, by identity: the edit the next {@link undo} reverts. */
+  /** See `UndoManager.lastUndo`. */
   get lastUndo(): object | null {
     return this.history.lastUndo;
   }
@@ -380,7 +381,8 @@ export class DocumentController {
   ): Map<DocumentOp, Array<DocumentOp | HistoryPart>> {
     const captured = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     try {
-      // Batch cell reads retain the same compact capture used by local history.
+      // With several operations, the cells of the `set` operations are read in
+      // one batch per sheet.
       if (patches.length > 1) {
         const sets_by_sheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
         for (const patch of patches) {
@@ -1359,11 +1361,6 @@ export class DocumentController {
   }
 
   /**
-   * Pre-edit definitions of every chart a structural edit of `sheet` may rewrite,
-   * set back after the structure is restored so undo returns them exactly.
-   * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
-   */
-  /**
    * The sheet's AutoFilter and column filters as they are, for the inverse of
    * an edit that can shrink or drop them, such as deleting its header row.
    */
@@ -1383,6 +1380,11 @@ export class DocumentController {
     ];
   }
 
+  /**
+   * Pre-edit definitions of every chart a structural edit of `sheet` may rewrite,
+   * set back after the structure is restored so undo returns them exactly.
+   * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
+   */
   private chart_restores(
     sheet: SheetId,
     { includeOwned: include_owned }: { includeOwned: boolean },
@@ -1667,7 +1669,7 @@ export class DocumentController {
           preparation.seed(operation, patch.block);
           return operation;
         } catch (error) {
-          // Above the restore block caps the block stays a candidate for splitting.
+          // A block above the restore block caps stays a candidate for splitting.
           const above_cap =
             error instanceof RangeError ||
             (error instanceof SheetwriteError && error.code === "resource-limit");

@@ -82,7 +82,6 @@ const AUTO_FILL_LABELS: Record<AutoFillChoice, string> = {
   year: "Fill Years",
 };
 
-/** How an edit opens. */
 interface EditRequest {
   /** Text typed to start the edit; without it the editor opens on the cell's content. */
   readonly initial?: string;
@@ -302,7 +301,6 @@ export class InteractionSessions {
     return this.active_editor !== null;
   }
 
-  /** Excel's cell mode now; see {@link CellMode}. */
   get cellMode(): CellMode {
     return this.mode;
   }
@@ -446,7 +444,6 @@ export class InteractionSessions {
     };
   }
 
-  /** AutoComplete's code, loaded once. */
   private load_autocomplete(): Promise<typeof import("./autocomplete.js")> {
     this.autocomplete_load ??= import("./autocomplete.js").then((module) => {
       this.autocomplete = module;
@@ -845,7 +842,7 @@ export class InteractionSessions {
       });
     }
 
-    // edit-begin remains a before-open notification. Reentrant callbacks can
+    // edit-begin is a before-open notification. Reentrant callbacks can
     // replace or invalidate this request, but cannot reopen its stale target.
     if (generation !== this.generation || this.deps.readOnly()) return;
 
@@ -1140,17 +1137,15 @@ export class InteractionSessions {
     return this.fill_target;
   }
 
-  /** The value tip beside the fill handle while it is dragged. */
   get fillTip(): FillTip | null {
     return this.tip;
   }
 
-  /** The new cells of the dragged fill handle's fill, which show their values in place. */
+  /** The fill's `dragArea` while the fill handle is dragged; null otherwise. */
   get fillValuesArea(): SelRect | null {
     return this.fill_target ? this.fills.dragArea : null;
   }
 
-  /** What a cell of {@link fillValuesArea} will show; null for a formula. */
   fillValueAt(row: number, col: number): { text: string; right: boolean } | null {
     return this.fills.preview(row, col);
   }
@@ -1453,7 +1448,6 @@ export class InteractionSessions {
     this.beginEdit(cell.row, cell.col);
   };
 
-  /** Whether a pointer at (client_x, client_y) is on the selection's fill handle. */
   private hits_fill_handle(client_x: number, client_y: number): boolean {
     const handle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
     if (!handle) return false;
@@ -2389,9 +2383,9 @@ export class InteractionSessions {
   }
 
   /**
-   * Window-drag replacement: capture the initiating pointer on the scroller and
-   * track it until `pointerup` (commit) or `pointercancel` (abandon, never
-   * commit). Events from other pointers are ignored for the drag's lifetime.
+   * Capture the initiating pointer on the scroller and track it until
+   * `pointerup` (commit) or `pointercancel` (abandon, never commit). Events
+   * from other pointers are ignored for the drag's lifetime.
    */
   private attach_drag(
     e: PointerEvent,

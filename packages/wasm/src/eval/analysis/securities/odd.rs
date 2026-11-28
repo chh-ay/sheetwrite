@@ -97,7 +97,6 @@ impl FirstPeriodBond {
         }
     }
 
-    /// The first period is shorter than a normal period.
     fn short_first_price(&self, annual_yield: f64, period_days: f64) -> f64 {
         let coupons = Coupons::find(self.settlement, self.maturity, self.frequency).remaining;
         let coupon = FACE_VALUE * self.rate / self.frequency;
@@ -116,8 +115,8 @@ impl FirstPeriodBond {
         value - coupon * accrued_share
     }
 
-    /// The first period is longer than a normal period. It is split into
-    /// quasi-coupon periods that step back from the first coupon date.
+    /// The long first period is split into quasi-coupon periods that step
+    /// back from the first coupon date.
     fn long_first_price(&self, annual_yield: f64, period_days: f64, first_period: Coupons) -> f64 {
         let quasi_periods = Coupons::find(self.issue, self.first_coupon, self.frequency).remaining;
         let mut later = self.first_coupon;
@@ -165,8 +164,9 @@ impl FirstPeriodBond {
     }
 
     /// The whole quasi-coupon periods from the settlement date to the first
-    /// coupon date. A first coupon on the 29th or 30th of a 31-day month
-    /// takes its month-end rule from the settlement date.
+    /// coupon date. A first coupon on the 29th or 30th of a month other than
+    /// February, when that day is not the month's last, takes its month-end
+    /// rule from the settlement date.
     fn quasi_periods_to_first_coupon(&self) -> f64 {
         let first = self.first_coupon;
         let mut is_month_end = first.is_last_day_of_month();

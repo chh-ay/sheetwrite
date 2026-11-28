@@ -796,8 +796,13 @@ The browser bench adapts the four scenario families in Handsontable's official
 performance suite, [`handsontable/performance-lab`](https://github.com/handsontable/performance-lab)
 (`master`), but uses Sheetwrite's versioned auditable protocol. Each measured
 sample repeats one logical action until its aggregate measured duration reaches
-at least 100 ms. Declared aggregate warmups are excluded; every measured sample
-is retained, and median, linearly interpolated p95, and MAD use all valid samples.
+at least 100 ms. Five warm-up aggregates run first and are excluded. With one,
+the scenario that ran first in a page was still on code the browser had not
+finished optimizing, and a version comparison of a row moved with its place in
+the page (1.16× to 1.51× for edit-open); with five it moves much less (1.13× to
+1.21×).
+Every measured sample is retained, and median, linearly interpolated p95, and
+MAD use all valid samples.
 
 | Adapted spec | What we mirror |
 |---|---|
@@ -811,9 +816,14 @@ keyboard path (`Enter` → editor, arrows → navigation, `applyTransaction` wit
 `addRows`/`removeRows` → altering); Handsontable uses `.ht_master .wtHolder`,
 `getActiveEditor()`, `alter()`, and its selection API. Scroll samples force each
 engine's paint inside the timed operation (`grid.refresh()` / `hot.render()`), so
-deferred work cannot make event dispatch look like a completed frame. Each engine
-runs in a separate fresh Chromium process with the same deterministic dataset,
-columns, 640×480 stage, scenario actions, correctness checkpoints, and virtualization.
+deferred work cannot make event dispatch look like a completed frame. The untimed
+setup before each scroll step leaves a presented frame, as a frame between two
+scroll events would: Sheetwrite's canvas is rasterized (copied into a one-pixel
+canvas) and Handsontable's DOM laid out. Without that, a step that reads the
+canvas, such as a scroll blit, would also pay for rasterizing the setup frame.
+Each engine runs in a separate fresh Chromium process with the same deterministic
+dataset, columns, 640×480 stage, scenario actions, correctness checkpoints, and
+virtualization.
 
 ### Current benchmark scope and missing coverage
 

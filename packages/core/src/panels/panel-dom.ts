@@ -1,4 +1,5 @@
-// DOM helpers shared by the Chart panel and the pivot field list.
+// DOM helpers shared by the side panels, and the message a panel shows when
+// the grid rejects a change.
 
 import type { ApplyTransactionResult } from "../types/transaction.js";
 
@@ -80,7 +81,7 @@ export function selectOf(
   return select;
 }
 
-/** A text input that commits once per change; `show` updates it from the model. */
+/** What {@link committingInput} returns. */
 export interface CommittingInput {
   readonly input: HTMLInputElement;
   /** Show the model's text, unless the user is typing a draft in this field. */

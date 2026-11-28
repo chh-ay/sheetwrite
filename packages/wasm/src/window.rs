@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::formula_slots::{FormulaResults, FormulaStore};
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{relative_reach, translate_relative_refs, Ast, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{relative_reach, translate_relative_refs, Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{payload_num, payload_str_id};
 use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
@@ -40,6 +40,50 @@ enum CondPred {
 struct FormulaRule {
     ast: Ast,
     reach: (u32, u32),
+}
+
+/// Whether `ast` has one value at every cell of a row: no reference moves
+/// with the column, and nothing reads the column of the cell it is read for
+/// or draws a random number for each cell. Defined names, table
+/// references, and custom and LAMBDA calls count as varying, since their
+/// content is not read here.
+fn same_across_row(ast: &Ast) -> bool {
+    match ast {
+        Ast::Cell(.., flags) | Ast::AbsCell(.., flags) => flags.col_abs(),
+        Ast::SheetCell(reference) => reference.flags.col_abs(),
+        Ast::Range(.., flags) | Ast::AbsRange(.., flags) => {
+            flags.start.col_abs() && flags.end.col_abs()
+        }
+        Ast::SheetRange(reference) => {
+            reference.flags.start.col_abs() && reference.flags.end.col_abs()
+        }
+        Ast::SheetSpan(span) => span.flags.start.col_abs() && span.flags.end.col_abs(),
+        Ast::Func(
+            Func::Column | Func::Cell | Func::Indirect | Func::Rand | Func::RandBetween,
+            ..,
+        ) => false,
+        Ast::Func(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(..)
+        | Ast::Pos(..)
+        | Ast::Percent(..)
+        | Ast::LetSlot { .. } => !ast.any_child(&mut |child| !same_across_row(child)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array(_) => true,
+        Ast::Name(_)
+        | Ast::DefinedName(..)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::UnknownFunc(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(_) | Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+    }
 }
 
 /// A cell a rule covers, and its distance in rows and columns from the rule
@@ -102,6 +146,10 @@ struct CondRule {
     c1: u32,
     pred: CondPred,
     stop_if_true: bool,
+    /// A formula rule that holds alike at every cell of a row
+    /// ([`same_across_row`]), so a window reads it once per row. It sits in
+    /// the rule's padding, so a rule takes no more memory for it.
+    same_across_row: bool,
 }
 
 /// Parsed conditional-format rules per sheet handle, synced from the host and
@@ -117,9 +165,17 @@ impl ConditionalRules {
         self.by_sheet.get(&sheet).map_or(&[], Vec::as_slice)
     }
 
-    /// A removed sheet handle never renders again.
+    /// Drops the rules of a removed sheet: its handle never renders again.
     pub(crate) fn remove_sheet(&mut self, sheet: usize) {
         self.by_sheet.remove(&sheet);
+    }
+
+    /// Whether a rule is a formula, which may call SUBTOTAL or AGGREGATE.
+    pub(crate) fn has_formula_rules(&self) -> bool {
+        self.by_sheet
+            .values()
+            .flatten()
+            .any(|rule| matches!(rule.pred, CondPred::Formula(_)))
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
@@ -154,6 +210,8 @@ impl CellStore {
     /// per rule; `nums` carries the numeric operand; `strs` the text/formula
     /// operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
     /// Formula strings are parsed once here, never once per visible cell.
+    /// Only the first 32 rules are read, and an unknown kind is skipped. A
+    /// formula longer than 8,192 bytes, or one that does not parse, never holds.
     #[wasm_bindgen(js_name = setConditionalRules)]
     pub fn set_conditional_rules(
         &mut self,
@@ -221,6 +279,11 @@ impl CellStore {
                 _ => continue,
             };
 
+            let row_invariant = if let CondPred::Formula(formula) = &pred {
+                same_across_row(&formula.ast)
+            } else {
+                false
+            };
             rules.push(CondRule {
                 r0,
                 c0,
@@ -228,6 +291,7 @@ impl CellStore {
                 c1,
                 pred,
                 stop_if_true: flag & 2 != 0,
+                same_across_row: row_invariant,
             });
         }
 
@@ -297,7 +361,7 @@ impl CellStore {
         let cond_matches =
             cond_matches_for_window(self, sheet, |ri| row_start_u + ri as u32, cols, &cells);
 
-        WindowView::new(self.strings.epoch, cells, cond_matches)
+        WindowView::new(self.strings.epoch, cells, &cond_matches)
     }
 
     /// Bulk read of an explicit row list (sorted/filtered views) — same output
@@ -351,39 +415,67 @@ impl CellStore {
             &cells,
         );
 
-        WindowView::new(self.strings.epoch, cells, cond_matches)
+        WindowView::new(self.strings.epoch, cells, &cond_matches)
     }
 }
 
-/// Cell buffers of one render window, row-major over `n_rows x n_cols`.
+/// Cells of one render window, row-major over `n_rows x n_cols`, written in
+/// place into the packed layout the host decodes: the header, then the kinds,
+/// the numbers (8-byte aligned), the pool string ids, the window-local string
+/// ids and the window-local style ids. [`WindowCells::into_packed`] appends
+/// the style dictionary and the conditional matches and writes the header.
 struct WindowCells {
     n_rows: usize,
     n_cols: usize,
-    kind: Vec<u8>,
-    num: Vec<f64>,
-    str_local: Vec<i32>,
-    style_local: Vec<u32>,
-    string_ids: Vec<u32>,
-    /// Window-local formula-error sentinels, indexed by `str_local`.
+    cell_count: usize,
+    packed: Vec<u8>,
+    numbers_start: usize,
+    string_ids_start: usize,
+    string_index_start: usize,
+    style_index_start: usize,
+    /// Window-local formula-error sentinels, indexed by the local string ids.
     strings: Vec<String>,
     style_dict: Vec<u32>,
     error_slots: [i32; FormulaError::COUNT],
 }
 
+// A zeroed kind is an empty cell, and the all-ones bytes the pool and local
+// string sections start as read back as `NO_STRING` and -1.
+const _: () = assert!(
+    KIND_EMPTY == 0 && NO_STRING == u32::MAX,
+    "a new window's zero and all-ones bytes must read as empty cells without strings"
+);
+
+/// Room for the style dictionary after the cell sections: a window holds a
+/// handful of styles, so appending it does not move the buffer.
+const STYLE_DICT_RESERVE_BYTES: usize = 16 * std::mem::size_of::<u32>();
+
 impl WindowCells {
-    /// `None` when the window's cell count overflows `usize`.
+    /// `None` when the window's byte length overflows `usize`.
     fn new(n_rows: usize, n_cols: usize) -> Option<Self> {
-        let cells = n_rows.checked_mul(n_cols)?;
+        let cell_count = n_rows.checked_mul(n_cols)?;
+        let numbers_start = align_to_8(WINDOW_PACKED_HEADER_BYTES.checked_add(cell_count)?)?;
+        let string_ids_start = numbers_start.checked_add(cell_count.checked_mul(8)?)?;
+        let string_index_start = string_ids_start.checked_add(cell_count.checked_mul(4)?)?;
+        let style_index_start = string_index_start.checked_add(cell_count.checked_mul(4)?)?;
+        let cells_end = style_index_start.checked_add(cell_count.checked_mul(4)?)?;
+        let mut packed = Vec::with_capacity(cells_end.checked_add(STYLE_DICT_RESERVE_BYTES)?);
+        // Header and kinds (empty), padding and numbers (0.0).
+        packed.resize(string_ids_start, 0);
+        // No pool string, no local string.
+        packed.resize(style_index_start, u8::MAX);
+        // Slots stay 0 for cells the window skips (past the sheet's edge, or
+        // not loaded), so local slot 0 must mean "no style".
+        packed.resize(cells_end, 0);
         Some(Self {
             n_rows,
             n_cols,
-            kind: vec![KIND_EMPTY; cells],
-            num: vec![0.0f64; cells],
-            str_local: vec![-1i32; cells],
-            // Slots stay 0 for cells the window skips (past the sheet's edge,
-            // or not loaded), so local slot 0 must mean "no style".
-            style_local: vec![0u32; cells],
-            string_ids: vec![NO_STRING; cells],
+            cell_count,
+            packed,
+            numbers_start,
+            string_ids_start,
+            string_index_start,
+            style_index_start,
             strings: Vec::new(),
             style_dict: vec![NO_STYLE_ID],
             error_slots: [-1i32; FormulaError::COUNT],
@@ -402,26 +494,24 @@ impl WindowCells {
         slots: &FormulaStore,
     ) {
         let Some((stored_kind, payload, style)) = resolved else {
-            self.kind[dst] = KIND_STRING;
-            self.str_local[dst] = local_error_index(
-                FormulaError::Loading,
-                &mut self.error_slots,
-                &mut self.strings,
-            );
+            self.set_error(dst, FormulaError::Loading);
             return;
         };
 
-        self.kind[dst] = stored_kind;
-        self.style_local[dst] = local_style_index(style, &mut self.style_dict);
+        let style_index = local_style_index(style, &mut self.style_dict);
+        self.write(self.style_index_start, dst, style_index.to_le_bytes());
 
         match stored_kind {
-            KIND_NUMBER | KIND_BOOL => self.num[dst] = payload_num(payload),
+            KIND_NUMBER | KIND_BOOL => {
+                self.set_kind(dst, stored_kind);
+                self.write(self.numbers_start, dst, payload_num(payload).to_le_bytes());
+            }
             KIND_STRING => {
+                // A string cell without pool text stays empty.
                 let pool_id = payload_str_id(payload);
-                if pool_id == NO_STRING {
-                    self.kind[dst] = KIND_EMPTY;
-                } else {
-                    self.string_ids[dst] = pool_id;
+                if pool_id != NO_STRING {
+                    self.set_kind(dst, KIND_STRING);
+                    self.write(self.string_ids_start, dst, pool_id.to_le_bytes());
                 }
             }
             KIND_FORMULA => {
@@ -429,16 +519,101 @@ impl WindowCells {
                 let entry = key.and_then(|cell| sheet.formulas.get(cell, slots));
                 let error = key.and_then(|cell| formula_error_with_entry(sheet, cell, entry));
                 if let Some(found) = error {
-                    self.kind[dst] = KIND_STRING;
-                    self.str_local[dst] =
-                        local_error_index(found, &mut self.error_slots, &mut self.strings);
+                    self.set_error(dst, found);
                 } else {
-                    self.kind[dst] = KIND_NUMBER;
-                    self.num[dst] = payload_num(payload);
+                    self.set_kind(dst, KIND_NUMBER);
+                    self.write(self.numbers_start, dst, payload_num(payload).to_le_bytes());
                 }
             }
-            _ => {}
+            _ => self.set_kind(dst, stored_kind),
         }
+    }
+
+    fn set_kind(&mut self, dst: usize, kind: u8) {
+        if let Some(slot) = self.packed.get_mut(WINDOW_PACKED_HEADER_BYTES + dst) {
+            *slot = kind;
+        }
+    }
+
+    /// Show `error`'s sentinel text in cell `dst`.
+    fn set_error(&mut self, dst: usize, error: FormulaError) {
+        let local = local_error_index(error, &mut self.error_slots, &mut self.strings);
+        self.set_kind(dst, KIND_STRING);
+        self.write(self.string_index_start, dst, local.to_le_bytes());
+    }
+
+    /// Write cell `dst`'s `N`-byte value into the section at `section_start`.
+    #[inline(always)]
+    fn write<const N: usize>(&mut self, section_start: usize, dst: usize, bytes: [u8; N]) {
+        let at = section_start + dst * N;
+        if let Some(slot) = self.packed.get_mut(at..at + N) {
+            slot.copy_from_slice(&bytes);
+        }
+    }
+
+    /// Cell `dst`'s `N`-byte value in the section at `section_start`.
+    fn read<const N: usize>(&self, section_start: usize, dst: usize) -> Option<[u8; N]> {
+        let at = section_start + dst * N;
+        self.packed.get(at..at + N)?.try_into().ok()
+    }
+
+    fn kind(&self, dst: usize) -> u8 {
+        self.packed
+            .get(WINDOW_PACKED_HEADER_BYTES + dst)
+            .copied()
+            .unwrap_or(KIND_EMPTY)
+    }
+
+    fn number(&self, dst: usize) -> f64 {
+        self.read(self.numbers_start, dst)
+            .map_or(0.0, f64::from_le_bytes)
+    }
+
+    fn pool_string_id(&self, dst: usize) -> u32 {
+        self.read(self.string_ids_start, dst)
+            .map_or(NO_STRING, u32::from_le_bytes)
+    }
+
+    fn local_string_id(&self, dst: usize) -> i32 {
+        self.read(self.string_index_start, dst)
+            .map_or(-1, i32::from_le_bytes)
+    }
+
+    /// The packed window with `cond_matches` (empty, or one mask per cell)
+    /// and the count of its local strings; `None` when `cond_matches` has
+    /// another length or a count overflows the header.
+    fn into_packed(self, cond_matches: &[u32], local_string_count: usize) -> Option<Vec<u8>> {
+        let Self {
+            n_rows,
+            n_cols,
+            cell_count,
+            mut packed,
+            style_dict,
+            ..
+        } = self;
+        if !cond_matches.is_empty() && cond_matches.len() != cell_count {
+            return None;
+        }
+        packed.reserve_exact((style_dict.len() + cond_matches.len()) * 4);
+        for value in style_dict.iter().chain(cond_matches) {
+            packed.extend_from_slice(&value.to_le_bytes());
+        }
+        let header = [
+            WINDOW_PACKED_MAGIC,
+            WINDOW_PACKED_VERSION,
+            WINDOW_PACKED_HEADER_BYTES.try_into().ok()?,
+            packed.len().try_into().ok()?,
+            n_rows.try_into().ok()?,
+            n_cols.try_into().ok()?,
+            cell_count.try_into().ok()?,
+            style_dict.len().try_into().ok()?,
+            cond_matches.len().try_into().ok()?,
+            local_string_count.try_into().ok()?,
+        ];
+        for (slot, word) in packed.as_chunks_mut::<4>().0.iter_mut().zip(header) {
+            *slot = word.to_le_bytes();
+        }
+        Some(packed)
     }
 }
 
@@ -470,9 +645,10 @@ fn local_error_index(
 
 /// Per-cell conditional-format matches for one window: bit `i` set means rule
 /// `i` (capped at 32 rules) matched the cell's displayed value. Empty when the
-/// sheet has no rules, so rule-free windows pay nothing. Predicates evaluate
-/// against the window OUTPUT arrays — the same displayed values the host would
-/// otherwise re-derive in JS — including formula results and error sentinels.
+/// sheet has no rules or the window has no cells, so rule-free windows pay
+/// nothing. Value predicates read the window's output arrays: the displayed
+/// values, formula results and error sentinels included. Formula rules
+/// evaluate at each covered cell. A matched stop-if-true rule ends the cell.
 fn cond_matches_for_window<F: Fn(usize) -> u32>(
     store: &CellStore,
     sheet_index: usize,
@@ -491,6 +667,8 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
     let mut results = FormulaResults::default();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
+        // The row's result of each rule that holds alike across it.
+        let mut row_holds = [None; 32];
         for (cj, &col) in cols.iter().enumerate() {
             let dst = ri * n_cols + cj;
             for (bit, rule) in rules.iter().take(32).enumerate() {
@@ -505,7 +683,13 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                             target: (data_row, col),
                             shift: (data_row - rule.r0, col - rule.c0),
                         };
-                        formula.holds(store, sheet_index, cell, &mut results)
+                        if rule.same_across_row {
+                            *row_holds[bit].get_or_insert_with(|| {
+                                formula.holds(store, sheet_index, cell, &mut results)
+                            })
+                        } else {
+                            formula.holds(store, sheet_index, cell, &mut results)
+                        }
                     }
                     predicate @ (CondPred::GtNum(_)
                     | CondPred::LtNum(_)
@@ -514,11 +698,11 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                     | CondPred::EqEmpty
                     | CondPred::Contains { .. }) => cond_pred_matches(
                         predicate,
-                        cells.kind[dst],
-                        cells.num[dst],
+                        cells.kind(dst),
+                        cells.number(dst),
                         cell_text(
-                            cells.string_ids[dst],
-                            cells.str_local[dst],
+                            cells.pool_string_id(dst),
+                            cells.local_string_id(dst),
                             &store.strings,
                             &cells.strings,
                         ),
@@ -586,97 +770,26 @@ pub struct WindowView {
 }
 
 impl WindowView {
-    fn new(string_pool_epoch: u32, cells: WindowCells, cond_matches: Vec<u32>) -> Self {
-        let packed = pack_window(&cells, &cond_matches).unwrap_or_default();
+    fn new(string_pool_epoch: u32, mut cells: WindowCells, cond_matches: &[u32]) -> Self {
+        let n_rows = cells.n_rows.try_into().unwrap_or_default();
+        let n_cols = cells.n_cols.try_into().unwrap_or_default();
+        let strings = std::mem::take(&mut cells.strings);
+        let packed = cells
+            .into_packed(cond_matches, strings.len())
+            .unwrap_or_default();
         Self {
             string_pool_epoch,
-            n_rows: cells.n_rows.try_into().unwrap_or_default(),
-            n_cols: cells.n_cols.try_into().unwrap_or_default(),
+            n_rows,
+            n_cols,
             packed,
-            strings: cells.strings,
+            strings,
         }
     }
 
     pub(crate) fn empty(epoch: u32) -> Self {
         let cells = WindowCells::new(0, 0).expect("an empty window has no cells");
-        Self::new(epoch, cells, Vec::new())
+        Self::new(epoch, cells, &[])
     }
-}
-
-fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
-    let WindowCells {
-        n_rows,
-        n_cols,
-        kind,
-        num,
-        str_local,
-        style_local,
-        string_ids,
-        strings,
-        style_dict,
-        ..
-    } = cells;
-    let cell_count = n_rows.checked_mul(*n_cols)?;
-    if kind.len() != cell_count
-        || num.len() != cell_count
-        || str_local.len() != cell_count
-        || style_local.len() != cell_count
-        || string_ids.len() != cell_count
-        || (!cond_matches.is_empty() && cond_matches.len() != cell_count)
-    {
-        return None;
-    }
-
-    let numbers_start = align_to_8(WINDOW_PACKED_HEADER_BYTES.checked_add(cell_count)?)?;
-    let string_ids_start = numbers_start.checked_add(cell_count.checked_mul(8)?)?;
-    let string_index_start = string_ids_start.checked_add(cell_count.checked_mul(4)?)?;
-    let style_index_start = string_index_start.checked_add(cell_count.checked_mul(4)?)?;
-    let style_dict_start = style_index_start.checked_add(cell_count.checked_mul(4)?)?;
-    let cond_matches_start = style_dict_start.checked_add(style_dict.len().checked_mul(4)?)?;
-    let total_bytes = cond_matches_start.checked_add(cond_matches.len().checked_mul(4)?)?;
-
-    let header = [
-        WINDOW_PACKED_MAGIC,
-        WINDOW_PACKED_VERSION,
-        WINDOW_PACKED_HEADER_BYTES.try_into().ok()?,
-        total_bytes.try_into().ok()?,
-        (*n_rows).try_into().ok()?,
-        (*n_cols).try_into().ok()?,
-        cell_count.try_into().ok()?,
-        style_dict.len().try_into().ok()?,
-        cond_matches.len().try_into().ok()?,
-        strings.len().try_into().ok()?,
-    ];
-    let mut packed = Vec::with_capacity(total_bytes);
-    for word in header {
-        packed.extend_from_slice(&word.to_le_bytes());
-    }
-    packed.extend_from_slice(kind);
-    packed.resize(numbers_start, 0);
-    for value in num {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    for value in string_ids {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    for value in str_local {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    for value in style_local {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    for value in style_dict {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    for value in cond_matches {
-        packed.extend_from_slice(&value.to_le_bytes());
-    }
-    debug_assert_eq!(
-        packed.len(),
-        total_bytes,
-        "the packed buffer has the length computed before packing"
-    );
-    Some(packed)
 }
 
 fn align_to_8(value: usize) -> Option<usize> {
@@ -727,15 +840,14 @@ impl WindowView {
 
 #[cfg(test)]
 mod tests {
-    use super::{pack_window, WindowCells};
+    use super::WindowCells;
 
     #[test]
-    fn packed_window_rejects_mismatched_cell_buffers() {
-        let mut cells = WindowCells::new(1, 1).unwrap();
-        cells.kind.clear();
-        assert!(pack_window(&cells, &[]).is_none());
-
+    fn packed_window_rejects_mismatched_conditional_matches() {
         let cells = WindowCells::new(1, 1).unwrap();
-        assert!(pack_window(&cells, &[0, 0]).is_none());
+        assert!(
+            cells.into_packed(&[0, 0], 0).is_none(),
+            "two conditional matches for one cell must not pack"
+        );
     }
 }

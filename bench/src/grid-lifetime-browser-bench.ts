@@ -8,9 +8,9 @@ import { optionValue } from "./cli-options.js";
 import lifetimePage from "./grid-lifetime-bench.html";
 import { median } from "./stats.js";
 
-// Grid lifetime memory gate in Chromium (#285, #178 decision 7). Each run
-// starts a fresh browser with `--expose-gc`. The page creates and destroys
-// `--warmup` grids, the driver records the retained V8 and Blink heaps and the
+// Grid lifetime memory gate in Chromium. Each run starts a fresh browser
+// with `--expose-gc`. The page creates and destroys `--warmup` grids, the
+// driver records the retained V8 and Blink heaps and the
 // DOM counters after a full collection, the page creates and destroys
 // `--cycles` more grids, and the driver records them again. The verdict is the
 // median heap growth of `--runs` runs, and it must be at most 5%; no run may

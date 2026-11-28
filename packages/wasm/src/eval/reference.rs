@@ -24,7 +24,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
+use crate::calc::{parse_a1, sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{CellRange, EvalResult, FormulaError, Value};
@@ -125,6 +125,19 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
         #[cfg(feature = "analysis")]
         Ast::Lambda(definition) => contains(&definition.body),
     }
+}
+
+/// Whether the formula-cell rewrite replaces a node in `ast`: an `A1#`, an
+/// OFFSET or INDIRECT call, or a defined name.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; the rewrite replaces no other node"
+)]
+fn rewrite_replaces(ast: &Ast) -> bool {
+    matches!(
+        ast,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, ..) | Ast::DefinedName(..)
+    ) || ast.any_child(&mut rewrite_replaces)
 }
 
 const fn sheet_ref(handle: u32) -> SheetRef {
@@ -287,6 +300,16 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Ast {
+        // A formula that is one call over arguments the rewrite keeps becomes
+        // the node its range resolves to, so the arguments are not copied.
+        if let Ast::Func(func @ (Func::Offset | Func::Indirect), args, _) = ast {
+            if !args.iter().any(rewrite_replaces) {
+                let range = self.runtime_range(*func, args, sheet, pass, depth + 1);
+                return RewriteScope::Root
+                    .resolved_node(range)
+                    .unwrap_or_else(|| ast.clone());
+            }
+        }
         let mut resolved = ast.clone();
         self.rewrite_references(&mut resolved, sheet, pass, depth, RewriteScope::Root);
         resolved
@@ -518,6 +541,18 @@ impl CellStore {
             };
             &converted
         };
+        // A plain cell address, the usual INDIRECT text, is the cell the
+        // formula parse below would find, without the parse.
+        if let Some((target_row, target_col, _)) = parse_a1(source) {
+            let formula_sheet = self.name_scope(sheet).sheet;
+            return Ok(CellRange::new(
+                formula_sheet,
+                target_row,
+                target_col,
+                target_row,
+                target_col,
+            ));
+        }
         let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(source, sheet as u32, row, col);
         entry
@@ -626,9 +661,9 @@ fn r1c1_axis(text: &str, origin: u32, limit: usize) -> Result<u32, FormulaError>
 }
 
 impl CellStore {
-    /// `OFFSET`, `INDIRECT`, reference operators, `CHOOSE`, `ROW(S)`,
-    /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
-    /// out-of-line `*_family` handlers.
+    /// `OFFSET`, `INDIRECT`, the reference operators, `AREAS`, `CHOOSE`,
+    /// `ROW(S)`, `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families
+    /// live in out-of-line `*_family` handlers.
     #[inline(never)]
     #[allow(
         clippy::wildcard_enum_match_arm,

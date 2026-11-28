@@ -1,4 +1,3 @@
-// Consolidates how shell inputs interpret selections and commit cell text.
 // Everything here goes through the public `Grid` contract — never `Store`
 // internals, never private grid DOM.
 

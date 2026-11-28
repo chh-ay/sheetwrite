@@ -223,16 +223,23 @@ const OPERATION_INDEX: Record<RuntimeResourceOperation, number> = {
   teardown: 10,
 };
 
+const NO_CROSSINGS: Readonly<MutableBoundaryOperationStats> = Object.freeze({
+  ffiCalls: 0,
+  jsToWasmBytes: 0,
+  wasmToJsBytes: 0,
+  largestTransferBytes: 0,
+  bulkCalls: 0,
+  scalarCalls: 0,
+});
+
 /** Fixed-cardinality counters: recording a boundary crossing never appends a trace event. */
 export class BoundaryResourceAccounting {
-  private readonly counters: MutableBoundaryOperationStats[] = RESOURCE_OPERATIONS.map(() => ({
-    ffiCalls: 0,
-    jsToWasmBytes: 0,
-    wasmToJsBytes: 0,
-    largestTransferBytes: 0,
-    bulkCalls: 0,
-    scalarCalls: 0,
-  }));
+  /**
+   * The counters of each operation, by `OPERATION_INDEX`, made when the
+   * operation first records: a store records few of the eleven, and every
+   * store builds one of these.
+   */
+  private readonly counters: Array<MutableBoundaryOperationStats | undefined> = [];
 
   /**
    * Counts `calls` boundary crossings that moved `bytes` in total.
@@ -251,7 +258,7 @@ export class BoundaryResourceAccounting {
     assert_non_negative_safe_integer(bytes, "boundary bytes");
     assert_non_negative_safe_integer(calls, "boundary calls");
     assert_non_negative_safe_integer(largestTransferBytes, "largest boundary transfer bytes");
-    const counter = this.counters[OPERATION_INDEX[operation]]!;
+    const counter = (this.counters[OPERATION_INDEX[operation]] ??= { ...NO_CROSSINGS });
     const next_ffi_calls = safe_counter_sum(counter.ffiCalls, calls, "boundary FFI calls");
     const next_js_to_wasm =
       direction === "js-to-wasm"
@@ -277,9 +284,9 @@ export class BoundaryResourceAccounting {
     counter.scalarCalls = next_scalar_calls;
   }
 
-  /** Sets every counter back to zero. */
   reset(): void {
     for (const counter of this.counters) {
+      if (!counter) continue;
       counter.ffiCalls = 0;
       counter.jsToWasmBytes = 0;
       counter.wasmToJsBytes = 0;
@@ -293,7 +300,7 @@ export class BoundaryResourceAccounting {
   snapshot(): BoundaryOperationStats[] {
     return RESOURCE_OPERATIONS.map((operation, index) => ({
       operation,
-      ...this.counters[index]!,
+      ...(this.counters[index] ?? NO_CROSSINGS),
     }));
   }
 }

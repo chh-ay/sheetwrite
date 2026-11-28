@@ -466,6 +466,11 @@ impl<'a> Parser<'a, '_> {
                 }
             }
         }
+        // Excel refuses a call with more arguments; the error marks the last
+        // token of the last one.
+        if self.args.len() - first > crate::types::MAX_FUNCTION_ARGS {
+            return Err(TOO_MANY_ARGUMENTS.into());
+        }
         self.close_paren()?;
         let args: Box<[Ast]> = self.args.drain(first..).collect();
         Ok(if let Some(known) = func {
@@ -656,6 +661,7 @@ const MIXED_AREA: &str = "A range joins two cells, two columns or two rows.";
 const LONE_AXIS: &str = "A column or row needs a range such as A:A or 1:1.";
 const NOT_EXPECTED: &str = "This is not expected here.";
 const MISSING_CLOSE_PAREN: &str = "Add ) to close the (.";
+const TOO_MANY_ARGUMENTS: &str = "A function takes at most 255 arguments.";
 
 fn missing_area_end(after: &str) -> String {
     format!("Enter a cell, column or row after {after}.")
@@ -666,6 +672,11 @@ fn missing_area_end(after: &str) -> String {
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
     let book_and_sheet = name.rfind('[').map_or(name, |start| &name[start..]);
+    // ASCII names, the common case, fold byte by byte; `char::to_lowercase`
+    // gives the same text for them.
+    if book_and_sheet.is_ascii() {
+        return book_and_sheet.to_ascii_lowercase();
+    }
     book_and_sheet
         .chars()
         .flat_map(char::to_lowercase)
@@ -678,8 +689,7 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// `[BUDGET.XLSX]!TOTAL`; the sheet-scoped `[Budget.xlsx]Annual!Total`
 /// gives `[BUDGET.XLSX]ANNUAL!TOTAL`. The folder and the letter case are
 /// left out, as for link sheets. A quote in a book or sheet name stays
-/// doubled, as a quoted formula writes it. `None` for a name without a
-/// workbook.
+/// doubled, as a quoted formula writes it. `None` for text without `!`.
 pub(crate) fn external_name_key(text: &str) -> Option<String> {
     let (quoted_qualifier, name) = text.rsplit_once('!')?;
     let qualifier = quoted_qualifier
@@ -699,7 +709,7 @@ pub(crate) fn external_name_key(text: &str) -> Option<String> {
 /// Whether the text before `!` names another workbook: a sheet of it
 /// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
 /// `C:\Reports\Budget.xlsx`). A file name has an extension, and a path
-/// has a folder; Excel sheet names hold neither `\\` nor `/`.
+/// has a folder; Excel sheet names hold neither `\` nor `/`.
 fn names_workbook(qualifier: &str) -> bool {
     is_external_sheet(qualifier) || qualifier.contains(['.', '\\', '/'])
 }
@@ -711,7 +721,6 @@ pub(crate) fn is_external_sheet(name: &str) -> bool {
     name.contains(']')
 }
 
-/// The error for a token after a complete formula.
 fn trailing_token_error(tok: &Tok<'_>) -> String {
     if matches!(tok, Tok::RParen) {
         "This ) has no matching (.".into()
@@ -720,7 +729,7 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
     }
 }
 
-/// Parse a formula source (with or without a leading `=`) into an AST.
+/// The leading `=` is optional.
 pub(crate) fn parse(src: &str) -> Result<Ast, String> {
     parse_with_features(src).map(|(ast, _)| ast)
 }
@@ -730,9 +739,10 @@ pub(crate) fn parse_with_features(src: &str) -> ParseResult {
     parse_source(src, None)
 }
 
-/// Bind a sheet token to its stable id while constructing its reference node.
-/// A formula of the same shape as one parsed before it gets a copy of that
-/// tree instead of a parse (`template`).
+/// [`parse_with_features`], binding sheet names to their stable handles,
+/// placing 3-D references and binding table references while the tree is
+/// built. During ingest, a formula of the same shape as one parsed before
+/// it gets a copy of that tree instead of a parse (`template`).
 pub(crate) fn parse_bound_with_features(
     src: &str,
     resolve: &SheetResolver<'_>,
@@ -754,8 +764,8 @@ fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let body = trimmed.strip_prefix('=').unwrap_or(trimmed);
     // Only ingest binds references, and only ingest meets long runs of
     // formulas of one shape, so only its parses look for a kept tree.
-    if sheets.is_some() && looks_for_shapes() {
-        return reuse_or_parse(body, || parse_body(body, sheets));
+    if let Some(binding) = sheets.filter(|_| looks_for_shapes()) {
+        return reuse_or_parse(body, binding.resolve, || parse_body(body, sheets));
     }
     parse_body(body, sheets)
 }

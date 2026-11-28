@@ -13,15 +13,14 @@ export const CODE_TAB_FRAMEWORKS = [
 
 type FrameworkId = (typeof CODE_TAB_FRAMEWORKS)[number]["id"];
 
-/** Props of {@link CodeTabs}: each framework's snippet, as finished markup in tab order. */
+/** Each framework's snippet, as finished markup in tab order. */
 export interface CodeTabsProps {
   readonly panels: readonly string[];
 }
 
 /**
- * The landing's framework snippets, ported from
- * docs/src/components/landing/CodeTabs.tsx. Every snippet is markup in the
- * page (hidden until its tab is chosen), so choosing a tab loads nothing; the
+ * The landing's framework snippets. Every snippet is markup in the page
+ * (hidden until its tab is chosen), so choosing a tab loads nothing; the
  * island reads the panels back from the page when it hydrates.
  */
 export function CodeTabs(props: CodeTabsProps) {

@@ -5,8 +5,10 @@ use super::*;
 
 const MAX_TABLES: usize = 1_024;
 const MAX_TABLE_COLUMNS: usize = 16_384;
-const MAX_TABLE_NAME_BYTES: usize = 255;
-const MAX_TABLE_ID_BYTES: usize = 128;
+// Name and id lengths count UTF-16 code units, as the TypeScript table limits
+// `maxNameLength` and `maxIdLength` do; Excel allows 255 characters a name.
+const MAX_TABLE_NAME_UNITS: usize = 255;
+const MAX_TABLE_ID_UNITS: usize = 128;
 
 /// Makes the new entry of the formula in the cell it is given after a table
 /// edit, reading the tables (and the defined names) of the formula's sheet as
@@ -69,9 +71,9 @@ impl CellStore {
         let existing = self.bindings.tables.with_id(id).map(|(slot, _)| slot);
         if (existing.is_none() && self.bindings.tables.len() >= MAX_TABLES)
             || id.is_empty()
-            || id.encode_utf16().count() > MAX_TABLE_ID_BYTES
+            || id.encode_utf16().count() > MAX_TABLE_ID_UNITS
             || name.is_empty()
-            || name.encode_utf16().count() > MAX_TABLE_NAME_BYTES
+            || name.encode_utf16().count() > MAX_TABLE_NAME_UNITS
             || column_ids.is_empty()
             || column_ids.len() > MAX_TABLE_COLUMNS
             || column_ids.len() != column_names.len()
@@ -106,9 +108,9 @@ impl CellStore {
         {
             let column_key = workbook_name_key(&column_name);
             if column_id.is_empty()
-                || column_id.encode_utf16().count() > MAX_TABLE_ID_BYTES
+                || column_id.encode_utf16().count() > MAX_TABLE_ID_UNITS
                 || column_name.is_empty()
-                || column_name.encode_utf16().count() > MAX_TABLE_NAME_BYTES
+                || column_name.encode_utf16().count() > MAX_TABLE_NAME_UNITS
                 || column_name.contains(['[', ']', ','])
                 || column_name.starts_with(['@', '#'])
                 || !ids.insert(workbook_name_key(&column_id))
@@ -234,8 +236,8 @@ impl CellStore {
         self.rebind_name_users(changed);
     }
 
-    /// Give each of `formulas` the entry `rebind` makes of it, if any: the
-    /// dependency index patches its reads and the formula recalculates.
+    /// Give each of `formulas` the entry `rebind` makes of it, if any, through
+    /// [`Self::replace_bound_formula`].
     /// Out of line, so the two table passes share one copy of the loop.
     #[inline(never)]
     fn rebind_table_users(&mut self, formulas: Vec<FormulaId>, rebind: &TableRebind<'_>) {

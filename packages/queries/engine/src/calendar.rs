@@ -108,7 +108,8 @@ fn date_days(bytes: &[u8]) -> Option<i64> {
     Some(days_from_civil(year, month, day))
 }
 
-/// Date storage uses whole days from the Unix epoch, independent of worksheet serials.
+/// Whole days from the Unix epoch for `YYYY-MM-DD` text. The count does not depend on
+/// worksheet serial numbers.
 pub(crate) fn date_from_text(value: &str) -> Option<i32> {
     let bytes = value.as_bytes();
     if bytes.len() != DATE_LENGTH {
@@ -187,7 +188,8 @@ fn write_date(text: &mut String, days: i64) -> Option<()> {
     }
 }
 
-/// Invariant `YYYY-MM-DD` text for stored day counts.
+/// Invariant `YYYY-MM-DD` text for a stored day count. A year outside `0..=9999` uses the
+/// signed ISO 8601 expanded form, such as `+10000-01-01`.
 pub(crate) fn format_date(days: i32) -> Option<String> {
     let mut text = String::with_capacity(DATE_LENGTH);
     write_date(&mut text, i64::from(days))?;

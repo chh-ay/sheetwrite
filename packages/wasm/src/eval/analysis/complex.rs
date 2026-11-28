@@ -8,7 +8,7 @@
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
 use super::super::lift::ValueArgs;
 use super::super::number_format::general_text;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 
 family_functions! {
     COMPLEX,
@@ -71,9 +71,6 @@ pub(super) const fn value_args(function: Function) -> ValueArgs {
     }
 }
 
-/// Excel accepts at most 255 arguments.
-const MAX_ARGUMENTS: usize = 255;
-
 const DEFAULT_SUFFIX: char = 'i';
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -95,9 +92,26 @@ impl Complex {
     }
 
     /// sqrt(re^2 + im^2). The engine already carries `sqrt`, while `hypot`
-    /// would add its own routine for parts above 1E154.
+    /// would add its own routine. A sum of squares that overflows (a part
+    /// above about 1E154) or leaves the normal doubles (parts below about
+    /// 1E-154) is computed again from the parts divided by the larger one.
     fn modulus(self) -> f64 {
-        (self.re * self.re + self.im * self.im).sqrt()
+        let squares = self.re * self.re + self.im * self.im;
+        if squares.is_finite() && (squares >= f64::MIN_POSITIVE || self.is_zero()) {
+            return squares.sqrt();
+        }
+        self.scaled_modulus()
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn scaled_modulus(self) -> f64 {
+        let scale = self.re.abs().max(self.im.abs());
+        if !scale.is_finite() {
+            return scale;
+        }
+        let (re, im) = (self.re / scale, self.im / scale);
+        scale * (re * re + im * im).sqrt()
     }
 
     fn argument(self) -> f64 {
@@ -292,7 +306,7 @@ fn complex(values: &FuncAccumulator) -> Result<Value, FormulaError> {
 /// `IMSUM` and `IMPRODUCT`: every argument, including cells of ranges.
 /// Blank cells in a range are skipped.
 fn fold(is_sum: bool, values: &FuncAccumulator) -> Result<Value, FormulaError> {
-    require_arity(values, 1, MAX_ARGUMENTS)?;
+    require_arity(values, 1, MAX_FUNCTION_ARGS)?;
     let mut suffix = Suffix(None);
     let mut result = if is_sum { Complex::ZERO } else { Complex::ONE };
 
@@ -401,7 +415,8 @@ fn parse_value(value: &Value) -> Result<(Complex, Option<char>), FormulaError> {
 }
 
 /// Reads `a`, `bi`, `a+bi` or `a-bi`, with `i` or `j`. A coefficient of 1
-/// may be left out: `i`, `-j`, `3+i`. Other text is `#NUM!`.
+/// may be left out: `i`, `-j`, `3+i`. Empty text is zero; other text is
+/// `#NUM!`.
 fn parse(text: &str) -> Result<(Complex, Option<char>), FormulaError> {
     if text.is_empty() {
         return Ok((Complex::ZERO, None));

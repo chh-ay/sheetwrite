@@ -29,7 +29,6 @@ export function setFormulaSuggester(store: Store, suggester: FormulaSuggester): 
   };
 }
 
-/** The suggester registered for `store`, or `null`. */
 export function formulaSuggester(store: Store): FormulaSuggester | null {
   return suggesters.get(store) ?? null;
 }

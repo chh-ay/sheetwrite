@@ -1,8 +1,9 @@
-// The part of the chart and pivot panels that every spreadsheet grid carries:
-// cheap event listeners that decide WHEN a panel is needed. The panels
-// themselves (panel-controller.ts and what it imports) load as their own
-// chunk on first use: an Insert command, Enter on a chart, or a cell selected
-// in a pivot's output. A grid that never does any of these never fetches it.
+// The part of the side panels that every spreadsheet grid carries: cheap
+// event listeners and commands that decide WHEN a panel is needed. The
+// panels themselves (panel-controller.ts and what it imports) load as their
+// own chunk on first use: a command that opens a panel, an activated chart,
+// or a cell selected in a pivot's output. A grid that never does any of
+// these never fetches it.
 
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
@@ -151,12 +152,12 @@ export function requestPanel(grid: Grid, open: (controller: PanelController) => 
   );
 }
 
-/** Formulas › Explain Formula: open its panel, loading the panels on first use. */
+/** Formulas › Explain Formula. */
 export function showFormulaExplanation(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openExplainPanel(grid));
 }
 
-/** Formulas › Defined Names loads the same optional panel chunk. */
+/** Formulas › Defined Names › Name Manager. */
 export function showNameManager(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid));
 }
@@ -165,7 +166,7 @@ export function showDefineName(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openNamePanel(grid, true));
 }
 
-/** Data › Custom Sort: open the Sort panel, loading the panels on first use. */
+/** Data › Custom Sort. */
 export function showSortPanel(grid: Grid): void {
   requestPanel(grid, (controller) => controller.openSortPanel(grid));
 }
@@ -207,8 +208,8 @@ export function pivotAt(
 }
 
 /**
- * Open the field list of the pivot under the focus cell, loading the panels on
- * first use. Does nothing when the focus cell is outside every pivot's output.
+ * Open the field list of the pivot under the focus cell. Does nothing when the
+ * focus cell is outside every pivot's output.
  */
 export function showPivotFields(grid: Grid): void {
   const cell = selectionCell(grid.getSelection());

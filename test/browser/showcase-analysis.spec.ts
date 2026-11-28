@@ -134,7 +134,6 @@ test("the Chart menu inserts the picked kind", async ({ page }) => {
   await expect(chart_objects(page)).toHaveCount(2);
 });
 
-// #700: a wide bar chart drew its value-axis labels into each other.
 test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page }) => {
   await page.setViewportSize(WIDE_VIEWPORT);
   await open(page);
@@ -163,7 +162,6 @@ test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page })
   });
 });
 
-// #727: a chart over the cells painted the stylesheet's background, not the grid's theme.
 test("a chart and a PivotChart sit on the grid's themed background", async ({ page }) => {
   await open(page);
   await page.evaluate(

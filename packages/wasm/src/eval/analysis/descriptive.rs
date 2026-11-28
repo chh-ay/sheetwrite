@@ -28,9 +28,10 @@ family_functions! {
     TRIMMEAN,
 }
 
-/// The arguments of `function` that take one value: `x` of FORECAST, `k`,
-/// the percent of TRIMMEAN, `x` and the significance of PERCENTRANK, and the
-/// number and order of RANK.AVG. The data are ranges or arrays.
+/// The arguments of `function` that take one value: `x` of FORECAST, `k` of
+/// PERCENTILE.EXC, `quart` of QUARTILE.EXC, the percent of TRIMMEAN, `x` and
+/// the significance of PERCENTRANK, and the number and order of RANK.AVG.
+/// The data are ranges or arrays.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::FORECAST | Function::FORECAST_LINEAR => ValueArgs::at(&[0]),
@@ -53,8 +54,8 @@ pub(super) const fn value_args(function: Function) -> ValueArgs {
     }
 }
 
-/// Functions whose arguments are number lists: a single-cell argument is a
-/// reference, so text and logical values in that cell are ignored.
+/// Functions whose arguments are number lists. See
+/// [`super::Family::reference_cells`] for what this changes.
 pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
     matches!(
         function,
@@ -151,7 +152,6 @@ fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
     }
 }
 
-/// The numbers of a function that takes one list of numbers.
 fn number_list(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
     require_arity(values, 1, 255)?;
     numbers(values.entries())
@@ -265,8 +265,7 @@ fn trimmed_mean(mut numbers: Vec<f64>, percent: f64) -> NumberResult {
     }
     // Excel drops floor(n * percent / 2) points from each end.
     let drop = (numbers.len() as f64 * percent / 2.0).floor() as usize;
-    // This plain-number sort shares the default engine's f64 instantiation.
-    numbers.sort_unstable_by(f64::total_cmp);
+    crate::sorting::sort_f64(&mut numbers);
     let kept = &numbers[drop..numbers.len() - drop];
     Ok(kept.iter().sum::<f64>() / kept.len() as f64)
 }

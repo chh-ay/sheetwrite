@@ -6,11 +6,11 @@ use crate::calc::{Ast, Func};
 use crate::store::names::{NameFacts, NameScope};
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, MAX_FUNCTION_ARGS,
+    RANGE_CELL_LIMIT,
 };
 
 use super::array::ast_produces_array;
-use super::functions::MAX_FUNCTION_ARGS;
 use super::math::{SubtotalCode, SubtotalFold};
 use super::matrix::{argument_range, range_from_ast};
 use super::range_view::{CellSink, RangeView};
@@ -194,11 +194,18 @@ impl SubtotalReader<'_> {
         // A cell after the code is a one-cell reference, so its row can be
         // hidden.
         let names = self.store.name_scope(self.sheet);
-        let reference = if index > 0 && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
+        let written = if index > 0 && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..)) {
             range_from_ast(arg, names)
         } else {
             argument_range(arg, names)
         };
+        // A LAMBDA's parameter bound to a range is that range, as in Excel.
+        #[cfg(feature = "analysis")]
+        let reference = written.or_else(|| {
+            super::analysis::lambda::parameter_reference(pass.results.call_frame(), arg)
+        });
+        #[cfg(not(feature = "analysis"))]
+        let reference = written;
         if let Some(range) = reference {
             return self.range(range, index > 0, pass, depth + 1);
         }

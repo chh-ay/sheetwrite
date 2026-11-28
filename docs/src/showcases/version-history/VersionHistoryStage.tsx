@@ -15,7 +15,6 @@ import {
 import { createLiveScenario, createScenarioAction } from "../lib/live-scenario.js";
 import { ControlActions, ControlButton, DemoGrid } from "../ui/feature-controls.js";
 
-/** Props of {@link VersionHistoryStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface VersionHistoryStageProps {
   /** The approved version every compare starts from. */
   readonly baselineName: string;

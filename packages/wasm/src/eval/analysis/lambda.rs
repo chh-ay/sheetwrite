@@ -20,7 +20,7 @@ use std::rc::Rc;
 use super::super::array::ast_produces_array;
 use super::super::functions::ReductionFold;
 use super::super::matrix::{
-    range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+    argument_range, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
 };
 use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
@@ -29,7 +29,9 @@ use crate::cells::payload_num;
 use crate::memory::MemoryOwnerStats;
 use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
-use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER};
+use crate::types::{
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_NUMBER,
+};
 
 family_functions! {
     BYCOL,
@@ -75,13 +77,17 @@ type Shape = (usize, usize, usize);
 pub(crate) enum Slot {
     /// A value every shape check sees as a scalar.
     Value(Value),
-    /// A blank or an error: one value to read, a one-cell array to shape
-    /// checks, as LAMBDA arguments have always been.
+    /// A blank or an error: one value to read, but a one-cell array to shape
+    /// checks.
     OneCell(Value),
     Array {
         rows: usize,
         cols: usize,
         values: Rc<[Value]>,
+        /// The range the argument named, when it was a range reference:
+        /// SUBTOTAL and AGGREGATE read it in place, so a LAMBDA's reference
+        /// parameter skips hidden rows as the range does.
+        reference: Option<CellRange>,
     },
     /// One table column at a list of its rows, read in place: a measure's
     /// column in one pivot cell. No rows read as one blank, as a range with
@@ -120,11 +126,12 @@ impl Slot {
         }
     }
 
-    pub(in crate::eval) fn array(mut matrix: EvalMatrix) -> Self {
+    pub(in crate::eval) fn array(mut matrix: EvalMatrix, reference: Option<CellRange>) -> Self {
         Self::Array {
             rows: matrix.rows,
             cols: matrix.cols,
             values: std::mem::take(&mut matrix.values).into(),
+            reference,
         }
     }
 }
@@ -236,7 +243,6 @@ pub(crate) struct ShapeScope<'a> {
     kinds: &'a [Kind<'a>],
     /// Where the called LAMBDA was created.
     outer: Shapes<'a>,
-    /// The LAMBDA called.
     callee: &'a LambdaDefinition,
     /// The call whose body holds this call, while its shape is decided.
     caller: Option<&'a Self>,
@@ -266,7 +272,6 @@ impl<'a> Shapes<'a> {
         }
     }
 
-    /// The defined names the checked formula reads.
     pub(crate) const fn names(self) -> NameScope<'a> {
         self.names
     }
@@ -550,7 +555,26 @@ pub(crate) fn parameter_count(
     definition(expression, names).map(|shared| shared.parameters.len())
 }
 
-/// The value a parameter use reads.
+/// The range a parameter use was bound to, when its argument was a range
+/// reference; `None` for any other argument or outside a call.
+pub(in crate::eval) fn parameter_reference(
+    frame: Option<&CallFrame>,
+    argument: &Ast,
+) -> Option<CellRange> {
+    let Ast::Parameter { depth, index, .. } = argument else {
+        return None;
+    };
+    match frame?.slot(*depth, *index)? {
+        Slot::Array { reference, .. } => *reference,
+        Slot::Value(_)
+        | Slot::OneCell(_)
+        | Slot::Rows { .. }
+        | Slot::Closure { .. }
+        | Slot::Missing
+        | Slot::Shaped { .. } => None,
+    }
+}
+
 pub(crate) fn parameter_value(
     store: &CellStore,
     frame: Option<&CallFrame>,
@@ -624,7 +648,7 @@ pub(in crate::eval) fn read_parameter_values(
 }
 
 /// Calls `read` with each value of an array-like slot in row-major order.
-/// A slot with no values to read is `#VALUE!`.
+/// A scalar, missing, closure or shape-only slot is `#VALUE!`.
 fn read_slot_values(
     store: &CellStore,
     slot: &Slot,
@@ -644,10 +668,10 @@ fn read_slot_values(
 }
 
 /// Folds every value of `args` into `fold` when each argument is a
-/// parameter bound to table rows (a measure's column in one pivot cell):
-/// the values [`read_slot_values`] passes to the accumulator, in the same
-/// order, and an error value returns at once, as it does there. `None`,
-/// having folded nothing, when an argument is anything else.
+/// parameter bound to table rows (a measure's column in one pivot cell).
+/// The values and their order are those [`read_slot_values`] reads. The
+/// first error value stops the fold and is returned. `None`, having folded
+/// nothing, when any argument is something else.
 pub(in crate::eval) fn fold_row_parameters(
     store: &CellStore,
     frame: Option<&CallFrame>,
@@ -1091,7 +1115,10 @@ impl<'a, 'p> Context<'a, 'p> {
             });
         }
         if ast_produces_array(argument, self.shapes()) {
-            return self.matrix(argument).map(Slot::array);
+            let reference = argument_range(argument, self.names());
+            return self
+                .matrix(argument)
+                .map(|matrix| Slot::array(matrix, reference));
         }
         // An error argument is bound as a value, so the body can handle it
         // (`LAMBDA(x,IFERROR(x,0))(1/0)` is 0).
@@ -1141,7 +1168,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(callee)
     }
 
-    /// A call's value as a scalar.
     fn call_value(&mut self, arguments: &[Ast]) -> Result<Value, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let value = self.scalar(&callee.definition.body);
@@ -1149,7 +1175,6 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(value)
     }
 
-    /// A call's value as an array.
     fn call_matrix(&mut self, arguments: &[Ast]) -> Result<EvalMatrix, FormulaError> {
         let callee = self.enter_arguments(arguments)?;
         let matrix = self.matrix(&callee.definition.body);
@@ -1365,6 +1390,7 @@ fn evaluate_with_context(
                     rows: if by_row { 1 } else { array.rows },
                     cols: if by_row { array.cols } else { 1 },
                     values: line,
+                    reference: None,
                 });
                 values.push(context.invoke(&callee, &mut slots)?);
             }
@@ -1659,7 +1685,7 @@ mod tests {
             ("=LAMBDA(x,x)()", "#VALUE!"),
             ("=LAMBDA(f,f)(LAMBDA(x,x))", "#CALC!"),
             ("=LAMBDA(f,f(1))(2)", "#VALUE!"),
-            // Deep recursion still stops: by depth, and by the call budget.
+            // Deep recursion stops: by depth, and by the call budget.
             ("=LAMBDA(self,self(self))(LAMBDA(self,self(self)))", "#NUM!"),
             ("=LAMBDA(self,n,IF(n=0,0,self(self,n-1)+self(self,n-1)))(LAMBDA(self,n,IF(n=0,0,self(self,n-1)+self(self,n-1))),30)", "#NUM!"),
         ];

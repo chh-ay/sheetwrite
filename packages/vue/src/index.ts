@@ -179,72 +179,49 @@ export type SheetwriteComponentConstructor<Props, Emits, Expose = object> = new 
   };
 
 const grid_props = {
-  /** Live workbook schema adopted by the Grid. */
   workbook: { type: Object as PropType<Workbook>, required: true as const },
-  /** Eager column-major values for the active sheet. */
   data: { type: Object as PropType<ColumnarData>, default: undefined },
-  /** Lazy row provider requested for visible windows. */
   datasource: { type: Object as PropType<DataSource>, default: undefined },
-  /** Allocation and cache policy for datasource storage. */
   datasourceStorage: {
     type: Object as PropType<DataSourceStorageOptions>,
     default: undefined,
   },
-  /** Optional stable host-row projection. */
   rowBridge: { type: Object as PropType<RowBridge>, default: undefined },
-  /** Paint backend; defaults to main-thread canvas. */
   renderer: { type: String as PropType<GridOptions["renderer"]>, default: undefined },
-  /** Browser-fetchable worker module URL. */
   workerUrl: {
     type: [String, URL] as unknown as PropType<GridOptions["workerUrl"]>,
     default: undefined,
   },
-  /** Positional spreadsheet or semantic data-grid headers. */
   presentation: { type: String as PropType<GridOptions["presentation"]>, default: undefined },
-  /** Live overrides merged into the resolved Grid theme. */
   theme: { type: Object as PropType<Partial<Theme>>, default: undefined },
-  /** Disables mutation while preserving navigation and selection. */
   readOnly: { type: Boolean, default: undefined },
-  /** Host-owned client permission check for protected ranges. */
   protectionResolver: {
     type: Function as PropType<GridOptions["protectionResolver"]>,
     default: undefined,
   },
-  /** Atomic or partial handling for denied local operations. */
   mutationPolicy: {
     type: String as PropType<GridOptions["mutationPolicy"]>,
     default: undefined,
   },
-  /** Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation. */
   transactionResourceLimits: {
     type: Object as PropType<GridOptions["transactionResourceLimits"]>,
     default: undefined,
   },
-  /** Controls link activation: emit an event, also navigate internally, or disable it. */
   hyperlinkActivation: {
     type: String as PropType<GridOptions["hyperlinkActivation"]>,
     default: undefined,
   },
-  /** Settings for add-ons installed by `initSheetwrite`, keyed by add-on name; applied when the Grid is created. */
   addons: { type: Object as PropType<GridOptions["addons"]>, default: undefined },
-  /** Named custom renderers registered when the Grid is created. */
   renderers: { type: Object as PropType<Record<string, CellRenderer>>, default: undefined },
-  /** Named custom editors registered when the Grid is created. */
   editors: { type: Object as PropType<GridOptions["editors"]>, default: undefined },
-  /** Extra rows painted above and below the viewport. */
   overscan: { type: Number, default: undefined },
-  /** Minimum rendered column count, including empty padding columns. */
   minColumns: { type: Number, default: undefined },
-  /** Built-in toolbar, menu, keyboard, find, and tab controls. */
   config: { type: Object as PropType<GridOptions["config"]>, default: undefined },
-  /** Explicit source passed to process-wide WASM initialization. */
   wasmSource: {
     type: [Object, String] as PropType<SheetwriteInitializationProps["wasmSource"]>,
     default: undefined,
   },
-  /** Host height in CSS pixels for numbers or any CSS length string. */
   height: { type: [Number, String], default: undefined },
-  /** Fills the parent's available width and height. */
   fill: { type: Boolean, default: undefined },
 };
 
@@ -311,8 +288,9 @@ const SheetwriteGridComponent = defineComponent({
       onExportError: (event) => emit("export-error", event),
       onKeyBindingsChange: (event) => emit("key-bindings-change", event),
       onReady(event) {
-        // Vue's emit catches listener exceptions before the lifetime can retire
-        // the Grid. Readiness is a publication transaction, so deliver it here.
+        // A ready listener that throws must reach the controller, which then
+        // retires the Grid. Vue's `emit` catches listener errors, so this calls
+        // the `onReady` and `onReadyOnce` listeners from the vnode props itself.
         const listeners = instance?.vnode.props;
         const ready_listeners: unknown = listeners?.onReady;
 
@@ -342,7 +320,8 @@ const SheetwriteGridComponent = defineComponent({
         if (grid) return nextTick();
       },
       setInitializationState() {
-        // Fallback follows exposed Grid availability in Vue.
+        // No state to keep: the render function shows the fallback slot while
+        // no Grid is exposed.
       },
       reportConsumerFailure(thrown) {
         reportError(thrown);
@@ -411,18 +390,13 @@ const SheetwriteSimpleComponent = defineComponent({
   name: "SheetwriteComponent",
   inheritAttrs: false,
   props: {
-    /** Ordered schema used to derive the component-owned sheet. */
     columns: { type: Array as PropType<readonly { key: string; title: string }[]>, required: true },
-    /** Rows converted to initial columnar data; missing keys become `null`. */
     defaultRows: { type: Array as PropType<readonly Record<string, CellScalar>[]>, required: true },
-    /** Generated sheet name; defaults to `Sheet 1`. */
     sheetName: { type: String, default: undefined },
-    /** Opt-in stable identity for host rows. */
     getRowId: {
       type: Function as PropType<(row: Record<string, CellScalar>, index: number) => RowBridgeId>,
       default: undefined,
     },
-    /** Creates identities for inserted rows. */
     createRowId: {
       type: Function as PropType<
         NonNullable<
@@ -433,9 +407,7 @@ const SheetwriteSimpleComponent = defineComponent({
       >,
       default: undefined,
     },
-    /** Host height in CSS pixels for numbers or any CSS length string. */
     height: { type: [Number, String], default: undefined },
-    /** Fills the parent; exactly one of `fill` or `height` is required. */
     fill: { type: Boolean, default: undefined },
   },
   setup(props, { attrs, slots }) {

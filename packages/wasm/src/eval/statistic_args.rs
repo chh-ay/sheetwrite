@@ -1,6 +1,6 @@
 //! The arguments of the statistics that read numbers: MEDIAN, MODE.SNGL,
-//! LARGE, SMALL, RANK.EQ, PERCENTILE.INC, QUARTILE.INC, STDEV, VAR,
-//! GEOMEAN, CORREL and COVARIANCE.
+//! LARGE, SMALL, RANK.EQ, PERCENTILE.INC, QUARTILE.INC, STDEV.S, STDEV.P,
+//! VAR.S, VAR.P, GEOMEAN, CORREL, COVARIANCE.S and COVARIANCE.P.
 //!
 //! A range argument is read in place through its [`RangeView`]: only its
 //! numbers are kept, not a value per cell. Every other argument reads as the
@@ -10,15 +10,19 @@
 //! number that isn't finite) is reported when the statistic reads that
 //! argument.
 
+use std::rc::Rc;
+
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, MAX_FUNCTION_ARGS,
+    RANGE_CELL_LIMIT,
 };
 
 use super::array::ast_produces_array;
-use super::functions::{treats_cell_as_reference, FuncAccumulator, MAX_FUNCTION_ARGS};
+use super::functions::{treats_cell_as_reference, FuncAccumulator};
 use super::matrix::argument_range;
+use super::preview_limits::RangeRead;
 use super::range_view::{NumberSink, RangeView};
 use super::statistics::{self, NumberStatistic, PairedCell, PairedKind, PairedMoments};
 use super::value::aggregate_number;
@@ -77,6 +81,54 @@ struct Arg {
     missing: bool,
 }
 
+/// The numbers of one literal-only range in [`f64::total_cmp`] order, and
+/// whether one of its numbers isn't finite.
+pub(crate) struct SortedNumbers {
+    numbers: Box<[f64]>,
+    non_finite: bool,
+}
+
+/// What reading a shared range for an order statistic gave: its sorted
+/// numbers, or the error the read stopped at.
+pub(crate) type OrderedRange = Result<Rc<SortedNumbers>, FormulaError>;
+
+/// The sorted numbers of literal-only ranges that more than one LARGE, SMALL
+/// or RANK.EQ formula reads in one pass, by range group: each formula then
+/// selects or counts in the sorted list instead of reading every cell. A
+/// range with formula or spill cells is not kept, as for shared sums.
+///
+/// `slots` maps a group to its entry and is valid only where `entries`
+/// holds that group, so the pass drops only `entries`.
+#[derive(Default)]
+pub(crate) struct OrderedRanges {
+    slots: Vec<u32>,
+    entries: Vec<(u32, OrderedRange)>,
+}
+
+impl OrderedRanges {
+    /// The range of `group`, when this pass has read it.
+    pub(crate) fn get(&self, group: usize) -> Option<OrderedRange> {
+        let slot = *self.slots.get(group)? as usize;
+        self.entries
+            .get(slot)
+            .filter(|(stored, _)| *stored as usize == group)
+            .map(|(_, range)| range.clone())
+    }
+
+    /// Keeps `range` for `group` for the rest of the pass; `groups` is the
+    /// index's group count.
+    pub(crate) fn insert(&mut self, group: usize, groups: usize, range: OrderedRange) {
+        if self.slots.len() != groups {
+            self.slots.resize(groups, 0);
+        }
+        let Some(slot) = self.slots.get_mut(group) else {
+            return;
+        };
+        *slot = self.entries.len() as u32;
+        self.entries.push((group as u32, range));
+    }
+}
+
 /// The arguments of a statistic, read once.
 pub(super) struct StatisticArgs {
     cells: Cells,
@@ -85,6 +137,9 @@ pub(super) struct StatisticArgs {
     total_cells: usize,
     /// The current argument while it is read.
     current: Option<Arg>,
+    /// The sorted numbers of the argument a shared range stood for; its
+    /// numbers are not in `cells`.
+    ordered: Option<Rc<SortedNumbers>>,
 }
 
 impl StatisticArgs {
@@ -98,6 +153,7 @@ impl StatisticArgs {
             args: Vec::new(),
             total_cells: 0,
             current: None,
+            ordered: None,
         }
     }
 
@@ -131,7 +187,7 @@ impl StatisticArgs {
         });
     }
 
-    /// One more cell, against the accumulator's limit of cells per call.
+    /// Counts `cells` more cells against the accumulator's limit per call.
     const fn count_cells(&mut self, cells: usize) -> Result<(), FormulaError> {
         let total = self.total_cells.saturating_add(cells);
         if total > RANGE_CELL_LIMIT as usize {
@@ -144,7 +200,6 @@ impl StatisticArgs {
         Ok(())
     }
 
-    /// Room for `cells` more cells.
     fn reserve(&mut self, cells: usize) -> Result<(), FormulaError> {
         let reserved = match &mut self.cells {
             Cells::Numbers(numbers) => numbers.try_reserve(cells),
@@ -184,7 +239,6 @@ impl StatisticArgs {
         self.args.push(arg);
     }
 
-    /// The number of arguments.
     pub(super) const fn arg_count(&self) -> usize {
         self.args.len()
     }
@@ -238,10 +292,16 @@ impl StatisticArgs {
         self.numbers_of(index..index + 1, max_cells)
     }
 
-    /// The numbers of every argument.
     pub(super) fn all_numbers(&mut self, max_cells: usize) -> Result<&mut [f64], FormulaError> {
         let count = self.args.len();
         self.numbers_of(0..count, max_cells)
+    }
+
+    /// The sorted numbers of the argument a shared literal range stood for.
+    /// Only LARGE, SMALL and RANK.EQ read their range this way, and only that
+    /// argument's numbers are missing from [`Self::numbers`].
+    pub(super) fn ordered(&self) -> Option<&[f64]> {
+        self.ordered.as_deref().map(|sorted| &*sorted.numbers)
     }
 
     /// The cells of argument `index` of a paired statistic.
@@ -255,12 +315,14 @@ impl StatisticArgs {
     }
 }
 
-/// Reads the arguments of one statistic call.
 struct Reader<'a> {
     store: &'a CellStore,
     func: Func,
     sheet: usize,
     values: StatisticArgs,
+    /// The argument whose range may be read as a shared sorted list:
+    /// LARGE and SMALL's array, RANK.EQ's reference.
+    ordered_arg: Option<usize>,
 }
 
 impl Reader<'_> {
@@ -299,6 +361,52 @@ impl Reader<'_> {
             }
             Cells::Paired(paired) => view.scan_numbers(pass, &mut PairedList(paired))?,
         }
+        Ok(view.cell(0, 0, pass))
+    }
+
+    /// Reads `area` as [`Self::range`] does, from the sorted numbers this
+    /// pass keeps for it when more than one formula reads it and every cell
+    /// is a literal. Any other range is read cell by cell.
+    fn ordered_range(
+        &mut self,
+        area: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        let shared = self
+            .store
+            .graph
+            .index()
+            .and_then(|index| index.shared_range_group(area));
+        let (Some((group, groups)), true) = (shared, depth <= FORMULA_RECURSION_LIMIT) else {
+            return self.range(area, pass, depth);
+        };
+        let view = RangeView::clipped(self.store, area, depth)?;
+        let (rows, cols) = view.shape();
+        let cells = (rows as u64).saturating_mul(cols as u64);
+        if cells > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+
+        let shared = match pass.results.ordered_range(group) {
+            Some(sorted) => {
+                view.charge_preview(RangeRead::Typed)?;
+                sorted
+            }
+            None if view.literal_columns().is_some() => {
+                let sorted = sorted_numbers(&view, cells as usize, pass);
+                pass.results
+                    .share_ordered_range(group, groups, sorted.clone());
+                sorted
+            }
+            None => return self.range(area, pass, depth),
+        };
+        self.values.count_cells(cells as usize)?;
+        let sorted = shared?;
+        if sorted.non_finite {
+            self.values.defer(FormulaError::Num);
+        }
+        self.values.ordered = Some(sorted);
         Ok(view.cell(0, 0, pass))
     }
 
@@ -374,10 +482,14 @@ impl Reader<'_> {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<StatisticArgs, FormulaError> {
-        for arg in args {
+        for (index, arg) in args.iter().enumerate() {
             self.values.start_arg();
             let first = if let Some(area) = argument_range(arg, self.store.name_scope(self.sheet)) {
-                self.range(area, pass, depth + 1)?
+                if self.ordered_arg == Some(index) {
+                    self.ordered_range(area, pass, depth + 1)?
+                } else {
+                    self.range(area, pass, depth + 1)?
+                }
             } else if matches!(arg, Ast::Func(Func::Union, ..) | Ast::SheetSpan(_)) {
                 self.areas(arg, pass, depth + 1)?
             } else {
@@ -393,7 +505,26 @@ impl Reader<'_> {
     }
 }
 
-/// One call of a statistic that reads numbers.
+/// The numbers of `view`, a range of `cells` literal cells, sorted for
+/// [`OrderedRanges`].
+fn sorted_numbers(view: &RangeView<'_>, cells: usize, pass: &mut EvalPass<'_>) -> OrderedRange {
+    let mut numbers = Vec::new();
+    if numbers.try_reserve_exact(cells).is_err() {
+        return Err(FormulaError::Num);
+    }
+    let mut sink = NumberList {
+        numbers: &mut numbers,
+        non_finite: false,
+    };
+    view.scan_numbers(pass, &mut sink)?;
+    let non_finite = sink.non_finite;
+    crate::sorting::sort_f64(&mut numbers);
+    Ok(Rc::new(SortedNumbers {
+        numbers: numbers.into_boxed_slice(),
+        non_finite,
+    }))
+}
+
 pub(super) struct StatisticCall<'a> {
     pub(super) statistic: NumberStatistic,
     pub(super) func: Func,
@@ -459,6 +590,7 @@ impl CellStore {
             func: call.func,
             sheet: call.sheet,
             values: StatisticArgs::new(call.statistic.is_paired()),
+            ordered_arg: call.statistic.ordered_arg(),
         };
         match reader.read(call.args, pass, call.depth) {
             Ok(mut values) => statistics::apply_numbers(call.statistic, &mut values),

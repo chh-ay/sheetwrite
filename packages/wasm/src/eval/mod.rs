@@ -97,6 +97,7 @@ pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use statistic_args::StatisticCall;
+pub(crate) use statistic_args::{OrderedRange, OrderedRanges};
 pub(crate) use subtotal::ast_calls_subtotal;
 use value::{bool_from_value, cached_formula_value, compare_values};
 pub(crate) use wildcard::Wildcard;
@@ -927,9 +928,10 @@ impl CellStore {
         self.recompute_at_volatile_serial(&seeds);
     }
 
-    /// Every other recalculation reads the clock once, as Excel does, so all
-    /// NOW and TODAY formulas of one pass see the same instant. A pass without
-    /// volatile formulas never reads it.
+    /// Recalculates the formulas that the dirty cells of the `seeds` sheets
+    /// affect. A pass with volatile formulas reads the host clock once, as
+    /// Excel does, so all NOW and TODAY formulas of the pass see the same
+    /// instant. A pass without volatile formulas never reads the clock.
     pub(crate) fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
         // Without formulas or pivot tables an edit can change no calculated
         // value, so the barrier only ends the pass. Doing that here keeps the
@@ -1007,7 +1009,9 @@ impl CellStore {
     }
 
     /// Ends a pass of a workbook without formulas. No formula reads the edited
-    /// values, so only the sums cached by the last pass and the dirty seeds go.
+    /// values, so the pass only clears the dirty seeds and drops the formula
+    /// state: the dependency index, the formula store and the results of the
+    /// last pass, with their cached range sums.
     fn finish_formula_free_pass(&mut self, seeds: &[usize]) {
         self.finish_recompute(seeds.iter().copied(), None);
         self.graph.invalidate();
@@ -1128,7 +1132,7 @@ impl CellStore {
         let mut vacated_spill = VacatedSpill::default();
 
         loop {
-            let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
+            let mut pending: Vec<(AbsCellKey, bool)> = affected
                 .keys(&self.formula_slots)
                 .filter(|key| !processed_arrays.contains(key))
                 .filter_map(|key| {
@@ -1149,7 +1153,7 @@ impl CellStore {
                     };
                     self.dynamic_array_bound(ast, key.sheet as usize, &mut pass)
                         .is_some()
-                        .then(|| (key, ast.clone(), entry.has_spill_refs()))
+                        .then(|| (key, entry.has_spill_refs()))
                 })
                 .collect();
 
@@ -1162,8 +1166,17 @@ impl CellStore {
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
-            for (key, stored_ast, has_spill_refs) in pending {
+            for (key, has_spill_refs) in pending {
                 let Some(id) = self.formula_id(key) else {
+                    continue;
+                };
+                // The entry is read in place: evaluating anchors changes
+                // values and spills, never formulas.
+                let Some(stored_ast) = self
+                    .formula_slots
+                    .get(id)
+                    .and_then(|entry| entry.ast.as_ref())
+                else {
                     continue;
                 };
                 processed_arrays.insert(key);
@@ -1190,25 +1203,29 @@ impl CellStore {
                 #[cfg(test)]
                 FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
                 let enclosing_reads = has_spill_refs.then(start_runtime_reads);
+                let resolved;
                 let ast = if has_spill_refs {
-                    self.resolve_spill_refs(&stored_ast, output_sheet, &mut pass, 0)
+                    resolved = self.resolve_spill_refs(stored_ast, output_sheet, &mut pass, 0);
+                    &resolved
                 } else {
                     stored_ast
                 };
 
-                let evaluated = match self.dynamic_array_bound(&ast, output_sheet, &mut pass) {
+                let evaluated = match self.dynamic_array_bound(ast, output_sheet, &mut pass) {
                     _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
                     Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
                         Some(total) => {
                             spill_work = total;
                             let _origin = FormulaOriginGuard::push(local);
-                            // A LET that resolves to one cell leaves no array
-                            // expression; its scalar value is the result.
+                            // After its spill references resolve, an
+                            // expression such as a LET over one cell can leave
+                            // no array expression; its scalar value is the
+                            // result.
                             let evaluated =
-                                match self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0) {
+                                match self.eval_dynamic_array(ast, output_sheet, &mut pass, 0) {
                                     Some(result) => result,
                                     None if has_spill_refs => {
-                                        match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                                        match self.eval_ast(ast, output_sheet, &mut pass, 0) {
                                             Value::Error(error) => Err(error),
                                             value @ (Value::Number(_)
                                             | Value::Text(_)
@@ -1244,7 +1261,7 @@ impl CellStore {
                     Some(Err(error)) => Err(error),
                     // Resolving a missing spill removes its array marker.
                     // Keep the scalar expression's error instead of replacing it.
-                    None => match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                    None => match self.eval_ast(ast, output_sheet, &mut pass, 0) {
                         Value::Error(error) => Err(error),
                         // A runtime reference that resolved to one cell can
                         // leave a scalar expression; its value is the result.
@@ -1739,7 +1756,7 @@ impl CellStore {
             (source_kind, source_payload)
         };
 
-        // Literal range scans avoid per-cell formula and calculated-error lookups.
+        // A literal value needs no formula or calculated-error lookup.
         if kind != KIND_FORMULA {
             debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains(key) }));
             return literal_cell_value(&self.strings, kind, payload);
@@ -1747,8 +1764,8 @@ impl CellStore {
 
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
-                // A settled formula's result is already in its cell, read as
-                // a clean formula is; iteration still records the read.
+                // A formula this pass settled has its result in its cell
+                // already; iteration still records the read.
                 if pass.affected.contains(id) {
                     if !pass.results.is_settled(id) {
                         // A formula evaluated inside a shifted read, such as
@@ -1887,7 +1904,7 @@ impl CellStore {
     /// cell. `shift` is the target's distance from the cell the expression
     /// is written for, which its relative references move by; the caller
     /// keeps every shifted reference inside the sheet. The pass recomputes
-    /// nothing, so referenced formula cells use their recomputed cache. The
+    /// nothing, so referenced formula cells give their stored results. The
     /// origin guard gives zero-argument ROW/COLUMN the target cell's
     /// coordinates.
     pub(crate) fn eval_conditional_ast(
@@ -2000,9 +2017,9 @@ impl CellStore {
 
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
-            // With host functions the arm above takes every unknown call; the
-            // default engine keeps this arm as it was, so its binary does not
-            // change.
+            // With host functions the arm above takes every unknown call, so
+            // the `UnknownFunc` pattern here is unreachable in that build. One
+            // arm serves both builds, so the default engine compiles the same code.
             #[cfg_attr(feature = "host-functions", allow(unreachable_patterns))]
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(_) => {
                 Value::Error(FormulaError::Name)
@@ -2091,11 +2108,9 @@ impl CellStore {
     /// The value of a defined name for a formula on `sheet`. A formula read
     /// in place is evaluated here; every other name takes
     /// [`Self::eval_defined_name_read_family`]. Out of line, so the name adds
-    /// one call to `eval_ast`, which must stay under the size above which
-    /// JavaScriptCore does not optimize a function; the `_family` suffix
-    /// keeps wasm-opt from inlining it back. The read path has its own
-    /// function, so this one keeps a small frame and its calls stay tail
-    /// calls.
+    /// one call to `eval_ast`; see [`Self::eval_func`] for why. The read path
+    /// has its own function, so this one keeps a small frame and its calls
+    /// stay tail calls.
     #[inline(never)]
     fn eval_defined_name_family(
         &self,
@@ -2162,9 +2177,9 @@ impl CellStore {
     /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,
     /// `IFERROR`, `IFNA`, `SUM` over one range, streamed reductions and the
     /// argument collection of scalar functions, plus the text and date
-    /// families in `apply_func` (out of line, they slowed the paired gate's
-    /// unicode-text-date-edit row 1.64×). Every other family runs in an
-    /// out-of-line `*_family` handler.
+    /// families in `apply_func` (out of line, they made the
+    /// `unicode-text-date-edit` benchmark 1.64× slower). Every other family
+    /// runs in an out-of-line `*_family` handler.
     ///
     /// `eval_func` and its one-caller callees are inlined into `eval_ast`.
     /// JavaScriptCore never compiles a WebAssembly function of 100,000 bytes or

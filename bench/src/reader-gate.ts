@@ -43,7 +43,7 @@ const GATE_PAIRS = 8;
 const MINIMUM_AA_PAIRS = 24;
 const RESAMPLES = 20_000;
 const RESAMPLE_SEED = 0x5eed_0a0a;
-/** 39 readers at 1 in 1,000 each: an A/A run fails about 1 gate in 25 before LIMIT_MARGIN. */
+/** 40 readers at 1 in 1,000 each: an A/A run fails about 1 gate in 25 before LIMIT_MARGIN. */
 const LIMIT_QUANTILE = 0.999;
 /** The headroom over the A/A quantile, as in `formula-gate.ts`, for windows quieter than the floor's. */
 const LIMIT_MARGIN = 1.2;

@@ -1,6 +1,6 @@
 [package]
 name = "sheetwrite-wasm"
-version = "0.7.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT"
 description = "Sheetwrite columnar store and data engine (Rust/WASM)."
@@ -26,8 +26,9 @@ rustc-hash = "2"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "=0.3.102"
 
-# v0.4.0 interleaved captures keep `3`: `"s"` saves 14,218 Brotli bytes
-# but slows the resolved 100k formula paths by 8.60–11.71%.
+# Optimize for speed, not size. In interleaved captures at v0.4.0, `"s"`
+# saved 14,218 Brotli bytes but made the resolved 100k formula paths
+# 8.60–11.71% slower.
 [profile.release]
 opt-level = 3
 lto = "fat"
@@ -40,15 +41,17 @@ codegen-units = 1
 # tier (see `eval_func` in src/eval/mod.rs). `--no-inline` must come before
 # `-O3`: wasm-opt runs passes in order. It takes one pattern, matched against
 # the demangled names wasm-bindgen writes.
+# `--converge` repeats the passes until the module stops shrinking: on the
+# engine after 0.6.1 it took 751 Brotli bytes off the default engine and 1,646
+# off the full one.
 [package.metadata.wasm-pack.profile.release]
 # Keep names for the function-size guard in wasm-factory; it removes the name
 # section before either engine is packaged.
-wasm-opt = ["--no-inline=*_family", "-O3", "-g"]
+wasm-opt = ["--no-inline=*_family", "-O3", "--converge", "-g"]
 
-# The three crates share this lint set; `bun scripts/rust-lint.ts` fails when
-# their `[lints]` tables differ. Policy and examples: docs/contributing/rust.md.
-# A lint at "warn" still fails CI when its count rises above
-# scripts/rust-lint-baseline.json; it moves to "deny" once it reaches zero.
+# The three crates share this lint set. `bun scripts/rust-lint.ts` fails when
+# their `[lints]` tables differ, or when a lint's warning count differs from
+# scripts/rust-lint-baseline.json. Policy and examples: docs/contributing/rust.md.
 
 [lints.rust]
 elided_lifetimes_in_paths = "warn"

@@ -20,7 +20,6 @@ export interface FunctionFamilyChoice {
   readonly formulaNames: readonly string[];
 }
 
-/** Props of {@link FunctionsStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface FunctionsStageProps {
   readonly families: readonly FunctionFamilyChoice[];
   /** The family shown before the scenario reports one. */

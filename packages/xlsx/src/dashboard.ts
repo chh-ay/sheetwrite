@@ -1,4 +1,4 @@
-// Dashboards in XLSX (#231). Excel has no dashboard sheet, so the export
+// Dashboards in XLSX. Excel has no dashboard sheet, so the export
 // writes each dashboard as a worksheet of its current values: one worksheet
 // column per grid column and one row per grid row. Each item writes its
 // caption and values at the top-left of its box, and a chart item writes a
@@ -21,7 +21,6 @@ import type { PivotCells } from "./chart-cells.js";
 import type { PivotChartData } from "./chart-write.js";
 import { emitWarning, type XlsxCodecContext } from "./resources.js";
 
-/** Columns of the dashboard grid; Sheetwrite's layout has 12. */
 const GRID_COLUMNS = 12;
 /** Width of one worksheet column that stands for a grid column, in pixels. */
 const COLUMN_WIDTH = 100;

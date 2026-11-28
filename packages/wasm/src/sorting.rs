@@ -3,24 +3,72 @@
 //! Each `sort_unstable_by` or `sort_by` call compiles its own copy of Rust's
 //! sort for its element type and comparator, 3 to 25 KB of WASM each. Engine
 //! sorts go through the instances here instead: packed integer keys for any
-//! order that fits in 64 or 128 bits, and one stable index sort with a `dyn`
-//! comparator for orders that need a real comparison.
+//! order that fits in 64 or 128 bits, one stable index sort with a `dyn`
+//! comparator for orders that need a real comparison, and one in-place sort
+//! of the dependency index's (cell, formula) pairs.
 
 use std::cmp::Ordering;
 
 use crate::formula_slots::FormulaId;
 use crate::types::AbsCellKey;
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u64(keys: &mut [u64]) {
     keys.sort_unstable();
 }
 
-/// Sorts packed keys ascending.
 #[inline(never)]
 pub(crate) fn sort_u128(keys: &mut [u128]) {
     keys.sort_unstable();
+}
+
+const SIGN_BIT: u64 = 1 << 63;
+
+/// Sorts `values` ascending through [`sort_u64`], reusing their allocation:
+/// flipping the sign bit turns `i64` order into `u64` order.
+pub(crate) fn sort_i64(values: Vec<i64>) -> Vec<i64> {
+    let mut keys: Vec<u64> = values
+        .into_iter()
+        .map(|value| value as u64 ^ SIGN_BIT)
+        .collect();
+    sort_u64(&mut keys);
+    keys.into_iter()
+        .map(|key| (key ^ SIGN_BIT) as i64)
+        .collect()
+}
+
+/// Sorts `numbers` ascending in [`f64::total_cmp`] order through
+/// [`sort_u64`], on keys whose unsigned order is that order.
+pub(crate) fn sort_f64(numbers: &mut [f64]) {
+    let mut keys: Vec<u64> = numbers
+        .iter()
+        .map(|&number| total_order_key(number))
+        .collect();
+    sort_u64(&mut keys);
+    for (number, key) in numbers.iter_mut().zip(keys) {
+        *number = from_total_order_key(key);
+    }
+}
+
+/// Positive numbers get the sign bit set, so they follow every negative
+/// one; negative numbers get every bit flipped, so a larger magnitude sorts
+/// first. This is the order of [`f64::total_cmp`].
+const fn total_order_key(number: f64) -> u64 {
+    let bits = number.to_bits();
+    if bits & SIGN_BIT == 0 {
+        bits | SIGN_BIT
+    } else {
+        !bits
+    }
+}
+
+/// The number [`total_order_key`] made `key` from.
+const fn from_total_order_key(key: u64) -> f64 {
+    f64::from_bits(if key & SIGN_BIT == 0 {
+        !key
+    } else {
+        key ^ SIGN_BIT
+    })
 }
 
 /// Sorts `indices` by `compare`, stably.
@@ -130,5 +178,40 @@ mod tests {
         expected.sort_by_key(|cell| (cell.sheet, cell.row, cell.col));
         sort_cells_row_major(&mut cells);
         assert_eq!(cells, expected);
+    }
+
+    #[test]
+    fn numbers_sort_in_total_order() {
+        let mut numbers = vec![
+            1.5,
+            -0.0,
+            f64::INFINITY,
+            0.0,
+            -1.5,
+            f64::MIN_POSITIVE / 2.0,
+            f64::NEG_INFINITY,
+            -f64::MIN_POSITIVE / 2.0,
+            1.5,
+            f64::MAX,
+            -f64::MAX,
+        ];
+        let mut expected = numbers.clone();
+        expected.sort_by(f64::total_cmp);
+        sort_f64(&mut numbers);
+        let bits = |values: &[f64]| {
+            values
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(bits(&numbers), bits(&expected));
+    }
+
+    #[test]
+    fn signed_values_sort_ascending() {
+        let values = vec![3, i64::MIN, -1, 0, i64::MAX, -1, 45_000, 1];
+        let mut expected = values.clone();
+        expected.sort_unstable();
+        assert_eq!(sort_i64(values), expected);
     }
 }

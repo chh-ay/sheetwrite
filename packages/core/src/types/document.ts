@@ -346,8 +346,8 @@ export type DataValidationComparison =
 /**
  * Serializable condition enforced by a data-validation rule.
  *
- * `min` and `max` remain inclusive legacy bounds. Use `comparison` when the
- * operator itself is significant; comparison and legacy bounds are mutually exclusive.
+ * `min` and `max` are inclusive bounds. Use `comparison` when the operator
+ * itself is significant; a condition takes `comparison` or `min`/`max`, not both.
  * Formulas (`source`, `formula`, formula operands) are relative to the
  * top-left cell of the rule's range, as in Excel.
  */
@@ -462,7 +462,7 @@ export type CommitReason =
   | "edit-tab"
   | "edit-programmatic"
   | "paste"
-  /** No longer emitted: a cut changes nothing, and its paste commits as `"paste"`. */
+  /** Never emitted: a cut changes nothing, and its paste commits as `"paste"`. */
   | "cut"
   | "clear"
   | "fill"
@@ -603,9 +603,9 @@ export interface SnapshotCell {
  * Formula/reference tuples are sparse exceptions keyed by row-major offset.
  */
 export interface PackedCellBlock {
-  /** Number of rows in the block. */
+  /** Rows in the block; `values` holds `rowCount * colCount` entries. */
   rowCount: number;
-  /** Number of columns in the block. */
+  /** Columns in the block: the length of one row in `values`. */
   colCount: number;
   /** One value per cell, row by row: cell (r, c) is at `r * colCount + c`. */
   values: CellScalar[];
@@ -625,9 +625,9 @@ export interface CellBlock {
   startRow: number;
   /** Zero-based sheet column of the block's first column. */
   startCol: number;
-  /** Number of rows the block spans. */
+  /** Rows the block spans, down from `startRow`. */
   rowCount: number;
-  /** Number of columns the block spans. */
+  /** Columns the block spans, right from `startCol`. */
   colCount: number;
   /** The block's stored cells, placed by offsets from its first row and column. */
   cells: SnapshotCell[];
@@ -649,7 +649,7 @@ export interface SheetSnapshot {
   visibility?: SheetVisibility;
   /** See `Sheet.tabColor`. */
   tabColor?: string;
-  /** Number of rows the sheet has. */
+  /** Rows in the sheet, empty rows after the last stored cell included. */
   rowCount: number;
   /** Keys are stable, unique document column identities as well as datasource keys. */
   columns: Column[];
@@ -778,7 +778,7 @@ export interface XlsxSourceSnapshot {
 
 /** Schema-versioned serializable workbook document. */
 export interface WorkbookSnapshot {
-  /** Format version of the snapshot; always `1` today. */
+  /** Format version of the snapshot; always `1`. */
   schemaVersion: 1;
   /** ID of the document in your storage, kept through sync and persistence. */
   documentId?: string;

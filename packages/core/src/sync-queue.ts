@@ -7,7 +7,7 @@ function is_busy_status(status: SyncMutationStatus): status is BusyMutationStatu
   return status === "conflicted" || status === "sending" || status === "persisting";
 }
 
-/** Acknowledged IDs kept at the front of the order array before it is compacted. */
+/** Fewest acknowledged IDs at the front of `order` that a compaction drops. */
 const COMPACT_MIN_HEAD = 64;
 
 /**
@@ -26,8 +26,9 @@ export class PendingRecordQueue {
   private readonly order: string[] = [];
   /**
    * Index of the head in `order`. Acknowledging the head only moves it, so a
-   * drain costs the same per acknowledgement at any depth; the acknowledged
-   * prefix is dropped once it is at least half of `order`.
+   * drain costs the same per acknowledgement at any depth. The acknowledged
+   * prefix is dropped once it holds at least `COMPACT_MIN_HEAD` IDs and at
+   * least half of `order`.
    */
   private start = 0;
 
@@ -116,7 +117,7 @@ export class PendingRecordQueue {
     this.server_versions -= serverVersionsOf(record);
   }
 
-  /** Records that already left the queue change status without touching the totals. */
+  /** Set `record.status`. The totals change only while the record is still in the queue. */
   setStatus(record: SyncMutationRecord, status: SyncMutationStatus): void {
     if (this.records.get(record.clientMutationId) === record) {
       this.status_counts[record.status] -= 1;

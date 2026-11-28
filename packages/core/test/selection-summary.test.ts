@@ -130,7 +130,7 @@ it("names the step an undo or redo applied, and tints its cells for a moment", (
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
 
   grid.undo();
-  // The step leads the summary, after #849's cell mode.
+  // The step is the summary's last item, after the cell mode.
   expect(piece.element.lastElementChild?.textContent).toStartWith("Undo: Format Cells in A2:B3");
   expect(flashed()).toBeGreaterThan(0);
   jest.advanceTimersByTime(600);

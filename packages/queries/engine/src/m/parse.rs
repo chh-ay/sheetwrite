@@ -47,7 +47,7 @@ pub(crate) enum Expr {
     Not(Box<Self>),
     Negate(Box<Self>),
     Binary(&'static str, Box<Self>, Box<Self>),
-    /// A primitive type such as `type text`, with `nullable` folded in.
+    /// A primitive type such as `type text`; a `nullable` prefix is accepted and dropped.
     Type(String),
     Error(Box<Self>),
 }
@@ -614,7 +614,8 @@ impl Parser<'_> {
 
 /// Parses `section Section1;` and its members. A member whose expression is
 /// outside the subset keeps its text span and a reason; a malformed section
-/// header fails the whole document.
+/// header, member name or terminator, or text that does not tokenize, fails
+/// the whole document.
 pub(crate) fn parse_section(text: &str) -> Result<Vec<Member>, &'static str> {
     let tokens = tokenize(text)?;
     let mut parser = Parser {

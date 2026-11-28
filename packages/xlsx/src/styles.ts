@@ -688,7 +688,8 @@ export class StylesRegistry {
     xml.append(`<cellXfs count="${xfs.length}">`);
     for (const xf of xfs) {
       const alignment = xf.alignment;
-      // Include xf0: otherwise unstyled Sheetwrite cells render bottom-aligned.
+      // Every xf writes its alignment, xf0 included. Without it, unstyled cells
+      // take the OOXML default and render bottom-aligned, not centered.
       xml.append(
         `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""} applyAlignment="1">`,
       );

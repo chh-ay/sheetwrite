@@ -10,7 +10,11 @@ const COLUMN_TYPE_CODES: Readonly<Record<QueryColumnType, number>> = {
   mixed: 7,
 };
 
-/** Flat positions stay representable before a typed-array assignment can truncate them. */
+/**
+ * Returns `value` when it is an integer from 0 to 2^32 - 1, and throws a
+ * `RangeError` otherwise. Typed-array writes and u32 WASM arguments truncate
+ * larger values silently, so counts and offsets are checked before transfer.
+ */
 export function checkedU32(value: number): number {
   if (Number.isSafeInteger(value) === false || value < 0 || value > MAX_U32) {
     throw new RangeError("Query transfer value must be a u32");
@@ -44,7 +48,12 @@ export function packStrings(values: readonly string[]): {
   return { bytes, offsets };
 }
 
-/** Fatal decoding protects the metadata seam without parsing row values in JavaScript. */
+/**
+ * Splits a packed UTF-8 buffer at its u32 offsets. The decoder is fatal, so
+ * invalid UTF-8 from the engine throws instead of becoming replacement
+ * characters. Row text does not pass through here; it stays packed in its
+ * column.
+ */
 export function unpackStrings(bytes: Uint8Array, offsets: Uint32Array): string[] {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   const strings: string[] = [];
@@ -62,12 +71,12 @@ export function unpackStrings(bytes: Uint8Array, offsets: Uint32Array): string[]
   return strings;
 }
 
-/** Primitive codes share mixed tags; mixed has its own schema-only code. */
+/** The wire code of a column type. Codes 1 to 5 equal the mixed-column row tags; 7 marks a mixed column. */
 export function encodeType(type: QueryColumnType): number {
   return COLUMN_TYPE_CODES[type];
 }
 
-/** The switch narrows the exact public type without an unchecked assertion. */
+/** The column type of a wire code; throws on a code the engine does not define. */
 export function decodeType(code: number): QueryColumnType {
   switch (code) {
     case COLUMN_TYPE_CODES.number:

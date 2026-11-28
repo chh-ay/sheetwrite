@@ -17,6 +17,9 @@ const SIGNIFICANT_DIGITS: u32 = 15;
 const PLAIN_EXPONENTS: std::ops::Range<i32> = -9..15;
 /// Scientific General output shows at least two exponent digits.
 const MIN_EXPONENT_DIGITS: usize = 2;
+/// Whole numbers below this have at most 15 digits, all significant and
+/// all in plain notation, so General writes them as integers.
+const PLAIN_INTEGER_LIMIT: f64 = 1e15;
 /// Thousands are grouped in threes.
 const GROUP_SIZE: usize = 3;
 const PERCENT_SCALE: f64 = 100.0;
@@ -157,13 +160,30 @@ fn push_zeros(text: &mut String, count: usize) {
     text.extend(std::iter::repeat_n('0', count));
 }
 
+/// Powers of ten that a double holds exactly.
+const EXACT_POWERS_OF_TEN: [f64; 23] = [
+    1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16,
+    1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+];
+/// Integers below this are exact doubles.
+const EXACT_INTEGER_LIMIT: u64 = 1 << f64::MANTISSA_DIGITS;
+
 /// `number` rounded at a decimal place the way ROUND, ROUNDUP and ROUNDDOWN
 /// do. `places` may be negative.
 pub(super) fn round_decimal(number: f64, places: i32, rounding: Rounding) -> f64 {
     if !number.is_finite() {
         return number;
     }
-    Decimal::of(number).round(places, rounding).to_f64()
+    // Excel has no negative zero; the decimal path gives +0 as well.
+    if number == 0.0 {
+        return 0.0;
+    }
+    let (digits, last_place) = digit_integer(number.abs());
+    let (mantissa, exponent) = round_digit_integer(digits, last_place, places, rounding);
+    exact_value(mantissa, exponent).map_or_else(
+        || Decimal::of(number).round(places, rounding).to_f64(),
+        |magnitude| with_sign(magnitude, number),
+    )
 }
 
 /// `number` with at most 15 significant digits, the value Excel shows.
@@ -171,13 +191,88 @@ pub(super) fn significant(number: f64) -> f64 {
     if !number.is_finite() {
         return number;
     }
-    Decimal::of(number).to_f64()
+    if number == 0.0 {
+        return 0.0;
+    }
+    let (digits, last_place) = digit_integer(number.abs());
+    exact_value(digits, last_place).map_or_else(
+        || Decimal::of(number).to_f64(),
+        |magnitude| with_sign(magnitude, number),
+    )
+}
+
+/// The 15 significant digits of `magnitude` (positive, finite) as
+/// `digits × 10^last_place`, the integer form of [`Decimal::of`].
+fn digit_integer(magnitude: f64) -> (u64, i32) {
+    let rounded = rounded_digits(magnitude, SIGNIFICANT_DIGITS);
+    let count = rounded.digits.ilog10() as i32 + 1;
+    (rounded.digits, rounded.exponent + 1 - count)
+}
+
+/// `digits × 10^last_place` rounded at `places` decimals as [`Decimal::round`]
+/// does, as `mantissa × 10^exponent`.
+fn round_digit_integer(
+    digits: u64,
+    last_place: i32,
+    places: i32,
+    rounding: Rounding,
+) -> (u64, i32) {
+    let kept_place = places.saturating_neg();
+    let dropped = kept_place.saturating_sub(last_place);
+    if dropped <= 0 {
+        return (digits, last_place);
+    }
+    // `digits` has at most 15 digits: a unit above ten times them (or past
+    // 64 bits) leaves every digit below the kept place, and only a round-up
+    // keeps a unit there.
+    let dropped_unit = u32::try_from(dropped)
+        .ok()
+        .and_then(|count| 10u64.checked_pow(count));
+    let Some(unit) = dropped_unit.filter(|&unit| unit <= digits.saturating_mul(10)) else {
+        return (u64::from(rounding == Rounding::Away), kept_place);
+    };
+    let kept = digits / unit;
+    let rest = digits % unit;
+    let round_up = match rounding {
+        Rounding::Nearest => rest >= unit / 2,
+        Rounding::Away => rest != 0,
+        Rounding::Toward => false,
+    };
+    (kept + u64::from(round_up), kept_place)
+}
+
+/// `mantissa × 10^exponent` when both factors are exact doubles: one
+/// multiplication or division then rounds once, to the same double that
+/// parsing the decimal text gives.
+fn exact_value(mantissa: u64, exponent: i32) -> Option<f64> {
+    if mantissa >= EXACT_INTEGER_LIMIT {
+        return None;
+    }
+    let power = *EXACT_POWERS_OF_TEN.get(exponent.unsigned_abs() as usize)?;
+    let integer = mantissa as f64;
+    Some(if exponent < 0 {
+        integer / power
+    } else {
+        integer * power
+    })
+}
+
+/// `magnitude` with the sign of `number`; a zero result stays positive.
+const fn with_sign(magnitude: f64, number: f64) -> f64 {
+    if number < 0.0 && magnitude != 0.0 {
+        -magnitude
+    } else {
+        magnitude
+    }
 }
 
 /// The General text form that `&`, CONCAT and other text functions give a
-/// number: 15 significant digits, plain notation for exponents from -9 to 14
-/// and scientific notation outside them.
+/// number: 15 significant digits, in scientific notation outside
+/// [`PLAIN_EXPONENTS`].
 pub(super) fn general_text(number: f64) -> String {
+    if number.fract() == 0.0 && number.abs() < PLAIN_INTEGER_LIMIT {
+        return (number as i64).to_string();
+    }
     let decimal = Decimal::of(number);
     if decimal.is_zero() {
         return "0".into();
@@ -278,7 +373,6 @@ const fn is_date_letter(ch: char) -> bool {
     matches!(ch.to_ascii_lowercase(), 'd' | 'm' | 'y' | 'h' | 's')
 }
 
-/// The text of the character at `index` of `code`.
 fn char_at(code: &str, index: usize, ch: char) -> &str {
     &code[index..index + ch.len_utf8()]
 }
@@ -397,13 +491,18 @@ pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, F
         }
         parts.pop();
     }
-    let (part, magnitude_only) = match (parts.len(), number) {
-        (1, _) => (parts[0], false),
-        (_, value) if value < 0.0 => (parts[1], true),
-        (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], false),
-        _ => (parts[0], false),
+    // `contains` is a fast byte search; most codes have no brackets.
+    let conditional = if code.contains('[') {
+        conditional_section(&parts, number)
+    } else {
+        None
     };
-    let value = if magnitude_only { number.abs() } else { number };
+    let (part, value) = conditional.unwrap_or_else(|| match (parts.len(), number) {
+        (1, _) => (parts[0], number),
+        (_, value) if value < 0.0 => (parts[1], number.abs()),
+        (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], number),
+        _ => (parts[0], number),
+    });
     if let Some(fraction) = Fraction::parse(part) {
         return Ok(Some(fraction.render(value)));
     }
@@ -411,6 +510,139 @@ pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, F
         return Ok(None);
     };
     render(&section, value).map(Some)
+}
+
+/// The section that a code with a condition, such as `[>=100]`, chooses
+/// for `number`, and the value it shows; `None` when no section has a
+/// condition. Of the first two sections, the first whose condition `number`
+/// meets wins. Otherwise the third wins when both have conditions, the
+/// second when only the first has one, and the first when it has none or no
+/// other section exists. A section that only negative numbers meet shows the
+/// magnitude, as the negative section does; the others keep the sign. The
+/// first section does this only when more sections follow. The grid's
+/// formatter chooses the same way.
+fn conditional_section<'a>(parts: &[&'a str], number: f64) -> Option<(&'a str, f64)> {
+    if !parts.iter().any(|part| section_condition(part).is_some()) {
+        return None;
+    }
+    let first_part = *parts.first()?;
+    let first = section_condition(first_part);
+    let second_part = parts.get(1).copied();
+    let second = second_part.and_then(section_condition);
+    if let Some(condition) = first.filter(|condition| condition.meets(number)) {
+        let negative = parts.len() > 1 && condition.only_negative();
+        return Some((first_part, if negative { -number } else { number }));
+    }
+    if let (Some(part), Some(condition)) = (second_part, second) {
+        if condition.meets(number) {
+            return Some((
+                part,
+                if condition.only_negative() {
+                    -number
+                } else {
+                    number
+                },
+            ));
+        }
+    }
+    let part = match (first, second) {
+        (Some(_), Some(_)) => parts.get(2).copied().unwrap_or(first_part),
+        (Some(_), None) => second_part.unwrap_or(first_part),
+        (None, _) => first_part,
+    };
+    Some((part, number))
+}
+
+/// A comparison in a section's brackets, such as `[<=100]`.
+#[derive(Clone, Copy)]
+struct Condition {
+    operator: Comparison,
+    operand: f64,
+}
+
+#[derive(Clone, Copy)]
+enum Comparison {
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    Equal,
+    NotEqual,
+}
+
+impl Condition {
+    /// Reads the text inside the brackets: an operator, optional spaces and
+    /// a decimal number, such as `>=100` or `<-2.5`.
+    fn parse(content: &str) -> Option<Self> {
+        const OPERATORS: [(&str, Comparison); 6] = [
+            ("<=", Comparison::LessOrEqual),
+            (">=", Comparison::GreaterOrEqual),
+            ("<>", Comparison::NotEqual),
+            ("<", Comparison::Less),
+            (">", Comparison::Greater),
+            ("=", Comparison::Equal),
+        ];
+        let (operator, rest) = OPERATORS.iter().find_map(|&(text, operator)| {
+            content.strip_prefix(text).map(|rest| (operator, rest))
+        })?;
+        let number = rest.trim_start();
+        let is_decimal = !number.starts_with('+')
+            && number.bytes().all(|byte| {
+                byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'+' | b'e' | b'E')
+            });
+        let operand = number.parse().ok().filter(|_| is_decimal)?;
+        Some(Self { operator, operand })
+    }
+
+    fn meets(self, value: f64) -> bool {
+        match self.operator {
+            Comparison::Less => value < self.operand,
+            Comparison::LessOrEqual => value <= self.operand,
+            Comparison::Greater => value > self.operand,
+            Comparison::GreaterOrEqual => value >= self.operand,
+            Comparison::Equal => value == self.operand,
+            Comparison::NotEqual => value != self.operand,
+        }
+    }
+
+    /// Whether only negative numbers meet the condition.
+    fn only_negative(self) -> bool {
+        match self.operator {
+            Comparison::Less => self.operand <= 0.0,
+            Comparison::LessOrEqual | Comparison::Equal => self.operand < 0.0,
+            Comparison::Greater | Comparison::GreaterOrEqual | Comparison::NotEqual => false,
+        }
+    }
+}
+
+/// The first condition among the brackets of `section`; colors and other
+/// brackets are skipped.
+fn section_condition(section: &str) -> Option<Condition> {
+    let mut rest = section;
+    loop {
+        let inside = &rest[bracket_start(rest)? + 1..];
+        let close = inside.find(']')?;
+        if let Some(condition) = Condition::parse(&inside[..close]) {
+            return Some(condition);
+        }
+        rest = &inside[close + 1..];
+    }
+}
+
+/// Where the first `[` outside quotes and escapes is.
+fn bracket_start(section: &str) -> Option<usize> {
+    let mut quoted = false;
+    let mut escaped = false;
+    section.char_indices().find_map(|(index, ch)| {
+        let open = !quoted && !escaped && ch == '[';
+        match ch {
+            _ if escaped => escaped = false,
+            '\\' if !quoted => escaped = true,
+            '"' => quoted = !quoted,
+            _ => {}
+        }
+        open.then_some(index)
+    })
 }
 
 /// Whether a section holds `@`, the text placeholder, outside quotes and escapes.
@@ -533,7 +765,8 @@ impl Layout {
 }
 
 /// The mantissa and exponent of a scientific format: the mantissa has as many
-/// integer digits as the format has `0` placeholders before the point.
+/// integer digits as the format has `0` placeholders before the point, and at
+/// least one.
 fn scientific_parts(value: f64, layout: &Layout) -> (f64, i32) {
     if value == 0.0 {
         return (0.0, 0);
@@ -920,5 +1153,160 @@ fn closest_fraction(value: f64, max_denominator: u32) -> (f64, f64) {
             return (p1, q1);
         }
         rest = 1.0 / fraction;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{round_decimal, significant, Decimal, Rounding};
+
+    const SEED: u64 = 0x9e37_79b9_7f4a_7c15;
+    /// Random numbers of each kind. With the edge numbers, every place and
+    /// every rounding, the test checks about 30,000 cases, about a second in
+    /// a debug build.
+    const RANDOM_NUMBERS_PER_KIND: usize = 40;
+    /// From far left to far right of the 15 significant digits.
+    const PLACES: std::ops::RangeInclusive<i32> = -25..=25;
+    /// The limits ROUND accepts, and places beyond every digit of a double.
+    const EXTREME_PLACES: [i32; 4] = [-308, 308, -400, 400];
+    const ROUNDINGS: [(&str, Rounding); 3] = [
+        ("nearest", Rounding::Nearest),
+        ("away", Rounding::Away),
+        ("toward", Rounding::Toward),
+    ];
+    /// Decimal scales of everyday numbers, and of every finite magnitude
+    /// from subnormal to near `f64::MAX`.
+    const NARROW_SCALES: std::ops::RangeInclusive<i32> = -20..=8;
+    const WIDE_SCALES: std::ops::RangeInclusive<i32> = -340..=290;
+    const MAX_DIGITS: u32 = 17;
+
+    /// The decimal text path that the integer path stands in for, from the
+    /// number's digits (`None` when it is not finite).
+    fn text_path_round(
+        decimal: Option<&Decimal>,
+        number: f64,
+        places: i32,
+        rounding: Rounding,
+    ) -> f64 {
+        decimal.map_or(number, |digits| {
+            digits.clone().round(places, rounding).to_f64()
+        })
+    }
+
+    /// Halfway decimals, carries, the limits of exact doubles and of exact
+    /// powers of ten, huge, tiny and subnormal magnitudes, zeros and
+    /// numbers that are not finite.
+    fn edge_numbers() -> Vec<f64> {
+        let exact_integer_limit = 2f64.powi(53);
+        let positive = [
+            0.5,
+            1.5,
+            2.5,
+            0.125,
+            0.015,
+            1.005,
+            2.675,
+            9.995,
+            999.995,
+            0.1 + 0.2,
+            1.0 / 3.0,
+            99_999_999_999_999.5,
+            999_999_999_999_999.0,
+            exact_integer_limit - 1.0,
+            exact_integer_limit,
+            exact_integer_limit + 2.0,
+            1e22,
+            1e22 * 10.0,
+            1.234_567_890_123_45 * 1e22,
+            1e-22,
+            1e-23,
+            1e300,
+            f64::MAX,
+            1e-300,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE / 3.0,
+            f64::from_bits(1),
+        ];
+        let mut numbers: Vec<f64> = positive
+            .iter()
+            .flat_map(|&number| [number, -number])
+            .collect();
+        numbers.extend([0.0, -0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]);
+        numbers
+    }
+
+    /// A deterministic xorshift generator, so a failure reproduces.
+    struct Random(u64);
+
+    impl Random {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+
+        /// Any finite double: random sign, exponent and mantissa bits.
+        fn finite_bits(&mut self) -> f64 {
+            loop {
+                let number = f64::from_bits(self.next());
+                if number.is_finite() {
+                    return number;
+                }
+            }
+        }
+
+        /// Up to 17 random digits at a random scale and sign, sometimes
+        /// ending in a 5 to land on a halfway case.
+        fn decimal(&mut self, scales: std::ops::RangeInclusive<i32>) -> f64 {
+            let digit_count = 1 + (self.next() % u64::from(MAX_DIGITS)) as u32;
+            let mut digits = self.next() % 10u64.pow(digit_count);
+            if self.next().is_multiple_of(3) {
+                digits = digits / 10 * 10 + 5;
+            }
+            let scale_count = scales.end().abs_diff(*scales.start()) + 1;
+            let scale = scales.start() + (self.next() % u64::from(scale_count)) as i32;
+            // Two steps, so a tiny scale does not underflow before the digits apply.
+            let magnitude = digits as f64 * 10f64.powi(scale / 2) * 10f64.powi(scale - scale / 2);
+            if self.next().is_multiple_of(2) {
+                -magnitude
+            } else {
+                magnitude
+            }
+        }
+    }
+
+    fn numbers() -> Vec<f64> {
+        let mut random = Random(SEED);
+        let mut numbers = edge_numbers();
+        for _ in 0..RANDOM_NUMBERS_PER_KIND {
+            numbers.push(random.finite_bits());
+            numbers.push(random.decimal(NARROW_SCALES));
+            numbers.push(random.decimal(WIDE_SCALES));
+        }
+        numbers
+    }
+
+    #[test]
+    fn integer_rounding_gives_the_bits_of_the_decimal_text_path() {
+        let places: Vec<i32> = PLACES.chain(EXTREME_PLACES).collect();
+        for number in numbers() {
+            let decimal = number.is_finite().then(|| Decimal::of(number));
+            let shown = decimal.as_ref().map_or(number, Decimal::to_f64);
+            assert_eq!(
+                significant(number).to_bits(),
+                shown.to_bits(),
+                "significant({number:e})"
+            );
+            for &place in &places {
+                for (name, rounding) in ROUNDINGS {
+                    assert_eq!(
+                        round_decimal(number, place, rounding).to_bits(),
+                        text_path_round(decimal.as_ref(), number, place, rounding).to_bits(),
+                        "round {name} ({number:e}, {place})"
+                    );
+                }
+            }
+        }
     }
 }

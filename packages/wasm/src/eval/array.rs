@@ -1,4 +1,8 @@
-//! Bounded dynamic-array evaluation for FILTER, SORT, UNIQUE, and direct ranges.
+//! Bounded dynamic-array evaluation: the dispatch for every array
+//! expression, the array functions (FILTER, SORT, UNIQUE, TAKE, DROP,
+//! CHOOSECOLS, CHOOSEROWS, TRANSPOSE, SEQUENCE and TRIMRANGE), spill
+//! references (`A1#`), and the shape and spill-budget checks made before
+//! evaluation.
 
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
@@ -328,8 +332,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
-            // The shape is known only after evaluation, so the pending loop
-            // charges the spill budget with the evaluated size instead.
+            // The shape is known only after evaluation; see `UNKNOWN_SIZE_PRECHARGE`.
             Ast::Func(Func::Offset | Func::Indirect, ..) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
             Ast::Bin(..) | Ast::Cmp(..) | Ast::Neg(..) | Ast::Pos(..) | Ast::Percent(..)
                 if ast_produces_array(ast, pass.shapes(self.name_scope(formula_sheet))) =>
@@ -575,8 +578,9 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             Ast::Parameter { depth, index, .. } => {
                 let frame = pass.results.call_frame();
-                if let Some(super::analysis::lambda::Slot::Array { rows, cols, values }) =
-                    frame.and_then(|call_frame| call_frame.slot(*depth, *index))
+                if let Some(super::analysis::lambda::Slot::Array {
+                    rows, cols, values, ..
+                }) = frame.and_then(|call_frame| call_frame.slot(*depth, *index))
                 {
                     return Some(T::shared(*rows, *cols, values));
                 }
@@ -700,9 +704,7 @@ impl CellStore {
                 self.eval_trim_range(args, sheet, pass, depth + 1)
             }
             Ast::Func(Func::Sequence, args, _) => self.eval_sequence(args, sheet, pass, depth + 1),
-            // One out-of-line call: the check that IF and the other branch
-            // functions produce an array stays in the family, out of the
-            // evaluator this dispatch is inlined into.
+            // Out of line; `eval_branches_family` says why.
             Ast::Func(
                 Func::If | Func::IfError | Func::IfNa | Func::Ifs | Func::Switch | Func::Choose,
                 ..,
@@ -710,8 +712,7 @@ impl CellStore {
             Ast::Func(Func::Index, args, _) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }
-            // One out-of-line call, as for the branch functions: the check
-            // that a function taking one value is lifted stays in the family.
+            // Out of line; `eval_lifted_family` says why.
             Ast::Func(..) => self.eval_lifted_family(ast, sheet, pass, depth + 1)?,
             _ => return None,
         };
@@ -745,8 +746,8 @@ impl CellStore {
     }
 
     /// The shape of an array expression before it is evaluated. `pass` is the
-    /// pass that asks; the full engine's shape hooks share its compiled regex
-    /// programs, and the default engine only passes it on.
+    /// pass that asks: a LET name reads its binding from the pass's LET frame,
+    /// and the full engine's shape hooks share its compiled regex programs.
     #[cfg_attr(
         not(feature = "analysis"),
         allow(
@@ -1061,7 +1062,7 @@ impl CellStore {
         if filter_rows {
             return Ok(array.pick(selected.into_iter()));
         }
-        // Columns are picked by copying, as before.
+        // `ValueRows` picks only rows, so picked columns are copied.
         let matrix = array.into_matrix();
         let (rows, cols) = (matrix.rows, selected.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
@@ -1162,7 +1163,7 @@ impl CellStore {
             return Ok(array.pick(indices.into_iter()));
         }
 
-        // Columns are reordered by copying, as before.
+        // `ValueRows` picks only rows, so reordered columns are copied.
         let matrix = array.into_matrix();
         let mut values = Vec::with_capacity(matrix.values.len());
         for row in 0..matrix.rows {
@@ -1250,7 +1251,7 @@ impl CellStore {
             return Ok(array.pick(retained.into_iter()));
         }
 
-        // Columns are kept by copying, as before.
+        // `ValueRows` picks only rows, so kept columns are copied.
         let matrix = array.into_matrix();
         let (rows, cols) = (matrix.rows, retained.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
@@ -1287,7 +1288,7 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
-    /// TRIMRANGE(range, [`trim_rows`], [`trim_cols`]): the range without its
+    /// `TRIMRANGE(range, [trim_rows], [trim_cols])`: the range without its
     /// leading and trailing blank rows and columns. Each trim argument is 0
     /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
     /// with no value left is `#REF!`, as in Excel.
@@ -1349,7 +1350,7 @@ impl CellStore {
         ))
     }
 
-    /// A TRIMRANGE trim argument: a whole number from 0 to 3, 3 when omitted.
+    /// A TRIMRANGE trim argument, truncated to a whole number. `#VALUE!` outside 0 to 3.
     fn trim_mode(
         &self,
         mode_arg: Option<&Ast>,
@@ -1472,7 +1473,7 @@ impl CellStore {
             return Ok(source.span(row_start, output_rows));
         }
 
-        // A column cut copies, as before.
+        // `ValueRows` spans only whole rows, so a column cut is copied.
         let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
@@ -1551,7 +1552,7 @@ impl CellStore {
             return Ok(source.pick(indices.into_iter().map(|row| row as usize)));
         }
 
-        // Columns are chosen by copying, as before.
+        // `ValueRows` picks only rows, so chosen columns are copied.
         let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
@@ -1571,14 +1572,14 @@ impl CellStore {
 }
 
 /// The form an array dispatch returns, each checked against the array byte
-/// budget: a matrix for callers that read every value, or rows of one base
-/// for a row step's argument and for a spill.
+/// budget: a matrix for callers that read every value, a spill included, or
+/// rows of one base for a row step's argument.
 trait ArrayResult: Sized {
     /// A matrix a function computed.
     fn computed(matrix: EvalMatrix) -> Result<Self, FormulaError>;
     /// The rows a row step kept.
     fn rows(rows: ValueRows) -> Result<Self, FormulaError>;
-    /// An array constant's `values`, `cols` per row.
+    /// `values` of an array constant or a LAMBDA array argument, `cols` per row.
     fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError>;
 }
 
@@ -1608,7 +1609,7 @@ impl ArrayResult for ValueRows {
         Ok(rows)
     }
 
-    /// Shared with the formula tree, so nothing is copied or counted.
+    /// Shared with the formula tree or the call frame, so nothing is copied or counted.
     fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError> {
         Ok(Self::shared(rows, cols, Rc::clone(values)))
     }
@@ -1622,8 +1623,7 @@ pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Optio
 
 /// A LAMBDA body or array helper argument that calls OFFSET or INDIRECT has
 /// no shape before evaluation, so a shape query reports `#VALUE!`. Such a
-/// formula is charged like a bare runtime reference: a precharge now, and
-/// whatever its result holds beyond it once the pending loop evaluates it.
+/// formula is charged like a bare runtime reference: [`UNKNOWN_SIZE_PRECHARGE`].
 #[cfg(feature = "analysis")]
 fn runtime_reference_bound(
     ast: &Ast,
@@ -1638,7 +1638,10 @@ fn runtime_reference_bound(
     }
 }
 
-/// A row of a by-row array is one slice; a column is read value by value.
+/// The hash of UNIQUE item `item`: a row, or a column when `by_col`. A row
+/// is read as one slice, a column value by value. A number hashes `-0` as
+/// `0` and text hashes case-folded, so equal numbers and texts that differ
+/// only in case hash alike.
 fn item_hash(array: RowReader<'_>, item: usize, by_col: bool) -> u64 {
     let mut hasher = DefaultHasher::new();
     if by_col {
@@ -1703,16 +1706,18 @@ fn items_equal(
     Ok(true)
 }
 
+/// Excel's UNIQUE keeps an empty cell apart from 0, "" and FALSE, which
+/// compare equal to it elsewhere; [`hash_item_value`] buckets it apart too.
 fn item_values_equal(left: &Value, right: &Value) -> Result<bool, FormulaError> {
     Ok(match (left, right) {
         (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
         (Value::Error(_), _) | (_, Value::Error(_)) => false,
+        (Value::Blank, other) | (other, Value::Blank) => matches!(other, Value::Blank),
         _ => compare_values(left, right)? == Ordering::Equal,
     })
 }
 
-/// TRIMRANGE trims leading blanks for mode 1, trailing blanks for mode 2
-/// and both for mode 3.
+/// TRIMRANGE trim mode bits; [`CellStore::eval_trim_range`] gives the modes.
 const TRIM_LEADING: u8 = 1;
 const TRIM_TRAILING: u8 = 2;
 const TRIM_BOTH: u8 = TRIM_LEADING | TRIM_TRAILING;
@@ -1757,6 +1762,37 @@ mod tests {
             (actual - expected).abs() < 1e-9,
             "expected {expected}, got {actual}"
         );
+    }
+
+    /// UNIQUE groups items by hash, then compares the items in a group. Two
+    /// values it calls equal must hash alike, or whether they merge depends
+    /// on a hash collision.
+    #[test]
+    fn unique_equality_agrees_with_its_hash() {
+        use super::{hash_item_value, item_values_equal, DefaultHasher, Hasher};
+        use crate::types::Value;
+
+        let hash = |value: &Value| {
+            let mut hasher = DefaultHasher::new();
+            hash_item_value(Some(value), &mut hasher);
+            hasher.finish()
+        };
+        let values = [
+            Value::Blank,
+            Value::Number(0.0),
+            Value::Number(-0.0),
+            Value::text(""),
+            Value::Bool(false),
+            Value::text("a"),
+            Value::text("A"),
+        ];
+        for left in &values {
+            for right in &values {
+                if item_values_equal(left, right).unwrap() {
+                    assert_eq!(hash(left), hash(right), "{left:?} and {right:?}");
+                }
+            }
+        }
     }
 
     #[test]
@@ -1877,8 +1913,7 @@ mod tests {
             store.set_number(sheet, row, 1, row as f64, 0);
         }
 
-        // UNIQUE and FILTER return fewer rows than their range; SORT and
-        // UNIQUE read the rows they return, not the rows of the range.
+        // UNIQUE and FILTER return fewer rows than their range.
         for (formula, expected) in [
             ("=SORT(UNIQUE(A1:A6))", vec!["a", "b", "c", "d"]),
             ("=SORT(FILTER(A1:A6,B1:B6<3),1,-1)", vec!["b", "b", "a"]),

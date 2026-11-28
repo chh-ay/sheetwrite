@@ -11,7 +11,7 @@ import { machineLabel } from "./machine-label.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { summarize, type Stat } from "./stats.js";
 
-// Charts, PivotCharts, pivots, measures and dashboards in Chromium (#625).
+// Charts, PivotCharts, pivots, measures and dashboards in Chromium.
 // Each run starts a fresh browser and page; the page builds one scenario's
 // workbook in a grid with the full engine and the charts add-on, runs the
 // warm-ups, then times each sample (see analytics-page.ts).

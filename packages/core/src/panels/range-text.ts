@@ -5,7 +5,7 @@ import { labelToCol, rangeA1 } from "../a1.js";
 import { sheetNameKey } from "../name-key.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 
-/** The sheet facts that parsing needs: the ID, the name and the size. */
+/** A sheet as parsing sees it; its size bounds the ranges it accepts. */
 export interface RangeTextSheet {
   readonly id: SheetId;
   readonly name: string;
@@ -24,7 +24,10 @@ const BOUNDS_ERROR = "The range is outside the sheet.";
 const RANGE_TEXT =
   /^(?:(?:'((?:[^']|'')+)'|([^!'\s][^!]*))!)?\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/;
 
-/** Sheet names that hold other characters than letters, digits and `_` are quoted. */
+/**
+ * Sheet names written without quotes: a letter or `_`, then letters, digits,
+ * `_` or `.`. Every other name is quoted.
+ */
 const PLAIN_SHEET_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 
 /**

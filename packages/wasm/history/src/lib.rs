@@ -215,7 +215,8 @@ impl DiffKernel {
     /// ordinal `from`. `row0`, `col0` and `before_row0`, `before_col0` are
     /// the sheet coordinates of the piece in each version. Returns the ordinal
     /// of the next cell to compare: `rows * cols` when the piece is done, less
-    /// when the page filled up first.
+    /// when the page filled up first. A piece that does not lie inside the
+    /// loaded windows is skipped and reported done, as for an unknown slot.
     #[allow(
         clippy::too_many_arguments,
         reason = "a WebAssembly export: JavaScript passes the piece as numbers, without building an object per call"
@@ -235,21 +236,27 @@ impl DiffKernel {
         before_col0: u32,
         from: u32,
     ) -> u32 {
+        let total = rows.saturating_mul(cols);
         let Some(Some(sheet)) = self.sheets.get(slot as usize) else {
-            return rows * cols;
+            return total;
         };
+        if !self.after.holds(piece_row, piece_col, rows, cols)
+            || (earlier && !self.before.holds(0, 0, rows, cols))
+        {
+            return total;
+        }
         if self.page.read {
             self.page.clear();
         }
 
         let window_rows = self.after.rows;
-        let total = rows * cols;
         let mut ordinal = from;
         let run_start = self.page.len();
 
         while ordinal < total && self.page.len() < self.limit {
             let row = ordinal / cols;
             let col = ordinal % cols;
+            // In range: both windows hold the piece, checked above.
             let after_index = (piece_col + col) as usize * window_rows + (piece_row + row) as usize;
             let after = compare::Cell {
                 block: &self.after,
@@ -365,17 +372,21 @@ impl DiffKernel {
 }
 
 impl DiffKernel {
+    /// Apply `op` to the rows of the sheet in `slot`, and to its writers'
+    /// rectangles only when the rows took it: an ignored operation moves no cells.
     fn rows(&mut self, slot: u32, op: AxisOp) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
-            sheet.rows.apply(op);
-            sheet.touches.apply_rows(op);
+            if sheet.rows.apply(op) {
+                sheet.touches.apply_rows(op);
+            }
         }
     }
 
     fn cols(&mut self, slot: u32, op: AxisOp) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
-            sheet.cols.apply(op);
-            sheet.touches.apply_cols(op);
+            if sheet.cols.apply(op) {
+                sheet.touches.apply_cols(op);
+            }
         }
     }
 
@@ -484,5 +495,54 @@ mod tests {
         );
         assert_eq!(kernel.page_cols(), vec![2]);
         assert_eq!(kernel.page_authors(), vec![NONE]);
+    }
+
+    #[test]
+    fn an_operation_outside_the_sheet_changes_nothing() {
+        let mut kernel = DiffKernel::new(1);
+        let sheet = kernel.add_sheet(3, 1, true);
+        kernel.touch(sheet, 0, 0, 2, 0, 7);
+
+        kernel.remove_rows(sheet, 2, 2);
+        kernel.insert_rows(sheet, 4, 1);
+        kernel.move_rows(sheet, 0, 2, 2);
+        kernel.move_rows(sheet, 0, 0, 0);
+        // A sheet as long as the u32 range has no room for another row.
+        let full = kernel.add_sheet(u32::MAX, 1, true);
+        kernel.insert_rows(full, 0, 1);
+
+        assert_eq!(kernel.row_segments(sheet), vec![0, 3, 0]);
+        assert_eq!(kernel.row_segments(full), vec![0, u32::MAX, 0]);
+        assert_eq!(
+            (0..3)
+                .map(|row| kernel.cell_authors(sheet, row, 0))
+                .collect::<Vec<_>>(),
+            vec![vec![7]; 3]
+        );
+    }
+
+    #[test]
+    fn a_piece_outside_the_loaded_windows_compares_nothing() {
+        let mut kernel = DiffKernel::new(10);
+        let sheet = kernel.add_sheet(2, 2, true);
+        let cells = vec![Cell::Number(1.0); 4];
+        assert!(kernel.load_after(&block_bytes(2, 2, &cells, &[])));
+        assert!(kernel.load_before(&block_bytes(1, 1, &cells[..1], &[])));
+
+        // (earlier, piece_row, piece_col, rows, cols): past the later window's
+        // rows, columns or the u32 range, or larger than the earlier cells.
+        for (earlier, piece_row, piece_col, rows, cols) in [
+            (false, 0, 0, 3, 1),
+            (false, 1, 1, 1, 2),
+            (false, u32::MAX, 0, 2, 1),
+            (false, 0, 0, u32::MAX, 2),
+            (true, 0, 0, 2, 1),
+        ] {
+            assert_eq!(
+                kernel.compare(sheet, earlier, piece_row, piece_col, rows, cols, 0, 0, 0, 0, 0),
+                rows.saturating_mul(cols)
+            );
+        }
+        assert!(kernel.page_rows().is_empty());
     }
 }

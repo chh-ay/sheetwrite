@@ -505,7 +505,9 @@ export class StoreWindowReader {
     } = decoded;
     this.sync_string_pool_epoch(string_pool_epoch);
 
-    // Rectangle/history reads may have warmed the host cache without updating the worker.
+    // Rectangle and history reads also fill the string cache, but the worker
+    // never gets those strings. When the epoch differs from the last visible
+    // read's, clear the cache so this read sends every string it uses.
     if (this.visible_string_pool_epoch !== string_pool_epoch) {
       this.string_cache.clear();
       this.visible_string_pool_epoch = string_pool_epoch;
@@ -624,7 +626,7 @@ export class StoreWindowReader {
   /**
    * Previous values and styles of one rectangle, row-major, in one packed read.
    *
-   * This is the change-capture view of a rectangle: it replaces a `getCell` per
+   * Change capture uses this read for a rectangle, not one `getCell` per
    * cell. It is not a viewport read — it never pins paged rows and never merges
    * hyperlink or conditional styles — so every entry is exactly what `getCell`
    * returns for the same cell.

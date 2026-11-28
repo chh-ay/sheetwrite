@@ -349,7 +349,7 @@ function sheet_outlines(sheet: SheetSnapshot, context: XlsxCodecContext): Worksh
 function append_sheet_header(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesRegistry): void {
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}">`);
-  // `tab_color` comes before `outlinePr` in `sheetPr`.
+  // `<tabColor>` comes before `<outlinePr>` in `<sheetPr>`.
   const tab_color =
     sheet.tabColor && /^#[\dA-Fa-f]{6}$/u.test(sheet.tabColor)
       ? `<tabColor rgb="FF${sheet.tabColor.slice(1).toUpperCase()}"/>`

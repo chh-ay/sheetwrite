@@ -6,8 +6,8 @@ export interface WorkerRendererOptions {
   /**
    * Force the SharedArrayBuffer paint path. Browsers normally require
    * `crossOriginIsolated`; tests and hosts that already enforce COOP/COEP can
-   * opt in explicitly. When false/unavailable, the renderer keeps the transfer
-   * path byte-for-byte compatible.
+   * opt in explicitly. When false or unavailable, the renderer copies each
+   * frame into buffers that it transfers to the worker.
    */
   sharedMemory?: boolean;
 }
@@ -272,8 +272,9 @@ export class WorkerRenderer implements Renderer {
       return;
     }
 
-    // Custom Store implementations may not expose raw arrays; keep the
-    // compatibility path while preserving ownership of their style IDs.
+    // Custom Store implementations may not expose raw arrays. Their view goes
+    // to the worker by structured clone, with a copy of its style IDs, so the
+    // view keeps its own buffer.
     const style_ids = view.styleIds.slice();
     this.worker?.postMessage({ type: "paint", view: { ...view, styleIds: style_ids } }, [
       style_ids.buffer,

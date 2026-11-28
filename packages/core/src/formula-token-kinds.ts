@@ -22,7 +22,6 @@ export const ENGINE_KINDS = [
   "bad",
 ] as const;
 
-/** One kind of `ENGINE_KINDS`. */
 export type RawKind = (typeof ENGINE_KINDS)[number];
 
 /** `kind`, `from`, `to` and the whitespace flag of each token in `formulaTokens`. */

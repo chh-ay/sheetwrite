@@ -369,9 +369,10 @@ async function saveWithQueries(grid: Grid) {
   [documented Power Query functions](https://learn.microsoft.com/en-us/powerquery-m/power-query-m-function-reference).
   M does not promise a row order for joins and groups, so the exported M sorts
   by keys and added row positions, which gives Sheetwrite's order. Conversions
-  use the `en-US` culture. A host source has no M connector, so it is written
-  as an M error with its source ID. Each such difference is a `query-loss`
-  warning.
+  use the `en-US` culture. A host source, and a file source whose locator is
+  not an `http(s)` URL, have no M connector, so they are written as an M error
+  with their source ID (`host-source` and `source-locator`). Each such
+  difference is a `query-loss` warning.
 - Import reads M as text with a bounded parser. It never evaluates M and
   never fetches a source. Supported members become saved queries, bound to
   their output tables by name. Other members stay in the kept DataMashup part

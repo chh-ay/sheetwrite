@@ -134,9 +134,11 @@ impl CellStore {
         true
     }
 
-    /// Checks that the sheet can take its new size, then detaches spills and
-    /// drops calculated values, which the edit moves. Changes nothing when the
-    /// size is over the sheet's limit.
+    /// Checks that the sheet can take its new size, and moves a dense sheet
+    /// to local pages when the new size passes the dense-cell limit. Then
+    /// detaches spills and drops calculated values, which the edit moves.
+    /// Returns `false`, changing nothing, when the new size passes the
+    /// local-cell limit or the move to local pages fails.
     fn begin_structural_edit(&mut self, sheet: usize, rows: usize, cols: usize) -> bool {
         let cells = rows.saturating_mul(cols);
         let data = &self.sheets[sheet];

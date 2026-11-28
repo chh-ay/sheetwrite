@@ -45,6 +45,9 @@ export function nextFrames(page: Page): Promise<unknown> {
   });
 }
 
+/** Layout rounds boxes to device pixels, so a measured edge or length can be off by this much. */
+export const BOX_ROUNDING_PX = 1;
+
 /** Text of the cells in a grid's ARIA mirror. */
 export function gridCellTexts(page: Page, grid = ".sheetwrite"): Promise<string[]> {
   return page.locator(`${grid} [role="gridcell"]`).allTextContents();

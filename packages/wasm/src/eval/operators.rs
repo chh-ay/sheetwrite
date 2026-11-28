@@ -211,14 +211,12 @@ impl CellStore {
     }
 }
 
-/// The operator of a binary node: arithmetic or a comparison.
 #[derive(Clone, Copy)]
 enum BinaryOperator {
     Arithmetic(Op),
     Comparison(CmpOp),
 }
 
-/// The operator and operand of a unary operator node, `None` for any other node.
 fn unary_parts(ast: &Ast) -> Option<(UnaryOp, &Ast)> {
     match ast {
         Ast::Neg(inner, _) => Some((UnaryOp::Neg, inner.as_ref())),
@@ -255,7 +253,6 @@ fn unary_parts(ast: &Ast) -> Option<(UnaryOp, &Ast)> {
 /// A binary operator node's operator and its left and right operands.
 type BinaryParts<'a> = (BinaryOperator, &'a Ast, &'a Ast);
 
-/// The operator and operands of a binary operator node, `None` for any other node.
 fn binary_parts(ast: &Ast) -> Option<BinaryParts<'_>> {
     match ast {
         Ast::Bin(op, left, right, _) => Some((

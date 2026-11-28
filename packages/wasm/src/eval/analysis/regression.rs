@@ -11,7 +11,7 @@ use super::descriptive;
 use crate::calc::{Ast, Func};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 use std::cmp::Ordering;
 
 family_functions! {
@@ -28,9 +28,9 @@ family_functions! {
     TREND,
 }
 
-/// The arguments of `function` that take one value: `k`, `x` and the
-/// significance of PERCENTRANK, and the number and order of RANK. The other
-/// functions return arrays of their own or read whole ranges.
+/// The arguments of `function` that take one value: `k` of PERCENTILE, `quart` of
+/// QUARTILE, `x` and the significance of PERCENTRANK, and the number and order of
+/// RANK. The other functions return arrays of their own or read whole ranges.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::PERCENTILE | Function::QUARTILE => ValueArgs::at(&[1]),
@@ -52,7 +52,6 @@ const QR_DEPENDENCE_FACTOR: f64 = 64.0;
 const QR_WORK_PER_CELL: usize = 4;
 const LINEST_MAX_ARGS: usize = 4;
 const FREQUENCY_ARGS: usize = 2;
-const MODE_MAX_ARGS: usize = 255;
 
 /// The legacy names use the same rules as their current names. The array
 /// functions evaluate through the array hooks only.
@@ -175,7 +174,7 @@ pub(crate) fn shape(
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
     } else if function == Function::MODE_MULT {
-        if args.is_empty() || args.len() > MODE_MAX_ARGS {
+        if args.is_empty() || args.len() > MAX_FUNCTION_ARGS {
             return Err(FormulaError::Value);
         }
         let mut cells = 0usize;
@@ -269,8 +268,9 @@ fn validate_prediction_resources(
     Ok(())
 }
 
-/// MODE.MULT keeps one count per distinct value, so its work and memory are
-/// linear in the number of input cells.
+/// MODE.MULT holds a few words per input cell: the numbers, their sorted positions and
+/// one run per distinct value. Its memory is linear in the input cells, and the cell
+/// count is bounded by the work limit.
 fn validate_mode_resources(cells: usize) -> Result<(), FormulaError> {
     if cells > SPILL_MAX_RECOMPUTE_CELLS {
         return Err(FormulaError::Num);
@@ -495,8 +495,8 @@ fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix
             }
         }
     }
-    // Sort positions by value. The sort is stable, so each run of equal values
-    // starts at its first occurrence.
+    // The sort is stable, so each run of equal values starts at its first
+    // occurrence.
     let positions = super::sorted_positions(numbers.len(), &mut |left, right| {
         numbers[left].total_cmp(&numbers[right])
     });

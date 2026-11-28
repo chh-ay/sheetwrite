@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use super::functions::{treats_cell_as_reference, ReductionFold, MAX_FUNCTION_ARGS};
+use super::functions::{treats_cell_as_reference, ReductionFold};
 use super::range_reader::RangeReader;
 use super::value::aggregate_number;
 use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
@@ -14,7 +14,7 @@ use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
-    KIND_NUMBER, KIND_STRING,
+    KIND_NUMBER, KIND_STRING, MAX_FUNCTION_ARGS,
 };
 
 impl CellStore {

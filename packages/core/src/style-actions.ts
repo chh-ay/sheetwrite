@@ -184,7 +184,9 @@ export class StyleActions {
 
     const captured = storeEngine(this.deps.store)?.captureCells(active_sheet, anchors);
 
-    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    // One `set` per cell without an engine, or with validation rules, protected
+    // ranges or spill children: the mutation policy then reports each issue at its
+    // own cell's operation index, and a write into a spill child can be refused alone.
     const scalar_writes =
       !captured ||
       Boolean(
@@ -198,7 +200,7 @@ export class StyleActions {
     let end_col = 0;
     for (const [index, addr] of anchors.entries()) {
       const cell = captured?.[index] ?? this.deps.store.getCell(addr);
-      // Custom stores without an engine retain their scalar source read contract.
+      // A store without an engine captures no cells: the formula comes from `loadable`.
       const persisted = captured?.[index]?.value;
       const formula = captured
         ? persisted?.kind === "formula"

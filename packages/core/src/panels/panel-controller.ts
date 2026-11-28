@@ -1,8 +1,10 @@
-// Opens the Chart panel, the pivot field list, the Explain Formula panel and
-// the Sort panel, and runs the Insert › Chart and Insert › PivotTable
-// commands. This module is the panel chunk: panel-loader.ts loads it on first
-// use and attaches it once per grid. The Sort panel is a chunk of its own
-// (`open_lazy_panel`). Everything goes through the public Grid API.
+// Opens the side panels (Chart, PivotTable Fields, Explain Formula, Name
+// Manager, Measures, Data Model, Insert Slicers, Insert KPI Card) and runs
+// the Insert › Chart, Insert › PivotChart and Insert › PivotTable commands.
+// This module is the panel chunk: panel-loader.ts loads it on first use and
+// attaches it once per grid. The Sort, Queries & Connections, Edit Links and
+// Version History panels are chunks of their own (`open_lazy_panel`).
+// Everything goes through the public Grid API.
 
 import { MAX_CHART_POINTS } from "../chart-definition.js";
 import { isDashboard } from "../dashboard.js";
@@ -77,7 +79,7 @@ const NEW_SHEET_ANCHOR = { row: 2, col: 0 };
 const PIVOT_LOCATION_ERROR = "Enter a cell for the pivot table, for example Sheet1!H2.";
 const NO_SELECTION = "Select the source data first.";
 
-/** Show the Chart panel for `ref`. */
+/** Show the Chart panel for `ref`; with `focus` false the panel does not take the focus. */
 export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "chart", sheet: ref.sheet, id: ref.id };
@@ -89,7 +91,7 @@ export function openChartPanel(grid: Grid, ref: ChartRef, focus = true): void {
   });
 }
 
-/** Show the field list of the pivot `id` on `sheet`. */
+/** Show the field list of pivot `id`; with `focus` false the panel does not take the focus. */
 export function openPivotPanel(grid: Grid, sheet: SheetId, id: string, focus = true): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "pivot", sheet, id };
@@ -121,7 +123,7 @@ export function openNamePanel(grid: Grid, define = false): void {
   });
 }
 
-/** Data › Measures opens the measures panel. */
+/** Data › Measures. */
 export function openMeasurePanel(grid: Grid): void {
   const state = state_of(grid);
   const open: OpenPanel = { kind: "measures" };
@@ -159,7 +161,7 @@ export function openKpiPanel(grid: Grid): void {
   grid.openPanel({ ...panel, render: (body) => track_open(state, open, panel.render(body)) });
 }
 
-/** Show the Sort panel for the selection or the current region. */
+/** Data › Custom Sort: the Sort panel for the selection or the current region. */
 export function openSortPanel(grid: Grid): void {
   // A dynamic import, so bundlers emit the Sort panel as its own chunk that
   // loads on first open instead of with every grid.
@@ -168,14 +170,14 @@ export function openSortPanel(grid: Grid): void {
 
 /** Data › Queries & Connections, or Get Data with the new-query form open. */
 export function openQueryPanel(grid: Grid, create: boolean): void {
-  // Its own chunk, like Sort: only grids with a query session load it.
+  // Only grids with a query session load this chunk.
   open_lazy_panel(grid, { kind: "queries" }, async () => {
     const { queryPanel: query_panel } = await import("./query-panel.js");
     return (target) => query_panel(target, create);
   });
 }
 
-/** Data › Queries & Connections › Edit Links, in its own chunk like Sort. */
+/** Data › Queries & Connections › Edit Links. */
 export function openEditLinksPanel(grid: Grid): void {
   open_lazy_panel(grid, { kind: "links" }, async () => {
     const { editLinksPanel: edit_links_panel } = await import("./edit-links-panel.js");
@@ -183,7 +185,7 @@ export function openEditLinksPanel(grid: Grid): void {
   });
 }
 
-/** Open an opted-in history panel in its own lazy chunk. */
+/** Open the opted-in history panel; `load` imports its chunk and returns its builder. */
 export function openHistoryPanel(grid: Grid, load: () => Promise<(grid: Grid) => GridPanel>): void {
   open_lazy_panel(grid, { kind: "history" }, load);
 }
@@ -302,7 +304,14 @@ export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolea
   const box = firstFreeBox(items, PIVOT_CHART_BOX.w, PIVOT_CHART_BOX.h);
   const title = grid.getPivots(sheet).find((pivot) => pivot.id === source.pivot)?.name;
   // A dashboard places the chart through its item box, so the anchor stays at the origin.
-  const anchor = { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 };
+  const anchor = {
+    row: 0,
+    col: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: DEFAULT_CHART_WIDTH,
+    height: DEFAULT_CHART_HEIGHT,
+  };
   const result = grid.applyTransaction({
     patches: [
       {
@@ -323,7 +332,7 @@ export function insertPivotChart(grid: Grid, kind: ChartKind = "column"): boolea
   return result.status === "applied";
 }
 
-/** Insert › Charts › PivotChart on a worksheet: a chart over the pivot that holds the active cell. */
+/** {@link insertPivotChart} on a worksheet. */
 function insert_worksheet_pivot_chart(grid: Grid, kind: ChartKind): boolean {
   const hit = selectedPivot(grid);
   const sheet = hit?.range.sheet;

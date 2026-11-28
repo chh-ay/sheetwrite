@@ -29,10 +29,11 @@ family_functions! {
     VALUETOTEXT,
 }
 
-/// The arguments of `function` that take one value. The delimiters of
-/// TEXTBEFORE and TEXTAFTER are a list to match any of, as in TEXTSPLIT;
-/// ARRAYTOTEXT takes an array; REGEXEXTRACT and TEXTSPLIT return arrays of
-/// their own.
+/// The arguments of `function` that take one value. The delimiter of
+/// TEXTBEFORE and TEXTAFTER is not lifted: Excel reads an array there as a
+/// list of delimiters to match any of, as in TEXTSPLIT
+/// ([`Context::any_delimiter`]). ARRAYTOTEXT takes an array; REGEXEXTRACT and
+/// TEXTSPLIT return arrays of their own.
 pub(super) const fn value_args(function: Function) -> ValueArgs {
     match function {
         Function::DOLLAR
@@ -86,10 +87,7 @@ impl Context<'_, '_> {
     }
 
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        let names = self.store.name_scope(self.sheet);
-        if range_from_ast(ast, names).is_some()
-            || super::super::array::ast_produces_array(ast, self.pass.shapes(names))
-        {
+        if self.is_array(ast) {
             self.store
                 .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
         } else {
@@ -103,10 +101,37 @@ impl Context<'_, '_> {
         }
     }
 
+    /// Whether `ast` is a range or gives an array.
+    fn is_array(&self, ast: &Ast) -> bool {
+        let names = self.store.name_scope(self.sheet);
+        range_from_ast(ast, names).is_some()
+            || super::super::array::ast_produces_array(ast, self.pass.shapes(names))
+    }
+
+    /// The delimiter argument of TEXTBEFORE and TEXTAFTER: one text, read
+    /// as a scalar argument without a list to hold it, or the texts of an
+    /// array or range to match any of.
+    fn any_delimiter(&mut self, args: &[Ast]) -> Result<AnyDelimiter, FormulaError> {
+        match optional_ast(args, 1) {
+            Some(ast) if self.is_array(ast) => self.delimiter_list(ast).map(AnyDelimiter::Many),
+            _ => self.text(args, 1, "").map(AnyDelimiter::One),
+        }
+    }
+
     fn delimiters(&mut self, args: &[Ast], index: usize) -> Result<Vec<String>, FormulaError> {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(Vec::new());
         };
+        let delimiters = self.delimiter_list(ast)?;
+        if delimiters.iter().any(String::is_empty) {
+            return Err(FormulaError::Value);
+        }
+        Ok(delimiters)
+    }
+
+    /// The texts of a delimiter argument: one value, or an array or range
+    /// of delimiters to match any of.
+    fn delimiter_list(&mut self, ast: &Ast) -> Result<Vec<String>, FormulaError> {
         let matrix = self.matrix(ast)?;
         let mut delimiters = Vec::new();
         let mut bytes = 0usize;
@@ -117,9 +142,6 @@ impl Context<'_, '_> {
                 .ok_or(FormulaError::Num)?;
             if bytes > MAX_TEXT_BYTES {
                 return Err(FormulaError::Num);
-            }
-            if delimiter.is_empty() {
-                return Err(FormulaError::Value);
             }
             delimiters.push(delimiter);
         }
@@ -180,6 +202,36 @@ fn delimiter_length(
     Ok(Some(end))
 }
 
+/// The delimiters of TEXTBEFORE and TEXTAFTER.
+enum AnyDelimiter {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl AnyDelimiter {
+    fn as_slice(&self) -> &[String] {
+        match self {
+            Self::One(delimiter) => std::slice::from_ref(delimiter),
+            Self::Many(delimiters) => delimiters,
+        }
+    }
+}
+
+/// The length of the first of `delimiters` that `text` starts with.
+fn first_delimiter_length(
+    text: &str,
+    delimiters: &[String],
+    insensitive: bool,
+    work: &mut usize,
+) -> Result<Option<usize>, FormulaError> {
+    for delimiter in delimiters {
+        if let Some(length) = delimiter_length(text, delimiter, insensitive, work)? {
+            return Ok(Some(length));
+        }
+    }
+    Ok(None)
+}
+
 fn split_parts<'a>(
     text: &'a str,
     delimiters: &[String],
@@ -195,7 +247,8 @@ fn split_parts<'a>(
         let mut parts = Vec::new();
         let mut comparisons = 0usize;
         for (index, part) in text.split(delimiter).enumerate() {
-            // ASCII byte lengths preserve the general scanner's comparison budget.
+            // Charge what the general scanner would: one comparison per character of each
+            // part, and one per match. In ASCII text each byte is one character.
             comparisons += part.len() + usize::from(index != 0);
             if !ignore_empty || !part.is_empty() {
                 parts.push(part);
@@ -214,14 +267,9 @@ fn split_parts<'a>(
     let mut start = 0;
     let mut offset = 0;
     while offset < text.len() {
-        let mut matched = None;
-        for delimiter in delimiters {
-            if let Some(length) = delimiter_length(&text[offset..], delimiter, insensitive, work)? {
-                matched = Some(length);
-                break;
-            }
-        }
-        if let Some(length) = matched {
+        if let Some(length) =
+            first_delimiter_length(&text[offset..], delimiters, insensitive, work)?
+        {
             if !ignore_empty || start != offset {
                 parts.push(&text[start..offset]);
             }
@@ -248,7 +296,8 @@ fn before_after(
 ) -> Result<Value, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
-    let delimiter = context.text(args, 1, "")?;
+    let delimiter = context.any_delimiter(args)?;
+    let delimiters = delimiter.as_slice();
     let instance = context.integer(args, 2, 1)?;
     let insensitive = mode(context, args, 3)?;
     let match_end = mode(context, args, 4)?;
@@ -260,7 +309,8 @@ fn before_after(
         return Ok(Value::text(""));
     }
     let is_before = function == Function::TEXTBEFORE;
-    if delimiter.is_empty() {
+    // An empty delimiter matches at once.
+    if delimiters.iter().any(String::is_empty) {
         return text_value(if is_before == (instance > 0) {
             String::new()
         } else {
@@ -273,7 +323,7 @@ fn before_after(
     if instance > 0 {
         while offset < text.len() {
             if let Some(length) =
-                delimiter_length(&text[offset..], &delimiter, insensitive, &mut work)?
+                first_delimiter_length(&text[offset..], delimiters, insensitive, &mut work)?
             {
                 matches.push((offset, offset + length));
                 offset += length;
@@ -291,9 +341,9 @@ fn before_after(
     } else {
         let mut boundary = text.len();
         for (position, _) in text.char_indices().rev() {
-            if let Some(length) = delimiter_length(
+            if let Some(length) = first_delimiter_length(
                 &text[position..boundary],
-                &delimiter,
+                delimiters,
                 insensitive,
                 &mut work,
             )? {
@@ -350,7 +400,8 @@ fn fixed(
     text_value(format_number(rounded, &code)?.ok_or(FormulaError::Value)?)
 }
 
-/// Append directly so ARRAYTOTEXT does not allocate a string for each cell.
+/// Writes `value` at the end of `output`, so ARRAYTOTEXT builds one string, not one per
+/// cell. Only a number allocates, in `general_text`.
 fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), FormulaError> {
     match value {
         Value::Text(text) if strict => {
@@ -418,8 +469,9 @@ fn to_text(
 }
 
 /// The compiled program for a REGEX call's pattern. A literal pattern uses
-/// the program its formulas share. A computed pattern uses the program this
-/// recalculation keeps for it, which the pass drops when it ends.
+/// the program its formulas share. A computed pattern reuses a program this
+/// pass compiled for the same pattern and case mode, or compiles one and keeps
+/// it in the pass's small table of recent programs.
 fn compile_regex(
     results: &mut FormulaResults,
     args: &[Ast],

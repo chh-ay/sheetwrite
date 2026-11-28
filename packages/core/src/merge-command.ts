@@ -163,7 +163,7 @@ function commit_merge(deps: StyleActionsDeps, merge: MergeBounds, center: boolea
     end: { row: merge.r1, col: merge.c1 },
   };
   const engine = storeEngine(deps.store);
-  // Per-cell operations preserve policy issue indices and partial spill rejection.
+  // One `set` per cell in the cases `StyleActions.applyStyle` explains.
   const scalar_writes =
     !engine ||
     Boolean(

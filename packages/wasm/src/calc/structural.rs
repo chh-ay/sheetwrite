@@ -9,7 +9,6 @@ pub(crate) enum Axis {
 }
 
 impl Axis {
-    /// The rows or columns of a sheet.
     pub(super) const fn len(self) -> u32 {
         match self {
             Self::Row => SHEET_ROWS,
@@ -137,7 +136,9 @@ pub(crate) fn shift_cols(
 }
 
 /// Rewrite the references of a formula on the sheet that `change` edits.
-/// Returns whether any reference changed.
+/// The formula's sheet and the edited sheet both count as handle 0, so pass
+/// a tree whose references name no sheet. Returns whether any reference
+/// changed.
 pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChange) -> bool {
     rewrite_axis(
         ast,
@@ -230,7 +231,8 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
     moved != Moved::Unchanged
 }
 
-/// Shift one coordinate. Deleting its target produces an explicit invalid ref.
+/// Shift one coordinate. `None` when the deletion removes it; the caller
+/// then writes `#REF!`.
 fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
     if index < at {
         return Some(index);

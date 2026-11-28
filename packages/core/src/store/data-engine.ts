@@ -69,6 +69,7 @@ import {
   clonePivot,
   encodePivotPayload,
   encodeSavedPivotPayload,
+  isPivotShape,
   MAX_PIVOTS_PER_WORKBOOK,
   type PivotIssue,
   pivotOwner,
@@ -78,9 +79,8 @@ import {
   sheetPivotScope,
   uncomputedPivotResult,
   validatePivotReferences,
-  validatePivotShape,
 } from "../pivot.js";
-import { cloneJsonValue } from "../plain-data.js";
+import { cloneColumnFilter, cloneJsonValue } from "../plain-data.js";
 import {
   consumeSourceSnapshot,
   type RangeSourceProjection,
@@ -127,7 +127,7 @@ import type {
 } from "../types/cell.js";
 import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { DataModel, RelationshipStatus } from "../types/data-model.js";
+import type { DataModel, RelationshipStatus, TableRelationship } from "../types/data-model.js";
 import type {
   AggregateOp,
   ColumnarData,
@@ -298,7 +298,6 @@ const RELATIONSHIP_STATUS = {
   duplicateKey: 5,
 } as const;
 
-/** Decodes one engine `relationshipStatus` record. */
 function relationship_status_of(record: Uint32Array): RelationshipStatus {
   const [code, first = 0, second = 0, unmatched = 0] = record;
   switch (code) {
@@ -821,20 +820,21 @@ export class StoreDataEngine {
       throw store_failure("invalid-argument", "Sheetwrite: ColumnarData requires dense storage");
     }
 
-    assertWorkbookTables(
-      workbook.sheets,
-      DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
-      (workbook.namedRanges ?? []).map((range) => range.name),
-    );
-
+    // The store checked the tables already, in `assertWorkbookAllocationLimits`.
     assertWorkbookCharts(workbook.sheets);
 
     this.workbook = workbook;
     this.sheets = new SheetRegistry(workbook);
     this.storage_options = options;
     this.wasm = new (getEngine().CellStore)();
-    this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
-    this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    // A new engine starts with the default limits, the engine's ceilings.
+    if (
+      storageLimits.maxDenseCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells ||
+      storageLimits.maxLocalPagedCells !== DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells
+    ) {
+      this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
+      this.boundary_accounting.record("startup", "js-to-wasm", 0, "scalar");
+    }
     this.view = new StoreViewState(this.wasm, this.sheets);
     this.window_reader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
     this.snapshot_codec = new StoreSnapshotCodec(
@@ -872,8 +872,14 @@ export class StoreDataEngine {
 
       this.sheets.handles.set(sheet.id, handle);
       this.sheet_ids_by_handle[handle] = sheet.id;
-      this.sync_spill_blockers(sheet);
-      this.view.queueHiddenRows(sheet.id);
+      if (
+        (sheet.merges?.length ?? 0) > 0 ||
+        (sheet.protectedRanges?.length ?? 0) > 0 ||
+        (sheet.validationRules?.length ?? 0) > 0
+      )
+        this.sync_spill_blockers(sheet);
+      if ((sheet.hiddenRows?.size ?? 0) > 0 || sheet.rowGroups?.some((group) => group.collapsed))
+        this.view.queueHiddenRows(sheet.id);
     }
 
     // Before any formula is loaded, so formulas find the links they read.
@@ -904,7 +910,12 @@ export class StoreDataEngine {
       }
     }
 
-    if (!this.sync_relationships(workbook.dataModel)) {
+    // A new engine holds no relationships or measures.
+    const model = workbook.dataModel;
+    if (
+      ((model?.relationships?.length ?? 0) > 0 || (model?.measures?.length ?? 0) > 0) &&
+      !this.sync_relationships(model)
+    ) {
       this.wasm.free();
       throw store_failure("invalid-snapshot", "invalid data model");
     }
@@ -1117,12 +1128,10 @@ export class StoreDataEngine {
 
   private pivot_issues(pivot: unknown, owner: Sheet, sheets: readonly Sheet[]): PivotIssue[] {
     const issues: PivotIssue[] = [];
-    validatePivotShape(pivot, "pivot", issues);
-    if (issues.length > 0) return issues;
+    if (!isPivotShape(pivot, "pivot", issues)) return issues;
 
-    // Shape validation above proves the definition schema.
     validatePivotReferences(
-      pivot as PivotDefinition,
+      pivot,
       { rows: owner.rowCount, cols: owner.columns.length },
       sheetPivotScope(sheets),
       "pivot",
@@ -1433,6 +1442,7 @@ export class StoreDataEngine {
 
   /** The result `text` would have in `cell`, read without changing the store. */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
+    this.send_held_hidden_rows();
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
     const result = this.wasm.previewFormula(target, text, fields);
@@ -1445,6 +1455,7 @@ export class StoreDataEngine {
    * validation custom formula checks a typed value with it before it is stored.
    */
   previewFormulaWith(cell: CellAddress, text: string, trial: CellScalar): FormulaPreview {
+    this.send_held_hidden_rows();
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
     const result = this.wasm.previewFormulaWith(
@@ -1456,6 +1467,11 @@ export class StoreDataEngine {
       fields,
     );
     return decodePreview(fields, result);
+  }
+
+  /** A previewed formula may call SUBTOTAL, so the rows held back until one does go first. */
+  private send_held_hidden_rows(): void {
+    if (this.view.hasQueuedHiddenRows()) this.view.flushHiddenRows();
   }
 
   private validation_reads_cache: StoreValidationReads | undefined;
@@ -1605,7 +1621,11 @@ export class StoreDataEngine {
     );
   }
 
-  /** Empty protection releases remain valid after their sheet has been removed. */
+  /**
+   * Pin the row bands a viewport shows, so the paged cache keeps their chunks.
+   * An empty `bands` releases the pins; for a removed sheet it does nothing.
+   * Any other call for an unknown sheet throws.
+   */
   pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
     const handle = this.sheets.handles.get(sheet);
     if (handle === undefined && bands.length === 0) return;
@@ -1937,6 +1957,17 @@ export class StoreDataEngine {
   /** Key status of the relationship with `id`, checked now from the cell values. */
   getRelationshipStatus(id: string): RelationshipStatus {
     const record = this.wasm.relationshipStatus?.(id);
+    if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
+    return relationship_status_of(record);
+  }
+
+  /**
+   * Key status of `relationship` before it is saved, checked now from the
+   * cell values; `unavailable` on an engine that does not check keys.
+   */
+  getRelationshipKeyStatus(relationship: TableRelationship): RelationshipStatus {
+    const { from, to } = relationship;
+    const record = this.wasm.relationshipKeyStatus?.(from.table, from.column, to.table, to.column);
     if (!record || record.length < RELATIONSHIP_STATUS_STRIDE) return { status: "unavailable" };
     return relationship_status_of(record);
   }
@@ -2302,7 +2333,7 @@ export class StoreDataEngine {
     return { values, formats, counts };
   }
 
-  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  /** `StoreViewState.filteredRows`, but throws `IncompleteDataError` while the sheet has unloaded cells. */
   filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
     this.requireCompleteQuery(sheet);
     return this.view.filteredRows(sheet, filters);
@@ -2818,6 +2849,17 @@ export class StoreDataEngine {
   }
 
   /**
+   * The distinct styles of a rectangle of data rows and columns, collected
+   * inside the engine. A paged sheet leaves its unloaded cells out.
+   */
+  rangeStyles(sheet: SheetId, r0: number, c0: number, r1: number, c1: number): CellStyle[] {
+    return Array.from(
+      this.wasm.rangeStyleIds(this.sheets.handleOf(sheet), r0, c0, r1, c1),
+      (style_id) => this.styles.get(style_id),
+    );
+  }
+
+  /**
    * Previous values of a sparse cell list, read in one batched call.
    *
    * Entry `n` belongs to cell `n` of `cells` and matches what `getCell` reports
@@ -2846,8 +2888,8 @@ export class StoreDataEngine {
    * Previous values of one dense block, read in one packed call.
    *
    * Each entry is the resolved value and style `getCell` reports for the same
-   * address, so captured `oldValue`/`oldStyle` payloads stay unchanged while the
-   * read costs one crossing instead of one per cell.
+   * address, so the captured `oldValue`/`oldStyle` payloads match `getCell`,
+   * and the read costs one crossing, not one per cell.
    */
   private capture_block_before_cells(
     bounds: Range,
@@ -3005,8 +3047,6 @@ export class StoreDataEngine {
       }
     }
 
-    // One UTF-8 buffer for the text cells, so a block does not cross the
-    // boundary as one JS string per cell.
     const packed_text = pack_texts(literal_texts);
 
     this.note_range_mutation_ffi(cells.length);
@@ -3146,18 +3186,19 @@ export class StoreDataEngine {
 
       return { appliedPatches: applied_patches, changes, storageRevision: storage_revision };
     } finally {
-      // Most transactions queue no hidden rows. With the flush and its nested
-      // try on every edit, JavaScriptCore optimized one-cell edits later, and
-      // the engine memory probe measured a 27% slower edit median.
+      // Most transactions queue no hidden rows, so the flush and its nested
+      // try run only when one did. Run on every edit, they make
+      // JavaScriptCore optimize one-cell edits later: the engine memory probe
+      // measured a 27% slower edit median.
       if (this.view.hasQueuedHiddenRows()) this.flush_hidden_rows_and_commit();
       else this.commit_engine_sources();
     }
   }
 
-  /** Send the queued hidden rows, then close the mutation, even when the engine rejects the runs. */
+  /** Send the queued hidden rows a formula may read, then close the mutation, even when the engine rejects the runs. */
   private flush_hidden_rows_and_commit(): void {
     try {
-      this.view.flushHiddenRows();
+      this.view.flushHiddenRowsWhenRead();
     } finally {
       this.commit_engine_sources();
     }
@@ -4018,7 +4059,7 @@ export class StoreDataEngine {
           if (patch.patch.filters !== undefined) {
             sheet.filters = patch.patch.filters.map(([col, filter]) => [
               col,
-              cloneJsonValue(filter),
+              cloneColumnFilter(filter),
             ]);
           }
 
@@ -5370,8 +5411,9 @@ export class StoreDataEngine {
       for (const sheet of this.workbook.sheets) {
         if (sheet.pivots?.length) this.sync_pivots(sheet, replacement);
       }
-      // Installing definitions marks pivots dirty; finish calculation before the
-      // replacement becomes observable, without changing no-pivot transfers.
+      // Installing definitions marks pivots dirty, so commit the replacement's
+      // sources to calculate them before it becomes observable. A workbook
+      // without pivots skips this call.
       if (this.workbook.sheets.some((sheet) => sheet.pivots?.length)) replacement.commitSources();
     } catch (cause) {
       for (const snapshot of history) snapshot.replacement.free();
@@ -5443,9 +5485,20 @@ export class StoreDataEngine {
       const column = columns[col]!;
       const source = data.columns[column.key];
       const base = col * row_count;
+      if (source instanceof Float64Array) {
+        write_number_column(kinds, numbers, base, source, row_count);
+        continue;
+      }
       for (let row = 0; row < row_count; row++) {
-        const parsed = columnar_scalar(source?.[row], column.type);
+        const value = source?.[row];
         const offset = base + row;
+        // A number, the most common cell, needs no parsing.
+        if (typeof value === "number") {
+          kinds[offset] = KIND_NUMBER;
+          numbers[offset] = value;
+          continue;
+        }
+        const parsed = columnar_scalar(value, column.type);
         if (parsed && typeof parsed === "object") {
           if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
           else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
@@ -5498,6 +5551,22 @@ export class StoreDataEngine {
     this.note_range_mutation_ffi();
     this.wasm.compactStringStorage();
   }
+}
+
+/**
+ * Write a `Float64Array` column at `base`: every entry is a number cell, so
+ * the column is copied in one call. Rows past the end of `source` stay empty.
+ */
+function write_number_column(
+  kinds: Uint8Array,
+  numbers: Float64Array,
+  base: number,
+  source: Float64Array,
+  row_count: number,
+): void {
+  const length = Math.min(source.length, row_count);
+  numbers.set(source.subarray(0, length), base);
+  kinds.fill(KIND_NUMBER, base, base + length);
 }
 
 /**

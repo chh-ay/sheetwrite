@@ -10,13 +10,12 @@ import { setItemCount } from "./item-count.js";
 /** Sheet rows that hold the nine dashboard rows the starting items fill. */
 const GRID_ROWS = 18;
 
-/** The dashboards showcase's island: the dashboard sheet, its slicer and its saved layout. */
-/** Props of {@link DashboardsStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface DashboardsStageProps {
   /** The region the slicer button keeps. */
   readonly firstRegion: string;
 }
 
+/** The dashboards showcase's island: the dashboard sheet, its slicer and its saved layout. */
 export function DashboardsStage(props: DashboardsStageProps) {
   const live = createLiveScenario<DashboardScenario, DashboardSnapshot>(() =>
     import("./boot.js").then(

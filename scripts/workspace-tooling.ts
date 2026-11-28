@@ -23,7 +23,6 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/svelte",
 ] as const;
 
-/** One published package name. */
 export type PublishablePackage = (typeof PUBLISHABLE_PACKAGE_ORDER)[number];
 
 /** Publication position of a package name, or -1 for a name that is not published. */
@@ -195,6 +194,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/check-local-paths.test.ts",
   "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
+  "scripts/wasm-factory.test.ts",
   "scripts/wasm-function-sizes.test.ts",
   "scripts/wasm-relocations.test.ts",
   "scripts/snake-case-internals.test.ts",

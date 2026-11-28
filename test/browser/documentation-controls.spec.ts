@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
+import { BOX_ROUNDING_PX, expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
 // Shared docs controls in a real browser; code-enhancements and
 // code-popover-placement unit tests own their logic.
@@ -238,8 +238,6 @@ test("a code popover opens alike on focus and hover, holds while its link has fo
 
 /** The panel's distance from its symbol (`PANEL_OFFSET_PX` in `code-popovers.ts`). */
 const POPOVER_GAP_PX = 8;
-/** Layout rounds boxes to device pixels. */
-const POPOVER_GAP_TOLERANCE_PX = 1;
 /** The panel's width cap: 35rem at the 16 px root size. */
 const POPOVER_MAX_WIDTH_PX = 560;
 /** How far from the scrolled code panel's left edge the 390 px run brings the symbol. */
@@ -297,9 +295,9 @@ for (const { scrolled, ...viewport } of [
     if (symbol === null || box === null) throw new Error("The symbol or its panel has no box.");
     const opens_below = box.y >= symbol.y + symbol.height;
     const gap = opens_below ? box.y - (symbol.y + symbol.height) : symbol.y - (box.y + box.height);
-    expect(Math.abs(gap - POPOVER_GAP_PX)).toBeLessThanOrEqual(POPOVER_GAP_TOLERANCE_PX);
+    expect(Math.abs(gap - POPOVER_GAP_PX)).toBeLessThanOrEqual(BOX_ROUNDING_PX);
     // The panel starts at the symbol's column, unless that would push it past the viewport.
-    expect(box.x).toBeLessThanOrEqual(symbol.x + POPOVER_GAP_TOLERANCE_PX);
+    expect(box.x).toBeLessThanOrEqual(symbol.x + BOX_ROUNDING_PX);
     expect(box.x + box.width).toBeGreaterThan(symbol.x);
     expect(
       box.x >= 0 &&

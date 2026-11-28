@@ -18,6 +18,7 @@ import {
 } from "./ranges.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
+import { CELL_STATE_LOCAL_EDIT } from "./wire-tags.js";
 
 export interface PagedDirtyPreflightStats {
   ffiCalls: number;
@@ -26,8 +27,10 @@ export interface PagedDirtyPreflightStats {
   admissionReferenceMapsMaterialized: number;
 }
 
-// Sparse batches amortize the dirty-coordinate set after 128 probes and eight probes
-// per dirty cell; measurements favor scalar reads below this transfer/setup cost.
+// A sparse batch asks the engine about each cell (`cellState`) until it has
+// made 128 probes and eight probes per dirty cell of the sheet. It then reads
+// the sheet's dirty cells into a set once and checks the set. Below that
+// point, measurements show the single reads cost less than the bulk read.
 const SPARSE_BULK_MIN_PROBES = 128;
 const SPARSE_BULK_DIRTY_RATIO = 8;
 
@@ -351,7 +354,7 @@ export class PagedDirtyPreflight {
         state.existing?.has(key) ||
         (state.existing === null &&
           state.handle !== null &&
-          this.wasm.cellState(state.handle, row, col) === 3)
+          this.wasm.cellState(state.handle, row, col) === CELL_STATE_LOCAL_EDIT)
       ) {
         return null;
       }

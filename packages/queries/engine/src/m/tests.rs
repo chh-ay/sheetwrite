@@ -117,7 +117,8 @@ fn sales_steps() -> Vec<Step> {
     ]
 }
 
-/// Queries whose identities equal their names, so an import must reproduce them exactly.
+/// Queries whose identities equal their names, so an import must reproduce their sources and
+/// steps exactly.
 fn fixtures() -> Vec<MQuery> {
     let regions = query(
         "Regions",
@@ -210,6 +211,31 @@ fn exported_sections_import_to_the_same_plans() {
     assert!(reported(0, Some(1), "error-policy-scope"));
     assert!(reported(2, None, "host-source"));
     assert_eq!(section.members[0], "Sales_report");
+
+    // Query names that differ only in letter case clash in Excel, for every alphabet.
+    let cased = emit_section(&[
+        query("Ä", MSourceKind::Host, None, vec![], vec![]),
+        query("ä", MSourceKind::Host, None, vec![], vec![]),
+    ]);
+    assert_eq!(cased.members, ["Ä", "ä (2)"]);
+
+    // A file source without a web locator is written as an error too, for a different reason.
+    let local = emit_section(&[query(
+        "Local",
+        MSourceKind::Csv {
+            delimiter: b',',
+            headers: true,
+            empty_is_null: false,
+        },
+        Some("sales.csv"),
+        vec![column("Region", ColumnType::Text)],
+        vec![],
+    )]);
+    assert!(local.losses.contains(&Loss {
+        query: 0,
+        step: None,
+        code: "source-locator",
+    }));
 }
 
 /// Workbook queries in the forms the M documentation shows, plus members outside the subset.
@@ -241,6 +267,21 @@ shared Joined = let
     Merged = Table.Join(Typed, {"Region"}, Files, {"Name"}, JoinKind.Inner)
 in
     Merged;
+
+shared Unfiltered = let
+    Source = Excel.CurrentWorkbook(){[Name="Keys"]}[Content],
+    Typed = Table.TransformColumnTypes(Source, {{"Amount", type number}}),
+    Positive = Table.SelectRows(Typed, each [Amount] > 0),
+    Merged = Table.RemoveColumns(Table.Sort(Table.Join(Table.AddIndexColumn(Typed, "Sheetwrite.LeftRow", 0, 1), {"Amount"}, Table.AddIndexColumn(Orders, "Sheetwrite.RightRow", 0, 1), {"Total"}, JoinKind.Inner), {{"Amount", Order.Ascending}}), {"Sheetwrite.LeftRow", "Sheetwrite.RightRow"})
+in
+    Merged;
+
+shared Narrow = let
+    Source = Csv.Document(Web.Contents("https://example.test/wide.csv"), [Delimiter = ",", Columns = 3, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+    Named = Table.RenameColumns(Source, {{"Column1", "Region"}, {"Column2", "Amount"}}),
+    Typed = Table.TransformColumnTypes(Named, {{"Region", type text}, {"Amount", type number}})
+in
+    Typed;
 "#;
 
 #[test]
@@ -297,6 +338,8 @@ fn workbook_queries_from_m_documentation_forms_import() {
         vec![
             ("Files", "source", "Folder.Files"),
             ("Lambda", "syntax", "syntax"),
+            ("Unfiltered", "step", "Table.Join"),
+            ("Narrow", "source", "Csv.Document Columns"),
             ("Joined", "dependency", ""),
         ]
     );
@@ -359,4 +402,25 @@ fn query_lists_round_trip_through_host_lanes() {
     )
     .unwrap_err();
     assert_eq!(issue.code, "definition");
+
+    // A list longer than any saved plan may be is refused before it is read, as a plan is.
+    let fixture_copies_past_the_code_bound = 4_000;
+    let many: Vec<MQuery> = std::iter::repeat_with(fixtures)
+        .take(fixture_copies_past_the_code_bound)
+        .flatten()
+        .collect();
+    let mut long = super::PlanWriter::default();
+    super::encode_queries(&many, &mut long);
+    let long_lanes = long.finish();
+    let oversized = super::decode_queries(
+        crate::plan_wire::PlanWire {
+            codes: &long_lanes.codes,
+            numbers: &long_lanes.numbers,
+            text: &long_lanes.text,
+            offsets: &long_lanes.offsets,
+        },
+        &crate::plan::Limits::default(),
+    )
+    .unwrap_err();
+    assert_eq!(oversized.code, "limit");
 }

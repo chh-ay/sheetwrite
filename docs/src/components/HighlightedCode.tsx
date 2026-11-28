@@ -1,7 +1,6 @@
 import { type RuntimeCodeLanguage, tokenizeCode } from "@docs/lib/code-tokens.js";
 import { createMemo, For, type JSX, splitProps } from "solid-js";
 
-/** Props of {@link HighlightedCode}. */
 type HighlightedCodeProps = Omit<JSX.HTMLAttributes<HTMLElement>, "children"> & {
   readonly code: string;
   readonly language: RuntimeCodeLanguage;

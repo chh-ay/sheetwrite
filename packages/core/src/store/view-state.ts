@@ -1,5 +1,5 @@
 import { SheetwriteError } from "../errors.js";
-import { cloneJsonValue } from "../plain-data.js";
+import { cloneColumnFilter } from "../plain-data.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
@@ -98,6 +98,11 @@ export class StoreViewState {
     this.engine_hidden_rows.flush();
   }
 
+  /** {@link flushHiddenRows} once a formula may read hidden rows; until then they stay queued. */
+  flushHiddenRowsWhenRead(): void {
+    this.engine_hidden_rows.flushWhenRead();
+  }
+
   order(sheet: SheetId): Uint32Array | undefined {
     return this.order_by_sheet.get(sheet);
   }
@@ -110,14 +115,15 @@ export class StoreViewState {
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
     if (!Number.isInteger(dataRow) || dataRow < 0) return null;
 
-    const order = this.order_by_sheet.get(sheet);
-    if (!order) {
-      const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
-      return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
-    }
-
+    // A sheet keeps a valid index only while it has an order (`drop_order`).
     let index = this.row_index_by_sheet.get(sheet);
     if (!index?.valid) {
+      const order = this.order_by_sheet.get(sheet);
+      if (!order) {
+        const meta = this.sheets.workbook.sheets.find((candidate) => candidate.id === sheet);
+        return meta !== undefined && dataRow < meta.rowCount ? dataRow : null;
+      }
+
       const meta = this.sheets.sheetMeta(sheet);
       if (dataRow >= meta.rowCount) return null;
       index = this.rebuild_row_index(sheet, order, meta.rowCount, index);
@@ -143,7 +149,7 @@ export class StoreViewState {
     }
   }
 
-  /** Retained packed backing bytes for focused resource attribution. */
+  /** Bytes of the sheet's packed data-row-to-view-row index, for memory reports. */
   inverseIndexByteLength(sheet: SheetId): number {
     return this.row_index_by_sheet.get(sheet)?.storage.byteLength ?? 0;
   }
@@ -178,7 +184,7 @@ export class StoreViewState {
 
     state.sortKeys = meta.sortKeys?.map((key) => ({ ...key })) ?? [];
     state.filters = new Map(
-      meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? [],
+      meta.filters?.map(([col, filter]) => [col, cloneColumnFilter(filter)]) ?? [],
     );
     state.hiddenRows = new Set(meta.hiddenRows ?? []);
     state.groups = meta.rowGroups?.map((group) => ({ ...group })) ?? [];
@@ -210,8 +216,9 @@ export class StoreViewState {
   }
 
   /**
-   * Row structures already rebased workbook metadata; invalidate the sort and
-   * rebuild from it. Column filters keep: they name columns, not rows, as an
+   * The row edit already moved the hidden rows and row groups in the
+   * workbook metadata; clear the sort and build the view again from that
+   * metadata. Column filters keep: they name columns, not rows, as an
    * AutoFilter's do in Excel when rows are inserted or deleted.
    */
   rowsChanged(sheet: SheetId): void {
@@ -372,7 +379,7 @@ export class StoreViewState {
       state === undefined ||
       (state.sortKeys.length === 0 && state.filters.size === 0 && !hidden)
     ) {
-      this.engine_hidden_rows.viewChanged(sheet, null, row_count);
+      this.engine_hidden_rows.viewChanged(sheet, null);
       this.drop_order(sheet);
       return;
     }
@@ -383,7 +390,7 @@ export class StoreViewState {
       state.filters.size > 0
         ? keepOutsideAutoFilter(this.run_filters(handle, state.filters), meta.autoFilter, row_count)
         : null;
-    this.engine_hidden_rows.viewChanged(sheet, survivors, row_count);
+    this.engine_hidden_rows.viewChanged(sheet, survivors);
 
     if (hidden) {
       if (survivors) {
@@ -545,7 +552,9 @@ export class StoreViewState {
       const meta = this.sheets.sheetMeta(sheet);
       state = {
         sortKeys: meta.sortKeys?.map((key) => ({ ...key })) ?? [],
-        filters: new Map(meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? []),
+        filters: new Map(
+          meta.filters?.map(([col, filter]) => [col, cloneColumnFilter(filter)]) ?? [],
+        ),
         hiddenRows: new Set(meta.hiddenRows ?? []),
         groups: meta.rowGroups?.map((group) => ({ ...group })) ?? [],
       };

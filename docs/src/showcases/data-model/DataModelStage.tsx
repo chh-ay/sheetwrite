@@ -18,7 +18,6 @@ import { createLiveScenario, createScenarioAction } from "../lib/live-scenario.j
 import { ControlActions, ControlButton, DemoGrid } from "../ui/feature-controls.js";
 import { RadioGroup } from "../ui/RadioGroup.js";
 
-/** Props of {@link DataModelStage}. The route passes the scenario's data, so the island imports no scenario code before its grid loads. */
 export interface DataModelStageProps {
   /** The panel before the grid is ready. */
   readonly pending: DataModelSnapshot;

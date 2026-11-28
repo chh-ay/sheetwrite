@@ -42,7 +42,7 @@ fn a_cell_argument_is_a_reference_whose_row_can_be_hidden() {
     let (mut store, sheet) = microsoft_example(&formulas);
     assert_eq!(results(&store, sheet, formulas.len()), ["130", "10"]);
 
-    assert!(store.set_hidden_rows(sheet, &[1, 1], &[]));
+    assert!(store.set_row_visibility(sheet, &[1, 1], None));
 
     assert_eq!(results(&store, sheet, formulas.len()), ["120", "10"]);
 }
@@ -60,7 +60,7 @@ fn nested_subtotals_and_errors_in_hidden_rows_are_skipped() {
     store.set_formula(sheet, 2, FORMULA_COLUMN, "=SUBTOTAL(9,A1:A4)", 0);
     store.commit_sources();
 
-    assert!(store.set_hidden_rows(sheet, &[3, 3], &[]));
+    assert!(store.set_row_visibility(sheet, &[3, 3], None));
 
     assert_eq!(
         results(&store, sheet, 3),
@@ -73,7 +73,7 @@ fn inside_a_mutation_the_commit_barrier_recalculates() {
     let (mut store, sheet) = microsoft_example(&["=SUBTOTAL(109,A1:A4)"]);
 
     store.begin_mutation();
-    assert!(store.set_hidden_rows(sheet, &[2, 3], &[]));
+    assert!(store.set_row_visibility(sheet, &[2, 3], None));
     assert_eq!(results(&store, sheet, 1), ["303"]);
 
     store.commit_sources();
@@ -84,16 +84,19 @@ fn inside_a_mutation_the_commit_barrier_recalculates() {
 fn rejects_invalid_runs_and_missing_sheets() {
     let (mut store, sheet) = microsoft_example(&["=SUBTOTAL(109,A1:A4)"]);
 
-    assert!(!store.set_hidden_rows(sheet, &[3, 2], &[]));
-    assert!(!store.set_hidden_rows(sheet, &[], &[1]));
-    assert!(!store.set_hidden_rows(sheet + 1, &[0, 0], &[]));
+    assert!(!store.set_row_visibility(sheet, &[3, 2], None));
+    assert!(!store.set_row_visibility(sheet, &[1], None));
+    assert!(!store.set_row_visibility(sheet, &[], Some(vec![2, 1])));
+    assert!(!store.set_row_visibility(sheet, &[], Some(vec![1, 1])));
+    assert!(!store.set_row_visibility(sheet, &[], Some(vec![12])));
+    assert!(!store.set_row_visibility(sheet + 1, &[0, 0], None));
     assert_eq!(results(&store, sheet, 1), ["303"]);
 }
 
 #[test]
 fn hidden_rows_move_with_inserted_and_deleted_rows() {
     let (mut store, sheet) = microsoft_example(&["=SUBTOTAL(109,A1:A4)"]);
-    assert!(store.set_hidden_rows(sheet, &[1, 1], &[]));
+    assert!(store.set_row_visibility(sheet, &[1, 1], None));
 
     assert!(store.add_rows(sheet, 0, 1));
     store.commit_sources();
@@ -121,11 +124,47 @@ fn aggregate_odd_options_skip_rows_hidden_by_hand_or_by_a_filter() {
     let (mut store, sheet) = microsoft_example(&formulas);
     store.set_formula(sheet, 4, DATA_COLUMN, "=1/0", 0);
     // Row 2 is hidden by hand, rows 3 and 5 by a filter.
-    assert!(store.set_hidden_rows(sheet, &[1, 1], &[2, 2, 4, 4]));
+    let kept = vec![0, 1, 3, 5, 6, 7, 8, 9, 10, 11];
+    assert!(store.set_row_visibility(sheet, &[1, 1], Some(kept)));
     store.commit_sources();
 
     assert_eq!(
         results(&store, sheet, formulas.len()),
         ["143", "143", "143", "143", "303", "303", "120"]
+    );
+}
+
+/// Excel passes a range to a LAMBDA as a reference, so SUBTOTAL and
+/// AGGREGATE of the parameter skip the rows a filter hides, named or not.
+#[cfg(feature = "analysis")]
+#[test]
+fn a_lambda_reads_a_range_parameter_without_its_hidden_rows() {
+    let formulas = [
+        "=Total(A1:A4)",
+        "=LAMBDA(r,SUBTOTAL(9,r))(A1:A4)",
+        "=LAMBDA(r,AGGREGATE(9,5,r))(A1:A4)",
+    ];
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 12);
+    assert!(store.set_named_formula("Total", -1, "=LAMBDA(r,SUBTOTAL(9,r))"));
+    for (row, value) in [120.0, 10.0, 150.0, 23.0].into_iter().enumerate() {
+        store.set_number(sheet, row, DATA_COLUMN, value, 0);
+    }
+    for (row, formula) in formulas.iter().enumerate() {
+        store.set_formula(sheet, row, FORMULA_COLUMN, formula, 0);
+    }
+    store.commit_sources();
+    assert_eq!(
+        results(&store, sheet, formulas.len()),
+        ["303", "303", "303"]
+    );
+    assert!(store.reads_row_visibility());
+
+    // The filter keeps rows 1 and 3: 120 and 150.
+    assert!(store.set_row_visibility(sheet, &[], Some(vec![0, 2])));
+
+    assert_eq!(
+        results(&store, sheet, formulas.len()),
+        ["270", "270", "270"]
     );
 }

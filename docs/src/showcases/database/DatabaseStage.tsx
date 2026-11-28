@@ -118,7 +118,6 @@ function UndoReportView(props: Readonly<{ report: UndoReport }>) {
   );
 }
 
-/** Props of {@link DatabaseStage}. */
 export interface DatabaseStageProps {
   readonly demoLabel: string;
 }

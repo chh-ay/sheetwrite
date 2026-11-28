@@ -59,6 +59,8 @@ fn set_anchor_value(
 
 /// Whether the dirty cells of a finished pass cut `attempt`: a write inside
 /// it that the output does not own, so the output must be placed again.
+/// A dirty rectangle that meets `attempt`, or a whole-sheet dirty state,
+/// always counts as a cut.
 pub(super) fn attempt_cut(data: &SheetData, attempt: SpillRange, installed: bool) -> bool {
     let cut = |cell: CellKey| {
         attempt.contains(cell) && (!installed || data.spill.owner(cell) != Some(attempt.anchor))
@@ -154,7 +156,13 @@ impl CellStore {
             return (changed, Err(FormulaError::Num));
         }
 
+        // The anchor is the range's first cell. Listing it just before the
+        // row-major body keeps the output cells in ascending order, so the
+        // dirty list can take them without sorting.
         let strings = &mut self.strings;
+        if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
+            changed.push(anchor);
+        }
         let mut written = data
             .spill
             .reinstall(range, &mut data.cells, &vacated_spill, |offset| {
@@ -162,10 +170,6 @@ impl CellStore {
             });
         changed.append(&mut written);
         changed.extend(vacated_spill.cleared_outside(Some(range)));
-
-        if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
-            changed.push(anchor);
-        }
         (changed, Ok(()))
     }
 
@@ -195,7 +199,9 @@ impl CellStore {
             .expect("a cell inside the sheet is a one-cell range");
         data.spill.register_attempt(range);
         if set_anchor_value(data, &mut self.strings, anchor, &Value::Error(error)) {
-            changed.push(anchor);
+            // Before the cleared cells, which `clear` lists row-major after
+            // the anchor, so the dirty list takes them without sorting.
+            changed.insert(0, anchor);
         }
         (self.mark_pivot_cells_dirty(owner, changed), Some(range))
     }
@@ -225,7 +231,8 @@ impl CellStore {
                 && data.cells.calculated_cell_at(index).is_some()
             {
                 data.cells.remove_calculated(index);
-                changed.push(anchor);
+                // First, as in `show_output_error`.
+                changed.insert(0, anchor);
             }
         }
         self.mark_pivot_cells_dirty(owner, changed);

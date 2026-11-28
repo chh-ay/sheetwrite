@@ -139,11 +139,12 @@ impl Criterion {
         }
     }
 
-    /// Counts the matches among numbers given as their `f64` bits, with the
-    /// result of [`Self::matches`] on each number. `None` when the criterion
-    /// is not a plain number: text and wildcard criteria need each cell's
-    /// value.
-    pub(super) fn count_numbers(&self, numbers: &[u64]) -> Option<usize> {
+    /// Counts the matches among dense cells given as their raw kinds and
+    /// payloads, with the result of [`Self::matches`] on each number. `None`
+    /// when a cell is not a number literal or holds a stored infinity or NaN,
+    /// which the cell reader reads as `#NUM!`, or when the criterion is not a
+    /// plain number: text and wildcard criteria need each cell's value.
+    pub(super) fn count_numbers(&self, kinds: &[u8], numbers: &[u64]) -> Option<usize> {
         let Value::Number(threshold) = self.operand else {
             return None;
         };
@@ -152,22 +153,44 @@ impl Criterion {
         }
 
         // One loop per operator keeps the operator match out of the loop.
-        Some(match self.op {
-            CmpOp::Eq => count_numbers_where(numbers, |number| number == threshold),
-            CmpOp::Ne => count_numbers_where(numbers, |number| number != threshold),
-            CmpOp::Lt => count_numbers_where(numbers, |number| number < threshold),
-            CmpOp::Le => count_numbers_where(numbers, |number| number <= threshold),
-            CmpOp::Gt => count_numbers_where(numbers, |number| number > threshold),
-            CmpOp::Ge => count_numbers_where(numbers, |number| number >= threshold),
-        })
+        match self.op {
+            CmpOp::Eq => count_numbers_where(kinds, numbers, |number| number == threshold),
+            CmpOp::Ne => count_numbers_where(kinds, numbers, |number| number != threshold),
+            CmpOp::Lt => count_numbers_where(kinds, numbers, |number| number < threshold),
+            CmpOp::Le => count_numbers_where(kinds, numbers, |number| number <= threshold),
+            CmpOp::Gt => count_numbers_where(kinds, numbers, |number| number > threshold),
+            CmpOp::Ge => count_numbers_where(kinds, numbers, |number| number >= threshold),
+        }
     }
 }
 
-fn count_numbers_where(numbers: &[u64], matches: impl Fn(f64) -> bool) -> usize {
-    numbers
-        .iter()
-        .filter(|&&bits| matches(f64::from_bits(bits)))
-        .count()
+/// The exponent bits of an `f64`, all set for an infinity or NaN.
+const EXPONENT_BITS: u64 = 0x7FF0_0000_0000_0000;
+/// The lowest exponent bit.
+const EXPONENT_UNIT: u64 = 1 << 52;
+const SIGN_BIT: u64 = 1 << 63;
+
+/// One pass over the kinds and payloads. A cell of another kind, or a
+/// non-finite number, is noted without leaving the loop and sends the column
+/// to the cell reader, which reads the number as `#NUM!`. JavaScriptCore runs
+/// this shape faster than a separate pass over the kinds or a finite check in
+/// the comparison (see `ReductionFold::push_number_column`).
+fn count_numbers_where(
+    kinds: &[u8],
+    numbers: &[u64],
+    matches: impl Fn(f64) -> bool,
+) -> Option<usize> {
+    let mut other_kinds = 0u8;
+    // One more than an all-ones exponent carries into the sign bit, and no
+    // other exponent does, so the sign bit of the OR marks a non-finite number.
+    let mut exponent_carries = 0u64;
+    let mut count = 0usize;
+    for (&kind, &bits) in kinds.iter().zip(numbers) {
+        other_kinds |= kind ^ KIND_NUMBER;
+        exponent_carries |= (bits & EXPONENT_BITS) + EXPONENT_UNIT;
+        count += usize::from(matches(f64::from_bits(bits)));
+    }
+    (other_kinds == 0 && exponent_carries & SIGN_BIT == 0).then_some(count)
 }
 
 /// The sum range of SUMIF and AVERAGEIF. Excel reads as many rows and columns
@@ -199,7 +222,6 @@ impl WildcardPattern {
         })
     }
 
-    /// Matches the text a lookup candidate shows a wildcard.
     pub(super) fn matches_text(&self, text: &str) -> bool {
         self.wildcard.matches(text)
     }
@@ -304,7 +326,8 @@ impl IfExtreme {
         }
     }
 
-    /// Folds one matched row.
+    /// Folds one matched row: an error or a non-finite number stops the walk,
+    /// and only finite numbers count.
     pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
         match value {
             Value::Number(number) if number.is_finite() => {
@@ -460,14 +483,15 @@ impl CellStore {
     /// COUNTIF with a numeric criterion over dense columns that hold only
     /// number literals: it compares the stored payloads directly instead of
     /// reading each cell as a `Value`. `None` sends the caller to the cell
-    /// reader, for paged storage, any other cell kind or any other criterion.
+    /// reader, for paged storage, any other cell kind, a stored infinity or
+    /// NaN, or any other criterion.
     /// Call it only after `RangeReader::new` accepted `range`: it clamps the
     /// range to the used extent the same way.
     ///
     /// Out of line, and named `*_family`, so neither LLVM nor wasm-opt puts
     /// its loops into `eval_ast`. The scan is scalar: enabling `simd128` for
     /// one function enables it for the whole module, which makes other range
-    /// formulas up to 1.8x slower on x86-64 (#342).
+    /// formulas up to 1.8x slower on x86-64.
     #[inline(never)]
     fn dense_number_count_if_family(
         &self,
@@ -493,10 +517,7 @@ impl CellStore {
             let kinds = column_kinds.get(row_start..=row_end)?;
             // A literal's raw kind is its kind, and a number's payload is its
             // `f64` bits. Formulas and blanks have other raw kinds.
-            if kinds.iter().any(|&kind| kind != KIND_NUMBER) {
-                return None;
-            }
-            count += criterion.count_numbers(&numbers[row_start..=row_end])?;
+            count += criterion.count_numbers(kinds, numbers.get(row_start..=row_end)?)?;
         }
         Some(count)
     }

@@ -10,5 +10,4 @@ export const CODE_ROLES = [
   "punctuation",
 ] as const;
 
-/** One syntax role. */
 export type CodeRole = (typeof CODE_ROLES)[number];

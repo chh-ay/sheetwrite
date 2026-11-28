@@ -18,7 +18,7 @@ export interface QueryLimits {
   readonly maxCells: number;
   /** Most bytes a source may have before it is parsed; default 64 MiB. */
   readonly maxSourceBytes: number;
-  /** Conservative cell payload budget across all columns, checked before each append. */
+  /** Conservative cell payload budget across all columns, checked before each append; default 256 MiB. */
   readonly maxOutputBytes: number;
   /** Most steps a plan may have; default 256. */
   readonly maxSteps: number;

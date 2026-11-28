@@ -71,7 +71,6 @@ type InsertDeleteOptions = {
   readonly ask?: boolean;
 };
 
-/** Run the key's `command` for the grid behind `host`. */
 export function runCellCommand(host: CellCommandsHost, command: CellCommand): void {
   const { actions } = host.grid;
   switch (command) {

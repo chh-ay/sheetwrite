@@ -7,7 +7,7 @@ use std::cell::Cell;
 
 use crate::store::names::NAME_READS;
 use crate::store::CellStore;
-use crate::tests::support::{number, string as text, tree_address};
+use crate::tests::support::{evaluations, number, string as text, tree_address};
 
 /// A store with one sheet, `Data`, holding 1, 2, 3 in A1:A3 and 10, 20, 30
 /// in B1:B3.
@@ -157,8 +157,7 @@ fn chain_over_rate(sheet_rate: bool) -> usize {
 
 /// A sheet's own name changes what the names over it read on that sheet,
 /// not how often they are read: a chain over it is read about as often as
-/// a chain over a workbook name, not once per path through the chain
-/// (#1060).
+/// a chain over a workbook name, not once per path through the chain.
 #[test]
 fn a_chain_of_names_over_a_sheets_own_name_reads_as_often_as_over_a_workbook_name() {
     let workbook = chain_over_rate(false);
@@ -212,8 +211,7 @@ fn add_summary(store: &mut CellStore) -> usize {
     summary
 }
 
-/// A reference with no sheet in a workbook name reads the sheet of the
-/// formula that uses the name, also inside another name.
+/// This also holds for a name used inside another name.
 #[test]
 fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     let (mut store, data, other) = two_sheet_store();
@@ -249,8 +247,8 @@ fn a_workbook_name_without_a_sheet_reads_the_sheet_of_each_formula() {
     assert_eq!(number(&store, other, 5, 4), 15.0);
 }
 
-/// A workbook name that uses another name reads that sheet's own definition
-/// on a sheet that has one, and the workbook's once it is removed.
+/// Once the sheet's own name is removed, the workbook's applies on that sheet
+/// again.
 #[test]
 fn a_workbook_name_reads_a_sheets_own_name_on_that_sheet() {
     let (mut store, data, other) = two_sheet_store();
@@ -271,8 +269,6 @@ fn a_workbook_name_reads_a_sheets_own_name_on_that_sheet() {
     assert_eq!(number(&store, other, 1, 4), 10.0);
 }
 
-/// Formulas that used the names before a row and a column edit and formulas
-/// that use them after it read the same moved cells.
 #[test]
 fn names_follow_row_and_column_edits_for_formulas_before_and_after_them() {
     let (mut store, data) = data_store();
@@ -303,8 +299,7 @@ fn names_follow_row_and_column_edits_for_formulas_before_and_after_them() {
     assert_eq!(number(&store, summary, 1, 2), 30.0);
 }
 
-/// Formulas that used the names before a sheet rename or removal and
-/// formulas that use them after it give the same result.
+/// Formulas written before and after the edit give the same result.
 #[test]
 fn names_follow_a_sheet_rename_and_removal() {
     let (mut store, data) = data_store();
@@ -365,8 +360,9 @@ fn recursion_past_the_call_limit_is_a_num_error() {
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
 }
 
-/// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3 and `=Ratio+1`
-/// in D4, where `Total` is `=Rate*10` and `Ratio` is not defined yet.
+/// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3, `=Ratio+1` in D4
+/// and `=Step` in D5, where `Total` is `=Rate*10`, `Step` is a LET whose own
+/// variable is spelled `Rate`, and `Ratio` is not defined yet.
 fn name_users() -> (CellStore, usize) {
     let (mut store, sheet) = data_store();
     assert!(
@@ -377,10 +373,15 @@ fn name_users() -> (CellStore, usize) {
         store.set_named_formula("Total", -1, "=Rate*10"),
         "Total is set"
     );
+    assert!(
+        store.set_named_formula("Step", -1, "=LET(Rate,2,Rate+1)"),
+        "Step is set"
+    );
     store.set_formula(sheet, 0, 3, "=SUM(Rate)*A1", 0);
     store.set_formula(sheet, 1, 3, "=Total*2", 0);
     store.set_formula(sheet, 2, 3, "=B1*2", 0);
     store.set_formula(sheet, 3, 3, "=Ratio+1", 0);
+    store.set_formula(sheet, 4, 3, "=Step", 0);
     store.recompute(sheet);
     assert_eq!(number(&store, sheet, 0, 3), 10.0, "SUM(Rate)*A1");
     assert_eq!(number(&store, sheet, 1, 3), 200.0, "Total*2");
@@ -405,12 +406,16 @@ fn a_name_change_binds_only_the_formulas_that_use_it() {
         "SUM(Rate)*A1 and Total*2 have operands"
     );
 
-    // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too.
-    assert!(
-        store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
-        "Rate is B2"
-    );
-    store.recompute(sheet);
+    // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too. Step's
+    // LET reads its own `Rate`, so `=Step` is not bound again.
+    let recalculated = evaluations(|| {
+        assert!(
+            store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
+            "Rate is B2"
+        );
+        store.recompute(sheet);
+    });
+    assert_eq!(recalculated, 2, "only SUM(Rate)*A1 and Total*2 recalculate");
     assert_eq!(number(&store, sheet, 0, 3), 20.0, "SUM(Rate)*A1 reads B2");
     assert_eq!(number(&store, sheet, 1, 3), 400.0, "Total*2 reads B2");
     assert_eq!(tree_address(&store, sheet, 2, 3), unrelated, "B1*2 is kept");
@@ -575,8 +580,9 @@ fn retained_bytes(store: &CellStore) -> f64 {
 /// some spare capacity that a rebuild would not. That growth comes with the
 /// first edit and stays flat after it: 50 edits that move `Rate` back and
 /// forth over the formulas that use it retain what the first one did. The
-/// index patches the reads of up to 256 changed formulas in place and
-/// rebuilds past that, so 200 and 300 users take each path.
+/// index rebuilds instead of patching past 256 changed formulas
+/// ([`crate::graph::FormulaGraph::replace_entry`]), so 200 and 300 users take
+/// each path.
 #[test]
 fn name_edits_retain_bounded_index_capacity() {
     const EDITS: usize = 50;

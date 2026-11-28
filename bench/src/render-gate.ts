@@ -9,6 +9,7 @@ import {
   RENDER_ORDER_SEED,
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
+  RENDER_WARMUP_SAMPLES,
   type RenderBenchmarkArtifact,
   type RenderRunConfig,
   renderMatrixKey,
@@ -51,7 +52,7 @@ export const RENDER_GATE_POLICIES: Readonly<Record<BenchmarkMode, RenderGatePoli
     config: RENDER_FULL_CONFIG,
     rounds: 2,
     measuredSamples: 3,
-    warmupSamples: 1,
+    warmupSamples: RENDER_WARMUP_SAMPLES,
     minimumSampleDurationMs: RENDER_MINIMUM_SAMPLE_MS,
   },
   smoke: {
@@ -59,7 +60,7 @@ export const RENDER_GATE_POLICIES: Readonly<Record<BenchmarkMode, RenderGatePoli
     config: RENDER_SMOKE_CONFIG,
     rounds: 1,
     measuredSamples: 1,
-    warmupSamples: 1,
+    warmupSamples: RENDER_WARMUP_SAMPLES,
     minimumSampleDurationMs: RENDER_MINIMUM_SAMPLE_MS,
   },
 };
@@ -75,7 +76,7 @@ function equal_values<T extends string | number>(
 }
 
 export interface RenderGateOptions extends ParseRenderOptions {
-  /** Controlled baseline generation deliberately uses >=10 rounds. */
+  /** Rounds the artifact must record, instead of the policy's count; controlled baselines need at least 10. */
   readonly rounds?: number;
 }
 

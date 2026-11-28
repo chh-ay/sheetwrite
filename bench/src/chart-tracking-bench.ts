@@ -45,11 +45,11 @@ const SAMPLES = 101;
 /**
  * Untimed commits before each row's samples, at most. Rows time microsecond
  * commits, and JavaScriptCore keeps tiering the commit and resolution paths
- * for thousands of commits: on develop, a literal commit at 2,000 and 20,000
- * charts is still 1.3-1.7 times its later time after 1,000 commits, and stays
- * within 5% of it from 3,800-6,800 commits depending on the row, on Linux and
- * on the Mac. With 20 warmups a row partly measured how far earlier rows had
- * warmed those paths. See #639.
+ * for thousands of commits: a literal commit at 2,000 and 20,000 charts is
+ * still 1.3-1.7 times its later time after 1,000 commits, and stays within 5%
+ * of it from 3,800-6,800 commits depending on the row, on Linux and on the
+ * Mac. With a few dozen warmups, a row would partly measure how far earlier
+ * rows had warmed those paths. See #639 for the measurements.
  */
 const WARMUPS = 7_000;
 /** Wall-clock cap on one row's warm-up; see {@link WarmUp}. */

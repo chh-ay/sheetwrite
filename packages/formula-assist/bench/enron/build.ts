@@ -37,11 +37,10 @@ import {
 import { analyzeFormula } from "@sheetwrite/core/functions";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
-/** Where figshare serves the archive. */
 const ARCHIVE_URL = "https://ndownloader.figshare.com/files/3242531";
 /** MD5 of the archive as figshare lists it. */
 const ARCHIVE_MD5 = "188ec98d04c83a4725d9205cc75ce5a2";
-/** Seed of the development draw (#801); its workbooks alternate between dev.json and dev2.json. */
+/** Seed of the development draw; its workbooks alternate between dev.json and dev2.json. */
 const DEV_SEED = 801;
 const DEV_WORKBOOKS = 100;
 /**

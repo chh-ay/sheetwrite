@@ -912,8 +912,6 @@ function lookup_fixture(count: number, phase: LookupPhase, variant: LookupVarian
   };
 }
 
-/** Key-table sizes of the mixed-type exact lookup rows. */
-
 /** Table rows per lookup formula of the mixed-type rows. */
 const MIXED_LOOKUP_ROWS_PER_FORMULA = 10;
 
@@ -1545,17 +1543,11 @@ function let_reuse_fixture(count: number): TimedFixture {
   };
 }
 
-/** The `let-many` sizes: a normal sheet and a large one. */
 /** Every `let-many` formula reads this scale from `$C$1`, so one edit dirties all of them. */
 const LET_MANY_SCALE = 2;
 const LET_MANY_EDITED_SCALE = 3;
 
-/**
- * Rows for formula shapes the other rows do not exercise: ROUND, text
- * concatenation, OFFSET, INDIRECT and LETs that bind function calls, one
- * formula per row. Each formula reads `$C$1`, so the timed edit recalculates
- * all of them.
- */
+/** Every shape formula reads this scale from `$C$1`, so one edit recalculates all of them. */
 const SHAPE_SCALE = 2;
 const SHAPE_EDITED_SCALE = 3;
 /** Column A's fractional part: a multiple of it never ends in a rounding tie at two places. */
@@ -1680,12 +1672,6 @@ function let_calls_formula(row: number): string {
     : `=LET(x,SUM(${source},1),y,ROUND(x/3,2),z,y*x,x+y+z)`;
 }
 
-/**
- * Rows for binding formulas to sheets, names and tables: defining names, a
- * row insert in a workbook with names, a table that grows by a row, a sort
- * that moves formulas, loading formulas that name another sheet or a table
- * column, and restoring a released engine from its memory state.
- */
 /** Defined names `Scale_0`…`Scale_9`; each points at one cell holding `NAME_SCALE`. */
 const BINDING_NAMES = 10;
 /** One formula in this many uses a name; the others are plain. */
@@ -3254,14 +3240,7 @@ function subtotal_filtered_fixture(count: number): TimedFixture {
     numeric_column(count, (row) => row + 1),
     0,
   );
-  const hidden: number[] = [];
-  for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
-    hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
-  }
-  assert(
-    store.setHiddenRows(sheet, new Uint32Array(), Uint32Array.from(hidden)),
-    "subtotal-filtered: hidden rows rejected",
-  );
+  assert(hide_every_other_block(store, sheet, count), "subtotal-filtered: hidden rows rejected");
   store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
   store.recompute(sheet);
   return {
@@ -3274,6 +3253,37 @@ function subtotal_filtered_fixture(count: number): TimedFixture {
     dispose: () => store.free(),
     restore: restore_number(store, sheet, { row: 0, col: 0, value: 1 }),
   };
+}
+
+/** An engine before `setRowVisibility`, which took the filtered rows as runs. */
+interface HiddenRunsStore {
+  setHiddenRows(sheet: number, manual: Uint32Array, filtered: Uint32Array): boolean;
+}
+
+function takes_hidden_runs(store: object): store is HiddenRunsStore {
+  return "setHiddenRows" in store && !("setRowVisibility" in store);
+}
+
+/**
+ * Hides every other block of `SUBTOTAL_BLOCK_ROWS` rows, as a filter would.
+ * The gate runs this harness on older base engines too, which take the
+ * filtered rows as runs instead of the rows the filter keeps.
+ */
+function hide_every_other_block(store: CellStore, sheet: number, count: number): boolean {
+  const manual = new Uint32Array();
+  if (takes_hidden_runs(store)) {
+    const hidden: number[] = [];
+    for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
+      hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
+    }
+    return store.setHiddenRows(sheet, manual, Uint32Array.from(hidden));
+  }
+
+  const kept: number[] = [];
+  for (let row = 0; row < count; row++) {
+    if (Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0) kept.push(row);
+  }
+  return store.setRowVisibility(sheet, manual, Uint32Array.from(kept));
 }
 
 /**

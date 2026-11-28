@@ -49,7 +49,8 @@ const FREE_SLOT: u64 = 0;
 const DIRTY_BLOCK_SHIFT: u32 = 12;
 /// Rows per dirty block. Row offsets inside a block fit in a `u16`.
 pub(super) const DIRTY_BLOCK_ROWS: usize = 1 << DIRTY_BLOCK_SHIFT;
-/// Rows per dirty band bit: a block has one bit per band in a `u64`.
+/// log2 of the rows per dirty band: a block has one bit per band in a
+/// `u64`, so 64 bands.
 const DIRTY_BAND_SHIFT: u32 = DIRTY_BLOCK_SHIFT - u64::BITS.trailing_zeros();
 
 /// log2 of the most rows a calculated block holds: 8 KiB of results.
@@ -216,8 +217,9 @@ pub(super) struct CleanPage {
 
 impl CleanPage {
     // Row moves also call the `#[inline(always)]` page and dirty-cell helpers
-    // in this file. With two callers wasm-opt left them out of line, which made
-    // a page load that evicts 6-8% slower on the Mac than with them inline.
+    // in this file. With two callers, wasm-opt leaves them out of line unless
+    // they are forced inline, and a page load that evicts then runs 6-8%
+    // slower.
     #[inline(always)]
     fn new(rows: usize) -> Self {
         Self {
@@ -303,8 +305,8 @@ struct PageRecord {
     pins: u8,
 }
 
-// One per page record of a paged sheet; the queued bit keeps the stamp in place
-// of a second one.
+// There is one record per page of a paged sheet, so its size matters. The
+// queued bit lives in the access stamp, so the record needs no second stamp.
 const _: () = assert!(
     std::mem::size_of::<PageRecord>() == 32,
     "PageRecord changed size: measure, then update this number"
@@ -543,7 +545,7 @@ pub(super) struct PagedStorage {
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
     evictions: u64,
-    /// A local sheet: a dense sheet that grew past the dense cap. It has no
+    /// A local sheet: one that does not fit the store's dense-cell limit. It has no
     /// datasource, so it never evicts, keeps no dirty overlay and counts
     /// every cell as loaded.
     pub(super) local: bool,
@@ -599,8 +601,8 @@ impl PagedStorage {
         })
     }
 
-    /// Local storage for a sheet without a datasource: chunks of
-    /// `chunk_rows`, no eviction and no dirty overlay.
+    /// Local storage with chunks of `chunk_rows` rows; see
+    /// [`Self::local`].
     pub(super) fn new_local(chunk_rows: usize) -> Result<Self, String> {
         let mut storage = Self::new(chunk_rows, 0, 0)?;
         storage.local = true;
@@ -819,8 +821,8 @@ impl PagedStorage {
     }
 
     /// The clean page of (`col`, `page`), loading an empty one when absent.
-    // Single cell writes and column writes both load pages here. Inline in
-    // each, as with the helpers `CleanPage::new` names.
+    // Single-cell writes and column writes both load pages here. It is inlined
+    // into each, for the reason given at `CleanPage::new`.
     #[inline(always)]
     fn ensure_clean(&mut self, col: usize, page: usize) -> &mut CleanPage {
         let id = self.record_or_insert(col, page);
@@ -964,8 +966,8 @@ impl PagedStorage {
     ///
     /// `cell(index)` gives `(row, kind, payload, style)` for `index` in
     /// `0..len`. Taking it by `&dyn` keeps one copy of this loop: generic
-    /// copies were inlined into the dense block writers that call it and made
-    /// their dense paths slower.
+    /// copies would be inlined into the dense block writers that call it and
+    /// slow their dense paths.
     #[inline(never)]
     pub(super) fn write_column(
         &mut self,
@@ -1047,7 +1049,12 @@ impl PagedStorage {
 
     /// Reserves slot and revision-list room for `additional` new dirty cells
     /// and `written` writes under `revision`.
-    fn reserve_dirty(&mut self, additional: usize, written: usize, revision: u64) -> bool {
+    pub(super) fn reserve_dirty(
+        &mut self,
+        additional: usize,
+        written: usize,
+        revision: u64,
+    ) -> bool {
         if self.dirty_cells().saturating_add(additional) > self.max_dirty_cells
             || self.slots.try_reserve(additional).is_err()
         {
@@ -1830,7 +1837,6 @@ impl PagedStorage {
         }
     }
 
-    /// Writes the page records.
     fn write_record_transfer(&self, out: &mut Writer) {
         out.usize(self.records.len());
         for record in &self.records {
@@ -2292,8 +2298,9 @@ mod tests {
         }
     }
 
-    /// The eviction order before access stamps: every access moves the page
-    /// to the newest place, and eviction takes the oldest unpinned page.
+    /// A reference model of the eviction order without access stamps: every
+    /// access moves the page to the newest place, and eviction takes the
+    /// oldest unpinned page.
     struct EvictionModel {
         /// Pages by column, then page.
         columns: Vec<Vec<ModelPage>>,

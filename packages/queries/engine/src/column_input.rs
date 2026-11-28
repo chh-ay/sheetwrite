@@ -8,7 +8,9 @@ use crate::plan::Diagnostic;
 use crate::transport::error;
 use crate::wire::decode_type;
 
-/// Packed metadata contains id, name, then an interned code pool for sparse error rows.
+/// Builds one column from host lanes. The constructor takes the masks and the packed metadata:
+/// id, name, then an interned code pool for sparse error rows. Setters add the payload lanes,
+/// and `build` checks them all.
 #[wasm_bindgen(js_name = ColumnBuilder)]
 #[derive(Debug)]
 #[allow(

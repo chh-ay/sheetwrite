@@ -1,4 +1,6 @@
+import type { CellScalar } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
+import type { ColumnFilter } from "./types/document.js";
 
 /** NUL is forbidden in display text without excluding other text control characters. */
 export const NUL_CHARACTER = String.fromCharCode(0);
@@ -103,4 +105,50 @@ export function sanitizeRange(value: unknown): Range | null {
  */
 export function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+}
+
+/**
+ * A copy of `filter`, the same as `cloneJsonValue(filter)` gives. A value
+ * list can hold hundreds of thousands of picks, so a plain one is copied
+ * pick by pick instead of through JSON text; anything else goes through JSON.
+ */
+export function cloneColumnFilter(filter: ColumnFilter): ColumnFilter {
+  return (filter.kind === "values" && copy_plain_value_filter(filter)) || cloneJsonValue(filter);
+}
+
+/**
+ * The JSON copy of a plain `{ kind, values }` filter whose picks are strings,
+ * booleans, nulls and finite numbers; null when JSON could write it
+ * differently (other fields, holes, objects, `toJSON`).
+ */
+function copy_plain_value_filter(filter: {
+  readonly kind: "values";
+  readonly values: readonly CellScalar[];
+}): ColumnFilter | null {
+  if (Object.getPrototypeOf(filter) !== Object.prototype || "toJSON" in filter) return null;
+  const keys = Object.keys(filter);
+  if (keys.length !== 2 || keys[0] !== "kind" || keys[1] !== "values") return null;
+
+  const { values } = filter;
+  if (
+    !Array.isArray(values) ||
+    Object.getPrototypeOf(values) !== Array.prototype ||
+    "toJSON" in values
+  ) {
+    return null;
+  }
+
+  const copy = new Array<CellScalar>(values.length);
+  for (let index = 0; index < values.length; index++) {
+    const value: unknown = values[index];
+    if (typeof value === "string" || typeof value === "boolean" || value === null) {
+      copy[index] = value;
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      // JSON writes -0 as 0.
+      copy[index] = value === 0 ? 0 : value;
+    } else {
+      return null;
+    }
+  }
+  return { kind: "values", values: copy };
 }

@@ -18,6 +18,7 @@ import {
   MAX_HYPERLINKS_PER_SHEET,
   sanitizeCellHyperlink,
 } from "./hyperlink.js";
+import { markOwnedArray } from "./json-bytes.js";
 import {
   conditionalFormatPastePatches,
   copyConditionalFormats,
@@ -88,7 +89,6 @@ export interface ClipboardControllerDeps {
   lastUndo: () => object | null;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
-  /** Load Paste Special's code. */
   loadPasteSpecial: () => Promise<PasteSpecialModule>;
   /** Ask with the Paste Special dialog; `ownCopy` is false for another application's cells. */
   askPasteSpecial: (ownCopy: boolean) => Promise<PasteSpecialOptions | null>;
@@ -839,8 +839,9 @@ function sparse_cells_patch(
 
 /**
  * Translates between the current selection and clipboard payloads. Formula/ref
- * fidelity is restored only when a versioned private envelope carries the
- * controller's current in-memory token. Every other clipboard source is inert.
+ * fidelity is restored only when the payload carries the controller's current
+ * in-memory token, in the versioned private envelope or on the HTML table.
+ * Every other clipboard source is inert.
  *
  * As in Excel, a cut changes nothing: it marks its cells, and the next paste
  * moves them with one `moveCells` operation. Esc, an edit, another copy or cut,
@@ -852,7 +853,6 @@ export class ClipboardController {
   /** Last rich copy/cut and its unguessable in-memory provenance token. */
   private trusted: TrustedClipboard | null = null;
 
-  /** The cut that waits for a paste. */
   private pending_cut: PendingCut | null = null;
 
   /**
@@ -1020,7 +1020,8 @@ export class ClipboardController {
           await clipboard.write([new ClipboardItem({ "text/plain": plain, "text/html": html })]);
           return "done";
         } catch {
-          // Retain the universally available text-only fallback.
+          // Fall through to `writeText`: plain text alone is the format every
+          // clipboard accepts.
         }
       }
     }
@@ -1139,7 +1140,6 @@ export class ClipboardController {
     return target;
   }
 
-  /** Paste what the clipboard holds. */
   private async read_and_paste(
     read: Scope,
     clipboard: Clipboard,
@@ -1981,6 +1981,10 @@ export class ClipboardController {
       }
 
       if (can_pack) {
+        // Built here from the parsed cells and reached by nothing else before
+        // the commit measures them: the measurement reads the entries directly.
+        markOwnedArray(values);
+        markOwnedArray(style_ids);
         const block: PackedCellBlock = {
           rowCount: available_rows,
           colCount: width,
@@ -2132,13 +2136,6 @@ export class ClipboardController {
   }
 
   /**
-   * Snapshot the focused selection rectangle into a {@link ClipboardSnapshot}:
-   * per-cell value (formula src preserved, else literal), resolved scalar, and
-   * style, plus the source anchor, the TSV those resolved scalars produce, and
-   * the rectangle in data rows when they are one block. Returns `null` when
-   * there is no focused rectangle.
-   */
-  /**
    * The active cell on a row the view hides, copied or cut alone, as Excel's
    * Copy and Cut take the active cell that Go To left on a hidden row. A cut
    * of a spill's child cell is refused, as in a selection.
@@ -2187,6 +2184,15 @@ export class ClipboardController {
     };
   }
 
+  /**
+   * Snapshot the focused selection rectangle into a {@link ClipboardSnapshot}:
+   * per-cell value (formula src preserved, else literal), resolved scalar, and
+   * style, plus the source anchor, the TSV those resolved scalars produce, and
+   * the rectangle in data rows when they are one block. Without a focus cell,
+   * the active cell on a hidden row is captured alone
+   * ({@link capture_hidden_cell}). Returns `null` without a focused rectangle
+   * or a hidden active cell.
+   */
   private capture(cut: boolean): CapturedClipboard | null {
     const focus = this.deps.selection().focusCell;
     if (!focus) {

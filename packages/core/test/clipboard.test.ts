@@ -66,7 +66,6 @@ class FakeClipboardItem {
   }
 }
 
-/** Replace the browser clipboard with `value`. */
 function use_clipboard(value: object): void {
   Object.defineProperty(navigator, "clipboard", { configurable: true, value });
 }

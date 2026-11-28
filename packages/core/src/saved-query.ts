@@ -1,7 +1,7 @@
 // Pure saved-query rules shared by the protocol, the store and the history:
 // shape checks, structural checks and copies. Step semantics (column
 // references, types, predicate trees) are checked by the Rust query engine
-// when `@sheetwrite/queries` defines or refreshes a query (#227).
+// when `@sheetwrite/queries` defines or refreshes a query.
 
 import { isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import type { SavedQuery, SavedQuerySource } from "./types/query.js";
@@ -272,8 +272,8 @@ function query_dependencies(query: SavedQuery): string[] {
 
 /**
  * Structural checks for shape-valid queries: unique IDs, unique names when
- * ASCII letter case is ignored, joins that name another existing query, no
- * join cycle, and at most one query per output table.
+ * letter case is ignored, joins that name another existing query, no join
+ * cycle, and at most one query per output table.
  */
 function validate_query_structure(
   queries: readonly SavedQuery[],
@@ -500,7 +500,6 @@ export function withoutQuery(
   return next.length > 0 ? next : undefined;
 }
 
-/** The saved query with `id`, if there is one. */
 export function findQuery(
   queries: readonly SavedQuery[] | undefined,
   id: string,

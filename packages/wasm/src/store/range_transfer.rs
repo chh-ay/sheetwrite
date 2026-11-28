@@ -63,7 +63,11 @@ impl CellStore {
         let payload = input.words()?;
         let style = input.ints()?;
 
-        if rows.checked_mul(cols) != Some(kind.len())
+        // `capture_range` never writes an empty range, and restoring one would
+        // take its last row or column as one before its first.
+        if rows == 0
+            || cols == 0
+            || rows.checked_mul(cols) != Some(kind.len())
             || kind.len() != payload.len()
             || kind.len() != style.len()
         {
@@ -697,14 +701,13 @@ impl CellStore {
 
     /// Packed writes and history restores share source replacement so a local
     /// native undo has the same result as its serialized replay on another peer.
-    /// Readers supply source kinds directly, avoiding a second per-cell source
-    /// test after the packed reader has already selected formula or literal.
-    /// Choose the literal-only loop once per range; a numeric/text import must
-    /// not test the source map for every cell.
+    /// `cell(row_offset, col_offset)` gives each cell's kind, payload and
+    /// style, so the reader that already chose formula or literal for a cell
+    /// is not asked again. The literal-only loop is chosen once per range, so
+    /// a numeric or text import does not test the source map for every cell.
     ///
-    /// The rectangle is dirtied and its spills detached once, so readers
-    /// outside it keep their calculated values and the per-cell writes skip
-    /// both the spill scan and the dirty mark.
+    /// [`prepare_rect_write`] dirties the rectangle and detaches its spills
+    /// once, so the per-cell writes skip both the spill scan and the dirty mark.
     pub(crate) fn replace_range_sources(
         &mut self,
         sheet: usize,
@@ -739,9 +742,10 @@ impl CellStore {
         mut sources: FxHashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
-        // A literal-only dense block needs no per-cell source decision: write
-        // storage column by column, then retire any formulas the block covered.
-        // Dense sheets are capped below u32 coordinates, so keys always exist.
+        // A literal-only block needs no per-cell source decision when the
+        // storage takes it whole: write storage column by column, then retire
+        // any formulas the block covered. A cell past `u32` coordinates has no
+        // key and holds no formula, so skipping it retires nothing.
         if !HAS_SOURCES {
             let sheet_data = &mut self.sheets[sheet];
             if sheet_data
@@ -853,5 +857,26 @@ mod tests {
         bytes[row..row + 4].copy_from_slice(&1u32.to_le_bytes());
 
         assert!(store.read_range_memory(&bytes, 0, 0, 0).is_err());
+    }
+
+    #[test]
+    fn range_transfer_rejects_a_range_without_rows_or_columns() {
+        let mut store = CellStore::new();
+        store.add_sheet(2, 2);
+
+        for (rows, cols) in [(0, 2), (2, 0), (0, 0)] {
+            let mut out = Writer::new(RANGE_TAG);
+            out.usize(rows);
+            out.usize(cols);
+            out.bytes(&[]);
+            out.words(&[]);
+            out.ints(&[]);
+            out.strings(&StringStorage::new());
+            out.usize(0);
+            assert!(
+                store.read_range_memory(&out.0, 0, 0, 0).is_err(),
+                "{rows} by {cols}"
+            );
+        }
     }
 }

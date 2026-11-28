@@ -1,4 +1,5 @@
-//! Shared value model: cell tags, keys, formula errors/values, read-sets.
+//! Shared value model: cell kind tags, cell keys, formula errors and values,
+//! read sets, formula entries and the string pool.
 
 use crate::calc::{
     bind_sheet_refs, has_unresolved_local_sheets, invalidate_sheet_refs, move_refs,
@@ -18,7 +19,7 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 // TypeScript mirrors these values in packages/core/src/store/wire-tags.ts;
-// packages/core/test/wire-tags.test.ts enforces the pairing.
+// packages/core/test/wire-tags.test.ts checks that the two agree.
 pub(crate) const KIND_EMPTY: u8 = 0;
 pub(crate) const KIND_NUMBER: u8 = 1;
 pub(crate) const KIND_STRING: u8 = 2;
@@ -40,6 +41,10 @@ pub(crate) const NO_STRING: u32 = u32::MAX;
 pub(crate) const FORMULA_RECURSION_LIMIT: usize = 256;
 /// Bounds one materialized formula range; larger ranges resolve to `#NUM!`.
 pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
+/// The most arguments one function call takes. Excel's specifications and
+/// limits give 255; Excel refuses a formula with more, and so does the
+/// parser.
+pub(crate) const MAX_FUNCTION_ARGS: usize = 255;
 
 pub(crate) type CellKey = (u32, u32);
 
@@ -103,7 +108,9 @@ impl FormulaError {
         }
     }
 
-    /// Dense slot index for per-window scratch tables.
+    /// Dense index of the error, from 0 to `COUNT - 1`. A calculated error
+    /// result stores it as its payload, and [`FormulaEntry`] stores it in its
+    /// flags.
     pub(crate) const fn slot(self) -> usize {
         match self {
             Self::Cycle => 0,
@@ -428,7 +435,7 @@ fn ast_is_plain(ast: &Ast) -> bool {
 /// Whether `ast` calls a volatile function, in a formula that uses no
 /// defined name. It passes itself to `any_child` as a plain function: with
 /// no name scope to capture, the walk keeps no closure in memory. Inline,
-/// so the check of the top node costs no call in each rewrite of a formula.
+/// so the check of the top node costs no call in each parse of a formula.
 #[inline]
 fn ast_is_volatile(ast: &Ast) -> bool {
     calls_volatile(ast) || ast.any_child(&mut ast_is_volatile)
@@ -617,7 +624,6 @@ impl FormulaEntry {
     const TABLE_REFS: u16 = 1 << 10;
     /// The tree may use a defined name: a bare name or an unknown function.
     const NAME_REFS: u16 = 1 << 11;
-    /// The tree calls GETPIVOTDATA.
     #[cfg(feature = "analysis")]
     const CALLS_PIVOT_DATA: u16 = 1 << 12;
 
@@ -662,7 +668,7 @@ impl FormulaEntry {
     }
 
     /// Capture a history entry with current source text. Its stale bit is
-    /// cleared, so history can read/export it without retaining the registry.
+    /// cleared, so history can read and export its text without the names.
     pub(crate) fn captured(&self, names: &WrittenNames<'_>) -> Self {
         Self {
             ast: self.ast.clone(),
@@ -705,15 +711,17 @@ impl FormulaEntry {
         self.set_flag(Self::VOLATILE, volatile);
     }
 
-    /// Mark the formula as one reference (`=A1`, `=Sheet2!B3:C4`), as a
+    /// Mark the entry as a plain reference ([`Self::reference`]), as a
     /// transferred formula records it.
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) const fn set_reference(&mut self, reference: bool) {
         self.set_flag(Self::REFERENCE, reference);
     }
 
-    /// Runtime references share the existing spill-resolution path and flag.
-    /// This avoids a new entry field or checks on formulas without these calls.
+    /// Whether the tree has a spill reference (ANCHORARRAY) or a runtime
+    /// reference (OFFSET, INDIRECT). Both kinds share this flag and the
+    /// spill-resolution path, so the entry needs no extra field, and
+    /// formulas without these calls skip that path.
     pub(crate) const fn has_spill_refs(&self) -> bool {
         self.flags & Self::SPILL_REFS != 0
     }
@@ -817,8 +825,10 @@ impl FormulaEntry {
         entry
     }
 
-    /// Same-build transfers own their read sets and cached metadata. Only the
-    /// AST is rebuilt; deriving its reads again would discard runtime reads.
+    /// An entry read from a same-build transfer, which carries its read set
+    /// and cached flags. Only the tree is prepared again (name shapes, LET
+    /// names) with the flags that come from the parse; the caller sets the
+    /// carried flags. Deriving the reads again would discard runtime reads.
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn transferred_source(
         mut ast: Option<Ast>,
@@ -952,8 +962,8 @@ impl FormulaEntry {
         true
     }
 
-    /// Bind only retained detached sheet references. Moves the tree and source
-    /// into its replacement, leaving the old read set for the graph edit.
+    /// Bind only retained detached sheet references. The text stays as typed;
+    /// [`Self::rebound`] builds the replacement.
     pub(crate) fn bind_sheets(
         &mut self,
         names: NameScope<'_>,
@@ -1136,7 +1146,8 @@ impl FormulaEntry {
     }
 }
 
-// Include the no-error sentinel in the low nibble's capacity.
+// The largest stored error code is `COUNT` (see `FormulaEntry::flags`), so it
+// must fit in the mask.
 const _: () = assert!(
     FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize,
     "every formula error code fits in the error bits of FormulaEntry"
@@ -1242,6 +1253,19 @@ impl StringStorage {
         id
     }
 
+    /// The pool id of `text`, without adding it; `None` when the pool does
+    /// not hold it. The pool holds each text once, so two cells hold the same
+    /// text exactly when they hold the same id.
+    pub(crate) fn find(&self, text: &str) -> Option<u32> {
+        match self.lookup.get(&string_hash(text))? {
+            InternSlot::One(id) => (self.get(*id) == Some(text)).then_some(*id),
+            InternSlot::Many(ids) => ids.iter().copied().find(|&id| self.get(id) == Some(text)),
+        }
+    }
+
+    /// Interns `text`. It repeats the lookup of [`Self::find`] instead of
+    /// calling a shared helper: a shared helper made a 100,000-row sparse
+    /// page write 10% slower in WASM (36.7 to 40.4 ms).
     pub(crate) fn intern(&mut self, text: &str) -> u32 {
         let hash = string_hash(text);
 
@@ -1282,7 +1306,11 @@ impl StringStorage {
         self.bytes.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
     }
 
-    /// Build before remapping roots: reservation failure leaves the old epoch intact.
+    /// A new pool that holds only the strings `marks` marks, and the map from
+    /// each old id to its new id (`NO_STRING` for a dropped string). `None`
+    /// when a reservation fails, or, unless `force`, when a collection would
+    /// free too little. The caller remaps its roots only after this returns,
+    /// so a failed reservation leaves the old pool and epoch intact.
     pub(crate) fn collection(&self, marks: &[bool], force: bool) -> Option<(Self, Vec<u32>)> {
         let live_count = marks.iter().filter(|&&marked| marked).count();
         let live_utf8 = self
@@ -1331,6 +1359,14 @@ impl StringStorage {
             .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
     }
 
+    /// Drops the spare capacity that growth left in the pool, keeping every
+    /// id: what [`Self::collection`] releases when no string is dead.
+    pub(crate) fn release_slack(&mut self) {
+        self.bytes.shrink_to_fit();
+        self.spans.shrink_to_fit();
+        self.lookup.shrink_to_fit();
+    }
+
     pub(crate) fn index_memory_stats(&self) -> MemoryOwnerStats {
         let mut stats = MemoryOwnerStats::default();
         stats.add_hash_table::<u64, InternSlot>(self.lookup.len(), self.lookup.capacity());
@@ -1344,7 +1380,9 @@ impl StringStorage {
         stats
     }
 
-    /// Destructive bulk changes may leave no subsequent unique-string growth.
+    /// Lowers the collection threshold to its floor. A destructive bulk
+    /// change can leave many dead strings, and no later growth may come to
+    /// pass the old threshold.
     pub(crate) const fn request_collection(&mut self) {
         self.next_collection_bytes = STRING_COLLECTION_FLOOR_BYTES;
     }

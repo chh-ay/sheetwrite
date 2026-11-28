@@ -102,7 +102,7 @@ describe("chart persistence", () => {
     own.series.push({ name: "Lost", values: "#REF!" });
     const owner = source.sheets[0];
     if (!owner) throw new Error("fixture sheet missing");
-    // Deliberately reverse identifier order so snapshot validation cannot reorder drawings.
+    // Identifiers in reverse order, so the round trip must keep the drawing order, not sort it.
     owner.charts = [chart("z-last-id"), own, chart("a-first-id")];
     const { store } = setup(source);
 

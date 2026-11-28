@@ -12,10 +12,8 @@
 //! scalar binding's use as a scalar, which is what it sees through the
 //! expansion too: such a binding is never a range, a reference or an array.
 //! A function call qualifies only when no shape check looks inside it
-//! ([`call_has_scalar_result`]): those checks see through `INTERSECT`, the
-//! array functions, `INDEX`, `CHOOSE`, `OFFSET`, `INDIRECT` and spill
-//! references, and take the scalar path for every other call. So results do
-//! not depend on which path a LET takes.
+//! ([`call_has_scalar_result`]). So results do not depend on which path a LET
+//! takes.
 
 use std::ptr;
 
@@ -406,7 +404,7 @@ impl LetFrame {
     /// is being evaluated; see the type's safety notes.
     #[allow(
         unsafe_code,
-        reason = "LET bindings point into the formula's own tree; a safe version is not yet measured on both machines"
+        reason = "the pass-wide LET frame outlives each formula's borrow of its tree, so it keeps raw pointers to binding expressions, not references; see the type's safety notes"
     )]
     pub(crate) unsafe fn binding<'tree>(&self, slot: u32) -> Option<&'tree Ast> {
         let index = self.resolved_base? + slot as usize;
@@ -430,8 +428,7 @@ impl LetFrame {
 impl CellStore {
     /// Evaluates a LET whose names were resolved to slots when the formula
     /// was entered: binds each slot to its expression in the original tree,
-    /// then evaluates the result expression. A binding is evaluated on its
-    /// first use, as the expansion does.
+    /// then evaluates the result expression.
     #[inline(never)]
     pub(super) fn eval_let_family(
         &self,
@@ -531,8 +528,8 @@ mod tests {
         }
     }
 
-    /// The LET formulas of the test suite and the gate rows, with cells that
-    /// hold numbers, text, an error and formulas that use LET themselves.
+    /// LET formulas over cells that hold numbers, text, an error and
+    /// formulas that use LET themselves.
     const FORMULAS: &[&str] = &[
         "=LET(x,1,x+1)",
         "=LET(x,1,y,x+1,x+y)",
@@ -583,7 +580,8 @@ mod tests {
         "=LET(k,LEN(B1),ROWS(A1:A3)+k)",
     ];
 
-    /// Values of `formula` in D1 of a small sheet, before and after an edit.
+    /// The cells D1:D3 of a small sheet that holds `formula` in D1, before
+    /// and after an edit.
     fn evaluate(formula: &str, resolve: bool) -> Vec<String> {
         RESOLVE_LET_NAMES.with(|cell| cell.set(resolve));
         let mut store = CellStore::new();

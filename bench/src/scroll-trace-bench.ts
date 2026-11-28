@@ -1,5 +1,5 @@
 /**
- * Scroll-trace prefetch benchmark (#703).
+ * Scroll-trace prefetch benchmark.
  *
  * Replays four scroll traces against the real `DatasourceController` and a
  * paged `SheetwriteStore`. A simulated datasource answers each request after a

@@ -206,7 +206,9 @@ fn detached_references_keep_their_exact_sheet_text() {
 }
 
 /// Formulas that name a sheet before it exists bind to it once it is named,
-/// and then read its edits.
+/// and then read its edits. A pending formula that is overwritten or moved
+/// before that leaves no stale use of the sheet, and a formula that does not
+/// name the sheet is not parsed again.
 #[test]
 fn overwritten_and_moved_pending_formulas_do_not_leave_stale_sheet_users() {
     let mut store = CellStore::new();
@@ -295,7 +297,7 @@ fn appending_table_rows_rebuilds_only_whole_column_users() {
     assert_eq!(store.get_cell(sheet, 0, 3).num(), 19.0);
     assert_eq!(tree_address(&store, sheet, 1, 3), unrelated);
     assert_eq!(tree_address(&store, sheet, 1, 1), own_row);
-    // An edited table's users name it as it is now, as before slots.
+    // An edited table's users write its current table and column names.
     assert_eq!(
         store.formula_source(sheet, 0, 3).as_deref(),
         Some("=SUM(Sales[Amount])")
@@ -339,7 +341,7 @@ fn a_new_table_binds_only_the_formulas_waiting_for_it() {
     );
 }
 
-/// Table1 over A`row + 1`:B`row + 1 + amounts` of `sheet`, with a header
+/// Table1 over A`row + 1`:B`row + 1 + amounts.len()` of `sheet`, with a header
 /// row, ID `id` and columns Amount and Other, holding `amounts`.
 fn table_one(store: &mut CellStore, sheet: usize, row: usize, id: &str, amounts: &[f64]) -> bool {
     for (offset, &amount) in amounts.iter().enumerate() {

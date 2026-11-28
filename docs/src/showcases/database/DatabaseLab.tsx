@@ -6,7 +6,7 @@ import { Button } from "../ui/Button.js";
 import { ready, runAction } from "./DatabaseStage.js";
 import { busy, engine, limitReport, stats, status } from "./state.js";
 
-/** Props of {@link DatabaseLab}: the adapter's compaction bounds, for the storage note. */
+/** The adapter's compaction bounds, for the storage note. */
 export interface DatabaseLabProps {
   readonly maxTailRecords: number;
   readonly maxTailBytes: number;

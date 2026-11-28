@@ -243,7 +243,7 @@ const INVALID_SOURCE_STATUS: u32 = 2;
 fn column_major_block_input_rejects_metadata_that_row_major_rejects() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(2, 2);
-    // Two string cells but only one text boundary.
+    // Two string cells but only one packed string.
     assert_eq!(
         store.set_column_block_packed(
             sheet,

@@ -373,7 +373,6 @@ function WorkbenchControls(props: Readonly<{ flight: ScaleFlight }>) {
   );
 }
 
-/** Props of {@link PerformanceStage}. */
 export interface PerformanceStageProps {
   readonly demoTitle: string;
 }

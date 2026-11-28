@@ -302,7 +302,7 @@ describe("AutoFilter in the grid", () => {
       range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
     });
     expect(await grid.actions.cut()).toBe("done");
-    // Excel moves the hidden rows silently; the grid says so (#843).
+    // Excel moves the hidden rows silently; the grid says so.
     expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
     // Paste on A7: view row 5 is sheet row 7 below the filtered range.
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
@@ -553,7 +553,7 @@ describe("AutoFilter in the grid", () => {
     expect(await clipboard_text()).toBe("banana");
 
     expect(await grid.actions.cut()).toBe("done");
-    // Paste on A7: view row 5 shows sheet row 6, below the filtered range.
+    // Paste on A7: view row 5 shows sheet row 7, below the filtered range.
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
     expect(await grid.actions.paste()).toBe("done");
     expect(store.getCell(banana).resolved).toBeNull();

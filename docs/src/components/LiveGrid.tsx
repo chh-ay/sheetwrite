@@ -1,6 +1,5 @@
 import { createEffect, createSignal, mergeProps, on, onCleanup, Show } from "solid-js";
 
-/** Props of {@link LiveGrid}. */
 interface LiveGridProps {
   /** A key of `LIVE_WORKBOOKS` (figures/live-workbooks.ts). */
   readonly name: string;

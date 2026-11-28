@@ -99,7 +99,9 @@ fn calculate(function: Function, values: &FuncAccumulator) -> DateResult {
     }
 }
 
-// Masks start on Monday. The serial calendar retains Excel's false leap day.
+// The day of the week, 0 for Monday to 6 for Sunday, as weekend masks index it. It counts
+// Excel serials, which include Excel's false 29 February 1900, so it agrees with Excel's
+// WEEKDAY before March 1900 too.
 const fn weekday(serial: i64) -> usize {
     (serial + 5).rem_euclid(DAYS_PER_WEEK) as usize
 }
@@ -148,9 +150,9 @@ fn holidays(values: &FuncAccumulator, weekend: &[bool; 7]) -> Result<Vec<i64>, F
             working_holidays.push(serial);
         }
     }
-    working_holidays.sort_unstable();
-    working_holidays.dedup();
-    Ok(working_holidays)
+    let mut sorted = crate::sorting::sort_i64(working_holidays);
+    sorted.dedup();
+    Ok(sorted)
 }
 
 fn workday_count(start: i64, end: i64, weekend: &[bool; 7], holidays: &[i64]) -> i64 {
@@ -160,7 +162,8 @@ fn workday_count(start: i64, end: i64, weekend: &[bool; 7], holidays: &[i64]) ->
     for offset in 0..length % DAYS_PER_WEEK {
         count += i64::from(!weekend[weekday(start + offset)]);
     }
-    // Sorted working-day holidays let every search count its interval in logarithmic time.
+    // The holidays are sorted, deduplicated working days, so two binary searches count
+    // those inside the interval.
     let first = holidays.partition_point(|&holiday| holiday < start);
     let last = holidays.partition_point(|&holiday| holiday <= end);
     count - (last - first) as i64

@@ -10,8 +10,6 @@ impl CellStore {
     pub fn add_sheet(&mut self, n_cols: usize, row_count: usize) -> usize {
         match self.try_add_sheet(n_cols, row_count) {
             Ok(index) => {
-                // SHEET and SHEETS count the tabs, so volatile formulas
-                // recompute when one is added.
                 self.recompute_with_volatile_sheets(Vec::new());
                 index
             }
@@ -39,8 +37,9 @@ impl CellStore {
         }
     }
 
-    /// Like [`Self::add_paged_sheet`], with an unsupported chunk size as an
-    /// error instead of a JavaScript exception.
+    /// Like [`Self::add_paged_sheet`], but returns an error, such as an
+    /// unsupported chunk size, instead of throwing a JavaScript exception, and
+    /// does not recalculate volatile formulas.
     pub(crate) fn try_add_paged_sheet(
         &mut self,
         n_cols: usize,
@@ -259,8 +258,6 @@ impl CellStore {
 
         self.sheet_order = Some(Box::new(order.to_vec()));
         let affected = self.refresh_sheet_spans();
-        // SHEET and SHEETS read the tab order, so volatile formulas
-        // recompute too.
         self.recompute_with_volatile_sheets(affected);
         true
     }
@@ -377,8 +374,11 @@ impl CellStore {
         (!held_by_other).then_some(name_key)
     }
 
-    /// Naming a sheet visits only formulas whose retained tree names it.
-    /// Stable ids keep this index correct when formulas move between cells.
+    /// Binds the formulas that wait for a sheet with this `id` or `name`, and
+    /// returns the sheets that hold them. Only formulas whose retained tree
+    /// names the sheet are visited, through the unresolved-sheet index. The
+    /// index holds stable formula ids, so it stays correct when formulas move
+    /// between cells.
     fn bind_pending_sheet_formulas(&mut self, id: &str, name: &str) -> Vec<usize> {
         let keys = [sheet_name_key(name), sheet_name_key(id)];
         let users = self.formula_slots.unresolved_sheet_users(&keys);
@@ -438,8 +438,9 @@ impl CellStore {
             .map(|&index| index as u32)
     }
 
-    /// Bind standalone-parsed definitions/measures without rebuilding their tree.
-    /// Such definitions still reject missing local sheets at installation.
+    /// Binds the sheet references of a tree parsed outside a cell, such as a
+    /// defined name or a measure, in place. Returns `#REF!` when the tree
+    /// names a local sheet that does not exist.
     pub(super) fn resolve_sheets(&self, mut ast: Ast) -> Result<Ast, FormulaError> {
         bind_sheet_refs(&mut ast, &|name| self.sheet_handle(name), &|span| {
             place_span(span, &self.tab_order())

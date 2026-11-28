@@ -1,8 +1,8 @@
-// Chart views over dashboard pivots (#231). As an Excel PivotChart does, the
-// row items are the categories and each value field, for each column item, is
-// one series. The view reads the item's hidden pivot, which has no subtotals
-// or totals and one label column per row field, so the chart never shows a
-// total as a point.
+// Chart views over pivots, on a dashboard or a worksheet. As an Excel
+// PivotChart does, the row items are the categories and each value field, for
+// each column item, is one series. The view reads a hidden copy of the pivot,
+// which has no subtotals or totals and one label column per row field, so the
+// chart never shows a total as a point.
 
 import { MAX_CHART_POINTS, MAX_CHART_SERIES } from "../chart-definition.js";
 import type { CellScalar } from "../types/cell.js";
@@ -13,7 +13,11 @@ import type {
   ChartView,
 } from "../types/chart.js";
 
-/** One pivot output from the engine, decoded: cells in row-major order and the layout counts. */
+/**
+ * One pivot output: cells in row-major order and the layout counts.
+ * `pivotOutputOf` decodes it from the engine, and a `PivotResultView` has the
+ * same shape.
+ */
 export interface PivotOutputRead {
   readonly cells: CellScalar[];
   readonly rows: number;

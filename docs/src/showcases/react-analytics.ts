@@ -115,8 +115,8 @@ export function fitColumnsToHost(workbook: Workbook, hostWidth: number): void {
   });
 }
 
-/** Host width the workbench fits its columns to; 0 until the stage is measured. */
 interface AnalyticsWorkbenchOptions {
+  /** Host width the workbench fits its columns to; 0 until the stage is measured. */
   gridHostWidth?: number;
 }
 

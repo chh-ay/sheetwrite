@@ -69,6 +69,26 @@ fn data_edge_follows_google_ctrl_arrow_semantics() {
     assert_eq!(store.data_edge(sheet, 50, 0, 1, 0), 0);
 }
 
+/// A formula is data whatever it returns: Excel's Ctrl+Arrow stops at a
+/// formula that shows nothing, and the scan in a view order agrees.
+#[test]
+fn data_edge_stops_at_a_formula_with_a_blank_result_in_any_order() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 4);
+    store.set_string(sheet, 0, 1, "x", 0);
+    store.set_formula(sheet, 1, 1, "=C4", 0);
+    store.set_string(sheet, 3, 1, "x", 0);
+    store.recompute(sheet);
+
+    let view_order: Vec<u32> = (0..4).collect();
+    assert_eq!(store.data_edge(sheet, 0, 1, 1, 0), 1, "in data order");
+    assert_eq!(
+        store.data_edge_ordered(sheet, &view_order, 0, 1, 1, 0),
+        1,
+        "in a view order"
+    );
+}
+
 #[test]
 fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     let mut store = CellStore::new();
@@ -341,8 +361,8 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
     let sheet = store.add_sheet(1, 16);
     fill_mixed_distinct_column(&mut store, sheet);
 
-    // The error formula at row 3 restarts the scan on content hashing, so a
-    // limit that lands past it still returns identical values.
+    // The error formula at row 3 has no pool id, so the scan restarts with
+    // content hashing; a limit past that row still lists first-seen values.
     let mut three = store.distinct_values(sheet, 0, 3);
     assert_eq!(three.take_kinds(), vec![2, 1, 2]);
     assert_eq!(distinct_number_bits(&mut three), vec![2.0f64.to_bits()]);
@@ -442,15 +462,14 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
     assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
 }
 
-/// "Values" filter coverage: the per-column lookup must answer exactly what the
-/// linear scan answered, including NaN, `-0.0`, blanks, booleans and text.
+/// "Values" filter coverage: the per-column lookup must keep the same rows as
+/// the linear scan, including NaN, `-0.0`, blanks, booleans and text.
 mod value_set_filter {
     use crate::*;
 
-    /// Sentinel the view layer sends for a picked boolean; the `\0` prefix keeps
-    /// it distinct from a cell holding the text `TRUE`.
+    /// [`crate::query::VALUE_SET_TRUE`]: the view layer's picked `TRUE`.
     const PICKED_TRUE: &str = "\0TRUE";
-    /// Sentinel for a picked `FALSE`; see [`PICKED_TRUE`].
+    /// [`crate::query::VALUE_SET_FALSE`]: the view layer's picked `FALSE`.
     const PICKED_FALSE: &str = "\0FALSE";
 
     /// One column of 15 rows covering every kind the filter distinguishes:
@@ -478,8 +497,8 @@ mod value_set_filter {
         (store, sheet)
     }
 
-    /// Runs a "values" filter over column 0; nine or more picks take the lookup
-    /// path, eight or fewer the linear scan.
+    /// Runs a "values" filter over column 0. Up to
+    /// [`crate::query::VALUE_SET_LINEAR_MAX`] picks take the linear scan; more take the lookup.
     fn filter_values(
         store: &CellStore,
         sheet: usize,
@@ -525,10 +544,10 @@ mod value_set_filter {
     }
 }
 
-/// The dense column scans in `filterRows`, `dataEdgeOrdered`, `rangeStyleIds`
-/// and `aggregate` classify literals from the raw kind byte. These tests put
-/// formula results and calculated spill cells in the same column, so the
-/// branches that resolve a calculated slot are covered too.
+/// The dense column scans in `filterRows` and `dataEdgeOrdered` classify
+/// literals from the raw kind byte. These tests put formula results and
+/// calculated spill cells in the same column, so the branches that resolve a
+/// calculated slot are covered too.
 mod dense_reader_fast_paths {
     use super::*;
 

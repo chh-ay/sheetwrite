@@ -39,13 +39,16 @@ export interface MutationPolicyResult {
 /** Rendered pivot output rectangles on one sheet. */
 export type PivotOutputProvider = (sheet: SheetId) => ReadonlyArray<{ id: string; range: Range }>;
 
-/** Pure policy evaluation over workbook metadata; storage and events stay outside this owner. */
+/**
+ * Decides from workbook metadata which operations of a transaction may apply.
+ * It does not write to the store or emit events.
+ */
 export class StoreMutationPolicy {
   constructor(
     private readonly workbook: Workbook,
     private readonly pivotOutputs: PivotOutputProvider = () => [],
-    /** Formula results and list sources for rules that need them. */
-    private readonly reads?: ValidationReads,
+    /** Formula results and list sources for rules that need them, built on first use. */
+    private readonly reads?: () => ValidationReads,
   ) {}
 
   /**
@@ -60,7 +63,7 @@ export class StoreMutationPolicy {
     resolver: ProtectionResolver | undefined,
     mode: MutationPolicyMode,
   ): MutationPolicyResult {
-    const reads = this.reads;
+    const reads = this.reads?.();
     if (!reads) return this.evaluate_checked(patches, commitReason, resolver, mode);
     try {
       return reads.check(() => this.evaluate_checked(patches, commitReason, resolver, mode));
@@ -449,7 +452,7 @@ export class StoreMutationPolicy {
         if (
           rule.policy === "allow" ||
           !rangeContains(rule.range, patch.addr) ||
-          validationAccepts(rule, patch.value.value, patch.addr, this.reads)
+          validationAccepts(rule, patch.value.value, patch.addr, this.reads?.())
         ) {
           continue;
         }
@@ -502,7 +505,7 @@ export class StoreMutationPolicy {
         for (const rule of candidates) {
           if (
             !rangeContains(rule.range, addr) ||
-            validationAccepts(rule, cell.value.value, addr, this.reads)
+            validationAccepts(rule, cell.value.value, addr, this.reads?.())
           ) {
             continue;
           }
@@ -576,7 +579,7 @@ export class StoreMutationPolicy {
           if (formula_offsets.has(offset) || ref_offsets.has(offset)) continue;
           const scalar = block.values[offset] ?? null;
           const addr = { sheet: range.sheet, row, col };
-          if (validationAccepts(rule, scalar, addr, this.reads)) continue;
+          if (validationAccepts(rule, scalar, addr, this.reads?.())) continue;
           const value: CellValue = { kind: "literal", value: scalar };
           issues.push({
             kind: "validation",

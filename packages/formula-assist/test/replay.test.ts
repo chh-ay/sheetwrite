@@ -11,8 +11,8 @@ import { REPLAY_SETS, replayWorkbooks } from "../bench/corpora.js";
 import { replayMetrics, replaySet } from "../bench/replay.js";
 import { attachPredictor, SIGNALS } from "../src/predictor.js";
 
-// The quality gate of #801: replay every formula of each set key by key and
-// hold the predictor to the bar of bench/bar.ts.
+// The predictor's quality gate: replay every formula of each set key by key
+// and hold the predictor to the bar of bench/bar.ts.
 
 /** A set replays thousands of formulas key by key. */
 const SET_TIMEOUT_MS = 600_000;

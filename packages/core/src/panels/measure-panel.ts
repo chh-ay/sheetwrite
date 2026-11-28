@@ -3,8 +3,10 @@
 // `setMeasure` and `removeMeasure`, so undo, sync and the admission rules
 // (unique names, an existing home table) apply.
 
+import type { SheetwriteStore } from "../store.js";
 import type { Measure, MeasureStatus } from "../types/data-model.js";
 import type { Grid, GridPanel } from "../types/grid.js";
+import type { Store } from "../types/store.js";
 import type { WorkbookTable } from "../types/table.js";
 import { panelField, panelSection, rejectionMessage, selectOf } from "./panel-dom.js";
 
@@ -23,6 +25,17 @@ function measure_status_text(status: MeasureStatus): string | null {
     case "unavailable":
       return "This measure no longer exists.";
   }
+}
+
+/**
+ * Whether `store` reports each measure's status, as `SheetwriteStore` does.
+ * It checks the method instead of the class, so the panel's lazy chunk does
+ * not import the store module.
+ */
+function reports_measure_status(
+  store: Store,
+): store is Store & Pick<SheetwriteStore, "getMeasureStatus"> {
+  return "getMeasureStatus" in store && typeof store.getMeasureStatus === "function";
 }
 
 /** The first `measure-N` ID that no measure uses. */
@@ -104,8 +117,7 @@ export function measurePanel(grid: Grid): GridPanel {
 
       /** The ID of the measure the form edits; null for a new one. */
       let editing: string | null = null;
-      // `SheetwriteStore` reports each measure's status; another store shows none.
-      const store = grid.store as { getMeasureStatus?: (id: string) => MeasureStatus };
+      const store = reports_measure_status(grid.store) ? grid.store : null;
 
       const edit = (measure: Measure | null): void => {
         editing = measure?.id ?? null;
@@ -183,7 +195,7 @@ export function measurePanel(grid: Grid): GridPanel {
             source.textContent = measure.formula;
             row.append(source);
             const status = measure_status_text(
-              store.getMeasureStatus?.(measure.id) ?? { status: "ok" },
+              store?.getMeasureStatus(measure.id) ?? { status: "ok" },
             );
             if (status !== null) {
               const warning = document.createElement("p");

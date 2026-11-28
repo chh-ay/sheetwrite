@@ -1,7 +1,7 @@
 //! Financial function family dispatch.
 
 use crate::calc::Func;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 
 use super::functions::{number_arg, require_arity, FuncAccumulator, FuncValue};
 use super::value::aggregate_number;
@@ -64,7 +64,7 @@ fn pmt(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 fn npv(values: &FuncAccumulator) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 254)?;
+    require_arity(values, 2, MAX_FUNCTION_ARGS)?;
     let rate = number_arg(values, 0, None)?;
     let base = 1.0 + rate;
     let mut discount = base;
@@ -99,13 +99,18 @@ fn npv(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 
 fn irr(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     require_arity(values, 1, 2)?;
-    let cashflows = values.arg(0).ok_or(FormulaError::Value)?;
+    let entries = values.arg(0).ok_or(FormulaError::Value)?;
+    // The solver samples the cashflows dozens of times (40 for six yearly
+    // cashflows from a 0.1 guess), so each entry is read as a number once
+    // and every sample is only multiply-adds.
+    let mut cashflows = Vec::with_capacity(entries.len());
     let mut has_positive = false;
     let mut has_negative = false;
-    for entry in cashflows {
+    for entry in entries {
         if let Some(cashflow) = cashflow_number(entry)? {
             has_positive |= cashflow > 0.0;
             has_negative |= cashflow < 0.0;
+            cashflows.push(cashflow);
         }
     }
     if !has_positive || !has_negative {
@@ -113,7 +118,7 @@ fn irr(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
 
     let guess = number_arg(values, 1, Some(0.1))?;
-    solve_root(guess, |x| irr_sample(cashflows, x))
+    solve_root(guess, |x| irr_sample(&cashflows, x))
 }
 
 fn rate(values: &FuncAccumulator) -> Result<f64, FormulaError> {
@@ -308,14 +313,11 @@ impl RootSample {
     }
 }
 
-fn irr_sample(cashflows: &[FuncValue], x: f64) -> Result<RootSample, FormulaError> {
+fn irr_sample(cashflows: &[f64], x: f64) -> Result<RootSample, FormulaError> {
     let inverse_growth = (-x).exp();
     let mut value = 0.0;
     let mut scale = 0.0;
-    for entry in cashflows.iter().rev() {
-        let Some(cashflow) = cashflow_number(entry)? else {
-            continue;
-        };
+    for &cashflow in cashflows.iter().rev() {
         value = value * inverse_growth + cashflow;
         scale = scale * inverse_growth + cashflow.abs();
     }

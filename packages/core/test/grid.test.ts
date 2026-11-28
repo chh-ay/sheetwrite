@@ -79,7 +79,6 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 
-/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
 let restore_xlsx_slots = keepXlsxSlots();
 
 beforeEach(() => {

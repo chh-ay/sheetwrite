@@ -176,7 +176,6 @@ fn install(store: &mut CellStore, source: usize, output: usize, rows: usize, agg
     assert!(status[STATUS_ROWS] > 0, "the pivot installed output");
 }
 
-/// The status of a pivot that shows `#SPILL!`.
 fn spill_status() -> u32 {
     FormulaError::Spill.slot() as u32 + 1
 }
@@ -638,7 +637,6 @@ fn assert_copy_matches_placed(store: &CellStore, output: usize) {
         .map(|count| count as usize)
         .collect();
     let (rows, cols, header_rows, label_cols) = (layout[0], layout[1], layout[2], layout[3]);
-    // Two regions by three quarters.
     assert_eq!(
         (rows - header_rows, cols - label_cols),
         (2, 3),

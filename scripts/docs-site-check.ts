@@ -24,7 +24,6 @@ import { SITE_URL } from "../docs/src/lib/seo.js";
 
 const repository_root = resolve(import.meta.dir, "..");
 const PUBLISHED_URLS = join(repository_root, "docs/published-urls.txt");
-/** Routes that must never be indexed. */
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\//, /^\/404\/$/];
 /** Fewer characters of main text than this is a page whose content renders only in the browser. */
 const MIN_MAIN_TEXT = 200;
@@ -38,9 +37,8 @@ const ONE_DATE_LIMIT = 50;
 /**
  * One page of each kind, with what its static HTML must hold inside `<main>`:
  * text length, h2/h3 headings, internal links, and whether it has code
- * samples. The numbers are about half of what each page held when this list
- * was written, so content edits pass and content that renders only in the
- * browser fails.
+ * samples. Each number is about half of what the page holds, so content edits
+ * pass and content that renders only in the browser fails.
  */
 const CONTENT_SAMPLE: readonly {
   path: string;

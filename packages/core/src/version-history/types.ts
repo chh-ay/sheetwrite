@@ -103,11 +103,11 @@ export interface HistoryHead {
 export interface HistoryStorageUsage {
   /** Bytes the document's history takes in storage. */
   encodedBytes: number;
-  /** Number of stored records. */
+  /** Stored records. A record that several versions share counts once. */
   recordCount: number;
   /** Number of versions, named and automatic. */
   versionCount: number;
-  /** Number of named versions. */
+  /** Named versions. Retention removes one only when `HistoryPruneRequest.deleteVersionId` names it. */
   namedVersionCount: number;
 }
 
@@ -184,9 +184,9 @@ export interface HistoryListRequest extends HistoryStorageRequest {
   fromRevision?: number;
   /** Highest revision to include. */
   toRevision?: number;
-  /** The largest number of entries the page may hold. */
+  /** Entries the page may hold, from 1 to `limits.maxPageEntries`. */
   maxEntries: number;
-  /** The largest size of the page as JSON, in bytes. */
+  /** Largest size of the page as JSON, in bytes, from 1 to `limits.maxPageBytes`. */
   maxBytes: number;
   /** Where to continue, from the previous page's `cursor`. */
   cursor?: string;
@@ -234,7 +234,10 @@ export interface HistoryArchiveOptions {
   documentId: string;
   /** Where the archive stores its records, such as IndexedDB storage from `@sheetwrite/core/browser-history`. */
   storage: HistoryStorageAdapter;
-  /** Overrides for the default limits. */
+  /**
+   * Overrides for `DEFAULT_HISTORY_LIMITS`. Each must be a positive safe
+   * integer, and `maxTransactionBytes` cannot go above its default.
+   */
   limits?: Partial<HistoryLimits>;
 }
 

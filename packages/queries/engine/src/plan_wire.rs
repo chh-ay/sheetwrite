@@ -12,7 +12,8 @@ use crate::plan::{
 };
 use crate::wire::{decode_strings, decode_type};
 
-/// Code lanes above this length are rejected before decoding; saved plans are small.
+/// Code and literal lanes above this length are rejected before decoding; saved plans and
+/// query lists are small.
 const MAX_PLAN_CODES: usize = 256 * 1024;
 
 /// Step codes. `filter`: predicate. `select`: count, ids. `rename`: count, id/name pairs.
@@ -43,7 +44,8 @@ pub(crate) const LITERAL_TRUE: u32 = 2;
 pub(crate) const LITERAL_NUMBER: u32 = 3;
 pub(crate) const LITERAL_TEXT: u32 = 4;
 
-/// A row-count aggregate has no source column.
+/// Marks an absent string: the source column of a row-count aggregate, or an optional string
+/// in a query list.
 pub(crate) const NO_COLUMN: u32 = u32::MAX;
 
 /// Operator codes are one-based positions in these tables; zero is never valid.
@@ -75,7 +77,8 @@ const AGGREGATE_OPS: [AggregateOp; 6] = [
     AggregateOp::Max,
 ];
 
-/// Borrowed host lanes for one plan; the decoder copies only the strings it keeps.
+/// Borrowed host lanes for one plan. The decoder copies the string table once, then clones
+/// each string that the plan uses.
 #[derive(Debug)]
 pub struct PlanWire<'a> {
     /// Step, predicate and literal codes, starting with the step count.
@@ -102,6 +105,10 @@ pub(crate) fn definition() -> Diagnostic {
 
 impl<'a> Cursor<'a> {
     pub(crate) fn new(wire: PlanWire<'a>) -> Result<Self, Diagnostic> {
+        if wire.codes.len() > MAX_PLAN_CODES || wire.numbers.len() > MAX_PLAN_CODES {
+            return Err(Diagnostic::limit());
+        }
+
         Ok(Self {
             codes: wire.codes,
             position: 0,
@@ -170,7 +177,7 @@ impl<'a> Cursor<'a> {
                     .get(row_index(self.code()?)?)
                     .ok_or_else(definition)?;
 
-                // Number lanes store finite values only.
+                // A number literal must be finite, like the values of a number column.
                 if !number.is_finite() {
                     return Err(definition());
                 }
@@ -331,10 +338,6 @@ impl Cursor<'_> {
 
 /// Decodes a bounded saved step list; schema-dependent validation happens in execution.
 pub fn decode_plan(wire: PlanWire<'_>, limits: &Limits) -> Result<Plan, Diagnostic> {
-    if wire.codes.len() > MAX_PLAN_CODES || wire.numbers.len() > MAX_PLAN_CODES {
-        return Err(Diagnostic::limit());
-    }
-
     let mut cursor = Cursor::new(wire)?;
     let plan = cursor.steps(limits)?;
 

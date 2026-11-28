@@ -31,7 +31,6 @@ export interface ValidationList {
   readonly keys: ReadonlySet<string>;
 }
 
-/** The list of `items`. */
 export function validationList(items: readonly CellScalar[]): ValidationList {
   const keys = new Set<string>();
   for (const item of items) if (item !== null) keys.add(item_key(item));

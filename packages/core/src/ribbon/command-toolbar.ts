@@ -47,9 +47,9 @@ export interface CommandToolbarOptions {
 }
 
 /**
- * Legacy toolbar actions that were one-click buttons before 0.7 and are now
- * part of a registry menu or split button. A custom toolbar that names one
- * keeps that one-click button; `command` lends it the registry command's
+ * Toolbar actions whose command sits inside a registry menu or split button.
+ * A custom toolbar that names one gets a one-click button that runs the action
+ * directly; `command` names the registry command that lends the button its
  * availability. Every other `ToolbarActionName` is the id of a registry command.
  */
 interface OneClickAction {
@@ -292,7 +292,8 @@ export class CommandToolbar {
     this.lifetime.add(
       grid.on("change", () => this.refresh((command) => grid.getCommandState(command))),
     );
-    // Absent in some test environments; every command then stays on the row.
+    // Absent in some test environments. The row then fits only at mount and
+    // when command availability changes, not on resize.
     if (typeof ResizeObserver === "function") {
       const resize_observer = new ResizeObserver(() => this.schedule_fit());
       resize_observer.observe(this.element);
@@ -444,9 +445,8 @@ export class CommandToolbar {
   }
 
   private readonly on_keydown = (event: KeyboardEvent): void => {
-    // The toolbar sits inside the grid host, whose handler treats Enter, Space
-    // and arrows as cell navigation. Keep plain keys here; Ctrl/Cmd shortcuts
-    // (undo, copy) still reach the grid, as they do from the ribbon.
+    // Plain keys stop here and Ctrl/Cmd shortcuts reach the grid, as in
+    // `Ribbon.on_keydown`.
     if (!event.ctrlKey && !event.metaKey) event.stopPropagation();
     if (event.key === "Escape") {
       event.preventDefault();

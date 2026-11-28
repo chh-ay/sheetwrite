@@ -240,6 +240,22 @@ fn malformed_sources_and_duplicate_definitions_are_rejected() {
             .code,
         "duplicate-column"
     );
+
+    // Output columns become Excel table headers, which must differ in more than letter case
+    // in every alphabet.
+    let cased = SourceSpec::Json {
+        columns: vec![
+            column("upper", "Ä", ColumnType::Text),
+            column("lower", "ä", ColumnType::Text),
+        ],
+        path: Vec::new(),
+    };
+    assert_eq!(
+        parse_source(b"[]", &cased, &Limits::default())
+            .unwrap_err()
+            .code,
+        "duplicate-column"
+    );
 }
 
 #[test]

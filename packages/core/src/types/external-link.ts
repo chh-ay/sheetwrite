@@ -7,7 +7,7 @@
  */
 export type ExternalLinkValue = number | string | boolean | { error: string };
 
-/** One saved cell of a linked sheet; `row` and `col` start at 0. */
+/** One saved cell of a linked sheet. */
 export interface ExternalLinkCell {
   /** Zero-based row in the linked sheet. */
   row: number;

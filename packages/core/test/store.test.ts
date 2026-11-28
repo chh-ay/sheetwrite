@@ -37,10 +37,8 @@ const set_ref = (address: CellAddress, target: CellAddress, style?: CellStyle): 
   value: { kind: "ref", target },
   ...(style && { style }),
 });
-/** A paged store over the fixture workbook. */
 const paged_store = (rows: number, options: Record<string, number> = {}) =>
   new SheetwriteStore(makeWorkbook(rows), undefined, { storage: "paged", ...options });
-/** The fixture workbook with a second sheet "s2". */
 function with_second_sheet(rows: number): Workbook {
   const workbook = makeWorkbook(rows);
   workbook.sheets.push({ ...structuredClone(workbook.sheets[0]!), id: "s2", name: "Second" });

@@ -15,7 +15,7 @@ describe("sitemap normalization contract", () => {
       "/docs/proof/",
       "/404",
       "/docs/start/installation/",
-      // Query variants name the plain URL as canonical; sitemap XML escapes "&" as "&amp;".
+      // Sitemap XML escapes "&" as "&amp;".
       "/showcases/interoperability/?compatibility=formula.let",
       "/showcases/interoperability/?compatibility=x&amp;view=y",
       "/showcases/interoperability/",

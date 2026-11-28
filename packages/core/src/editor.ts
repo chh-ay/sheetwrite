@@ -1,10 +1,11 @@
+import { cellPadding } from "./canvas-paint.js";
 import {
   EDIT_SURFACE_ATTRIBUTE,
   type EditorFieldMetrics,
   editorLineCount as lineCount,
+  editorTextareaHeight,
   insertEditorLineBreak,
   readEditorFieldMetrics,
-  sizeEditorTextarea,
 } from "./editor-textarea.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
@@ -15,6 +16,9 @@ import type { CellMode } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
+
+/** Room the caret takes past a line's last glyph, in CSS pixels. */
+const CARET_WIDTH = 2;
 
 /**
  * Where the active cell goes after a commit. Enter (`down`, `up`) and Tab
@@ -84,6 +88,19 @@ export interface EditorLook {
   readonly decoration: string;
   /** Space between the text and the cell's left and right gridlines, as the cell paints it at the zoom. */
   readonly pad: number;
+}
+
+/**
+ * Put on the declarations of `look` that differ from what `.sheetwrite-editor`
+ * (grid.css) already gives the editor: the theme's font and colour, left
+ * alignment, no decoration and the cell padding at zoom 1.
+ */
+function write_look(style: CSSStyleDeclaration, look: EditorLook, theme: Theme): void {
+  if (look.font !== theme.font) style.font = look.font;
+  if (look.color !== theme.fg) style.color = look.color;
+  if (look.align !== "left") style.textAlign = look.align;
+  if (look.decoration !== "none") style.textDecoration = look.decoration;
+  if (look.pad !== cellPadding(1)) style.setProperty("--sheetwrite-cell-pad", `${look.pad}px`);
 }
 
 export interface BeginEditOptions {
@@ -169,8 +186,9 @@ export class EditController {
   private ref_end = -1;
   private readonly assist: FormulaAssist | null;
   private assist_attached = false;
-  // Read once per open and again only when the editor's line height changes,
-  // so sizing reads only the textarea's own box, never its computed style.
+  // The textarea's line height and insets: read on the first multi-line sizing
+  // of an open, and again only after the line height changes. One line needs
+  // none of them, so opening the editor reads no style and no layout.
   private metrics: EditorFieldMetrics | null = null;
   private metrics_line_height = "";
   private sizing: EditorSizing | null = null;
@@ -185,6 +203,8 @@ export class EditController {
   private reported_mode: EditorMode | null = null;
   /** A refused formula's message is open: commits and blur wait for it. */
   private refusing = false;
+  /** Measures the edited line's width without laying the page out; see {@link reveal_line_end}. */
+  private measure_context: CanvasRenderingContext2D | null | undefined;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -237,16 +257,10 @@ export class EditController {
     ta.style.setProperty("--sheetwrite-fg", opts.theme.fg);
     ta.style.setProperty("--sheetwrite-bg", opts.theme.bg);
     // The cell's own formatting is content, not theme: it goes on inline, as
-    // the canvas paints it, so the text does not jump when the edit starts or ends.
-    const look = opts.look;
-    if (look !== undefined) {
-      const { style } = ta;
-      style.font = look.font;
-      style.color = look.color;
-      style.textAlign = look.align;
-      style.textDecoration = look.decoration;
-      style.setProperty("--sheetwrite-cell-pad", `${look.pad}px`);
-    }
+    // the canvas paints it, so the text does not jump when the edit starts or
+    // ends. Only what differs from the stylesheet goes on: inline declarations
+    // make the style recalculation that focusing the editor forces slower.
+    if (opts.look !== undefined) write_look(ta.style, opts.look, opts.theme);
 
     this.host.appendChild(ta);
     this.textarea = ta;
@@ -267,11 +281,32 @@ export class EditController {
     } else {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
+      this.reveal_line_end(ta, opts);
     }
     // The key that opened the editor is the first typed character.
     if (opts.focus && opts.entering) this.auto_complete(ta);
     if (opts.focus) this.attach_assist();
     this.report_mode();
+  }
+
+  /**
+   * Scroll the editor so the caret at the end of a last line wider than the
+   * editor shows. Chromium scrolls to the caret when the selection is set;
+   * Firefox and WebKit do not. The line is measured on a canvas, so a line that
+   * fits, the usual case, reads no layout; only a wider one costs the layout
+   * that setting the scroll needs.
+   */
+  private reveal_line_end(ta: HTMLTextAreaElement, opts: BeginEditOptions): void {
+    const line = ta.value.slice(ta.value.lastIndexOf("\n") + 1);
+    if (line === "") return;
+    this.measure_context ??= document.createElement("canvas").getContext("2d");
+    const context = this.measure_context;
+    if (context === null) return;
+    context.font = opts.look?.font ?? opts.theme.font;
+    // The text box: the cell less the editor's padding and border on each side (grid.css).
+    const room = opts.rect.w - 2 * (opts.look?.pad ?? cellPadding(1));
+    const overflow = context.measureText(line).width + CARET_WIDTH - room;
+    if (overflow > 0) ta.scrollLeft = overflow;
   }
 
   /**
@@ -311,7 +346,7 @@ export class EditController {
       const line_height = `${Math.max(1, rect.h - 4)}px`;
       if (line_height !== this.metrics_line_height) {
         ta.style.lineHeight = line_height;
-        this.metrics = readEditorFieldMetrics(ta);
+        this.metrics = null;
         this.metrics_line_height = line_height;
       }
       this.size(rect.h);
@@ -422,15 +457,22 @@ export class EditController {
     if (this.textarea && this.opts) this.size(this.opts.rect.h);
   }
 
+  /**
+   * Fit the explicit lines, up to eight. One line is the cell's height. The
+   * editor has no horizontal scrollbar (`overflow-x: hidden` in grid.css), so
+   * no line can hide under one and its box is never read back.
+   */
   private size(minimum_height: number): void {
     const ta = this.textarea;
     if (!ta) return;
-    sizeEditorTextarea(ta, minimum_height, this.metrics);
-    this.sizing = {
-      width: ta.style.width,
-      minimumHeight: minimum_height,
-      lines: lineCount(ta.value),
-    };
+    const lines = lineCount(ta.value);
+    if (lines > 1) this.metrics ??= readEditorFieldMetrics(ta);
+    const height =
+      lines > 1 && this.metrics !== null
+        ? editorTextareaHeight(lines, minimum_height, this.metrics)
+        : minimum_height;
+    ta.style.height = `${height}px`;
+    this.sizing = { width: ta.style.width, minimumHeight: minimum_height, lines };
   }
 
   /**

@@ -64,19 +64,43 @@ impl RowVisibility {
     /// pairs of inclusive rows in ascending order without overlap. Returns
     /// `None`, and keeps the old rows, when a slice breaks that rule;
     /// otherwise whether the hidden rows changed.
+    #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn replace(&mut self, manual: &[u32], filtered: &[u32]) -> Option<bool> {
-        let next = HiddenRuns {
+        Some(self.store(HiddenRuns {
             manual: parse_runs(manual)?,
             filtered: parse_runs(filtered)?,
-        };
+        }))
+    }
 
+    /// Like [`Self::replace`], but the filter's rows come as the rows of
+    /// `0..row_count` it keeps, ascending, or `None` when no filter is on;
+    /// it hides the others. Returns `None`, and keeps the old rows, when
+    /// `manual` breaks its rule or `kept` is out of order or past the sheet.
+    pub(crate) fn replace_kept(
+        &mut self,
+        manual: &[u32],
+        kept: Option<&[u32]>,
+        row_count: u32,
+    ) -> Option<bool> {
+        let filtered = match kept {
+            Some(rows) => missing_runs(rows, row_count)?,
+            None => Vec::new(),
+        };
+        Some(self.store(HiddenRuns {
+            manual: parse_runs(manual)?,
+            filtered,
+        }))
+    }
+
+    /// Keeps `next`; whether the hidden rows changed.
+    fn store(&mut self, next: HiddenRuns) -> bool {
         let stored = (!next.manual.is_empty() || !next.filtered.is_empty()).then(|| Box::new(next));
         if self.0 == stored {
-            return Some(false);
+            return false;
         }
 
         self.0 = stored;
-        Some(true)
+        true
     }
 
     /// A cursor over the rows that `skipped` leaves out, for a walk down the
@@ -244,6 +268,33 @@ fn parse_runs(packed: &[u32]) -> Option<Vec<RowRun>> {
             return None;
         }
         push_merged(&mut runs, run);
+    }
+    Some(runs)
+}
+
+/// The runs of `0..row_count` that the ascending `kept` rows leave out; `None`
+/// when a kept row repeats, comes out of order or is past the sheet. The runs
+/// are apart by at least one kept row, so none of them touch.
+fn missing_runs(kept: &[u32], row_count: u32) -> Option<Vec<RowRun>> {
+    let mut runs = Vec::new();
+    let mut next = 0;
+    for &row in kept {
+        if row < next || row >= row_count {
+            return None;
+        }
+        if row > next {
+            runs.push(RowRun {
+                start: next,
+                end: row - 1,
+            });
+        }
+        next = row + 1;
+    }
+    if next < row_count {
+        runs.push(RowRun {
+            start: next,
+            end: row_count - 1,
+        });
     }
     Some(runs)
 }

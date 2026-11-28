@@ -5,19 +5,17 @@ use std::mem::MaybeUninit;
 
 use crate::calc::Func;
 use crate::cells::payload_num;
-use crate::types::{EvalResult, FormulaError, Value, KIND_EMPTY, KIND_NUMBER, RANGE_CELL_LIMIT};
+use crate::types::{
+    EvalResult, FormulaError, Value, KIND_EMPTY, KIND_NUMBER, MAX_FUNCTION_ARGS, RANGE_CELL_LIMIT,
+};
 
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
 use super::{date, financial, math, statistics, text};
 
-// The column fold tells empty and number kinds apart from the rest by their
-// bits alone.
 const _: () = assert!(
     KIND_EMPTY == 0 && KIND_NUMBER == 1,
     "the column fold tells empty and number kinds apart by their bits"
 );
-
-pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 
 #[derive(Debug)]
 pub(super) struct FuncValue {
@@ -53,7 +51,7 @@ impl Default for FuncAccumulator {
 impl FuncAccumulator {
     #[allow(
         unsafe_code,
-        reason = "arguments live in a fixed array of MaybeUninit slots; a safe layout is not yet measured on both machines"
+        reason = "a new accumulator leaves its 255 argument slots (about 4 KB) unwritten; only the slots below arg_count, which are written first, are read"
     )]
     fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
         if index >= self.arg_count {

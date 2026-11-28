@@ -42,7 +42,8 @@ export async function replaceDocument(
     run.signal.throwIfAborted();
     assert_replacement_allowed(host);
 
-    // Construction and hydration may fail. None of the live owners is reset first.
+    // `replaceSnapshot` builds and hydrates the new document, and it can fail.
+    // The live owners are reset only after it succeeds.
     host.store?.replaceSnapshot(snapshot);
     host.cancelOperations();
     host.windows.resetDocument();

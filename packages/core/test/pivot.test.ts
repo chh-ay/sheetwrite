@@ -150,6 +150,18 @@ describe("pivot definitions in snapshots", () => {
     }
   });
 
+  it("keeps the 255-character pivot ID bound that 0.6 documents were saved under", () => {
+    expect(validateWorkbookSnapshot(snapshot([range_pivot({ id: "p".repeat(255) })])).ok).toBe(
+      true,
+    );
+
+    const checked = validateWorkbookSnapshot(snapshot([range_pivot({ id: "p".repeat(256) })]));
+    if (checked.ok) throw new Error("expected a rejection");
+    expect(checked.errors).toContainEqual(
+      expect.objectContaining({ path: "sheets[0].pivots[0].id", code: "invalid-value" }),
+    );
+  });
+
   it.each([
     [
       "a pivot ID used on two sheets",
@@ -729,8 +741,8 @@ describe("pivot engine boundary on the default engine", () => {
 });
 
 it("preserves full-engine pivot output through structural undo, transfer and write refusal", async () => {
-  // Engine selection is process-wide. Exercise the full provider in its own
-  // process so the default-engine contract above remains independent.
+  // The full provider runs in the probe's own process (see its header), so the
+  // default-engine tests above stay independent of it.
   const probe = Bun.spawn(
     [
       process.execPath,

@@ -181,9 +181,8 @@ pub(super) struct Definition {
     /// that uses a name some sheet defines in its own scope, directly or
     /// through other names. Such a formula is read in a copy whose name
     /// shapes are marked for the reading sheet ([`shapes`]), and this holds
-    /// its facts as each sheet with names of its own reads it. One thin
-    /// pointer, so a formula that reads alike everywhere pays no more than
-    /// the flag it replaces.
+    /// its facts as each sheet with names of its own reads it. A formula
+    /// that reads alike everywhere pays only this one pointer.
     sheet_shapes: Option<Box<SheetFacts>>,
     /// What the formula does that the formulas using the name inherit,
     /// worked out when the names are bound, as the workbook reads it.
@@ -236,7 +235,6 @@ impl NameFacts {
     #[cfg(feature = "analysis")]
     pub(crate) const CALLS_PIVOT_DATA: Self = Self(1 << 4);
 
-    /// Whether `fact` holds.
     pub(crate) const fn has(self, fact: Self) -> bool {
         self.0 & fact.0 != 0
     }
@@ -284,7 +282,6 @@ pub(crate) enum InPlace<'a> {
     Shifted(&'a Ast, (u32, u32)),
 }
 
-/// The cells a named range covers.
 const fn range_cells(range: &NamedRangeRef) -> CellRange {
     CellRange::new(
         range.sheet,
@@ -304,7 +301,6 @@ pub(crate) struct NameRead<'a> {
 }
 
 impl<'a> NameRead<'a> {
-    /// A read that guards no name.
     const fn unguarded(view: NameView<'a>) -> Self {
         Self {
             view,
@@ -413,12 +409,10 @@ pub(crate) struct NameScope<'a> {
 }
 
 impl<'a> NameScope<'a> {
-    /// The names of a formula on `sheet`, read from `bindings`.
     pub(crate) const fn new(bindings: &'a Bindings, sheet: u32) -> Self {
         Self { bindings, sheet }
     }
 
-    /// The name table.
     pub(crate) const fn table(self) -> &'a NameTable {
         &self.bindings.names
     }
@@ -815,14 +809,13 @@ impl NameTable {
         let before = entry.definitions.len();
         entry.definitions.retain(|(defined, _)| *defined != scope);
         let removed = entry.definitions.len() != before;
-        // A name left with no definition keeps only its entry.
+        // A name left with no definition frees its list; its entry stays.
         if entry.definitions.is_empty() {
             entry.definitions = Vec::new();
         }
         removed
     }
 
-    /// Whether any scope defines `key`.
     pub(super) fn defines(&self, key: &str) -> bool {
         self.id(key)
             .and_then(|id| self.entry(id))
@@ -841,8 +834,8 @@ impl NameTable {
     }
 
     /// Keep only the definitions `keep` accepts; it gets each one's scope and
-    /// folded name, and may change it. Takes a `dyn` closure so each caller
-    /// shares one copy of the walk.
+    /// its name's spelling, and may change it. Takes a `dyn` closure so each
+    /// caller shares one copy of the walk.
     pub(super) fn retain(&mut self, keep: &mut KeepDefinition<'_>) {
         for entry in self.entries_mut() {
             let spelling = &entry.spelling;
@@ -1105,9 +1098,10 @@ impl CellStore {
                 if changed.contains(&key) {
                     continue;
                 }
-                let mut used = Vec::new();
-                used_names(&formula.ast, &mut used);
-                if used
+                let mut uses = NameUses::default();
+                used_names(&formula.ast, &mut uses);
+                if uses
+                    .names
                     .iter()
                     .any(|name| changed.contains(&workbook_name_key(name)))
                 {
@@ -1125,9 +1119,8 @@ impl CellStore {
     /// and flags again from their trees, which hold only the names' ids; the
     /// dependency index patches their reads and they recalculate. A formula
     /// whose tree a change does alter is parsed again from its text: one
-    /// that calls a changed name that no longer holds a formula, or that
-    /// holds a changed name unbound, and one with a LET, whose tree is
-    /// resolved in place.
+    /// that calls a changed name or holds one unbound, and one that reads a
+    /// changed name and has a LET, whose tree is resolved in place.
     pub(super) fn rebind_name_users(&mut self, mut changed: Vec<String>) {
         if changed.is_empty() {
             return;
@@ -1231,8 +1224,6 @@ impl CellStore {
                 formula.nodes.set(None);
             }
         }
-        // Past the limit, a formula reads as `#NUM!`, as a LET does past
-        // its expansion limit.
         for (at, _) in bound {
             let oversized = table.entries().get(at.0).is_some_and(|entry| {
                 let scope = entry.definitions.get(at.1).and_then(|(scope, _)| *scope);
@@ -1360,7 +1351,6 @@ impl CellStore {
         }
     }
 
-    /// Follow a sheet rename in every name's formula.
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         let sheets = &self.sheet_names;
         for entry in self.bindings.names.entries_mut() {
@@ -1505,8 +1495,8 @@ enum NameUse {
 /// The formulas of a sheet whose tree uses a defined name. A name change
 /// scans every formula for them and usually finds few, so the scan has a
 /// loop of its own, out of line; the `_family` suffix keeps wasm-opt from
-/// inlining it back. Under JavaScriptCore this list made the scan of
-/// `name-define-unused` 7% faster than a callback per user.
+/// inlining it back. Under JavaScriptCore, a list makes the scan of the
+/// `name-define-unused` benchmark about 7% faster than a callback per user.
 #[inline(never)]
 fn name_users_family(formulas: &SheetFormulas, slots: &FormulaStore) -> Vec<FormulaId> {
     formulas
@@ -1551,7 +1541,6 @@ fn name_use(
     }
 }
 
-/// Visit `ast` and every node below it.
 fn walk(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     visit(ast);
     ast.any_child(&mut |child| {
@@ -1604,35 +1593,72 @@ fn reference_target(ast: &Ast, formula_sheet: u32, shift: (u32, u32)) -> Option<
     })
 }
 
-/// The names that `ast` uses, as a name or as a function it calls.
+/// What [`used_names`] gathers: the names a formula uses, and the LET
+/// variables in scope at the node it walks.
+#[derive(Default)]
+struct NameUses<'a> {
+    names: Vec<&'a str>,
+    locals: Vec<&'a str>,
+}
+
+impl<'a> NameUses<'a> {
+    /// Adds `name` unless a LET variable in scope has its spelling: inside
+    /// its LET, a variable reads its own value whatever defined name is
+    /// spelled the same, as in Excel.
+    fn add(&mut self, name: &'a str) {
+        if !self
+            .locals
+            .iter()
+            .any(|local| local.eq_ignore_ascii_case(name))
+        {
+            self.names.push(name);
+        }
+    }
+}
+
+/// Adds to `uses` the names that `ast` uses, as a name or as a function it
+/// calls. A name's formula keeps its LET variables as names, so a LET's
+/// variables are in scope from the value after each one to the end of the
+/// LET, as the binder scopes them.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node uses no name"
 )]
-fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
+fn used_names<'a>(ast: &'a Ast, uses: &mut NameUses<'a>) {
     match ast {
-        Ast::Name(name) | Ast::LetName { name, .. } => names.push(name),
+        Ast::Name(name) => uses.add(name),
         Ast::UnknownFunc(call) => {
-            names.push(&call.name);
+            uses.add(&call.name);
             for arg in &call.args {
-                used_names(arg, names);
+                used_names(arg, uses);
             }
+        }
+        Ast::Func(crate::calc::Func::Let, args, _) if args.len() >= 3 && args.len() % 2 == 1 => {
+            let outer = uses.locals.len();
+            if let Some((body, bindings)) = args.split_last() {
+                for [binding, value] in bindings.as_chunks::<2>().0 {
+                    used_names(value, uses);
+                    if let Ast::Name(local) = binding {
+                        uses.locals.push(local);
+                    }
+                }
+                used_names(body, uses);
+            }
+            uses.locals.truncate(outer);
         }
         Ast::Func(_, args, _) => {
             for arg in args {
-                used_names(arg, names);
+                used_names(arg, uses);
             }
         }
         Ast::Bin(_, left, right, _) | Ast::Cmp(_, left, right, _) => {
-            used_names(left, names);
-            used_names(right, names);
+            used_names(left, uses);
+            used_names(right, uses);
         }
-        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => {
-            used_names(inner, names)
-        }
-        Ast::LetSlot { expression, .. } => used_names(expression, names),
+        Ast::Neg(inner, _) | Ast::Pos(inner, _) | Ast::Percent(inner, _) => used_names(inner, uses),
+        Ast::LetSlot { expression, .. } => used_names(expression, uses),
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => used_names(&definition.body, names),
+        Ast::Lambda(definition) => used_names(&definition.body, uses),
         _ => {}
     }
 }

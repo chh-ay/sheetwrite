@@ -27,10 +27,9 @@ import { Island } from "../islands/Island.js";
 import landingStylesheet from "@docs/styles/landing.css?url";
 
 /*
- * The product landing, ported from docs/src/routes/index.tsx. The page is
- * static; the hero, the architecture scene, the story reel and the framework
- * snippets are islands. The grid glow and the feature cards' animations are
- * plain DOM (lib/landing.ts).
+ * The product landing. The page is static; the hero, the architecture scene,
+ * the story reel and the framework snippets are islands. The grid glow and
+ * the feature cards' animations are plain DOM (lib/landing.ts).
  */
 
 export const Route = createFileRoute("/")({

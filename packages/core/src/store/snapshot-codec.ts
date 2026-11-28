@@ -101,7 +101,11 @@ export function decodeWorkbookSnapshot(
   return { snapshot, workbook };
 }
 
-/** Cold-path serializer over stable live owners; none of these references are copied on reads. */
+/**
+ * Encodes the live workbook as a snapshot. It holds the store's workbook,
+ * window reader and handle-to-sheet list by reference and copies nothing
+ * until `encode` runs.
+ */
 export class StoreSnapshotCodec {
   constructor(
     private readonly workbook: Workbook,

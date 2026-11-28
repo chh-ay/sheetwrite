@@ -62,6 +62,34 @@ fn assert_spills(cases: &[SpillCase<'_>]) {
     assert!(mismatches.is_empty(), "\n{}", mismatches.join("\n"));
 }
 
+/// Excel's specifications and limits give 255 arguments per function: a
+/// call with 255 is evaluated. The parser refuses a 256-argument call, as
+/// Excel does when the formula is entered, so the cell shows `#VALUE!`.
+#[test]
+fn functions_take_at_most_255_arguments() {
+    let call = |name: &str, count: usize, argument: &str| {
+        format!("{name}({})", vec![argument; count].join(","))
+    };
+    let cases = [
+        vec![
+            (format!("={}", call("SUM", 255, "1")), "255"),
+            (format!("={}", call("SUM", 256, "1")), "#VALUE!"),
+            (format!("=NPV(0,{})", vec!["1"; 254].join(",")), "254"),
+            (format!("={}", call("AVERAGEA", 255, "1")), "1"),
+        ],
+        #[cfg(feature = "analysis")]
+        vec![
+            (format!("={}", call("IMSUM", 255, "\"1+i\"")), "255+255i"),
+            (format!("={}", call("IMSUM", 256, "\"1+i\"")), "#VALUE!"),
+            (format!("=ROWS({})", call("VSTACK", 255, "1")), "255"),
+            (format!("=ROWS({})", call("VSTACK", 256, "1")), "#VALUE!"),
+        ],
+    ]
+    .concat();
+    let (mut store, report) = data_workbook(2, cases.len());
+    assert_formulas(&mut store, report, 0, &cases);
+}
+
 #[cfg(feature = "analysis")]
 #[test]
 fn lambda_arguments_can_be_errors_that_the_body_handles() {
@@ -164,9 +192,7 @@ fn engineering_functions() {
     ]);
 }
 
-/// The IM function examples, parsed text forms and errors. Published
-/// results with 15 significant digits can differ in the last digit with the
-/// order of operations, so they match to 1E-13 of their size.
+/// The IM function examples, parsed text forms and errors.
 #[cfg(feature = "analysis")]
 #[allow(clippy::too_many_lines, reason = "one table of formula cases")]
 #[test]
@@ -177,6 +203,9 @@ fn complex_functions() {
         ("=COMPLEX(0,1)", "i"),
         ("=COMPLEX(1,0)", "1"),
         ("=IMABS(\"5+12i\")", "13"),
+        // Squaring parts past 1E154 overflows; the modulus does not.
+        ("=IMABS(\"3E+200+4E+200i\")", "~5.00000000000000E+200"),
+        ("=IMABS(\"3E-200+4E-200i\")", "~5.00000000000000E-200"),
         ("=IMAGINARY(\"3+4i\")", "4"),
         ("=IMAGINARY(\"0-j\")", "-1"),
         ("=IMAGINARY(4)", "0"),
@@ -258,7 +287,9 @@ fn complex_functions() {
         ("IMSQRT(\"1+i\")", "1.09868411346781+0.455089860562227i"),
         ("IMTAN(\"4+3i\")", "0.00490825806749606+1.00070953606723i"),
     ];
-    // Each part within 1E-13 of its own size, as the published digits allow.
+    // Published results with 15 significant digits can differ in the last
+    // digit with the order of operations, so each part matches to 1E-13 of
+    // its own size.
     let cases: Vec<(String, &str)> = rounded
         .iter()
         .flat_map(|(call, published)| {
@@ -618,6 +649,13 @@ fn discrete_distribution_functions() {
         ("=BINOM.DIST.RANGE(60,0.75,48)", "0.084±0.0005"),
         ("=BINOM.DIST.RANGE(60,0.75,45,50)", "0.524±0.0005"),
         ("=BINOM.INV(6,0.5,0.75)", "4"),
+        // Past 2^53 not every whole number is a double; the search for the
+        // smallest count still ends.
+        (
+            "=BINOM.INV(2^60,0.9999999999999999,0.5)",
+            "~1.15292150460685E+18",
+        ),
+        ("=CRITBINOM(2^60,1,0.5)", "~1.15292150460685E+18"),
         ("=HYPGEOM.DIST(1,4,8,20,TRUE)", "0.4654±0.00005"),
         ("=HYPGEOM.DIST(1,4,8,20,FALSE)", "0.3633±0.00005"),
         ("=NEGBINOM.DIST(10,5,0.25,TRUE)", "0.3135141±0.00000005"),
@@ -1462,6 +1500,12 @@ fn analysis_text_functions() {
             (r#"=TEXTBEFORE("","x")"#, ""),
             (r#"=TEXTBEFORE("a","x",,,, "missing")"#, "missing"),
             (r#"=TEXTAFTER("a-b","-",,,,1/0)"#, "b"),
+            // An array of delimiters: the first match of any of them counts.
+            (r#"=TEXTBEFORE("Jones, Bob",{", ",","})"#, "Jones"),
+            (r#"=TEXTAFTER("Jones,Bob",{", ",","})"#, "Bob"),
+            (r#"=TEXTBEFORE("a-b c",{" ","-"},2)"#, "a-b"),
+            (r#"=TEXTAFTER("a-b c",{" ","-"},-1)"#, "c"),
+            (r#"=TEXTAFTER("a-b c",{"x","y"},,,,"none")"#, "none"),
             ("=FIXED(1234.567,1)", "1,234.6"),
             ("=FIXED(1234.567,-1,TRUE)", "1230"),
             ("=DOLLAR(-1234.567,2)", "($1,234.57)"),
@@ -2378,7 +2422,7 @@ fn text_applies_the_number_format_codes() {
         ("=TEXT(1234.5,\"General\")", "1234.5"),
         ("=TEXT(45000,\"yyyy-mm-dd\")", "2023-03-15"),
         // A percent code that takes the number past the largest double
-        // overflows: #NUM!, as for Excel's numeric functions (#433).
+        // overflows: #NUM!, as for Excel's numeric functions.
         ("=TEXT(9.99999999999999E+307,\"0%\")", "#NUM!"),
         ("=TEXT(-9.99999999999999E+307,\"0.0%;(0.0%)\")", "#NUM!"),
         ("=TEXT(1E+305,\"0%%\")", "#NUM!"),
@@ -2623,7 +2667,7 @@ fn branch_functions_take_array_arguments_element_by_element() {
 /// and `SUM(IF(ISERROR(Data),"",Data))`; the rows marked "documented" follow
 /// those examples. The TEXT row uses `yyyy-mm-dd`, as the engine has no
 /// month names. Every other row applies the same rule to a function the
-/// page doesn't show, and is on the Excel checks list (#219).
+/// page doesn't show, and is not yet checked in Excel.
 const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     // Documented.
     ("=SQRT({1,4;9,16})", 2, &["1", "2", "3", "4"]),
@@ -2683,8 +2727,8 @@ const LIFTED_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
 /// The full engine's functions under the same rule; each family declares
 /// which of its arguments take one value. Microsoft Support, "TEXTBEFORE
 /// function": an array of delimiters means any of them, so that argument is
-/// not lifted (documented). Every other row is on the Excel checks list
-/// (#219).
+/// not lifted (documented). Every other row applies the same rule and is not
+/// yet checked in Excel.
 #[cfg(feature = "analysis")]
 const LIFTED_ANALYSIS_FUNCTION_RESULTS: &[SpillCase<'static>] = &[
     ("=TEXTBEFORE(\"a-b;c\",{\"-\",\";\"})", 1, &["a", ""]),
@@ -2717,8 +2761,7 @@ fn functions_that_take_one_value_run_once_for_each_element() {
 }
 
 /// A call decides whether it can lift when the formula is entered. A name
-/// that the formula reads before it is defined can still become a range,
-/// so the call lifts once the name is defined.
+/// that the formula reads before it is defined can still become a range.
 #[test]
 fn a_name_defined_after_the_formula_still_lifts_the_call() {
     let (mut store, report) = data_workbook(2, 4);
@@ -2731,9 +2774,8 @@ fn a_name_defined_after_the_formula_still_lifts_the_call() {
     assert_eq!(shown_cells, ["1", "0", "1"]);
 }
 
-/// A scalar condition evaluates only the branch it takes: the SEQUENCE in
-/// the untaken branch builds no array. The second formula takes that branch
-/// and shows that the count sees it.
+/// The SEQUENCE in the untaken branch builds no array. The second formula
+/// takes that branch and shows that the count sees it.
 #[test]
 fn a_scalar_condition_evaluates_only_the_branch_it_takes() {
     let result_and_arrays_built = |formula: &str| {

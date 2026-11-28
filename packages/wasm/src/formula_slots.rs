@@ -17,7 +17,9 @@ const MIN_SLOT_GROWTH: usize = 1;
 /// Below this many slots, location growth takes several steps at once.
 const DOUBLING_SLOT_LIMIT: usize = 4096;
 
-// One membership word of ids per page bounds moves of occupied entry storage.
+// Entry pages hold one membership word of ids (64 slots) each. Growth adds a
+// page and never moves the entries of earlier pages. It is also the smallest
+// location capacity.
 const SLOT_PAGE_LEN: usize = BITS_PER_WORD;
 
 /// The location capacity after `len` slots fill it. Every capacity is a step
@@ -55,7 +57,10 @@ impl FormulaId {
     }
 }
 
-/// Primary membership bits shared by dirty work and active evaluation state.
+/// A set of formula ids, one bit per id, with a member count so the empty
+/// check is constant-time. A pass keeps its selected, settled, pulled and
+/// active formulas in such sets; the store keeps its volatile, SUBTOTAL and
+/// GETPIVOTDATA formulas in them.
 #[derive(Default)]
 pub(crate) struct FormulaBits {
     words: Vec<u64>,
@@ -302,9 +307,9 @@ impl TableUsers {
 }
 
 /// The formulas an edit elsewhere has to find: those that name a sheet the
-/// workbook does not have, and those that use a table. A sheet that
-/// appears finds its formulas by a scan, since few formulas name a missing
-/// sheet.
+/// workbook does not have, those that use a table, and those that call
+/// GETPIVOTDATA. A sheet that appears finds its formulas by a scan, since
+/// few formulas name a missing sheet.
 #[derive(Default)]
 struct ReferenceUsers {
     /// The missing sheet names each formula holds, each once.
@@ -516,7 +521,8 @@ impl FormulaStore {
             .collect()
     }
 
-    /// Reuse a free slot or grow one page; source writes preflight id capacity.
+    /// Reuse a free slot or add one at the end. Source writes check
+    /// [`Self::can_allocate`] first, so an exhausted id space changes no cell.
     #[inline(never)]
     pub(crate) fn allocate(
         &mut self,
@@ -657,6 +663,11 @@ impl FormulaStore {
     /// references `OFFSET` and `INDIRECT`.
     pub(crate) fn has_volatile(&self) -> bool {
         !self.volatile.is_empty()
+    }
+
+    /// Whether any formula calls SUBTOTAL or AGGREGATE.
+    pub(crate) fn has_subtotals(&self) -> bool {
+        !self.subtotals.is_empty()
     }
 
     /// Select edit-barrier seeds without walking the formula syntax tree.
@@ -857,12 +868,13 @@ pub(crate) struct FormulaResults {
 struct PassScratch {
     /// LET slot values and resolved bindings.
     let_frame: crate::eval::LetFrame,
-    /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
     regexes: PassRegexes,
     /// LAMBDA parameter values of the calls in progress.
     #[cfg(feature = "analysis")]
     call_frame: crate::eval::analysis::lambda::CallFrame,
+    /// Sorted numbers of the literal ranges LARGE, SMALL and RANK.EQ share.
+    ordered_ranges: crate::eval::OrderedRanges,
 }
 
 /// Compiled regex programs one pass keeps at once. Formulas that alternate
@@ -959,8 +971,8 @@ impl FormulaResults {
         }
     }
 
-    /// A result waiting to be written. The list is short, so it is searched
-    /// from its newest entry.
+    /// A result waiting to be written. The list is short, so a linear search
+    /// finds it.
     #[inline]
     pub(crate) fn pulled(&self, id: FormulaId) -> Option<&EvalResult> {
         if !self.pulled_bits.contains(id) {
@@ -997,7 +1009,8 @@ impl FormulaResults {
         }
     }
 
-    /// The oldest waiting result, which the pass writes next.
+    /// Takes one waiting result for the pass to write. The order is not kept:
+    /// `swap_remove` moves the newest result to the front.
     pub(crate) fn pop_pulled(&mut self) -> Option<(FormulaId, EvalResult)> {
         if self.pulled.is_empty() {
             return None;
@@ -1056,9 +1069,27 @@ impl FormulaResults {
         self.range_sums.last = Some((range, sum));
     }
 
-    /// The search states of lookup ranges in this pass.
     pub(crate) fn lookup_states(&mut self) -> &mut crate::eval::LookupStates {
         &mut self.lookups
+    }
+
+    /// The sorted numbers this pass keeps for range group `group`.
+    pub(crate) fn ordered_range(&self, group: usize) -> Option<crate::eval::OrderedRange> {
+        self.scratch.as_deref()?.ordered_ranges.get(group)
+    }
+
+    /// Keeps the sorted numbers of range group `group` for the rest of the
+    /// pass; `groups` is the index's group count.
+    pub(crate) fn share_ordered_range(
+        &mut self,
+        group: usize,
+        groups: usize,
+        sorted: crate::eval::OrderedRange,
+    ) {
+        self.scratch
+            .get_or_insert_with(Box::default)
+            .ordered_ranges
+            .insert(group, groups, sorted);
     }
 
     /// The program this pass compiled for exactly `pattern` in this case mode.

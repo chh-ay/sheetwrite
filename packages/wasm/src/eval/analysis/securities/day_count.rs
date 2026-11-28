@@ -167,12 +167,10 @@ impl Date {
         Self { year, month, day }
     }
 
-    /// The same date with another day of the month.
     pub(crate) const fn with_day(self, day: i64) -> Self {
         Self { day, ..self }
     }
 
-    /// The last day of the date's month.
     pub(crate) fn month_end(self) -> Self {
         self.with_day(days_in_month(self.year, self.month))
     }
@@ -215,19 +213,19 @@ impl Coupons {
     }
 }
 
-/// The months in one coupon period.
 pub(crate) const fn period_months(frequency: f64) -> i64 {
     MONTHS_PER_YEAR / frequency as i64
 }
 
-/// Actual calendar days from `start` to `end`.
 pub(crate) fn actual_days(start: Date, end: Date) -> f64 {
     end.serial() - start.serial()
 }
 
-/// US 30/360 days. Both rules change a 31st and a last day of February to
-/// the 30th. `change_both` also changes the end date when the start date is
-/// not at a month end.
+/// US 30/360 days. A start date on the 31st or on the last day of February
+/// counts as the 30th. An end date on the last day of February counts as the
+/// 30th when the start date is one too, and an end date on the 31st when the
+/// start day is 30 or 31. `change_both` changes such end dates whatever the
+/// start date.
 pub(crate) fn days_360_us(start: Date, end: Date, change_both: bool) -> f64 {
     let mut start_day = start.day;
     let mut end_day = end.day;
@@ -264,9 +262,11 @@ const fn days_360(start: Date, start_day: i64, end: Date, end_day: i64) -> f64 {
     (years * 360 + months * DAYS_PER_30_360_MONTH + end_day - start_day) as f64
 }
 
-/// The actual/actual year length. An interval of up to one year has 366
-/// days when it holds a 29 February, or ends on one. A longer interval uses
-/// the average length of the calendar years it touches.
+/// The actual/actual year length. An interval inside one calendar year has
+/// 366 days when that year is a leap year. An interval of up to one year
+/// across two calendar years has 366 days when it holds a 29 February or
+/// ends on one. A longer interval uses the average length of the calendar
+/// years it touches.
 fn actual_year_days(start: Date, end: Date) -> f64 {
     let is_within_a_year = start.year == end.year
         || (end.year == start.year + 1 && (start.month, start.day) >= (end.month, end.day));

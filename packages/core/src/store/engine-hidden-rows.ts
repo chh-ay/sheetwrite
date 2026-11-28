@@ -3,25 +3,33 @@ import type { RowGroup, Workbook } from "../types/document.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
 
 const EMPTY_RUNS = new Uint32Array(0);
-const NOTHING_HIDDEN: SentRuns = { manual: EMPTY_RUNS, filtered: EMPTY_RUNS };
+const NOTHING_HIDDEN: SentRows = { manual: EMPTY_RUNS, kept: null };
 
-interface SentRuns {
+interface SentRows {
+  /** Rows hidden by hand or by a collapsed group, as packed runs. */
   readonly manual: Uint32Array;
-  readonly filtered: Uint32Array;
+  /** The rows the filters keep, or `null` when no filter is on. */
+  readonly kept: Uint32Array | null;
 }
 
 /**
  * Sends the hidden rows of each sheet to the engine, where SUBTOTAL and
  * AGGREGATE skip them. The engine keeps two kinds apart, as Excel does: rows
- * hidden by hand or by a collapsed row group, and rows that a filter hides.
- * Both travel as packed inclusive `[first, last]` runs. A view change only
- * queues its sheet; {@link flush} sends each queued sheet once per
- * transaction, and only when its runs changed, so hiding many rows costs one
- * engine call, not one per row.
+ * hidden by hand or by a collapsed row group, which travel as packed
+ * inclusive `[first, last]` runs, and rows that a filter hides, which travel
+ * as the rows the filter keeps: the view has them already, and the engine
+ * lists the others. A view change only queues its sheet; {@link flush} sends
+ * each queued sheet once per transaction, and only when its rows may have
+ * changed, so hiding many rows costs one engine call, not one per row.
+ *
+ * Most workbooks have no formula that reads hidden rows, and a filter would
+ * still send its rows on every change. {@link flushWhenRead} keeps them
+ * queued until the engine holds a formula that may read them, then sends
+ * the latest rows.
  */
 export class EngineHiddenRows {
-  private readonly filtered_by_sheet = new Map<SheetId, Uint32Array>();
-  private readonly sent_by_sheet = new Map<SheetId, SentRuns>();
+  private readonly kept_by_sheet = new Map<SheetId, Uint32Array>();
+  private readonly sent_by_sheet = new Map<SheetId, SentRows>();
   private readonly pending = new Set<SheetId>();
 
   constructor(
@@ -46,17 +54,20 @@ export class EngineHiddenRows {
   /**
    * Queue a sheet after its view was computed again. `filterSurvivors` holds
    * the ascending data rows that the active filters keep, or `null` when no
-   * filter is active.
+   * filter is active; it is kept, not copied, so it must not change later.
    */
-  viewChanged(sheet: SheetId, filterSurvivors: Uint32Array | null, rowCount: number): void {
-    if (filterSurvivors)
-      this.filtered_by_sheet.set(sheet, missing_row_runs(filterSurvivors, rowCount));
-    else this.filtered_by_sheet.delete(sheet);
+  viewChanged(sheet: SheetId, filterSurvivors: Uint32Array | null): void {
+    if (filterSurvivors) this.kept_by_sheet.set(sheet, filterSurvivors);
+    else this.kept_by_sheet.delete(sheet);
 
     this.pending.add(sheet);
   }
 
-  /** Send the queued sheets whose runs differ from what the engine holds. */
+  /**
+   * Send the queued sheets whose rows may differ from what the engine holds.
+   * Kept rows compare by identity: a view computed again sends its new rows,
+   * and the engine recalculates only when the hidden rows changed.
+   */
   flush(): void {
     if (this.pending.size === 0) return;
 
@@ -65,31 +76,57 @@ export class EngineHiddenRows {
       const handle = this.handles.get(sheet);
       if (!meta || handle === undefined) continue;
 
-      const next: SentRuns = {
+      const next: SentRows = {
         manual: manual_row_runs(meta.hiddenRows, meta.rowGroups),
-        filtered: this.filtered_by_sheet.get(sheet) ?? EMPTY_RUNS,
+        kept: this.kept_by_sheet.get(sheet) ?? null,
       };
       const sent = this.sent_by_sheet.get(sheet) ?? NOTHING_HIDDEN;
-      if (same_runs(sent.manual, next.manual) && same_runs(sent.filtered, next.filtered)) continue;
+      if (same_runs(sent.manual, next.manual) && sent.kept === next.kept) continue;
 
-      if (!this.wasm.setHiddenRows(handle, next.manual, next.filtered)) {
+      if (!this.wasm.setRowVisibility(handle, next.manual, next.kept ?? undefined)) {
         throw new RangeError(`invalid hidden rows for sheet: ${sheet}`);
       }
-      if (next.manual.length === 0 && next.filtered.length === 0) this.sent_by_sheet.delete(sheet);
+      if (next.manual.length === 0 && next.kept === null) this.sent_by_sheet.delete(sheet);
       else this.sent_by_sheet.set(sheet, next);
     }
 
     this.pending.clear();
   }
 
+  /**
+   * {@link flush} once the engine holds a formula that may read hidden
+   * rows. Until then the queued sheets wait, except the ones that would
+   * send nothing: they hide no row and the engine holds none for them.
+   */
+  flushWhenRead(): void {
+    if (this.wasm.readsRowVisibility()) {
+      this.flush();
+      return;
+    }
+
+    for (const sheet of this.pending) {
+      if (this.kept_by_sheet.has(sheet) || this.sent_by_sheet.has(sheet)) continue;
+
+      const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
+      if (
+        meta &&
+        ((meta.hiddenRows?.size ?? 0) > 0 || meta.rowGroups?.some((group) => group.collapsed))
+      ) {
+        continue;
+      }
+
+      this.pending.delete(sheet);
+    }
+  }
+
   removeSheet(sheet: SheetId): void {
-    this.filtered_by_sheet.delete(sheet);
+    this.kept_by_sheet.delete(sheet);
     this.sent_by_sheet.delete(sheet);
     this.pending.delete(sheet);
   }
 
   dispose(): void {
-    this.filtered_by_sheet.clear();
+    this.kept_by_sheet.clear();
     this.sent_by_sheet.clear();
     this.pending.clear();
   }
@@ -126,19 +163,6 @@ function manual_row_runs(
   runs.push(start, end);
 
   return Uint32Array.from(runs);
-}
-
-/** Runs of the rows in `[0, row_count)` that the ascending `present` rows leave out. */
-function missing_row_runs(present: Uint32Array, row_count: number): Uint32Array {
-  const runs: number[] = [];
-  let next = 0;
-  for (const row of present) {
-    if (row > next) runs.push(next, row - 1);
-    next = row + 1;
-  }
-  if (next < row_count) runs.push(next, row_count - 1);
-
-  return runs.length === 0 ? EMPTY_RUNS : Uint32Array.from(runs);
 }
 
 function same_runs(left: Uint32Array, right: Uint32Array): boolean {

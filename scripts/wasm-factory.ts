@@ -29,6 +29,13 @@ export async function copyEngineLoaders(packageDirectory: string): Promise<void>
   );
 }
 
+/**
+ * The Rust documentation wasm-bindgen copies into the glue as JSDoc blocks. It
+ * stays in the `.d.ts`. The shipped JavaScript drops it: it would be about 63%
+ * of the Brotli bytes.
+ */
+const DOC_COMMENT = /^[ \t]*\/\*\*[\s\S]*?\*\/[ \t]*\n/gm;
+
 /** Keep wasm-bindgen's closure-local caches and finalizers isolated per engine. */
 export async function generateWasmFactory(packageDirectory: string): Promise<void> {
   const wasm_path = resolve(packageDirectory, "pkg/sheetwrite_wasm_bg.wasm");
@@ -56,6 +63,7 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
   }
 
   const implementation = source
+    .replace(DOC_COMMENT, "")
     .replace(/^export (class|function|const|let) /gm, "$1 ")
     .replace(/^export \{[^}]*\};?\s*$/gm, "")
     .replace(/ptr => wasm\./g, "ptr => wasm?.")

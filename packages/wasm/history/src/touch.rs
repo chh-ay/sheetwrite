@@ -35,7 +35,7 @@ impl Touches {
             return;
         }
 
-        // A repeated write of the same cells by the same person adds nothing.
+        // A write that repeats the previous one (same cells, same author) adds nothing.
         if self.list.last() == Some(&touch) {
             return;
         }
