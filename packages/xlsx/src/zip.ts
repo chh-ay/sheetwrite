@@ -632,13 +632,31 @@ export type ZipPart =
   | { readonly name: string; readonly data: Uint8Array | Iterable<Uint8Array> }
   | { readonly name: string; readonly stored: StoredZipEntry };
 
+/** A part `writeZip` deflated as the writer produced it, before the parts are sorted. */
+interface DeflatedPart {
+  readonly name: string;
+  readonly deflated: {
+    readonly chunks: readonly Uint8Array<ArrayBuffer>[];
+    readonly crc: number;
+    /** The uncompressed size. */
+    readonly size: number;
+  };
+}
+
 const ZIP_OUTPUT_CHUNK_BYTES = 64 * 1024;
 /** Per-entry header/directory allowance in the pre-compression output bound. */
 const ENTRY_OVERHEAD_BYTES = 256;
 
 /** Pull-driven ZIP encoding; pending codec output is drained after each bounded push. */
-export async function* zipChunks(
+export function zipChunks(
   parts: Iterable<ZipPart>,
+  context: XlsxCodecContext,
+): AsyncGenerator<Uint8Array> {
+  return zip_parts(parts, context);
+}
+
+async function* zip_parts(
+  parts: Iterable<ZipPart | DeflatedPart>,
   context: XlsxCodecContext,
 ): AsyncGenerator<Uint8Array> {
   const pending: Uint8Array[] = [];
@@ -719,31 +737,45 @@ export async function* zipChunks(
         if (!file.ondata) throw new Error(`Sheetwrite: ZIP output handler missing for ${name}`);
         let entry_bytes = 0;
         let checksum = 0xffffffff;
-        const chunks = part.data instanceof Uint8Array ? [part.data] : part.data;
-        // The codec pulls each piece only after the limits allow it.
-        const pieces = function* (): Generator<Uint8Array> {
-          for (const chunk of chunks) {
-            // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
-            for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
-              checkAbort(context);
-              const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
-              entry_bytes += piece.length;
-              total_bytes += piece.length;
-              assertResource(context, "maxEntryUncompressedBytes", entry_bytes);
-              assertResource(context, "maxTotalUncompressedBytes", total_bytes);
-              assertResource(
-                context,
-                "maxOutputBytes",
-                total_bytes + names.size * ENTRY_OVERHEAD_BYTES,
-              );
-              checksum = update_crc32(checksum, piece);
-              yield piece;
-            }
-          }
+        /** The codec takes each piece only after the limits allow it. */
+        const admit = (piece: number): void => {
+          checkAbort(context);
+          entry_bytes += piece;
+          total_bytes += piece;
+          assertResource(context, "maxEntryUncompressedBytes", entry_bytes);
+          assertResource(context, "maxTotalUncompressedBytes", total_bytes);
+          assertResource(
+            context,
+            "maxOutputBytes",
+            total_bytes + names.size * ENTRY_OVERHEAD_BYTES,
+          );
         };
-        // fflate is the default: its bytes are the same in every runtime.
-        const native = context.options?.compression === "native" ? native_deflate() : undefined;
-        const compressed = native ? pipe_native(native, pieces()) : deflate_fflate(pieces());
+        let compressed: AsyncIterable<Uint8Array<ArrayBuffer>> | Iterable<Uint8Array<ArrayBuffer>>;
+        if ("deflated" in part) {
+          // The pieces it was deflated in pass the same checks, in archive order.
+          const { size } = part.deflated;
+          for (let offset = 0; offset < size; offset += DEFLATE_PUSH_BYTES) {
+            admit(Math.min(DEFLATE_PUSH_BYTES, size - offset));
+          }
+          checksum = part.deflated.crc ^ 0xffffffff;
+          compressed = part.deflated.chunks;
+        } else {
+          const chunks = part.data instanceof Uint8Array ? [part.data] : part.data;
+          const pieces = function* (): Generator<Uint8Array> {
+            for (const chunk of chunks) {
+              // fflate emits a Huffman block per push over 8 KiB; larger pushes keep blocks efficient.
+              for (let offset = 0; offset < chunk.length; offset += DEFLATE_PUSH_BYTES) {
+                const piece = chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
+                admit(piece.length);
+                checksum = update_crc32(checksum, piece);
+                yield piece;
+              }
+            }
+          };
+          // fflate is the default: its bytes are the same in every runtime.
+          const native = context.options?.compression === "native" ? native_deflate() : undefined;
+          compressed = native ? pipe_native(native, pieces()) : deflate_fflate(pieces());
+        }
         for await (const chunk of compressed) {
           file.ondata(null, chunk, false);
           yield* drain();
@@ -762,33 +794,71 @@ export async function* zipChunks(
 }
 
 /**
- * Buffered API: parts are materialized and sorted by name for canonical archives.
- * Streams cannot sort because styles and content types depend on every worksheet.
+ * Cut `data` into the DEFLATE_PUSH_BYTES pieces `zipChunks` pushes for one
+ * buffer of the same bytes, so the codec emits the same stream. A piece that
+ * spans chunks is copied; with `reuse`, always into the same buffer, which the
+ * consumer must read before it takes the next piece.
  */
-export async function writeZip(
-  parts: Iterable<ZipPart>,
-  context: XlsxCodecContext,
-): Promise<Uint8Array> {
-  const materialized: ZipPart[] = [];
-  for (const part of parts) {
-    if ("stored" in part || part.data instanceof Uint8Array) {
-      materialized.push(part);
-      continue;
+function* buffer_pieces(data: Iterable<Uint8Array>, reuse: boolean): Generator<Uint8Array> {
+  let staged = new Uint8Array(0);
+  let used = 0;
+  for (const chunk of data) {
+    let offset = 0;
+    while (offset < chunk.length) {
+      if (used === 0 && chunk.length - offset >= DEFLATE_PUSH_BYTES) {
+        yield chunk.subarray(offset, offset + DEFLATE_PUSH_BYTES);
+        offset += DEFLATE_PUSH_BYTES;
+        continue;
+      }
+      if (used === 0 && !(reuse && staged.length === DEFLATE_PUSH_BYTES)) {
+        staged = new Uint8Array(DEFLATE_PUSH_BYTES);
+      }
+      const count = Math.min(DEFLATE_PUSH_BYTES - used, chunk.length - offset);
+      staged.set(chunk.subarray(offset, offset + count), used);
+      offset += count;
+      used += count;
+      if (used === DEFLATE_PUSH_BYTES) {
+        yield staged;
+        used = 0;
+      }
     }
-    const pieces = [...part.data];
-    const data = new Uint8Array(pieces.reduce((total, piece) => total + piece.length, 0));
-    let written = 0;
-    for (const piece of pieces) {
-      data.set(piece, written);
-      written += piece.length;
-    }
-    materialized.push({ name: part.name, data });
   }
-  materialized.sort((left, right) => left.name.localeCompare(right.name));
-  const sources: Iterable<ZipPart> = materialized;
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of zipChunks(sources, context)) chunks.push(chunk);
-  const size = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  if (used > 0) yield staged.subarray(0, used);
+}
+
+/** Deflate a part as the writer produces it; `zipChunks` checks its limits when it is written. */
+async function deflate_part(
+  data: Iterable<Uint8Array>,
+  context: XlsxCodecContext,
+): Promise<DeflatedPart["deflated"]> {
+  let size = 0;
+  let checksum = 0xffffffff;
+  const native = context.options?.compression === "native" ? native_deflate() : undefined;
+  const pieces = function* (): Generator<Uint8Array> {
+    // The fflate codec copies each piece before it takes the next; a native stream may not.
+    for (const piece of buffer_pieces(data, native === undefined)) {
+      checkAbort(context);
+      size += piece.length;
+      checksum = update_crc32(checksum, piece);
+      yield piece;
+    }
+  };
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  if (native) {
+    for await (const chunk of pipe_native(native, pieces())) chunks.push(chunk);
+  } else {
+    for (const chunk of deflate_fflate(pieces())) chunks.push(chunk);
+  }
+  return { chunks, crc: (checksum ^ 0xffffffff) >>> 0, size };
+}
+
+/**
+ * A streamed part up to this size is buffered and deflated with the other
+ * parts once they are sorted; a longer one is deflated as it is produced.
+ */
+const BUFFERED_PART_BYTES = 1024 * 1024;
+
+function concat(chunks: readonly Uint8Array[], size: number): Uint8Array {
   const output = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) {
@@ -796,4 +866,50 @@ export async function writeZip(
     offset += chunk.length;
   }
   return output;
+}
+
+/**
+ * Buffered API: parts are sorted by name for canonical archives. A long part is
+ * deflated as the writer produces it, so only its compressed bytes wait for the
+ * sort. Streams cannot sort because styles and content types depend on every
+ * worksheet.
+ */
+export async function writeZip(
+  parts: Iterable<ZipPart>,
+  context: XlsxCodecContext,
+): Promise<Uint8Array> {
+  const sources: (ZipPart | DeflatedPart)[] = [];
+  for (const part of parts) {
+    if ("stored" in part || part.data instanceof Uint8Array) {
+      sources.push(part);
+      continue;
+    }
+    const iterator = part.data[Symbol.iterator]();
+    const head: Uint8Array[] = [];
+    let bytes = 0;
+    let step = iterator.next();
+    for (; !step.done && bytes <= BUFFERED_PART_BYTES; step = iterator.next()) {
+      head.push(step.value);
+      bytes += step.value.length;
+    }
+    if (step.done) {
+      sources.push({ name: part.name, data: concat(head, bytes) });
+      continue;
+    }
+    const next = step.value;
+    const rest: Iterable<Uint8Array> = { [Symbol.iterator]: () => iterator };
+    const data = (function* (): Generator<Uint8Array> {
+      yield* head.splice(0);
+      yield next;
+      yield* rest;
+    })();
+    sources.push({ name: part.name, deflated: await deflate_part(data, context) });
+  }
+  sources.sort((left, right) => left.name.localeCompare(right.name));
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of zip_parts(sources, context)) chunks.push(chunk);
+  return concat(
+    chunks,
+    chunks.reduce((total, chunk) => total + chunk.length, 0),
+  );
 }
