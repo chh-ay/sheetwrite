@@ -1,5 +1,0 @@
----
-"@sheetwrite/core": minor
----
-
-Add an opt-in version history archive (#228). Import `HistoryArchive` and `MemoryHistoryStorage` from the new `@sheetwrite/core/history` entrypoint, and `IndexedDbHistoryStorage` from `@sheetwrite/core/browser/history`. The archive stores a checkpoint plus the committed document operations since it. Checkpoints are content-addressed chunks: one record per sheet, fixed 16-row by 4-column cell pages and separate metadata blocks, so a new checkpoint stores only the chunks that changed. Named and automatic versions record their author and time. `readVersion` rebuilds a version in a disposable store. Hosts keep history in their own backend through the four-method `HistoryStorageAdapter` (`put`, `get`, `list`, `prune`), with atomic publication, reference-counted pruning and byte ceilings. A grid that does not import these entrypoints loads no history code, timers, storage requests or arrays. New `SheetwriteErrorCode` values: `invalid-history`, `capacity` and `integrity`; new `SheetwriteErrorOperation` value: `history`.
