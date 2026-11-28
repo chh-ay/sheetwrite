@@ -1162,6 +1162,7 @@ export class GridImpl implements Grid {
       rowAtOffset: (content_y) => this.geometry.rowAtOffset(content_y),
       rowCount: () => this.geometry.rowCount,
       contentTop: () => this.geometry.toContent(this.scroller.scrollTop),
+      viewOrigin: () => this.read_windows.paintedView() ?? this.measured_view(),
       viewportH: () => this.viewport_h(),
       colLeftOf: (col) => this.col_left_of(col),
       rowTop: (row) => this.geometry.rowOffset(row),
