@@ -5,6 +5,7 @@ import {
   editorLineCount as lineCount,
   editorTextareaHeight,
   insertEditorLineBreak,
+  MAX_VISIBLE_EDITOR_LINES,
   readEditorFieldMetrics,
 } from "./editor-textarea.js";
 import { FormulaAssist } from "./formula-assist.js";
@@ -292,13 +293,19 @@ export class EditController {
   /**
    * Scroll the editor so the caret at the end of a last line wider than the
    * editor shows. Chromium scrolls to the caret when the selection is set;
-   * Firefox and WebKit do not. The line is measured on a canvas, so a line that
-   * fits, the usual case, reads no layout; only a wider one costs the layout
-   * that setting the scroll needs.
+   * Firefox and WebKit do not. Focusing the editor laid it out, so a focused
+   * single line reads its own box at no cost. Otherwise the last line is
+   * measured on a canvas, so a line that fits reads no layout; only a wider
+   * one costs the layout that setting the scroll needs.
    */
   private reveal_line_end(ta: HTMLTextAreaElement, opts: BeginEditOptions): void {
-    const line = ta.value.slice(ta.value.lastIndexOf("\n") + 1);
+    const line_start = ta.value.lastIndexOf("\n") + 1;
+    const line = ta.value.slice(line_start);
     if (line === "") return;
+    if (line_start === 0 && this.isFocused) {
+      if (ta.scrollWidth > ta.clientWidth) ta.scrollLeft = ta.scrollWidth;
+      return;
+    }
     this.measure_context ??= document.createElement("canvas").getContext("2d");
     const context = this.measure_context;
     if (context === null) return;
@@ -459,8 +466,10 @@ export class EditController {
 
   /**
    * Fit the explicit lines, up to eight. One line is the cell's height. The
-   * editor has no horizontal scrollbar (`overflow-x: hidden` in grid.css), so
-   * no line can hide under one and its box is never read back.
+   * editor has no horizontal scrollbar (`overflow: hidden` in grid.css), so
+   * no line can hide under one and its box is never read back. Only text past
+   * eight lines scrolls vertically: a box that may show a scrollbar makes the
+   * layout of every open slower.
    */
   private size(minimum_height: number): void {
     const ta = this.textarea;
@@ -472,6 +481,9 @@ export class EditController {
         ? editorTextareaHeight(lines, minimum_height, this.metrics)
         : minimum_height;
     ta.style.height = `${height}px`;
+    const scrolls = lines > MAX_VISIBLE_EDITOR_LINES;
+    const scrolled = (this.sizing?.lines ?? 0) > MAX_VISIBLE_EDITOR_LINES;
+    if (scrolls !== scrolled) ta.style.overflowY = scrolls ? "auto" : "";
     this.sizing = { width: ta.style.width, minimumHeight: minimum_height, lines };
   }
 

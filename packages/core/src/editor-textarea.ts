@@ -1,4 +1,5 @@
-const MAX_VISIBLE_EDITOR_LINES = 8;
+/** Explicit lines an editor shows before it scrolls vertically. */
+export const MAX_VISIBLE_EDITOR_LINES = 8;
 
 /**
  * Marks a field that edits the same draft as the cell editor, such as a
