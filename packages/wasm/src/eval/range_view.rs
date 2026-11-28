@@ -19,7 +19,7 @@ use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
 use super::preview_limits::{self, RangeRead};
 use super::{string_from_pool_ref, EvalPass, LiteralSources};
 
-/// A written range clipped to its sheet's used extent.
+/// A written range clipped to its sheet's rows and columns.
 pub(super) struct RangeView<'a> {
     pub(super) store: &'a CellStore,
     pub(super) data: &'a SheetData,
@@ -110,9 +110,8 @@ impl<'a> RangeView<'a> {
             let (column_kinds, payloads) = column.raw_slices();
             let kinds = column_kinds.get(rows.clone())?;
 
-            // Literal kinds are 0..=3 (a raw empty kind without the calculated
-            // bit is a plain blank). Any other kind sets a higher bit, so one
-            // OR over the column decides it without a branch per cell.
+            // One OR over the column decides it without a branch per cell; see
+            // `LITERAL_KIND_BITS`.
             if kinds.iter().fold(0, |any, &kind| any | kind) & !LITERAL_KIND_BITS != 0 {
                 return None;
             }
@@ -168,9 +167,8 @@ impl<'a> RangeView<'a> {
 
     /// Reads every cell in row-major order into `sink`, as a function that
     /// reads only the numbers of a range sees it. The first unloaded cell is
-    /// `#LOADING!` and the first error cell is its error, as is a literal
-    /// number that isn't finite or text missing from the string pool; the
-    /// walk stops there.
+    /// `#LOADING!`, and the first error stops the walk, including the literal
+    /// errors of [`literal_number`].
     pub(super) fn scan_numbers(
         &self,
         pass: &mut EvalPass<'_>,
@@ -227,21 +225,37 @@ impl<'a> RangeView<'a> {
     /// as a paired statistic reads two ranges of literal cells: an error of
     /// this view wins over any error of `other`, and `visit` gets each pair's
     /// numbers. `None`, before any cell is evaluated, when either view isn't
-    /// dense, when they differ in size, or when a cell holds a formula.
+    /// dense, when they differ in size, or when a cell holds a formula; the
+    /// preview charge of the two views is then put back, since the reader
+    /// that takes over charges them itself.
     pub(super) fn literal_pairs(
         &self,
         other: &Self,
-        mut visit: impl FnMut(Option<f64>, Option<f64>),
+        visit: impl FnMut(Option<f64>, Option<f64>),
     ) -> Option<Result<(), FormulaError>> {
         if self.rows * self.cols != other.rows * other.cols {
             return None;
         }
+        let charged = preview_limits::checkpoint();
         if let Err(error) = self
             .charge_preview(RangeRead::Typed)
             .and_then(|()| other.charge_preview(RangeRead::Typed))
         {
             return Some(Err(error));
         }
+        let read = self.read_literal_pairs(other, visit);
+        if read.is_none() {
+            preview_limits::rewind(charged);
+        }
+        read
+    }
+
+    /// [`Self::literal_pairs`] after the charge.
+    fn read_literal_pairs(
+        &self,
+        other: &Self,
+        mut visit: impl FnMut(Option<f64>, Option<f64>),
+    ) -> Option<Result<(), FormulaError>> {
         let (left_kinds, left_payloads) = LiteralSources::new(self.data, self.depth)?.sources.raw();
         let (right_kinds, right_payloads) =
             LiteralSources::new(other.data, other.depth)?.sources.raw();
@@ -299,9 +313,8 @@ impl<'a> RangeView<'a> {
     /// Reads the cells in row-major order into `sink`, as SUBTOTAL reads a
     /// reference: rows that `hidden` skips and formula cells for which
     /// `skips_formula` holds are left out unread. The first unloaded cell is
-    /// `#LOADING!`, and the first error cell, a literal number that isn't
-    /// finite or text missing from the string pool stops the walk with its
-    /// error.
+    /// `#LOADING!`, and the first error stops the walk, including the literal
+    /// errors of [`literal_number`].
     pub(super) fn scan_visible(
         &self,
         hidden: &mut HiddenRowCursor,
@@ -414,10 +427,9 @@ impl<'a> RangeView<'a> {
 /// for text, a logical value or a blank, or the error that stops the read.
 type NumberCell = Result<Option<f64>, FormulaError>;
 
-/// A dense cell as a function that reads only numbers sees it: a number,
-/// `None` for text, a logical value or a blank, or the error of a number that
-/// isn't finite or text missing from the string pool. `None` for a formula
-/// or spill cell, which needs evaluating.
+/// A dense cell as a [`NumberCell`]. A number that isn't finite is `#NUM!`,
+/// and text missing from the string pool or an index outside the arrays is
+/// `#REF!`. `None` for a formula or spill cell, which needs evaluating.
 #[inline]
 fn literal_number(
     strings: &StringStorage,
@@ -596,13 +608,11 @@ impl ValueRows {
         }
     }
 
-    /// The number of values.
     pub(super) fn cells(&self) -> usize {
         let (rows, cols) = self.shape();
         rows * cols
     }
 
-    /// A reader for lookups in a loop.
     pub(super) fn reader(&self) -> RowReader<'_> {
         match self {
             Self::Matrix(matrix) => RowReader {
@@ -616,7 +626,7 @@ impl ValueRows {
         }
     }
 
-    /// The value at a zero-based `row` and `col`, or `None` outside the array.
+    /// [`RowReader::value`] through a new reader on each call.
     pub(super) fn value(&self, row: usize, col: usize) -> Option<&Value> {
         self.reader().value(row, col)
     }

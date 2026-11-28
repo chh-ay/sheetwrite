@@ -79,9 +79,13 @@ struct Templates {
     kept: Vec<Template>,
     /// The template the next new shape replaces once `kept` is full.
     next: usize,
-    /// The template the last lookup found or kept. A filled column repeats
-    /// it, so it is compared first, without the text's shape hash.
+    /// The template the last lookup found or kept.
     last: usize,
+    /// Whether the last lookup found the template the one before it found,
+    /// as in a filled column. Then the next formula is compared with `last`
+    /// first, without the text's shape hash; a single edit, whose shape
+    /// differs from the formulas before it, is not.
+    repeating: bool,
     /// The sites [`scan_sites`] lists for the formula being kept.
     sites: Vec<RefSite>,
     /// The sheet names [`scan_sites`] lists for the formula being kept.
@@ -95,6 +99,7 @@ thread_local! {
             kept: Vec::new(),
             next: 0,
             last: 0,
+            repeating: false,
             sites: Vec::new(),
             sheet_names: Vec::new(),
             values: Vec::new(),
@@ -413,23 +418,25 @@ fn shape_hash(body: &str) -> u64 {
 }
 
 impl Templates {
-    /// The kept formula of `body`'s shape: the last one found when `body`
-    /// repeats it, or else one with `body`'s [`shape_hash`], which `hash`
-    /// caches. A kept formula whose sheet names `resolve` binds to other
-    /// sheets has the shape but no usable tree.
+    /// The kept formula of `body`'s shape: the last one found while
+    /// formulas repeat it, or else one with `body`'s [`shape_hash`], which
+    /// `hash` caches. A kept formula whose sheet names `resolve` binds to
+    /// other sheets has the shape but no usable tree.
     fn lookup(
         &mut self,
         body: &str,
         hash: &mut Option<u64>,
         resolve: &SheetResolver<'_>,
     ) -> Lookup {
-        let repeated = self
-            .kept
-            .get(self.last)
-            .is_some_and(|template| template.values_in(body, &mut self.values));
+        let repeated = self.repeating
+            && self
+                .kept
+                .get(self.last)
+                .is_some_and(|template| template.values_in(body, &mut self.values));
         let index = if repeated {
             self.last
         } else {
+            self.repeating = false;
             if self.kept.is_empty() {
                 return Lookup::Miss;
             }
@@ -439,6 +446,7 @@ impl Templates {
             }) else {
                 return Lookup::Miss;
             };
+            self.repeating = index == self.last;
             self.last = index;
             index
         };

@@ -107,6 +107,24 @@ fn charge(update: impl FnOnce(&mut Budget) -> bool) -> Result<(), FormulaError> 
     })
 }
 
+/// The preview budget before a read is charged, for [`rewind`].
+pub(super) struct Checkpoint(Option<Budget>);
+
+/// Notes the preview budget before a read that may give up after its charge
+/// and leave its cells to another reader, which charges them again.
+#[inline]
+pub(super) fn checkpoint() -> Checkpoint {
+    Checkpoint(ACTIVE.with(Cell::get))
+}
+
+/// Puts back the budget of `checkpoint` when the read it was taken for read
+/// nothing, so the cells are charged once, by the reader that reads them.
+#[cold]
+#[inline(never)]
+pub(super) fn rewind(checkpoint: Checkpoint) {
+    ACTIVE.with(|active| active.set(checkpoint.0));
+}
+
 /// How a whole-range read reaches its cells.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum RangeRead {
@@ -184,7 +202,8 @@ pub(super) fn cell() -> Result<(), FormulaError> {
     }
 }
 
-/// Refuses an array of `cells` values before it is allocated.
+/// Refuses an array of more than [`PREVIEW_ARRAY_CELLS`] values before it is
+/// allocated.
 #[inline]
 pub(super) fn array(cells: usize) -> Result<(), FormulaError> {
     if active() && cells > PREVIEW_ARRAY_CELLS {
@@ -194,7 +213,7 @@ pub(super) fn array(cells: usize) -> Result<(), FormulaError> {
     }
 }
 
-/// Charges one LAMBDA call or step of helper work.
+/// Charges `steps` LAMBDA calls.
 #[cfg_attr(
     not(feature = "analysis"),
     allow(
@@ -211,7 +230,7 @@ pub(super) fn work(steps: usize) -> Result<(), FormulaError> {
     }
 }
 
-/// Charges `bytes` of text output before a text function writes it.
+/// Charges `bytes` of text against [`PREVIEW_TEXT_BYTES`].
 #[inline]
 pub(super) fn text(bytes: usize) -> Result<(), FormulaError> {
     if active() {

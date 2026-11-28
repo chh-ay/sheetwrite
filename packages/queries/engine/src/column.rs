@@ -229,7 +229,7 @@ pub struct Batch {
 }
 
 impl Batch {
-    /// Validates shape and unique identities before a batch enters the engine.
+    /// Validates shape, identities and names before a batch enters the engine.
     pub fn new(columns: Vec<Column>, rows: usize, limits: &Limits) -> Result<Self, Diagnostic> {
         limits.shape(rows, columns.len())?;
         if columns.iter().any(|column| column.len() != rows) {
@@ -327,9 +327,9 @@ pub(crate) fn validate_names(columns: &[Column]) -> Result<(), Diagnostic> {
     Ok(())
 }
 
-/// Whether two header names clash in a table: equal in upper case, as core's
-/// `workbookTableNameKey` compares them. Compares uppercase characters without building
-/// uppercase copies.
+/// Whether two header names clash in a table: equal in upper case. Core's
+/// `workbookTableNameKey` also normalizes both names to NFC first; this check does not.
+/// Compares uppercase characters without building uppercase copies.
 fn same_header(left: &str, right: &str) -> bool {
     left.chars()
         .flat_map(char::to_uppercase)

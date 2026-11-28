@@ -10,8 +10,6 @@ impl CellStore {
     pub fn add_sheet(&mut self, n_cols: usize, row_count: usize) -> usize {
         match self.try_add_sheet(n_cols, row_count) {
             Ok(index) => {
-                // SHEET and SHEETS count the tabs, so volatile formulas
-                // recompute when one is added.
                 self.recompute_with_volatile_sheets(Vec::new());
                 index
             }
@@ -260,8 +258,6 @@ impl CellStore {
 
         self.sheet_order = Some(Box::new(order.to_vec()));
         let affected = self.refresh_sheet_spans();
-        // SHEET and SHEETS read the tab order, so volatile formulas
-        // recompute too.
         self.recompute_with_volatile_sheets(affected);
         true
     }

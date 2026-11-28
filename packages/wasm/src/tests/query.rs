@@ -467,10 +467,9 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
 mod value_set_filter {
     use crate::*;
 
-    /// Sentinel the view layer sends for a picked boolean; the `\0` prefix keeps
-    /// it distinct from a cell holding the text `TRUE`.
+    /// [`crate::query::VALUE_SET_TRUE`]: the view layer's picked `TRUE`.
     const PICKED_TRUE: &str = "\0TRUE";
-    /// Sentinel for a picked `FALSE`; see [`PICKED_TRUE`].
+    /// [`crate::query::VALUE_SET_FALSE`]: the view layer's picked `FALSE`.
     const PICKED_FALSE: &str = "\0FALSE";
 
     /// One column of 15 rows covering every kind the filter distinguishes:
@@ -498,8 +497,8 @@ mod value_set_filter {
         (store, sheet)
     }
 
-    /// Runs a "values" filter over column 0; nine or more picks take the lookup
-    /// path, eight or fewer the linear scan.
+    /// Runs a "values" filter over column 0. Up to
+    /// [`crate::query::VALUE_SET_LINEAR_MAX`] picks take the linear scan; more take the lookup.
     fn filter_values(
         store: &CellStore,
         sheet: usize,

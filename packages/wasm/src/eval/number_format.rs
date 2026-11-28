@@ -267,8 +267,8 @@ const fn with_sign(magnitude: f64, number: f64) -> f64 {
 }
 
 /// The General text form that `&`, CONCAT and other text functions give a
-/// number: 15 significant digits, plain notation for exponents from -9 to 14
-/// and scientific notation outside them.
+/// number: 15 significant digits, in scientific notation outside
+/// [`PLAIN_EXPONENTS`].
 pub(super) fn general_text(number: f64) -> String {
     if number.fract() == 0.0 && number.abs() < PLAIN_INTEGER_LIMIT {
         return (number as i64).to_string();
@@ -373,7 +373,6 @@ const fn is_date_letter(ch: char) -> bool {
     matches!(ch.to_ascii_lowercase(), 'd' | 'm' | 'y' | 'h' | 's')
 }
 
-/// The text of the character at `index` of `code`.
 fn char_at(code: &str, index: usize, ch: char) -> &str {
     &code[index..index + ch.len_utf8()]
 }
@@ -492,13 +491,18 @@ pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, F
         }
         parts.pop();
     }
-    let (part, magnitude_only) = match (parts.len(), number) {
-        (1, _) => (parts[0], false),
-        (_, value) if value < 0.0 => (parts[1], true),
-        (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], false),
-        _ => (parts[0], false),
+    // `contains` is a fast byte search; most codes have no brackets.
+    let conditional = if code.contains('[') {
+        conditional_section(&parts, number)
+    } else {
+        None
     };
-    let value = if magnitude_only { number.abs() } else { number };
+    let (part, value) = conditional.unwrap_or_else(|| match (parts.len(), number) {
+        (1, _) => (parts[0], number),
+        (_, value) if value < 0.0 => (parts[1], number.abs()),
+        (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], number),
+        _ => (parts[0], number),
+    });
     if let Some(fraction) = Fraction::parse(part) {
         return Ok(Some(fraction.render(value)));
     }
@@ -506,6 +510,139 @@ pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, F
         return Ok(None);
     };
     render(&section, value).map(Some)
+}
+
+/// The section that a code with a condition, such as `[>=100]`, chooses
+/// for `number`, and the value it shows; `None` when no section has a
+/// condition. Of the first two sections, the first whose condition `number`
+/// meets wins. Otherwise the third wins when both have conditions, the
+/// second when only the first has one, and the first when it has none or no
+/// other section exists. A section that only negative numbers meet shows the
+/// magnitude, as the negative section does; the others keep the sign. The
+/// first section does this only when more sections follow. The grid's
+/// formatter chooses the same way.
+fn conditional_section<'a>(parts: &[&'a str], number: f64) -> Option<(&'a str, f64)> {
+    if !parts.iter().any(|part| section_condition(part).is_some()) {
+        return None;
+    }
+    let first_part = *parts.first()?;
+    let first = section_condition(first_part);
+    let second_part = parts.get(1).copied();
+    let second = second_part.and_then(section_condition);
+    if let Some(condition) = first.filter(|condition| condition.meets(number)) {
+        let negative = parts.len() > 1 && condition.only_negative();
+        return Some((first_part, if negative { -number } else { number }));
+    }
+    if let (Some(part), Some(condition)) = (second_part, second) {
+        if condition.meets(number) {
+            return Some((
+                part,
+                if condition.only_negative() {
+                    -number
+                } else {
+                    number
+                },
+            ));
+        }
+    }
+    let part = match (first, second) {
+        (Some(_), Some(_)) => parts.get(2).copied().unwrap_or(first_part),
+        (Some(_), None) => second_part.unwrap_or(first_part),
+        (None, _) => first_part,
+    };
+    Some((part, number))
+}
+
+/// A comparison in a section's brackets, such as `[<=100]`.
+#[derive(Clone, Copy)]
+struct Condition {
+    operator: Comparison,
+    operand: f64,
+}
+
+#[derive(Clone, Copy)]
+enum Comparison {
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    Equal,
+    NotEqual,
+}
+
+impl Condition {
+    /// Reads the text inside the brackets: an operator, optional spaces and
+    /// a decimal number, such as `>=100` or `<-2.5`.
+    fn parse(content: &str) -> Option<Self> {
+        const OPERATORS: [(&str, Comparison); 6] = [
+            ("<=", Comparison::LessOrEqual),
+            (">=", Comparison::GreaterOrEqual),
+            ("<>", Comparison::NotEqual),
+            ("<", Comparison::Less),
+            (">", Comparison::Greater),
+            ("=", Comparison::Equal),
+        ];
+        let (operator, rest) = OPERATORS.iter().find_map(|&(text, operator)| {
+            content.strip_prefix(text).map(|rest| (operator, rest))
+        })?;
+        let number = rest.trim_start();
+        let is_decimal = !number.starts_with('+')
+            && number.bytes().all(|byte| {
+                byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'+' | b'e' | b'E')
+            });
+        let operand = number.parse().ok().filter(|_| is_decimal)?;
+        Some(Self { operator, operand })
+    }
+
+    fn meets(self, value: f64) -> bool {
+        match self.operator {
+            Comparison::Less => value < self.operand,
+            Comparison::LessOrEqual => value <= self.operand,
+            Comparison::Greater => value > self.operand,
+            Comparison::GreaterOrEqual => value >= self.operand,
+            Comparison::Equal => value == self.operand,
+            Comparison::NotEqual => value != self.operand,
+        }
+    }
+
+    /// Whether only negative numbers meet the condition.
+    fn only_negative(self) -> bool {
+        match self.operator {
+            Comparison::Less => self.operand <= 0.0,
+            Comparison::LessOrEqual | Comparison::Equal => self.operand < 0.0,
+            Comparison::Greater | Comparison::GreaterOrEqual | Comparison::NotEqual => false,
+        }
+    }
+}
+
+/// The first condition among the brackets of `section`; colors and other
+/// brackets are skipped.
+fn section_condition(section: &str) -> Option<Condition> {
+    let mut rest = section;
+    loop {
+        let inside = &rest[bracket_start(rest)? + 1..];
+        let close = inside.find(']')?;
+        if let Some(condition) = Condition::parse(&inside[..close]) {
+            return Some(condition);
+        }
+        rest = &inside[close + 1..];
+    }
+}
+
+/// Where the first `[` outside quotes and escapes is.
+fn bracket_start(section: &str) -> Option<usize> {
+    let mut quoted = false;
+    let mut escaped = false;
+    section.char_indices().find_map(|(index, ch)| {
+        let open = !quoted && !escaped && ch == '[';
+        match ch {
+            _ if escaped => escaped = false,
+            '\\' if !quoted => escaped = true,
+            '"' => quoted = !quoted,
+            _ => {}
+        }
+        open.then_some(index)
+    })
 }
 
 /// Whether a section holds `@`, the text placeholder, outside quotes and escapes.

@@ -922,7 +922,7 @@ impl CellStore {
     #[wasm_bindgen(js_name = search)]
     #[expect(
         clippy::too_many_arguments,
-        reason = "wasm-bindgen export: JS passes flat scalars; separate flags keep older five-argument callers reading values"
+        reason = "a WebAssembly export: JavaScript passes the sheet, columns, query and three flags as plain arguments, without building an object per call"
     )]
     pub fn search(
         &self,
@@ -1081,48 +1081,119 @@ fn sort_positions_by_keys(
 
     let mut runs = vec![(0, row_count)];
     let mut next_runs = Vec::new();
-    let mut packed = Vec::new();
-    let mut sorted = Vec::new();
+    // A key with no number packs into 64 bits while the slot fits the bits
+    // below it, and a 64-bit sort compares in one instruction instead of two.
+    let fits_narrow = row_count <= 1 << NARROW_SLOT_BITS;
     for key in 0..key_count {
         let key_ascending = ascending.get(key).copied().unwrap_or(1) != 0;
-        let last_key = key + 1 == key_count;
+        let first = key * row_count;
         next_runs.clear();
-        for &(start, end) in &runs {
-            packed.clear();
-            packed.extend(
-                positions[start..end]
-                    .iter()
-                    .enumerate()
-                    .map(|(slot, &position)| {
-                        ranked.packed(key * row_count + position as usize, key_ascending)
-                            | slot as u128
-                    }),
-            );
-            sort_u128(&mut packed);
-            sorted.clear();
-            sorted.extend(
-                packed
-                    .iter()
-                    .map(|&packed_key| positions[start + key_index(packed_key) as usize]),
-            );
-            positions[start..end].copy_from_slice(&sorted);
-            if last_key {
-                continue;
-            }
-            // Runs of equal keys: the packed keys differ only in the slot.
-            let mut run_start = 0;
-            for slot in 1..=packed.len() {
-                if slot == packed.len() || packed[slot] >> 32 != packed[run_start] >> 32 {
-                    if slot - run_start > 1 {
-                        next_runs.push((start + run_start, start + slot));
-                    }
-                    run_start = slot;
-                }
-            }
+        let ties = (key + 1 < key_count).then_some(&mut next_runs);
+        if fits_narrow && ranked.is_narrow(first..first + row_count) {
+            sort_runs_by_key(&mut positions, &runs, ties, |position| {
+                ranked.packed_narrow(first + position as usize, key_ascending)
+            });
+        } else {
+            sort_runs_by_key(&mut positions, &runs, ties, |position| {
+                ranked.packed(first + position as usize, key_ascending)
+            });
         }
         std::mem::swap(&mut runs, &mut next_runs);
     }
     positions
+}
+
+/// Bits below a 64-bit packed sort key's order for its slot in the run: the
+/// class and the 32-bit value of [`SortKeys::packed_narrow`] take the other 35.
+const NARROW_SLOT_BITS: u32 = 29;
+
+/// A packed sort key: an order whose unsigned order is the key's, above the
+/// slot of its position in the run, which breaks ties.
+trait PackedSortKey: Copy + Eq {
+    fn sort(keys: &mut [Self]);
+    fn with_slot(self, slot: usize) -> Self;
+    fn slot(self) -> usize;
+    /// The key without its slot.
+    fn order(self) -> Self;
+}
+
+impl PackedSortKey for u64 {
+    fn sort(keys: &mut [Self]) {
+        sort_u64(keys);
+    }
+
+    fn with_slot(self, slot: usize) -> Self {
+        self | slot as Self
+    }
+
+    fn slot(self) -> usize {
+        (self & ((1 << NARROW_SLOT_BITS) - 1)) as usize
+    }
+
+    fn order(self) -> Self {
+        self >> NARROW_SLOT_BITS
+    }
+}
+
+impl PackedSortKey for u128 {
+    fn sort(keys: &mut [Self]) {
+        sort_u128(keys);
+    }
+
+    fn with_slot(self, slot: usize) -> Self {
+        self | slot as Self
+    }
+
+    fn slot(self) -> usize {
+        key_index(self) as usize
+    }
+
+    fn order(self) -> Self {
+        self >> 32
+    }
+}
+
+/// The positions `start..end` of a run, as `(start, end)`.
+type PositionRun = (usize, usize);
+
+/// Sorts each run of `positions` by one key, `pack` giving a position's
+/// key without its slot, and adds to `ties`, when given, the runs of
+/// positions that still tie after it.
+fn sort_runs_by_key<K: PackedSortKey>(
+    positions: &mut [u32],
+    runs: &[PositionRun],
+    mut ties: Option<&mut Vec<PositionRun>>,
+    pack: impl Fn(u32) -> K,
+) {
+    let mut packed: Vec<K> = Vec::new();
+    let mut sorted: Vec<u32> = Vec::new();
+    for &(start, end) in runs {
+        packed.clear();
+        packed.extend(
+            positions[start..end]
+                .iter()
+                .enumerate()
+                .map(|(slot, &position)| pack(position).with_slot(slot)),
+        );
+        K::sort(&mut packed);
+        sorted.clear();
+        sorted.extend(packed.iter().map(|&key| positions[start + key.slot()]));
+        positions[start..end].copy_from_slice(&sorted);
+
+        let Some(next_runs) = ties.as_deref_mut() else {
+            continue;
+        };
+        // Runs of equal keys: the packed keys differ only in the slot.
+        let mut run_start = 0;
+        for slot in 1..=packed.len() {
+            if slot == packed.len() || packed[slot].order() != packed[run_start].order() {
+                if slot - run_start > 1 {
+                    next_runs.push((start + run_start, start + slot));
+                }
+                run_start = slot;
+            }
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -2716,6 +2787,34 @@ impl SortKeys {
             (CLASS_ERROR - class, !value)
         };
         (u128::from(directed_class) << 64 | u128::from(directed_value)) << 32
+    }
+
+    /// Whether none of `keys` is a number, so [`Self::packed_narrow`] can
+    /// pack each of them: only a number's order needs all 64 bits of its
+    /// value.
+    fn is_narrow(&self, keys: Range<usize>) -> bool {
+        self.classes
+            .get(keys)
+            .is_some_and(|classes| !classes.contains(&CLASS_NUMBER))
+    }
+
+    /// [`Self::packed`] in 64 bits for a key that is not a number: the class
+    /// above a 32-bit value (a text rank, 0 or 1 for a logical value, 0 for
+    /// an error or a blank cell), shifted left [`NARROW_SLOT_BITS`] to leave
+    /// room for the tie-break. Its unsigned order is that of [`Self::packed`].
+    fn packed_narrow(&self, key: usize, ascending: bool) -> u64 {
+        let class = self.classes[key];
+        // A text rank counts the distinct strings of one sort call, so it fits.
+        let value = match class {
+            CLASS_ERROR | CLASS_EMPTY => 0,
+            _ => self.values[key] as u32,
+        };
+        let (directed_class, directed_value) = if ascending || class == CLASS_EMPTY {
+            (class, value)
+        } else {
+            (CLASS_ERROR - class, !value)
+        };
+        (u64::from(directed_class) << 32 | u64::from(directed_value)) << NARROW_SLOT_BITS
     }
 
     /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
