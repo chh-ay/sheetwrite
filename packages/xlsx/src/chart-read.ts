@@ -8,7 +8,7 @@ import type {
   SheetSnapshot,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { labelToCol, sheetNameKey } from "@sheetwrite/core";
+import { labelToCol, sheetNameKey } from "@sheetwrite/core/codec";
 
 import {
   CHART_NAMESPACES,

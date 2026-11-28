@@ -5,7 +5,7 @@ import type {
   SheetSnapshot,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { cellA1, rangeA1 } from "@sheetwrite/core";
+import { cellA1, rangeA1 } from "@sheetwrite/core/codec";
 
 import { areaA1 } from "./cell-reference.js";
 import {

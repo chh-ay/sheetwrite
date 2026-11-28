@@ -5,7 +5,7 @@ import type {
   WorkbookTable,
   XlsxUnsupportedQuery,
 } from "@sheetwrite/core";
-import { validateWorkbookSnapshot } from "@sheetwrite/core";
+import { validateWorkbookSnapshot } from "@sheetwrite/core/codec";
 import { inflateSync, unzipSync, zipSync } from "fflate";
 
 import { CONTENT_TYPES_NS, MAIN_NS, PACKAGE_RELATIONSHIPS_NS, RELATIONSHIPS_NS } from "./format.js";

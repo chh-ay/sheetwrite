@@ -7,7 +7,7 @@ import type {
   WorkbookSnapshot,
   WorkbookTable,
 } from "@sheetwrite/core";
-import { sheetNameKey } from "@sheetwrite/core";
+import { sheetNameKey } from "@sheetwrite/core/codec";
 
 import { columnWidthCharacters, columnWidthPixels } from "./format.js";
 import { snapshotAutoFilter } from "./reader-autofilter.js";

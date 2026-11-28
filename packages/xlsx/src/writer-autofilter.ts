@@ -9,7 +9,7 @@ import type {
   FilterCondition,
   SheetSnapshot,
 } from "@sheetwrite/core";
-import { cellA1, formatNumber } from "@sheetwrite/core";
+import { cellA1, formatNumber } from "@sheetwrite/core/codec";
 
 import { encodeXstring, escapeXml } from "./xml.js";
 

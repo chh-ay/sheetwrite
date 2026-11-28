@@ -1,5 +1,5 @@
 import type { SheetSnapshot, WorkbookSnapshot } from "@sheetwrite/core";
-import { withXlsxFormulaEngine } from "@sheetwrite/core";
+import { withXlsxFormulaEngine } from "@sheetwrite/core/codec";
 
 import { readCharts } from "./chart-read.js";
 import { hasExcelDataModel, readExcelDataModel } from "./data-model.js";

@@ -1,5 +1,5 @@
 import type { CellScalar, SheetSnapshot, SnapshotCell, WorkbookSnapshot } from "@sheetwrite/core";
-import { cellA1, colToA1 } from "@sheetwrite/core";
+import { cellA1, colToA1 } from "@sheetwrite/core/codec";
 import { formulaCallsExternalData } from "@sheetwrite/core/external-links";
 
 import { DYNAMIC_ARRAY_CELL_METADATA } from "./dynamic-array.js";

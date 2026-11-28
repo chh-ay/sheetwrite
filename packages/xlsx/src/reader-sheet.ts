@@ -1,5 +1,5 @@
 import type { SheetSnapshot } from "@sheetwrite/core";
-import { MAX_HYPERLINK_DISPLAY_LENGTH, MAX_VALIDATION_RULES } from "@sheetwrite/core";
+import { MAX_HYPERLINK_DISPLAY_LENGTH, MAX_VALIDATION_RULES } from "@sheetwrite/core/codec";
 
 import { OpcPackage, relationshipTypeMatches } from "./opc.js";
 import { isRetainedRelationship } from "./preservation.js";

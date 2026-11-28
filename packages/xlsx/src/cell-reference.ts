@@ -1,4 +1,4 @@
-import { cellA1, labelToCol, rangeA1 } from "@sheetwrite/core";
+import { cellA1, labelToCol, rangeA1 } from "@sheetwrite/core/codec";
 
 /** A rectangle of cells, with zero-based inclusive corners. */
 export interface CellRect {

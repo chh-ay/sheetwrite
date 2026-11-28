@@ -1,5 +1,5 @@
 import type { SheetSnapshot, WorkbookTableXmlElement } from "@sheetwrite/core";
-import { cellA1, labelToCol } from "@sheetwrite/core";
+import { cellA1, labelToCol } from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { areaA1 } from "./cell-reference.js";

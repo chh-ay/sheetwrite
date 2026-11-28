@@ -1,8 +1,5 @@
-import {
-  type WorkbookSnapshot,
-  withXlsxFormulaEngine,
-  type XlsxFormulaEngine,
-} from "@sheetwrite/core";
+import type { WorkbookSnapshot, XlsxFormulaEngine } from "@sheetwrite/core";
+import { withXlsxFormulaEngine } from "@sheetwrite/core/codec";
 
 /** The distinct cell and defined-name formula sources of a workbook. */
 export function workbookFormulaSources(snapshot: WorkbookSnapshot): string[] {

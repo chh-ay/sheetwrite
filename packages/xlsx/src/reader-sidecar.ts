@@ -7,7 +7,7 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { cellA1, sheetNameKey } from "@sheetwrite/core";
+import { cellA1, sheetNameKey } from "@sheetwrite/core/codec";
 
 import { META_MARKER, META_STEM } from "./format.js";
 import type { ParsedSheet } from "./reader-types.js";
