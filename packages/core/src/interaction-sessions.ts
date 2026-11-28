@@ -373,19 +373,19 @@ export class InteractionSessions {
       return;
     }
     if (this.active_editor === this.custom_editor) {
-      const value = this.deps.store.getCell(address).resolved;
+      const cell = this.deps.store.getCell(address);
       const formula =
         this.deps.loadable?.getFormula(address) ?? this.deps.store.getFormula(address);
       this.custom_editor.update({
         viewAddress: { sheet: address.sheet, row: view_row, col: address.col },
         column,
-        value,
+        value: cell.resolved,
         text:
           formula ??
           cellEditText(
-            value,
+            cell.resolved,
             column.type,
-            this.number_format_at(address, column),
+            this.number_format_of(cell.style, column),
             column.numberLocale,
           ),
         label: this.editor_label(view_row, address.col),
@@ -600,12 +600,13 @@ export class InteractionSessions {
       const view_row = this.deps.toViewRow(address.row);
       if (view_row === null) return;
       const column = this.deps.sheet().columns[address.col];
+      const style = this.deps.store.getCell(address).style;
       const parsed =
         typeof input === "string"
           ? parseCellEntry(
               input,
               column?.type ?? "text",
-              this.number_format_at(address, column),
+              this.number_format_of(style, column),
               column?.numberLocale,
             )
           : { value: input };
@@ -621,7 +622,7 @@ export class InteractionSessions {
                 op: "set",
                 addr: { ...address },
                 value,
-                style: this.entry_style(address, column, parsed.numberFormat),
+                style: this.entry_style(style, column, parsed.numberFormat),
               },
             ];
       const entry: CellEntry = { address, value, patches, navigate };
@@ -698,26 +699,21 @@ export class InteractionSessions {
   }
 
   /** A cell's effective number format: its own, then its column's. */
-  private number_format_at(
-    addr: Readonly<CellAddress>,
-    column: Column | undefined,
-  ): string | undefined {
-    return (
-      this.deps.store.getCell(addr).style.numberFormat ??
-      column?.cellStyle?.numberFormat ??
-      column?.numberFormat
-    );
+  private number_format_of(style: CellStyle, column: Column | undefined): string | undefined {
+    return style.numberFormat ?? column?.cellStyle?.numberFormat ?? column?.numberFormat;
   }
 
-  /** The style an entry stores: the cell's own, in `entry_format` when its format is General. */
+  /**
+   * The style an entry stores: the cell's own `style`, in `entry_format` when
+   * its format is General.
+   */
   private entry_style(
-    addr: Readonly<CellAddress>,
+    style: CellStyle,
     column: Column | undefined,
     entry_format: string | undefined,
   ): CellStyle {
-    const style = this.deps.store.getCell(addr).style;
     if (entry_format === undefined) return style;
-    const current = this.number_format_at(addr, column);
+    const current = this.number_format_of(style, column);
     return current === undefined || current === "General"
       ? { ...style, numberFormat: entry_format }
       : style;
@@ -801,14 +797,15 @@ export class InteractionSessions {
     };
 
     const formula = this.deps.store.getFormula(data_addr);
-    const current = this.deps.store.getCell(data_addr).resolved;
+    const cell = this.deps.store.getCell(data_addr);
+    const current = cell.resolved;
     const text =
       initial ??
       formula ??
       cellEditText(
         current,
         column.type,
-        this.number_format_at(data_addr, column),
+        this.number_format_of(cell.style, column),
         column.numberLocale,
       );
     const content_top = this.deps.contentTop();
@@ -943,7 +940,7 @@ export class InteractionSessions {
       theme: this.deps.theme(),
       look: this.editor_look(
         column,
-        this.deps.store.getCell(data_addr).style,
+        cell.style,
         // A formula edits left-aligned under General alignment, as in Excel;
         // a typed entry is not a value yet, so only a column type aligns it.
         initial !== undefined || formula !== null ? null : current,
@@ -1069,7 +1066,11 @@ export class InteractionSessions {
           patches.push({
             op: "set",
             addr,
-            style: this.entry_style(addr, columns[col], entry_format),
+            style: this.entry_style(
+              this.deps.store.getCell(addr).style,
+              columns[col],
+              entry_format,
+            ),
             value:
               value.kind === "formula"
                 ? {
@@ -1088,7 +1089,11 @@ export class InteractionSessions {
             op: "set",
             addr: { ...address },
             value,
-            style: this.entry_style(address, columns[address.col], entry_format),
+            style: this.entry_style(
+              this.deps.store.getCell(address).style,
+              columns[address.col],
+              entry_format,
+            ),
           },
         ];
   }
