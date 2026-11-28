@@ -1,8 +1,9 @@
 /**
  * The open Excel checks in one workbook, one sheet per check: those of
- * docs/contributing/excel-checks.md, #605's GROUPBY blank keys, and whether a
- * spilling formula Sheetwrite exported still spills in Excel. Sheetwrite
- * writes it through the full-engine XLSX export a user runs.
+ * docs/contributing/excel-checks.md, #605's GROUPBY blank keys, whether a
+ * spilling formula Sheetwrite exported still spills in Excel, and the value
+ * of a formula that reads an empty cell. Sheetwrite writes it through the
+ * full-engine XLSX export a user runs.
  *
  * Each check sheet holds its steps (none when Excel computes everything on
  * open), its inputs and a results block: what is compared, Sheetwrite's
@@ -1324,6 +1325,42 @@ function spill_export_check(): BuiltCheck {
   };
 }
 
+/** A formula that reads an empty cell holds 0, alone and as a spilled element. */
+function empty_reference_check(): BuiltCheck {
+  const sheet = new CheckSheet("c-empty-ref", "Empty reference");
+  const single = a1(INPUT_ROW, 0);
+  const empty = a1(INPUT_ROW, 2);
+  const spill_anchor = INPUT_ROW + 2;
+  const gap = a1(spill_anchor + 1, 0);
+  const spilled = `${a1(INPUT_ROW, 4)}:${a1(INPUT_ROW + 2, 4)}`;
+  sheet.formula(INPUT_ROW, 0, `=${empty}`);
+  sheet.put(INPUT_ROW, 4, 1);
+  sheet.put(INPUT_ROW + 2, 4, 3);
+  sheet.formula(spill_anchor, 0, `=${spilled}`);
+  sheet.results(INPUT_ROW, 6, [
+    { what: `${single} value`, excel: shown(single) },
+    { what: `${gap} value (spilled gap)`, excel: shown(gap) },
+    { what: `COUNT(${single})`, excel: shown(`COUNT(${single})`) },
+    { what: `ISBLANK(${single})`, excel: shown(`ISBLANK(${single})`) },
+    { what: `COUNTBLANK(${single})`, excel: shown(`COUNTBLANK(${single})`) },
+    { what: `ISBLANK(${empty})`, excel: shown(`ISBLANK(${empty})`) },
+  ]);
+  sheet.intro(
+    "Empty reference: a formula that reads an empty cell",
+    `${single} holds =${empty}, an empty cell; ${a1(spill_anchor, 0)} spills ${spilled}, whose ${a1(INPUT_ROW + 1, 4)} is empty.`,
+    [],
+  );
+  return {
+    info: {
+      sheet: sheet.name,
+      check: "Empty reference",
+      issues: "a formula cell that reads an empty cell",
+      seconds: 0,
+    },
+    sheet,
+  };
+}
+
 /** The defined name of the LAMBDA SUBTOTAL check, in the workbook's names. */
 const LAMBDA_SUBTOTAL_NAME = { name: "VisibleTotal", formula: "=LAMBDA(r,SUBTOTAL(109,r))" };
 const LAMBDA_SUBTOTAL_AMOUNTS = [10, 20, 40, 80];
@@ -1600,6 +1637,7 @@ async function layout(sheetwrite: Sheetwrite, after_steps: boolean): Promise<Lay
       auto_fill_check(),
       group_by_blank_key_check(),
       spill_export_check(),
+      empty_reference_check(),
       lambda_subtotal_check(),
     ],
     query: query.query,

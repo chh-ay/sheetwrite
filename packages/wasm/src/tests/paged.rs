@@ -453,8 +453,8 @@ mod aggregate_storage_parity {
     }
 
     #[test]
-    fn a_formula_returning_a_blank_is_ignored() {
-        assert_dense_matches_paged("=B1", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    fn a_formula_reading_an_empty_cell_counts_as_0() {
+        assert_dense_matches_paged("=B1", [4.0, 2.0, 0.0, 4.0, 2.0]);
     }
 
     #[test]

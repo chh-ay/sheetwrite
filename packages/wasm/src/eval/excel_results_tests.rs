@@ -2342,6 +2342,36 @@ fn information_functions() {
     assert_results_on(&[&["", "", ""]], &[("=CELL(\"col\")", "4")]);
 }
 
+/// A formula cell is never blank in Excel. A result that ends in an empty
+/// cell is the number 0, in the cell and in each spilled element; only `""`
+/// shows nothing. The IS functions page: ISBLANK is TRUE only for a
+/// reference to an empty cell, and a cell holding a formula is not empty.
+/// The COUNT page counts numbers in a reference, and the COUNTBLANK page
+/// does not count zero values. Functions that take the empty cell itself as
+/// an argument still see it as blank. `Report!A1` holds `=Data!F1`.
+#[test]
+fn a_formula_that_reads_an_empty_cell_holds_0() {
+    assert_results(&[
+        ("=Data!F1", "0"),
+        ("=ISBLANK(A1)", "FALSE"),
+        ("=COUNT(A1)", "1"),
+        ("=COUNTBLANK(A1)", "0"),
+        ("=IF(TRUE,Data!F1)", "0"),
+        ("=INDEX(Data!F1:F3,2)", "0"),
+        ("=VLOOKUP(2,Data!A1:F3,6,FALSE)", "0"),
+        ("=LET(cell,Data!F1,cell)", "0"),
+        ("=\"\"", ""),
+        ("=SUM(Data!F1)", "0"),
+        ("=ISBLANK(Data!F1)", "TRUE"),
+        ("=COUNTA(Data!F1)", "0"),
+        ("=COUNTBLANK(Data!F1:F2)", "2"),
+        #[cfg(feature = "analysis")]
+        ("=LAMBDA(cell,cell)(Data!F1)", "0"),
+    ]);
+    // `Data!D3` is empty, so the third spilled element is 0.
+    assert_spills(&[("=Data!D1:D3", 1, &["5", "x", "0"])]);
+}
+
 /// RANDBETWEEN rounds its bounds inward and refuses an empty interval.
 #[test]
 fn random_bounds() {
