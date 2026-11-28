@@ -262,7 +262,9 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * mount instead of turning a timed repaint into a no-op.
    */
   private install_frame_counter(): void {
-    const read_windows: unknown = Reflect.get(this.grid, "read_windows");
+    // 0.6.x names this field `readWindows`; the measured work is the same.
+    const read_windows: unknown =
+      Reflect.get(this.grid, "read_windows") ?? Reflect.get(this.grid, "readWindows");
     if (
       typeof read_windows !== "object" ||
       read_windows === null ||
@@ -679,7 +681,8 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
    * set cannot pass by recomputing the expected answer.
    */
   searchState(): SearchProbe {
-    const controller = Reflect.get(this.grid, "search_controller") as
+    const controller = (Reflect.get(this.grid, "search_controller") ??
+      Reflect.get(this.grid, "searchController")) as
       | {
           matches: { length: number; at(index: number): { row: number; col: number } | null };
           active: number;
