@@ -174,12 +174,22 @@ function typed_text(event: Event): boolean {
 }
 
 /**
- * Owns Layer 3: a single real `<textarea>` mounted over the active cell only
- * while editing, never recycled — so IME composition and focus survive scroll.
+ * Owns Layer 3: one real `<textarea>` per grid, made on the first edit,
+ * shown over the active cell while an edit is open and hidden between edits.
+ * Showing a kept field costs the browser less style and layout work than
+ * making and inserting a new one. It never moves while an edit is open, so
+ * IME composition and focus survive scroll.
  */
 export class EditController {
   private readonly host: HTMLElement;
+  /** Gets the focus back when an edit that has it closes; without one the focus leaves for the page. */
+  private readonly focus_home: HTMLElement | null;
+  /** The field every edit reuses; null until the first edit and after a composition was cut off. */
+  private field: HTMLTextAreaElement | null = null;
+  /** The field while an edit is open. */
   private textarea: HTMLTextAreaElement | null = null;
+  /** Counts opened and closed edits, so a callback of one edit never acts on the next. */
+  private edit = 0;
   private opts: BeginEditOptions | null = null;
   private composing = false;
   private tearing_down = false;
@@ -207,9 +217,10 @@ export class EditController {
   /** Measures the edited line's width without laying the page out; see {@link reveal_line_end}. */
   private measure_context: CanvasRenderingContext2D | null | undefined;
 
-  constructor(host: HTMLElement, assist?: AssistDeps) {
+  constructor(host: HTMLElement, assist?: AssistDeps, focusHome?: HTMLElement) {
     this.host = host;
     this.assist = assist ? new FormulaAssist(assist) : null;
+    this.focus_home = focusHome ?? null;
   }
 
   get isEditing(): boolean {
@@ -239,9 +250,15 @@ export class EditController {
 
   begin(opts: BeginEditOptions): void {
     this.teardown();
+    this.edit++;
 
-    const ta = document.createElement("textarea");
+    const ta = (this.field ??= this.make_field());
+    // Every edit starts from a bare field: no attribute, inline style or ARIA
+    // that an earlier edit, its formula help or its AutoComplete left on it.
+    for (const name of ta.getAttributeNames()) ta.removeAttribute(name);
     ta.className = "sheetwrite-editor";
+    // Setting the value also clears the browser's undo history of the field,
+    // so Ctrl+Z in this edit never brings back an earlier edit's text.
     ta.value = opts.initial;
     ta.inputMode = opts.type === "number" || opts.type === "currency" ? "decimal" : "text";
     ta.spellcheck = false;
@@ -263,20 +280,20 @@ export class EditController {
     // make the style recalculation that focusing the editor forces slower.
     if (opts.look !== undefined) write_look(ta.style, opts.look, opts.theme);
 
-    this.host.appendChild(ta);
+    if (ta.parentNode !== this.host) this.host.appendChild(ta);
+    // The previous edit closed without moving the focus on (a validation
+    // alert follows it): a draft shown from another surface takes no focus.
+    if (!opts.focus && document.activeElement === ta) ta.blur();
     this.textarea = ta;
     this.opts = opts;
     this.entering = opts.entering;
     this.position(opts.rect);
 
-    ta.addEventListener("compositionstart", this.on_composition_start);
-    ta.addEventListener("compositionend", this.on_composition_end);
-    ta.addEventListener("keydown", this.on_key_down);
-    ta.addEventListener("focus", this.on_focus);
-    ta.addEventListener("blur", this.on_blur);
-    ta.addEventListener("input", this.on_input);
-
     if (opts.focus) ta.focus();
+    // The browser keeps a hidden field's scroll offsets. Focusing has just
+    // laid the field out, so reading them then costs nothing.
+    if (ta.scrollTop !== 0) ta.scrollTop = 0;
+    if (ta.scrollLeft !== 0) ta.scrollLeft = 0;
     if (opts.selectAll) {
       ta.select();
     } else {
@@ -288,6 +305,18 @@ export class EditController {
     if (opts.focus && opts.entering) this.auto_complete(ta);
     if (opts.focus) this.attach_assist();
     this.report_mode();
+  }
+
+  /** The field, with the listeners every edit shares; each checks that an edit is open. */
+  private make_field(): HTMLTextAreaElement {
+    const ta = document.createElement("textarea");
+    ta.addEventListener("compositionstart", this.on_composition_start);
+    ta.addEventListener("compositionend", this.on_composition_end);
+    ta.addEventListener("keydown", this.on_key_down);
+    ta.addEventListener("focus", this.on_focus);
+    ta.addEventListener("blur", this.on_blur);
+    ta.addEventListener("input", this.on_input);
+    return ta;
   }
 
   /**
@@ -425,7 +454,7 @@ export class EditController {
 
   private readonly on_input = (event: Event): void => {
     const ta = this.textarea;
-    if (!ta) return;
+    if (!ta || this.tearing_down) return;
     this.ref_start = -1;
     this.completion = null;
     if (!this.composing) {
@@ -530,8 +559,9 @@ export class EditController {
       (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)
         ? active
         : ta;
+    const edit = this.edit;
     const show = (): void => {
-      if (this.textarea !== ta) return;
+      if (this.edit !== edit) return;
       this.refusing = false;
       field.focus();
       field.setSelectionRange(problem.from + offset, problem.to + offset);
@@ -556,21 +586,25 @@ export class EditController {
   }
 
   destroy(): void {
-    this.teardown();
+    this.teardown(false);
+    if (this.field !== null) this.drop_field(this.field);
   }
 
   private readonly on_composition_start = (): void => {
+    if (this.textarea === null || this.tearing_down) return;
     this.composing = true;
     this.completion = null;
   };
 
   private readonly on_composition_end = (): void => {
+    // An end without a start in this edit belongs to an earlier one.
+    if (!this.composing || this.tearing_down) return;
     this.composing = false;
     // Browsers differ on whether the composed text's input event comes before
     // or after compositionend; complete once both have passed.
-    const ta = this.textarea;
+    const edit = this.edit;
     setTimeout(() => {
-      if (this.textarea === ta) this.completeNow();
+      if (this.edit === edit) this.completeNow();
     }, 0);
   };
 
@@ -589,6 +623,7 @@ export class EditController {
   }
 
   private readonly on_key_down = (e: KeyboardEvent): void => {
+    if (this.textarea === null) return;
     // While the IME is composing, every keystroke belongs to the composition.
     if (this.composing || e.isComposing) {
       e.stopPropagation();
@@ -655,19 +690,31 @@ export class EditController {
     this.commit("none");
   };
 
-  private teardown(): void {
+  /**
+   * Close the open edit. The field hides and stays for the next edit; with
+   * `return_focus`, focus it held goes to the grid first, so the field never
+   * holds the focus hidden.
+   */
+  private teardown(return_focus = true): void {
     const ta = this.textarea;
     if (!ta) return;
     this.tearing_down = true;
     this.detach_assist();
     this.opts?.complete?.close();
-    ta.removeEventListener("compositionstart", this.on_composition_start);
-    ta.removeEventListener("compositionend", this.on_composition_end);
-    ta.removeEventListener("keydown", this.on_key_down);
-    ta.removeEventListener("focus", this.on_focus);
-    ta.removeEventListener("blur", this.on_blur);
-    ta.removeEventListener("input", this.on_input);
-    ta.remove();
+    // An IME may still commit an unfinished composition into the field after
+    // the edit has closed, some of them a while later: that field is dropped,
+    // so none of its text can reach the next edit.
+    const composing = this.composing;
+    if (return_focus && document.activeElement === ta) {
+      if (this.focus_home) this.focus_home.focus();
+      else ta.blur();
+    }
+    // Hidden, the field takes no focus and screen readers skip it; without
+    // its class, `.sheetwrite-editor` finds only an open editor.
+    ta.className = "";
+    ta.style.display = "none";
+    if (composing) this.drop_field(ta);
+    this.edit++;
     this.textarea = null;
     this.opts = null;
     this.composing = false;
@@ -681,5 +728,16 @@ export class EditController {
     this.reported_mode = null;
     this.refusing = false;
     this.tearing_down = false;
+  }
+
+  private drop_field(ta: HTMLTextAreaElement): void {
+    ta.removeEventListener("compositionstart", this.on_composition_start);
+    ta.removeEventListener("compositionend", this.on_composition_end);
+    ta.removeEventListener("keydown", this.on_key_down);
+    ta.removeEventListener("focus", this.on_focus);
+    ta.removeEventListener("blur", this.on_blur);
+    ta.removeEventListener("input", this.on_input);
+    ta.remove();
+    if (this.field === ta) this.field = null;
   }
 }

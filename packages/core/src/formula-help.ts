@@ -362,6 +362,8 @@ export class FormulaHelp {
   private readonly deps: AssistDeps;
   private readonly id: string;
   private field: FormulaEditorElement | null = null;
+  /** Counts attaches: a reused field is attached once per edit, and a late read belongs to its own. */
+  private attaches = 0;
   private functions: readonly FormulaFunctionMetadata[] = [];
   /** The defined names and tables the list offers, read when the field is attached. */
   private names: FormulaNames = { names: [], tables: [] };
@@ -409,6 +411,7 @@ export class FormulaHelp {
   attach(field: FormulaEditorElement, theme: Theme | null): void {
     this.detach();
     this.field = field;
+    const attach = ++this.attaches;
     this.names = formula_names(this.deps.store, this.deps.sheet(), this.deps.cell());
     this.mount_layer(field, theme);
     if (this.deps.suggestions === true) {
@@ -435,7 +438,7 @@ export class FormulaHelp {
     // Host functions can change between edits, so every edit reads the list.
     storeFunctions(this.deps.store).then(
       (functions) => {
-        if (this.field !== field) return;
+        if (this.attaches !== attach || this.field !== field) return;
         this.functions = functions;
         this.update();
       },
