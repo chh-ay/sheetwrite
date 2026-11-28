@@ -81,7 +81,8 @@ already have finite valid numeric values; invalid typed input is rejected.
 
 All column references use stable IDs. Rename changes a name, not an ID. Output
 IDs must be unique; names must not collide when letter case is ignored in any
-alphabet, as Excel table headers must not.
+alphabet and Unicode form is ignored ("Ä" as one character or as "A" with a
+combining diaeresis), as Excel table headers must not.
 
 - **Filter:** `compare`, `isNull`, `contains`, `and`, `or`, and `not`. Text matching
   is ordinal and case-sensitive. Null follows M logical rules; only true selects

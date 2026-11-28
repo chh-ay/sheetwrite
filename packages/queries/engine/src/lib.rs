@@ -16,6 +16,7 @@ mod json;
 mod keys;
 mod m;
 mod mixed;
+mod name_key;
 mod plan;
 mod plan_wire;
 mod power_query;

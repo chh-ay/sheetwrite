@@ -497,6 +497,10 @@ describe("saved query shape", () => {
     for (const list of [
       [customers, { ...orders, id: "customers" }],
       [customers, { ...orders, name: "CUSTOMERS" }],
+      [
+        { ...customers, name: "\u00C4" },
+        { ...orders, name: "A\u0308" },
+      ],
       [orders],
       [loop, orders],
       [shared_table, orders],
