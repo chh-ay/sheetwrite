@@ -43,6 +43,14 @@ const XLSX_SAMPLES_PER_PROCESS = 3;
 const XLSX_ROWS = 50_000;
 const MEMORY_FORMULAS = 100_000;
 const GC_TURNS = 5;
+/**
+ * JavaScriptCore's allocator returns freed heap pages to the system on its
+ * own timer, not during a collection. RSS read right after a GC still holds a
+ * varying part of what the load freed, which moved the 100k-formula row by
+ * up to 40 MiB between rounds on 20 CPUs, so the memory part waits this long
+ * after its collections before each RSS read.
+ */
+const ALLOCATOR_SETTLE_MS = 1_000;
 const BYTES_PER_KIB = 1024;
 const BYTES_PER_MIB = 1024 * 1024;
 const BROTLI_QUALITY = 11;
@@ -388,6 +396,13 @@ async function collect_garbage(): Promise<void> {
   }
 }
 
+/** Collects, gives the allocator time to return the freed pages, and collects again. */
+async function settle_memory(): Promise<void> {
+  await collect_garbage();
+  await Bun.sleep(ALLOCATOR_SETTLE_MS);
+  await collect_garbage();
+}
+
 function median(values: readonly number[]): number {
   if (values.length === 0) return Number.NaN;
   const sorted = [...values].sort((left, right) => left - right);
@@ -572,7 +587,7 @@ async function measure_memory(core: CoreModule) {
     const formulas = Array.from({ length: MEMORY_FORMULAS }, (_, row) =>
       formula_patch(row, 1, `=A${row + 1}+1`),
     );
-    await collect_garbage();
+    await settle_memory();
     const before = rss_bytes();
     await sampler.reset();
     apply_all(store, formulas);
@@ -581,7 +596,7 @@ async function measure_memory(core: CoreModule) {
       { address: address(MEMORY_FORMULAS - 1, 1), value: MEMORY_FORMULAS + 1 },
       "memory fixture",
     );
-    await collect_garbage();
+    await settle_memory();
     const after = rss_bytes();
     const sampled_peak = await sampler.stop();
     // The kernel max counts only when the load raised it; an earlier, higher
@@ -897,7 +912,7 @@ async function run(options: {
     method: {
       recalculation: `each row builds its fixture untimed, runs ${WARMUP_EDITS} warm-up edits of A1, then ${RECALC_SAMPLES_PER_PROCESS} samples that repeat the edit until ${MIN_SAMPLE_MS} ms (at least ${MIN_EDITS_PER_SAMPLE} edits) and record the mean per edit; every sample checks the recalculated value`,
       rows: RECALC_ROWS.map(({ id, description }) => ({ id, description })),
-      memory: `process RSS around loading ${MEMORY_FORMULAS.toLocaleString("en-US")} formulas =An+1 into a 100,000-row store (in ${PATCHES_PER_TRANSACTION.toLocaleString("en-US")}-formula transactions), with a forced GC before and after; retained = RSS after minus RSS before; peak = the highest RSS during the load (sampled every millisecond on a worker thread, or the kernel max RSS when the load raised it) minus RSS before`,
+      memory: `process RSS around loading ${MEMORY_FORMULAS.toLocaleString("en-US")} formulas =An+1 into a 100,000-row store (in ${PATCHES_PER_TRANSACTION.toLocaleString("en-US")}-formula transactions), with a forced GC, a ${ALLOCATOR_SETTLE_MS.toLocaleString("en-US")} ms wait for the allocator to return freed pages and another forced GC before and after; retained = RSS after minus RSS before; peak = the highest RSS during the load (sampled every millisecond on a worker thread, or the kernel max RSS when the load raised it) minus RSS before`,
       xlsx: `${XLSX_ROWS.toLocaleString("en-US")} rows x 6 columns (2 text, 2 number, 2 formula columns, 100,000 formulas). Export: toXlsxWorkbook(store.exportSnapshot()). Import: fromXlsxWorkbook(bytes) plus SheetwriteStore.fromSnapshot, of one file written by ${oldest.label} for every version. 1 warm-up and ${XLSX_SAMPLES_PER_PROCESS} samples per process, process median`,
       sizes: `raw and Brotli quality ${BROTLI_QUALITY} of the engine's .wasm and of the browser entry's JS import closure`,
       aaSpread:
