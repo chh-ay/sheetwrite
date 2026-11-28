@@ -13,7 +13,7 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { cellA1, sheetNameKey } from "@sheetwrite/core";
+import { cellA1, sheetNameKey } from "@sheetwrite/core/codec";
 
 import { type CellRect, parseCellRect, rectA1 } from "./cell-reference.js";
 import { staticCell } from "./dashboard.js";

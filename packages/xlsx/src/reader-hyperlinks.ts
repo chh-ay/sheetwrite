@@ -3,7 +3,7 @@ import {
   isSafeExternalHyperlink,
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/codec";
 
 import { type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import type { ParsedHyperlink } from "./reader-types.js";

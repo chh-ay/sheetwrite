@@ -1,5 +1,5 @@
 import type { CellBorder, CellStyle, CellVerticalAlign, SheetSnapshot } from "@sheetwrite/core";
-import { isCellFontFamily } from "@sheetwrite/core";
+import { isCellFontFamily } from "@sheetwrite/core/codec";
 
 import { DRAWINGML_NAMESPACES, MAIN_NAMESPACES, MAIN_NS } from "./format.js";
 import {

@@ -13,7 +13,7 @@ import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
   MAX_VALIDATION_FORMULA_LENGTH,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import type { ParsedValidation } from "./reader-types.js";
