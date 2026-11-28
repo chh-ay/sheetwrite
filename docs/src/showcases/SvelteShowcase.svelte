@@ -33,31 +33,31 @@ const GRID_CONFIG: GridConfig = {
 };
 
 let session = $state<SvelteWorkbenchSession>();
-let bootError = $state<string>();
-let actionState = $state<ActionState>({ pending: false, error: null });
-const action = createActionGuard((state) => { actionState = state; });
+let boot_error = $state<string>();
+let action_state = $state<ActionState>({ pending: false, error: null });
+const action = createActionGuard((state) => { action_state = state; });
 let mount = $state<WorkbenchMount>();
 let generation = $state(1);
-let remountNote = $state("initial");
+let remount_note = $state("initial");
 let grid = $state<Grid>();
 let online = $state(true);
-let actionKind = $state<"connection" | "merge">("connection");
-let merging = $derived(actionState.pending && actionKind === "merge");
-let syncState = $state<SyncStateSnapshot>();
+let action_kind = $state<"connection" | "merge">("connection");
+let merging = $derived(action_state.pending && action_kind === "merge");
+let sync_state = $state<SyncStateSnapshot>();
 let queue = $state<readonly SyncMutationRecord[]>([]);
 let conflict = $state<WorkbenchConflict | null>(null);
 let peers = $state<readonly PresenceMessage[]>([]);
 // The colleague keeps a pill whether or not they are connected, so the header
 // keeps its layout when their presence arrives or leaves.
-const colleaguePresent = $derived(peers.some((peer) => peer.actor.id === OFFLINE_COLLEAGUE_ACTOR.id));
-const otherPeers = $derived(peers.filter((peer) => peer.actor.id !== OFFLINE_COLLEAGUE_ACTOR.id));
+const colleague_present = $derived(peers.some((peer) => peer.actor.id === OFFLINE_COLLEAGUE_ACTOR.id));
+const other_peers = $derived(peers.filter((peer) => peer.actor.id !== OFFLINE_COLLEAGUE_ACTOR.id));
 let feed = $state<WorkbenchFeedEntry[]>([]);
-let chromeHost = $state<HTMLDivElement>();
-let gridWrap = $state<HTMLDivElement>();
+let chrome_host = $state<HTMLDivElement>();
+let grid_wrap = $state<HTMLDivElement>();
 
-const statusLabel = $derived.by(() => {
-  if (bootError) return `Boot failed: ${bootError}`;
-  const state = syncState;
+const status_label = $derived.by(() => {
+  if (boot_error) return `Boot failed: ${boot_error}`;
+  const state = sync_state;
   if (!state) return "Preparing the workbook…";
   switch (state.activity) {
     case "hydrating":
@@ -84,12 +84,12 @@ const statusLabel = $derived.by(() => {
 });
 
 const ready = $derived(
-  session !== undefined && grid !== undefined && syncState?.activity !== "hydrating",
+  session !== undefined && grid !== undefined && sync_state?.activity !== "hydrating",
 );
 
 const journey = $derived.by(() => {
-  const state = syncState;
-  if (bootError) {
+  const state = sync_state;
+  if (boot_error) {
     return {
       state: "error",
       title: "Dispatch could not start",
@@ -158,7 +158,7 @@ $effect(() => {
   let created: SvelteWorkbenchSession | undefined;
   void SvelteWorkbenchSession.create({
     onState: (state) => {
-      syncState = state;
+      sync_state = state;
     },
     onQueue: (records) => {
       queue = records;
@@ -173,13 +173,13 @@ $effect(() => {
       // Newest first; a bounded list keeps the rail a fixed, readable panel.
       feed = [entry, ...feed].slice(0, 6);
     },
-    onRemount: (nextMount, note) => {
-      mount = nextMount;
-      remountNote = note;
+    onRemount: (next_mount, note) => {
+      mount = next_mount;
+      remount_note = note;
       generation += 1;
     },
     // Columns are constructor-bound: the mount path sizes them to the live stage.
-    measureHostWidth: () => gridWrap?.clientWidth,
+    measureHostWidth: () => grid_wrap?.clientWidth,
   }).then(
     (value) => {
       if (cancelled) {
@@ -191,7 +191,7 @@ $effect(() => {
       mount = value.initialMount();
     },
     (error: unknown) => {
-      if (!cancelled) bootError = errorText(error);
+      if (!cancelled) boot_error = errorText(error);
     },
   );
   return () => {
@@ -203,36 +203,36 @@ $effect(() => {
 // Connect each published Grid generation to the session; the cleanup runs when
 // the adapter resets, the island remounts, or the component unmounts.
 $effect(() => {
-  const activeGrid = grid;
-  const activeSession = session;
-  const activeMount = mount;
-  if (!activeGrid || !activeSession || !activeMount) return;
-  activeSession.connect(activeGrid, activeMount.version);
-  (window as { __sheetwriteSvelteGrid?: Grid }).__sheetwriteSvelteGrid = activeGrid;
+  const active_grid = grid;
+  const active_session = session;
+  const active_mount = mount;
+  if (!active_grid || !active_session || !active_mount) return;
+  active_session.connect(active_grid, active_mount.version);
+  (window as { __sheetwriteSvelteGrid?: Grid }).__sheetwriteSvelteGrid = active_grid;
   return () => {
     delete (window as { __sheetwriteSvelteGrid?: Grid }).__sheetwriteSvelteGrid;
-    activeSession.disconnect();
+    active_session.disconnect();
   };
 });
 
 $effect(() => {
-  const activeGrid = grid;
-  if (!activeGrid) return;
-  return observeSiteTheme(() => activeGrid.replaceTheme(OFFLINE_THEME));
+  const active_grid = grid;
+  if (!active_grid) return;
+  return observeSiteTheme(() => active_grid.replaceTheme(OFFLINE_THEME));
 });
 
 // Shell chrome (name box, formula bar, selection status) binds to the same
 // Grid handle the adapter publishes — chrome composition without a wrapper.
 $effect(() => {
   const active = grid;
-  const chrome = chromeHost;
+  const chrome = chrome_host;
   if (!active || !chrome) return;
-  const focusGrid = (): void => {
-    gridWrap?.querySelector<HTMLElement>(".sheetwrite")?.focus();
+  const focus_grid = (): void => {
+    grid_wrap?.querySelector<HTMLElement>(".sheetwrite")?.focus();
   };
   const pieces = [
-    createNameBox(chrome, active, { focusGrid }),
-    createFormulaBar(chrome, active, { focusGrid }),
+    createNameBox(chrome, active, { focusGrid: focus_grid }),
+    createFormulaBar(chrome, active, { focusGrid: focus_grid }),
     createSelectionStatus(chrome, active),
   ];
   chrome.querySelector<HTMLInputElement>(".sheetwrite-shell-namebox")?.setAttribute("placeholder", "A1");
@@ -244,28 +244,28 @@ $effect(() => {
   };
 });
 
-function toggleConnection(event: MouseEvent): void {
+function toggle_connection(event: MouseEvent): void {
   if (!session || isRepeatClick(event)) return;
   const active = session;
   const next = !online;
   void action.run(async () => {
-    actionKind = "connection";
+    action_kind = "connection";
     await active.setOnline(next);
     online = next;
   }, () => "Cannot change the connection. Try again.");
 }
 
-async function mergeConflict(): Promise<void> {
+async function merge_conflict(): Promise<void> {
   if (!session) return;
   const active = session;
   await action.run(() => {
-    actionKind = "merge";
+    action_kind = "merge";
     return active.mergeAndResync();
   }, () => "Cannot merge the queued edits. Try again.");
 }
 </script>
 
-<section class="sw-demo-app sw-svw" data-framework="svelte" data-generation={generation} data-remount-note={remountNote}>
+<section class="sw-demo-app sw-svw" data-framework="svelte" data-generation={generation} data-remount-note={remount_note}>
   <div class="sw-demo-main" id="dispatch">
     <header class="sw-demo-controlbar sw-svw-chrome">
       <div class="sw-demo-controlbar__identity">
@@ -285,15 +285,15 @@ async function mergeConflict(): Promise<void> {
         data-testid="connection-toggle"
         role="switch"
         aria-checked={online}
-        disabled={!ready || actionState.pending}
-        aria-busy={actionState.pending || undefined}
-        onclick={toggleConnection}
+        disabled={!ready || action_state.pending}
+        aria-busy={action_state.pending || undefined}
+        onclick={toggle_connection}
       >
-        {#if actionState.pending}
+        {#if action_state.pending}
           Changing connection…
         {:else if online}
           <SheetwriteIcon name="cloud" />
-          {syncState?.activity === "sending" ? "Draining" : "Connected · Go offline"}
+          {sync_state?.activity === "sending" ? "Draining" : "Connected · Go offline"}
         {:else}
           <SheetwriteIcon name="cloud-off" />
           Reconnect · {queue.length} queued
@@ -301,7 +301,7 @@ async function mergeConflict(): Promise<void> {
       </button>
       <output class="sw-workbench-readout" aria-live="polite"><strong>{queue.length}</strong><span>durable edits waiting for HQ</span></output>
 
-      <div class="sw-svw-shellbar" bind:this={chromeHost}></div>
+      <div class="sw-svw-shellbar" bind:this={chrome_host}></div>
 
       <div class="sw-svw-collaborators">
         <span>Working here</span>
@@ -309,10 +309,10 @@ async function mergeConflict(): Promise<void> {
           <li style:--sw-svw-peer={OFFLINE_LOCAL_ACTOR.color}>
             {OFFLINE_LOCAL_ACTOR.displayName}
           </li>
-          <li style:--sw-svw-peer={OFFLINE_COLLEAGUE_ACTOR.color} data-present={colleaguePresent}>
-            {OFFLINE_COLLEAGUE_ACTOR.displayName}{#if !colleaguePresent}<span class="sw-visually-hidden"> (away)</span>{/if}
+          <li style:--sw-svw-peer={OFFLINE_COLLEAGUE_ACTOR.color} data-present={colleague_present}>
+            {OFFLINE_COLLEAGUE_ACTOR.displayName}{#if !colleague_present}<span class="sw-visually-hidden"> (away)</span>{/if}
           </li>
-          {#each otherPeers as peer (peer.actor.id)}
+          {#each other_peers as peer (peer.actor.id)}
             <li style:--sw-svw-peer={peer.actor.color}>
               {peer.actor.displayName ?? peer.actor.id}
             </li>
@@ -321,8 +321,8 @@ async function mergeConflict(): Promise<void> {
       </div>
     </header>
 
-    <p class="sw-action-error" role="alert" data-action-error="" hidden={!bootError && !actionState.error}>
-      {bootError ?? actionState.error}
+    <p class="sw-action-error" role="alert" data-action-error="" hidden={!boot_error && !action_state.error}>
+      {boot_error ?? action_state.error}
     </p>
     <div class="sw-demo-workspace" data-journey-state={journey.state}>
       <section class="sw-svw-gridstage" aria-label="Editable field dispatch workbook">
@@ -330,7 +330,7 @@ async function mergeConflict(): Promise<void> {
           <strong>Dispatch Grid</strong>
           <span>Edit ticket status directly or use the field action.</span>
         </header>
-        <div class="sw-demo-grid" bind:this={gridWrap}>
+        <div class="sw-demo-grid" bind:this={grid_wrap}>
           {#if mount}
             {#key generation}
               <SheetwriteGrid
@@ -341,8 +341,8 @@ async function mergeConflict(): Promise<void> {
                 theme={OFFLINE_THEME}
                 config={GRID_CONFIG}
                 fill
-                onReady={() => { bootError = undefined; }}
-                onInitializationError={(error) => { bootError = `Cannot load the workbook: ${String(error)}`; }}
+                onReady={() => { boot_error = undefined; }}
+                onInitializationError={(error) => { boot_error = `Cannot load the workbook: ${String(error)}`; }}
               />
             {/key}
           {/if}
@@ -353,10 +353,10 @@ async function mergeConflict(): Promise<void> {
         <section class="sw-svw-mission" data-state={journey.state}>
           <div class="sw-svw-mission__eyebrow">
             <span>FIELD HANDOFF</span>
-            <span data-testid="server-version">server v{syncState?.serverVersion ?? 0}</span>
+            <span data-testid="server-version">server v{sync_state?.serverVersion ?? 0}</span>
           </div>
           <h3>{journey.title}</h3>
-          <strong role="status" data-testid="sync-status">{statusLabel}</strong>
+          <strong role="status" data-testid="sync-status">{status_label}</strong>
           <p>{journey.detail}</p>
           <button
             type="button"
@@ -377,7 +377,7 @@ async function mergeConflict(): Promise<void> {
           {#if queue.length === 0}
             <p class="sw-demo-activity__empty">
               {journey.state === "resolved"
-                ? `Drained — acknowledged through server v${syncState?.serverVersion ?? 0}.`
+                ? `Drained — acknowledged through server v${sync_state?.serverVersion ?? 0}.`
                 : "No field edits waiting for dispatch."}
             </p>
           {:else}
@@ -412,7 +412,7 @@ async function mergeConflict(): Promise<void> {
                 ? "Conservative rebase: no overlap with your queued edits."
                 : "Overlapping edits — your queued values win on resync."}
             </span>
-            <button type="button" data-testid="merge-button" disabled={merging} aria-busy={merging || undefined} onclick={() => void mergeConflict()}>
+            <button type="button" data-testid="merge-button" disabled={merging} aria-busy={merging || undefined} onclick={() => void merge_conflict()}>
               <SheetwriteIcon name="merge" /> {merging ? "Merging…" : "Merge & resync"}
             </button>
           </section>
@@ -451,7 +451,7 @@ async function mergeConflict(): Promise<void> {
 
     <footer class="sw-demo-status sw-demo-status--metrics">
       <span>{OFFLINE_ROWS} dispatch rows</span>
-      <span>server v{syncState?.serverVersion ?? 0}</span>
+      <span>server v{sync_state?.serverVersion ?? 0}</span>
       <span>outbox {queue.length}</span>
       <span>{online ? "connected" : "offline"}</span>
       <span class="sw-demo-status__binding">

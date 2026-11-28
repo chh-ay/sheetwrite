@@ -10,96 +10,97 @@ import {
 import { untrack } from "svelte";
 import type { SheetwriteGridProps as Props } from "./props.js";
 
-
 let {
   workbook,
   data,
   datasource,
-  datasourceStorage,
+  datasourceStorage: datasource_storage,
   renderer = "canvas",
-  workerUrl,
+  workerUrl: worker_url,
   theme,
   presentation,
-  readOnly,
-  protectionResolver,
-  mutationPolicy,
-  transactionResourceLimits,
-  hyperlinkActivation,
+  readOnly: read_only,
+  protectionResolver: protection_resolver,
+  mutationPolicy: mutation_policy,
+  transactionResourceLimits: transaction_resource_limits,
+  hyperlinkActivation: hyperlink_activation,
   addons,
   renderers,
   editors,
   overscan,
-  minColumns,
+  minColumns: min_columns,
   config,
-  wasmSource,
+  wasmSource: wasm_source,
   height,
   fill,
-  rowBridge,
+  rowBridge: row_bridge,
   fallback,
-  onGridChange,
-  onRowDelta,
-  onSelectionChange,
-  onViewportChange,
-  onEditBegin,
-  onEditCommit,
-  onSearch,
-  onActiveSheetChange,
-  onCommandStateChange,
-  onMutationRejected,
-  onRendererFallback,
-  onDatasourceError,
-  onExportError,
-  onKeyBindingsChange,
-  onReady,
-  onInitializationError,
+  onGridChange: on_grid_change,
+  onRowDelta: on_row_delta,
+  onSelectionChange: on_selection_change,
+  onViewportChange: on_viewport_change,
+  onEditBegin: on_edit_begin,
+  onEditCommit: on_edit_commit,
+  onSearch: on_search,
+  onActiveSheetChange: on_active_sheet_change,
+  onCommandStateChange: on_command_state_change,
+  onMutationRejected: on_mutation_rejected,
+  onRendererFallback: on_renderer_fallback,
+  onDatasourceError: on_datasource_error,
+  onExportError: on_export_error,
+  onKeyBindingsChange: on_key_bindings_change,
+  onReady: on_ready,
+  onInitializationError: on_initialization_error,
   grid = $bindable(),
-  ...hostAttributes
+  ...host_attributes
 }: Props = $props();
 
 let host: HTMLDivElement;
 let loading = $state(!isSheetwriteReady());
 
-function forwardCommandStateChange(
-  event: Parameters<NonNullable<typeof onCommandStateChange>>[0],
+function forward_command_state_change(
+  event: Parameters<NonNullable<typeof on_command_state_change>>[0],
 ): void {
-  onCommandStateChange?.(event);
+  on_command_state_change?.(event);
 }
 
 const handlers: GridAdapterEventHandlers = {
-  onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
-  onRowDelta: (event: Parameters<NonNullable<typeof onRowDelta>>[0]) => onRowDelta?.(event),
-  onSelectionChange: (event: Parameters<NonNullable<typeof onSelectionChange>>[0]) =>
-    onSelectionChange?.(event),
-  onViewportChange: (event: Parameters<NonNullable<typeof onViewportChange>>[0]) =>
-    onViewportChange?.(event),
-  onEditBegin: (event: Parameters<NonNullable<typeof onEditBegin>>[0]) => onEditBegin?.(event),
-  onEditCommit: (event: Parameters<NonNullable<typeof onEditCommit>>[0]) => onEditCommit?.(event),
-  onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
-  onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
-    onActiveSheetChange?.(event),
+  onGridChange: (event: Parameters<NonNullable<typeof on_grid_change>>[0]) =>
+    on_grid_change?.(event),
+  onRowDelta: (event: Parameters<NonNullable<typeof on_row_delta>>[0]) => on_row_delta?.(event),
+  onSelectionChange: (event: Parameters<NonNullable<typeof on_selection_change>>[0]) =>
+    on_selection_change?.(event),
+  onViewportChange: (event: Parameters<NonNullable<typeof on_viewport_change>>[0]) =>
+    on_viewport_change?.(event),
+  onEditBegin: (event: Parameters<NonNullable<typeof on_edit_begin>>[0]) => on_edit_begin?.(event),
+  onEditCommit: (event: Parameters<NonNullable<typeof on_edit_commit>>[0]) =>
+    on_edit_commit?.(event),
+  onSearch: (event: Parameters<NonNullable<typeof on_search>>[0]) => on_search?.(event),
+  onActiveSheetChange: (event: Parameters<NonNullable<typeof on_active_sheet_change>>[0]) =>
+    on_active_sheet_change?.(event),
   // The controller only subscribes to command state while this is defined, so
   // absence must be visible instead of an always-present wrapper.
   get onCommandStateChange() {
-    return onCommandStateChange === undefined ? undefined : forwardCommandStateChange;
+    return on_command_state_change === undefined ? undefined : forward_command_state_change;
   },
-  onMutationRejected: (event: Parameters<NonNullable<typeof onMutationRejected>>[0]) =>
-    onMutationRejected?.(event),
-  onRendererFallback: (event: Parameters<NonNullable<typeof onRendererFallback>>[0]) =>
-    onRendererFallback?.(event),
-  onDatasourceError: (event: Parameters<NonNullable<typeof onDatasourceError>>[0]) =>
-    onDatasourceError?.(event),
-  onExportError: (event: Parameters<NonNullable<typeof onExportError>>[0]) =>
-    onExportError?.(event),
-  onKeyBindingsChange: (event: Parameters<NonNullable<typeof onKeyBindingsChange>>[0]) =>
-    onKeyBindingsChange?.(event),
-  onReady: (event: Parameters<NonNullable<typeof onReady>>[0]) => onReady?.(event),
-  onInitializationError: (error: Parameters<NonNullable<typeof onInitializationError>>[0]) =>
-    onInitializationError?.(error),
+  onMutationRejected: (event: Parameters<NonNullable<typeof on_mutation_rejected>>[0]) =>
+    on_mutation_rejected?.(event),
+  onRendererFallback: (event: Parameters<NonNullable<typeof on_renderer_fallback>>[0]) =>
+    on_renderer_fallback?.(event),
+  onDatasourceError: (event: Parameters<NonNullable<typeof on_datasource_error>>[0]) =>
+    on_datasource_error?.(event),
+  onExportError: (event: Parameters<NonNullable<typeof on_export_error>>[0]) =>
+    on_export_error?.(event),
+  onKeyBindingsChange: (event: Parameters<NonNullable<typeof on_key_bindings_change>>[0]) =>
+    on_key_bindings_change?.(event),
+  onReady: (event: Parameters<NonNullable<typeof on_ready>>[0]) => on_ready?.(event),
+  onInitializationError: (error: Parameters<NonNullable<typeof on_initialization_error>>[0]) =>
+    on_initialization_error?.(error),
 };
 
 const lifetime = createAdapterGridController(handlers, {
-  publish(nextGrid) {
-    grid = nextGrid ?? undefined;
+  publish(next_grid) {
+    grid = next_grid ?? undefined;
   },
   setInitializationState(state) {
     loading = state !== "ready";
@@ -115,12 +116,14 @@ $effect(() => {
   // `satisfies` fails the typecheck when a GridOptions key is missing.
   const input: AdapterGridInput = {
     options: {
-      workbook, data, datasource, datasourceStorage, renderer, workerUrl, presentation,
-      protectionResolver, mutationPolicy, transactionResourceLimits, hyperlinkActivation, addons,
-      renderers, editors, theme, readOnly, overscan, minColumns, config,
+      workbook, data, datasource, datasourceStorage: datasource_storage, renderer,
+      workerUrl: worker_url, presentation, protectionResolver: protection_resolver,
+      mutationPolicy: mutation_policy, transactionResourceLimits: transaction_resource_limits,
+      hyperlinkActivation: hyperlink_activation, addons, renderers, editors, theme,
+      readOnly: read_only, overscan, minColumns: min_columns, config,
     } satisfies Record<keyof GridOptions, unknown>,
-    rowBridge,
-    wasmSource,
+    rowBridge: row_bridge,
+    wasmSource: wasm_source,
   };
   untrack(() => {
     if (attached) lifetime.update(input);
@@ -136,9 +139,9 @@ let sizing = $derived(gridSizeStyle({ height, fill }));
 </script>
 
 <div
-  {...hostAttributes}
+  {...host_attributes}
   bind:this={host}
-  class={["sheetwrite", hostAttributes.class]}
+  class={["sheetwrite", host_attributes.class]}
   style:width={sizing.width}
   style:height={sizing.height}
   style:min-height={sizing.minHeight}

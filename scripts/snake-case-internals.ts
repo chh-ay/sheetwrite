@@ -43,11 +43,15 @@
  * file below a nested `tsconfig.json` (a fixture or consumer project) belongs to that
  * project and is skipped.
  * Generated `*.gen.ts` files are skipped too: their generator rewrites them.
+ * `.mjs` modules and the `<script>` blocks and markup expressions of `.svelte` components
+ * are planned with the project whose directory holds them; a `{name}` attribute becomes
+ * `name={new_name}`, so the attribute keeps its name.
  * `check` lists every pending rename and conflict and exits 1 when any exist; `apply`
  * rewrites the files. Conflicts need a hand-picked name in the names file.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import {
   NodeFlags,
@@ -450,6 +454,8 @@ function member_names(declaration: Node): Set<string> {
 function is_target(file_name: string, include: readonly string[]): boolean {
   if (file_name.endsWith(".d.ts") || file_name.includes(`${sep}node_modules${sep}`)) return false;
   if (file_name.endsWith(".gen.ts")) return false;
+  // `allowJs` is on only for the `.mjs` files; other JavaScript it pulls in is not checked.
+  if (/\.(?:c?js|jsx)$/.test(file_name)) return false;
   return include.some(
     (directory) => file_name === directory || file_name.startsWith(directory + sep),
   );
@@ -475,6 +481,194 @@ function in_nested_project(
   }
 
   return false;
+}
+
+/** The suffix of a `.svelte` component's TypeScript view, a file beside it that only the plan sees. */
+const SVELTE_VIEW_SUFFIX = ".snake-case.ts";
+/** The project the plan opens instead of a project that has `.mjs` or `.svelte` files. */
+const EXTRA_FILES_CONFIG = "tsconfig.snake-case.json";
+
+/** The file a name lives in: the component, for a name in a `.svelte` component's view. */
+function source_file_name(file_name: string): string {
+  const absolute = resolve(file_name);
+
+  return absolute.endsWith(`.svelte${SVELTE_VIEW_SUFFIX}`)
+    ? absolute.slice(0, -SVELTE_VIEW_SUFFIX.length)
+    : absolute;
+}
+
+/**
+ * The `.mjs` modules and `.svelte` components below `directories`, outside nested projects,
+ * that git tracks or would track. No `include` pattern lists them, so the plan adds them to
+ * the project itself. A directory outside a git work tree has none.
+ */
+function extra_files(
+  directories: readonly string[],
+  project_directory: string,
+  nested: Map<string, boolean>,
+): string[] {
+  const found = new Set<string>();
+  for (const directory of directories) {
+    const listed = spawnSync(
+      "git",
+      ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.mjs", "*.svelte"],
+      { cwd: directory, encoding: "utf8" },
+    );
+    if (listed.status !== 0) continue;
+
+    for (const listed_name of listed.stdout.split("\0")) {
+      if (listed_name === "") continue;
+
+      const absolute = resolve(directory, listed_name);
+      if (existsSync(absolute) && !in_nested_project(absolute, project_directory, nested)) {
+        found.add(absolute);
+      }
+    }
+  }
+
+  return [...found].sort();
+}
+
+/** A `.svelte` component as TypeScript, with the component's offsets and lines. */
+interface SvelteView {
+  readonly source: string;
+  readonly code: string;
+  /**
+   * Each `{name}` attribute by where its name starts, with the offsets of its braces: a
+   * rename there rewrites the attribute as `name={new_name}`.
+   */
+  readonly shorthands: ReadonlyMap<number, { readonly start: number; readonly end: number }>;
+}
+
+/** A markup tag whose keyword is followed by an expression: `{#if x}`, `{@render x()}`. */
+const SVELTE_EXPRESSION_TAG = /^\s*(?:#if|:else\s+if|#key|#await|@html|@render|@debug)(?=\s)/;
+/** A markup tag that declares names or closes a block: `{#snippet x()}`, `{:then x}`, `{/if}`. */
+const SVELTE_BLANK_TAG = /^\s*(?:#snippet|:then|:catch|:else|\/)/;
+const SVELTE_EACH_TAG = /^\s*#each(?=\s)/;
+const SVELTE_CONST_TAG = /^\s*@const(?=\s)/;
+const SVELTE_SPREAD = /^\s*\.\.\./;
+const SVELTE_BLOCK = /<(script|style)\b[^>]*>/y;
+const SVELTE_START_TAG = /<[A-Za-z]/y;
+const IDENTIFIER = /^\s*[A-Za-z_$][\w$]*\s*$/;
+
+/** The index of the `}` that closes the `{` at `open`, skipping strings; the length when none does. */
+function closing_brace(source: string, open: number): number {
+  let depth = 0;
+  let quote = "";
+  for (let index = open; index < source.length; index++) {
+    const unit = source.charAt(index);
+    if (quote !== "") {
+      if (unit === "\\") index++;
+      else if (unit === quote) quote = "";
+    } else if (unit === '"' || unit === "'" || unit === "`") {
+      quote = unit;
+    } else if (unit === "{") {
+      depth++;
+    } else if (unit === "}" && --depth === 0) {
+      return index;
+    }
+  }
+
+  return source.length;
+}
+
+/**
+ * The component's `<script>` blocks as they are and each markup `{…}` expression as a
+ * statement, with everything else blanked to spaces. Every UTF-16 unit and line break
+ * keeps its offset, so a planned edit applies to the component unchanged.
+ */
+function svelte_view(source: string): SvelteView {
+  const code = source
+    .split("")
+    .map((unit): string => (unit === "\n" || unit === "\r" ? unit : " "));
+  const shorthands = new Map<number, { start: number; end: number }>();
+  const keep = (start: number, end: number): void => {
+    for (let index = start; index < end; index++) code[index] = source.charAt(index);
+  };
+
+  // Keeps the `{…}` at `open` as a statement and returns the index after it.
+  const expression = (open: number, is_attribute: boolean): number => {
+    const close = closing_brace(source, open);
+    const inner_start = open + 1;
+    const inner = source.slice(inner_start, close);
+    code[open] = ";";
+    if (close < source.length) code[close] = ";";
+
+    // A tag that declares names or closes a block stays blank: the names it declares stay
+    // unresolved, like any name the component does not bind.
+    const tag = SVELTE_EXPRESSION_TAG.exec(inner);
+    if (tag) {
+      keep(inner_start + tag[0].length, close);
+    } else if (SVELTE_EACH_TAG.test(inner)) {
+      const list_start = inner_start + (SVELTE_EACH_TAG.exec(inner)?.[0].length ?? 0);
+      const item = source.indexOf(" as ", list_start);
+      keep(list_start, item < 0 || item > close ? close : item);
+    } else if (SVELTE_CONST_TAG.test(inner)) {
+      // `{@const name = value}` declares `name` for the markup: keep it as `const name = value`.
+      keep(inner_start, close);
+      code[inner_start + inner.indexOf("@")] = " ";
+    } else if (!SVELTE_BLANK_TAG.test(inner)) {
+      keep(inner_start + (SVELTE_SPREAD.exec(inner)?.[0].length ?? 0), close);
+      if (is_attribute && IDENTIFIER.test(inner)) {
+        shorthands.set(inner_start + inner.search(/\S/), { start: open, end: close + 1 });
+      }
+    }
+
+    return close + 1;
+  };
+
+  // Reads a start tag's attributes and returns the index after its `>`.
+  const start_tag = (open: number): number => {
+    let quote = "";
+    let after_equals = false;
+    for (let index = open + 1; index < source.length;) {
+      const unit = source.charAt(index);
+      if (unit === "{") {
+        index = expression(index, quote === "" && !after_equals);
+        after_equals = false;
+        continue;
+      }
+
+      if (quote !== "") {
+        if (unit === quote) quote = "";
+      } else if (unit === '"' || unit === "'") {
+        quote = unit;
+      } else if (unit === ">") {
+        return index + 1;
+      }
+      if (!/\s/.test(unit)) after_equals = unit === "=";
+      index++;
+    }
+
+    return source.length;
+  };
+
+  for (let index = 0; index < source.length;) {
+    if (source.startsWith("<!--", index)) {
+      const end = source.indexOf("-->", index);
+      index = end < 0 ? source.length : end + "-->".length;
+      continue;
+    }
+
+    SVELTE_BLOCK.lastIndex = index;
+    const block = SVELTE_BLOCK.exec(source);
+    if (block) {
+      const body_start = index + block[0].length;
+      const close = source.indexOf(`</${block[1]}`, body_start);
+      const body_end = close < 0 ? source.length : close;
+      if (block[1] === "script") keep(body_start, body_end);
+      const after = source.indexOf(">", body_end);
+      index = after < 0 ? source.length : after + 1;
+      continue;
+    }
+
+    SVELTE_START_TAG.lastIndex = index;
+    if (SVELTE_START_TAG.test(source)) index = start_tag(index);
+    else if (source.charAt(index) === "{") index = expression(index, false);
+    else index++;
+  }
+
+  return { source, code: code.join(""), shorthands };
 }
 
 const SCOPE_KINDS = new Set<SyntaxKind>([
@@ -734,10 +928,12 @@ async function collect_candidates(
         keeps_key = true;
       }
 
+      // A rest element (`...rest`) has no key to keep.
       if (
         isBindingElement(parent) &&
         parent.name === name &&
         parent.propertyName === undefined &&
+        parent.dotDotDotToken === undefined &&
         isObjectBindingPattern(parent.parent)
       ) {
         keeps_key = true;
@@ -764,7 +960,7 @@ async function collect_candidates(
 
       declaration_counts.set(symbol.id, (declaration_counts.get(symbol.id) ?? 0) + 1);
       if (symbol.declarations.length === 1 && !candidates.has(symbol.id)) {
-        const picked = picked_names.get(resolve(file.fileName))?.get(old_name);
+        const picked = picked_names.get(source_file_name(file.fileName))?.get(old_name);
         candidates.set(symbol.id, {
           kind,
           declaration: parent,
@@ -853,23 +1049,57 @@ export async function planRenames(
   other_members: PrivateMemberNames = new Map(),
 ): Promise<RenamePlan> {
   const config = resolve(project_path);
+  const project_directory = dirname(config);
   const directories =
-    include.length > 0 ? include.map((directory) => resolve(directory)) : [dirname(config)];
-  const api = new API({ cwd: dirname(config) });
+    include.length > 0 ? include.map((directory) => resolve(directory)) : [project_directory];
+  const nested = new Map<string, boolean>();
+
+  // No project lists the `.mjs` and `.svelte` files, so the plan opens a project of its
+  // own that adds them: each `.mjs` file as it is, and each component as its TypeScript
+  // view. Both files exist only for TypeScript, through its file system callbacks.
+  const extras = extra_files(directories, project_directory, nested);
+  const svelte_views = new Map<string, SvelteView>();
+  const virtual_files = new Map<string, string>();
+  let opened = config;
+  if (extras.length > 0) {
+    const roots = extras.map((file_name) => {
+      if (!file_name.endsWith(".svelte")) return file_name;
+
+      const view = svelte_view(readFileSync(file_name, "utf8"));
+      svelte_views.set(file_name + SVELTE_VIEW_SUFFIX, view);
+      virtual_files.set(file_name + SVELTE_VIEW_SUFFIX, view.code);
+      return file_name + SVELTE_VIEW_SUFFIX;
+    });
+    opened = join(project_directory, EXTRA_FILES_CONFIG);
+    virtual_files.set(
+      opened,
+      JSON.stringify({
+        extends: `./${basename(config)}`,
+        compilerOptions: { allowJs: true },
+        files: roots,
+      }),
+    );
+  }
+  const api = new API({
+    cwd: project_directory,
+    fs: {
+      fileExists: (file_name) => virtual_files.has(file_name) || undefined,
+      readFile: (file_name) => virtual_files.get(file_name),
+    },
+  });
 
   try {
-    const snapshot = await api.updateSnapshot({ openProjects: [config] });
+    const snapshot = await api.updateSnapshot({ openProjects: [opened] });
     const project = snapshot
       .getProjects()
-      .find((candidate) => resolve(candidate.configFileName) === config);
-    if (!project) throw new Error(`TypeScript did not load ${config}`);
+      .find((candidate) => resolve(candidate.configFileName) === opened);
+    if (!project) throw new Error(`TypeScript did not load ${opened}`);
 
     const files: SourceFile[] = [];
-    const nested = new Map<string, boolean>();
     for (const file_name of await project.program.getSourceFileNames()) {
       const absolute = resolve(file_name);
       if (!is_target(absolute, directories)) continue;
-      if (in_nested_project(absolute, dirname(config), nested)) continue;
+      if (in_nested_project(absolute, project_directory, nested)) continue;
 
       const file = await project.program.getSourceFile(file_name);
       if (file) files.push(file);
@@ -1003,11 +1233,34 @@ export async function planRenames(
     renames.sort(by_position);
     conflicts.sort(by_position);
 
+    // A name in a component's view is reported and edited in the component. The offsets
+    // are the component's; a `{name}` attribute spells out its attribute name.
+    const in_source = <Entry extends { readonly file: string }>(entry: Entry): Entry => ({
+      ...entry,
+      file: source_file_name(entry.file),
+    });
+    const source_edits = new Map<string, readonly TextEdit[]>();
+    for (const [file_name, file_edits] of edits) {
+      const view = svelte_views.get(resolve(file_name));
+      source_edits.set(
+        source_file_name(file_name),
+        view === undefined
+          ? file_edits
+          : file_edits.map((edit) => {
+              const attribute = view.shorthands.get(edit.start);
+              if (attribute === undefined) return edit;
+
+              const old_name = view.source.slice(edit.start, edit.end);
+              return { ...attribute, text: `${old_name}={${edit.text}}` };
+            }),
+      );
+    }
+
     return {
-      renames,
-      conflicts,
-      mentions: [...mentions.values()].sort(by_position),
-      edits,
+      renames: renames.map(in_source),
+      conflicts: conflicts.map(in_source),
+      mentions: [...mentions.values()].sort(by_position).map(in_source),
+      edits: source_edits,
       privateMembers: private_members,
     };
   } finally {

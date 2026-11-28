@@ -4,10 +4,10 @@ import { dirname, relative, resolve } from "node:path";
 import { assertIconSheetEmitted } from "../icon-sheet.mjs";
 import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
-const repositoryRoot = resolve("../../..");
+const repository_root = resolve("../../..");
 const root = resolve("dist");
-const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
-const packageLock = JSON.parse(await readFile("package-lock.json", "utf8"));
+const package_manifest = JSON.parse(await readFile("package.json", "utf8"));
+const package_lock = JSON.parse(await readFile("package-lock.json", "utf8"));
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -22,14 +22,14 @@ async function walk(directory) {
   ).flat();
 }
 
-const publicFiles = (await walk(root))
+const public_files = (await walk(root))
   .map((path) => relative(root, path).replaceAll("\\", "/"))
   .filter((path) => /\.(?:css|js|wasm)$/.test(path))
   .sort();
-const wasm = publicFiles.filter((path) => path.endsWith(".wasm"));
-const lazyChunks = publicFiles.filter((path) => /(?:^|\/)worker-[^/]*\.js$/.test(path));
+const wasm = public_files.filter((path) => path.endsWith(".wasm"));
+const lazy_chunks = public_files.filter((path) => /(?:^|\/)worker-[^/]*\.js$/.test(path));
 if (wasm.length !== 1) throw new Error(`Expected one webpack WASM asset, got ${wasm.length}`);
-if (!publicFiles.includes("main.js")) throw new Error("webpack emitted no initial main.js");
+if (!public_files.includes("main.js")) throw new Error("webpack emitted no initial main.js");
 
 // `chunkFilename` names every lazy chunk `worker-*`, so tell the opt-in chrome
 // (the ribbon, the toolbar and the command model they share), the side panels,
@@ -93,165 +93,167 @@ const REPLACEMENT_MARKER = "Disconnect collaboration before import";
 // webpack may give it a chunk of its own. Its formatter cache key survives
 // minifiers.
 const NUMBER_FORMAT_MARKER = "fixed:";
-const chromeChunks = [];
-const panelChunks = [];
-const sortPanelChunks = [];
-const queryPanelChunks = [];
-const editLinksPanelChunks = [];
-const functionTableChunks = [];
-const findChunks = [];
-const autoFilterChunks = [];
-const formatCellsChunks = [];
-const dataValidationChunks = [];
-const keyboardSettingsChunks = [];
-const pasteSpecialChunks = [];
-const dialogChunks = [];
-const sheetTabPanelChunks = [];
-const dashboardChunks = [];
+const chrome_chunks = [];
+const panel_chunks = [];
+const sort_panel_chunks = [];
+const query_panel_chunks = [];
+const edit_links_panel_chunks = [];
+const function_table_chunks = [];
+const find_chunks = [];
+const auto_filter_chunks = [];
+const format_cells_chunks = [];
+const data_validation_chunks = [];
+const keyboard_settings_chunks = [];
+const paste_special_chunks = [];
+const dialog_chunks = [];
+const sheet_tab_panel_chunks = [];
+const dashboard_chunks = [];
 const workers = [];
-const addonRegistryChunks = [];
-const addonSeamChunks = [];
-const documentChunks = [];
-const numberFormatChunks = [];
-const chromeCode = [];
-for (const file of lazyChunks) {
+const addon_registry_chunks = [];
+const addon_seam_chunks = [];
+const document_chunks = [];
+const number_format_chunks = [];
+const chrome_code = [];
+for (const file of lazy_chunks) {
   const code = await readFile(resolve(root, file), "utf8");
-  if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
-  else if (code.includes(EDIT_LINKS_PANEL_MARKER)) editLinksPanelChunks.push(file);
-  else if (code.includes(ADDON_REGISTRY_MARKER)) addonRegistryChunks.push(file);
-  else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addonSeamChunks.push(file);
-  else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
-  else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  if (code.includes(QUERY_PANEL_MARKER)) query_panel_chunks.push(file);
+  else if (code.includes(EDIT_LINKS_PANEL_MARKER)) edit_links_panel_chunks.push(file);
+  else if (code.includes(ADDON_REGISTRY_MARKER)) addon_registry_chunks.push(file);
+  else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addon_seam_chunks.push(file);
+  else if (code.includes(SORT_PANEL_MARKER)) sort_panel_chunks.push(file);
+  else if (code.includes(PANEL_MARKER)) panel_chunks.push(file);
   // Before the dashboard markers: the dropdown's chunk may hold the pivot model.
-  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
+  else if (code.includes(AUTOFILTER_MARKER)) auto_filter_chunks.push(file);
   // Before the function table: the shared dashboard code also lists the pivot aggregations.
   else if (DASHBOARD_SHARED_MARKERS.some((marker) => code.includes(marker)))
-    dashboardChunks.push(file);
-  else if (code.includes(FUNCTION_TABLE_MARKER)) functionTableChunks.push(file);
+    dashboard_chunks.push(file);
+  else if (code.includes(FUNCTION_TABLE_MARKER)) function_table_chunks.push(file);
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
-    chromeChunks.push(file);
-    chromeCode.push(code);
-  } else if (code.includes(FIND_MARKER)) findChunks.push(file);
-  else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
-  else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
-  else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboardSettingsChunks.push(file);
-  else if (code.includes(PASTE_SPECIAL_MARKER)) pasteSpecialChunks.push(file);
-  else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
-  else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
-  else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
+    chrome_chunks.push(file);
+    chrome_code.push(code);
+  } else if (code.includes(FIND_MARKER)) find_chunks.push(file);
+  else if (code.includes(DATA_VALIDATION_MARKER)) data_validation_chunks.push(file);
+  else if (code.includes(FORMAT_CELLS_MARKER)) format_cells_chunks.push(file);
+  else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboard_settings_chunks.push(file);
+  else if (code.includes(PASTE_SPECIAL_MARKER)) paste_special_chunks.push(file);
+  else if (code.includes(DIALOG_MARKER)) dialog_chunks.push(file);
+  else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheet_tab_panel_chunks.push(file);
+  else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboard_chunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
   )
-    documentChunks.push(file);
-  else if (code.includes(NUMBER_FORMAT_MARKER)) numberFormatChunks.push(file);
+    document_chunks.push(file);
+  else if (code.includes(NUMBER_FORMAT_MARKER)) number_format_chunks.push(file);
   else workers.push(file);
 }
 if (workers.length !== 1)
   throw new Error(`Expected one webpack Worker chunk, got ${workers.length}`);
 for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
-  if (!chromeCode.some((code) => code.includes(marker)))
+  if (!chrome_code.some((code) => code.includes(marker)))
     throw new Error(`No lazy webpack chrome chunk contains ${marker}`);
 }
-if (panelChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
-if (numberFormatChunks.length > 1) {
+if (panel_chunks.length !== 1)
+  throw new Error(`Expected one lazy webpack panel chunk, got ${panel_chunks.length}`);
+if (number_format_chunks.length > 1) {
   throw new Error(
-    `Expected at most one webpack number format chunk, got ${numberFormatChunks.length}`,
+    `Expected at most one webpack number format chunk, got ${number_format_chunks.length}`,
   );
 }
-if (sortPanelChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
-if (queryPanelChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack query panel chunk, got ${queryPanelChunks.length}`);
-if (editLinksPanelChunks.length !== 1) {
+if (sort_panel_chunks.length !== 1)
+  throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sort_panel_chunks.length}`);
+if (query_panel_chunks.length !== 1)
+  throw new Error(`Expected one lazy webpack query panel chunk, got ${query_panel_chunks.length}`);
+if (edit_links_panel_chunks.length !== 1) {
   throw new Error(
-    `Expected one lazy webpack Edit Links panel chunk, got ${editLinksPanelChunks.length}`,
+    `Expected one lazy webpack Edit Links panel chunk, got ${edit_links_panel_chunks.length}`,
   );
 }
-if (findChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
-if (autoFilterChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
-if (formatCellsChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
-if (dataValidationChunks.length !== 1) {
+if (find_chunks.length !== 1)
+  throw new Error(`Expected one lazy webpack find bar chunk, got ${find_chunks.length}`);
+if (auto_filter_chunks.length !== 1)
+  throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${auto_filter_chunks.length}`);
+if (format_cells_chunks.length !== 1)
   throw new Error(
-    `Expected one lazy webpack Data Validation chunk, got ${dataValidationChunks.length}`,
+    `Expected one lazy webpack Format Cells chunk, got ${format_cells_chunks.length}`,
+  );
+if (data_validation_chunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack Data Validation chunk, got ${data_validation_chunks.length}`,
   );
 }
-if (keyboardSettingsChunks.length !== 1)
+if (keyboard_settings_chunks.length !== 1)
   throw new Error(
-    `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboardSettingsChunks.length}`,
+    `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboard_settings_chunks.length}`,
   );
-if (pasteSpecialChunks.length !== 1) {
+if (paste_special_chunks.length !== 1) {
   throw new Error(
-    `Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`,
-  );
-}
-if (dialogChunks.length > 1)
-  throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
-if (sheetTabPanelChunks.length !== 1) {
-  throw new Error(
-    `Expected one lazy webpack sheet tab panel chunk, got ${sheetTabPanelChunks.length}`,
+    `Expected one lazy webpack Paste Special chunk, got ${paste_special_chunks.length}`,
   );
 }
-if (addonRegistryChunks.length !== 1) {
+if (dialog_chunks.length > 1)
+  throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialog_chunks.length}`);
+if (sheet_tab_panel_chunks.length !== 1) {
   throw new Error(
-    `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
+    `Expected one lazy webpack sheet tab panel chunk, got ${sheet_tab_panel_chunks.length}`,
   );
 }
-if (functionTableChunks.length !== 1) {
+if (addon_registry_chunks.length !== 1) {
   throw new Error(
-    `Expected one lazy webpack function table chunk, got ${functionTableChunks.length}`,
+    `Expected one lazy webpack add-on registry chunk, got ${addon_registry_chunks.length}`,
   );
 }
-const mainCode = await readFile(resolve(root, "main.js"), "utf8");
+if (function_table_chunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack function table chunk, got ${function_table_chunks.length}`,
+  );
+}
+const main_code = await readFile(resolve(root, "main.js"), "utf8");
 for (const marker of [CHROME_MARKER, TOOLBAR_MARKER]) {
-  if (mainCode.includes(marker)) {
+  if (main_code.includes(marker)) {
     throw new Error(`The command chrome (${marker}) is in webpack's main.js; it must load lazily`);
   }
 }
-if (mainCode.includes(PANEL_MARKER)) {
+if (main_code.includes(PANEL_MARKER)) {
   throw new Error("The side panels are in webpack's main.js; they must load lazily");
 }
-if (mainCode.includes(SORT_PANEL_MARKER)) {
+if (main_code.includes(SORT_PANEL_MARKER)) {
   throw new Error("The Sort panel is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(QUERY_PANEL_MARKER)) {
+if (main_code.includes(QUERY_PANEL_MARKER)) {
   throw new Error("The query panel is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(EDIT_LINKS_PANEL_MARKER)) {
+if (main_code.includes(EDIT_LINKS_PANEL_MARKER)) {
   throw new Error("The Edit Links panel is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(ADDON_REGISTRY_MARKER)) {
+if (main_code.includes(ADDON_REGISTRY_MARKER)) {
   throw new Error("The add-on registry is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(FIND_MARKER)) {
+if (main_code.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(AUTOFILTER_MARKER)) {
+if (main_code.includes(AUTOFILTER_MARKER)) {
   throw new Error("The AutoFilter dropdown is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(DIALOG_MARKER)) {
+if (main_code.includes(DIALOG_MARKER)) {
   throw new Error("The dialog shell is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(FORMAT_CELLS_MARKER)) {
+if (main_code.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(PASTE_SPECIAL_MARKER)) {
+if (main_code.includes(PASTE_SPECIAL_MARKER)) {
   throw new Error("Paste Special is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(DATA_VALIDATION_MARKER)) {
+if (main_code.includes(DATA_VALIDATION_MARKER)) {
   throw new Error("Data Validation is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(SHEET_TAB_PANELS_MARKER)) {
+if (main_code.includes(SHEET_TAB_PANELS_MARKER)) {
   throw new Error("The sheet tab panels are in webpack's main.js; they must load lazily");
 }
-if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
+if (main_code.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
 }
 for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
-  if (mainCode.includes(marker)) {
+  if (main_code.includes(marker)) {
     throw new Error(`A cold document operation is in webpack's main.js: ${marker}`);
   }
 }
@@ -259,24 +261,24 @@ for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
 // The fixture creates no grid, so it needs no store. Lazy modules that import
 // the store make webpack keep the store's helpers in shared startup modules.
 const STORE_MARKER = "Encoded JSON exceeds the";
-if (mainCode.includes(STORE_MARKER)) {
+if (main_code.includes(STORE_MARKER)) {
   throw new Error("Store helpers are in webpack's main.js; a lazy module imports the store");
 }
 
 // webpack.styles.config.js builds core's stylesheet on its own.
-const stylesRoot = resolve("dist-styles");
-const stylesheet = await readFile(resolve(stylesRoot, "styles.css"), "utf8");
+const styles_root = resolve("dist-styles");
+const stylesheet = await readFile(resolve(styles_root, "styles.css"), "utf8");
 if (!stylesheet.includes(".sheetwrite-tabstrip")) {
   throw new Error("webpack did not inline the parts that core's styles.css imports");
 }
 await assertIconSheetEmitted({
   bundler: "webpack",
-  stylesheets: [{ path: resolve(stylesRoot, "styles.css"), text: stylesheet }],
+  stylesheets: [{ path: resolve(styles_root, "styles.css"), text: stylesheet }],
   resolveUrl: (url, path) => resolve(dirname(path), url),
   packagedSheet: resolve("node_modules/@sheetwrite/core/styles/icons.svg"),
 });
 
-const assets = publicFiles.map((file) => {
+const assets = public_files.map((file) => {
   const kind = file.endsWith(".js") ? "javascript" : file.endsWith(".css") ? "css" : "wasm";
   let owner;
   let roles;
@@ -288,25 +290,25 @@ const assets = publicFiles.map((file) => {
     roles = ["worker-async"];
   } else if (
     [
-      chromeChunks,
-      panelChunks,
-      sortPanelChunks,
-      queryPanelChunks,
-      editLinksPanelChunks,
-      functionTableChunks,
-      findChunks,
-      autoFilterChunks,
-      formatCellsChunks,
-      dataValidationChunks,
-      keyboardSettingsChunks,
-      pasteSpecialChunks,
-      dialogChunks,
-      sheetTabPanelChunks,
-      documentChunks,
-      numberFormatChunks,
-      dashboardChunks,
-      addonRegistryChunks,
-      addonSeamChunks,
+      chrome_chunks,
+      panel_chunks,
+      sort_panel_chunks,
+      query_panel_chunks,
+      edit_links_panel_chunks,
+      function_table_chunks,
+      find_chunks,
+      auto_filter_chunks,
+      format_cells_chunks,
+      data_validation_chunks,
+      keyboard_settings_chunks,
+      paste_special_chunks,
+      dialog_chunks,
+      sheet_tab_panel_chunks,
+      document_chunks,
+      number_format_chunks,
+      dashboard_chunks,
+      addon_registry_chunks,
+      addon_seam_chunks,
     ].some((chunks) => chunks.includes(file))
   ) {
     // The function table loads from the panels and formula help, and the add-on registry from
@@ -317,7 +319,7 @@ const assets = publicFiles.map((file) => {
     throw new Error(`Unclassified webpack emitted asset: ${file}`);
   }
   return {
-    path: relative(repositoryRoot, resolve(root, file)).replaceAll("\\", "/"),
+    path: relative(repository_root, resolve(root, file)).replaceAll("\\", "/"),
     kind,
     owner,
     roles,
@@ -330,26 +332,26 @@ const attribution = [
     eagerImports: ["@sheetwrite/core#initSheetwrite"],
     entry: "src/main.js",
     name: "core-first-paint",
-    repositoryRoot,
+    repositoryRoot: repository_root,
     root,
   }),
 ];
-const terserVersion = packageLock.packages?.["node_modules/terser-webpack-plugin"]?.version;
-if (typeof terserVersion !== "string") {
+const terser_version = package_lock.packages?.["node_modules/terser-webpack-plugin"]?.version;
+if (typeof terser_version !== "string") {
   throw new Error("webpack fixture lock is missing terser-webpack-plugin");
 }
 const evidence = {
   schemaVersion: 2,
   bundler: "webpack",
-  version: packageManifest.dependencies.webpack,
+  version: package_manifest.dependencies.webpack,
   assets,
   provenance: attributionProvenance({
     minifier: "terser-webpack-plugin",
-    version: terserVersion,
+    version: terser_version,
   }),
   attribution,
 };
-const evidencePath = resolve(repositoryRoot, "test-results/bundlers/webpack.json");
-await mkdir(resolve(evidencePath, ".."), { recursive: true });
-await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
-console.log("webpack size manifest:", relative(process.cwd(), evidencePath));
+const evidence_path = resolve(repository_root, "test-results/bundlers/webpack.json");
+await mkdir(resolve(evidence_path, ".."), { recursive: true });
+await writeFile(evidence_path, `${JSON.stringify(evidence, null, 2)}\n`);
+console.log("webpack size manifest:", relative(process.cwd(), evidence_path));
