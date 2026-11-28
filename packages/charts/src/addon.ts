@@ -1,6 +1,23 @@
 import type { ChartRenderer, MountedChart, SheetwriteAddon, Store } from "@sheetwrite/core";
 
+import type * as ChartRendererChunk from "./chart-renderer.js";
 import { createChartViewCache } from "./view-cache.js";
+
+let loading: Promise<typeof ChartRendererChunk> | null = null;
+
+/** Load the drawing code once; a failed load is not kept, so the next chart tries again. */
+function load_drawing_code(): Promise<typeof ChartRendererChunk> {
+  loading ??= import("./chart-renderer.js").catch((error: unknown) => {
+    loading = null;
+    throw error;
+  });
+  return loading;
+}
+
+/** A chart mounted while the drawing code is missing stays empty; the next chart loads it again. */
+function report_load_failure(error: unknown): void {
+  console.warn("Sheetwrite: charts could not load the chart drawing code", error);
+}
 
 /**
  * The chart renderer of one grid. The SVG drawing code loads when the grid
@@ -10,12 +27,12 @@ function create_lazy_chart_renderer(store: Store): ChartRenderer {
   let renderer: ChartRenderer | undefined;
   let is_disposed = false;
 
-  const loaded = import("./chart-renderer.js").then(
-    ({ createChartRenderer: create_chart_renderer }) => {
-      if (!is_disposed) renderer = create_chart_renderer(store);
+  const load = () =>
+    load_drawing_code().then(({ createChartRenderer: create_chart_renderer }) => {
+      if (!is_disposed) renderer ??= create_chart_renderer(store);
       return renderer;
-    },
-  );
+    });
+  load().catch(report_load_failure);
 
   return {
     mount(host, chart, size) {
@@ -26,9 +43,9 @@ function create_lazy_chart_renderer(store: Store): ChartRenderer {
       let mounted: MountedChart | undefined;
       let is_unmounted = false;
 
-      void loaded.then((ready) => {
+      load().then((ready) => {
         if (ready && !is_unmounted) mounted = ready.mount(host, chart, { width, height });
-      });
+      }, report_load_failure);
 
       return {
         resize(next_width, next_height) {
