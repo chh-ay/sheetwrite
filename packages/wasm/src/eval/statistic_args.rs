@@ -15,11 +15,12 @@ use std::rc::Rc;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, MAX_FUNCTION_ARGS,
+    RANGE_CELL_LIMIT,
 };
 
 use super::array::ast_produces_array;
-use super::functions::{treats_cell_as_reference, FuncAccumulator, MAX_FUNCTION_ARGS};
+use super::functions::{treats_cell_as_reference, FuncAccumulator};
 use super::matrix::argument_range;
 use super::preview_limits::RangeRead;
 use super::range_view::{NumberSink, RangeView};

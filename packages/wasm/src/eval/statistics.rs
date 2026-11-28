@@ -1,7 +1,7 @@
 //! Statistical function family dispatch.
 
 use crate::calc::Func;
-use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS, RANGE_CELL_LIMIT};
 
 use super::criteria::Criterion;
 use super::functions::{require_arity, FuncAccumulator};
@@ -200,7 +200,7 @@ fn require_args(
 }
 
 fn require_at_least_one_arg(values: &StatisticArgs) -> Result<(), FormulaError> {
-    require_args(values, 1, 254)
+    require_args(values, 1, MAX_FUNCTION_ARGS)
 }
 
 /// Argument `index` as one number; `default` when it is left out.
@@ -445,7 +445,7 @@ fn variance(numbers: &[f64], sample: bool, standard_deviation: bool) -> Result<f
 /// as an argument is read as a number, and empty text is 0. Empty cells
 /// are skipped.
 fn counted_numbers(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
-    require_arity(values, 1, 254)?;
+    require_arity(values, 1, MAX_FUNCTION_ARGS)?;
 
     let entries = values.entries();
 

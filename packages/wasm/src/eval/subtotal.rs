@@ -6,11 +6,11 @@ use crate::calc::{Ast, Func};
 use crate::store::names::{NameFacts, NameScope};
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
+    CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, MAX_FUNCTION_ARGS,
+    RANGE_CELL_LIMIT,
 };
 
 use super::array::ast_produces_array;
-use super::functions::MAX_FUNCTION_ARGS;
 use super::math::{SubtotalCode, SubtotalFold};
 use super::matrix::{argument_range, range_from_ast};
 use super::range_view::{CellSink, RangeView};

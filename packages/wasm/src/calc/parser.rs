@@ -466,6 +466,11 @@ impl<'a> Parser<'a, '_> {
                 }
             }
         }
+        // Excel refuses a call with more arguments; the error marks the last
+        // token of the last one.
+        if self.args.len() - first > crate::types::MAX_FUNCTION_ARGS {
+            return Err(TOO_MANY_ARGUMENTS.into());
+        }
         self.close_paren()?;
         let args: Box<[Ast]> = self.args.drain(first..).collect();
         Ok(if let Some(known) = func {
@@ -656,6 +661,7 @@ const MIXED_AREA: &str = "A range joins two cells, two columns or two rows.";
 const LONE_AXIS: &str = "A column or row needs a range such as A:A or 1:1.";
 const NOT_EXPECTED: &str = "This is not expected here.";
 const MISSING_CLOSE_PAREN: &str = "Add ) to close the (.";
+const TOO_MANY_ARGUMENTS: &str = "A function takes at most 255 arguments.";
 
 fn missing_area_end(after: &str) -> String {
     format!("Enter a cell, column or row after {after}.")

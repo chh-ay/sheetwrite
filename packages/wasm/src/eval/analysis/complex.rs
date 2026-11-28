@@ -8,7 +8,7 @@
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
 use super::super::lift::ValueArgs;
 use super::super::number_format::general_text;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 
 family_functions! {
     COMPLEX,
@@ -70,9 +70,6 @@ pub(super) const fn value_args(function: Function) -> ValueArgs {
         | Function::IMTAN => ValueArgs::ALL,
     }
 }
-
-/// Excel accepts at most 255 arguments.
-const MAX_ARGUMENTS: usize = 255;
 
 const DEFAULT_SUFFIX: char = 'i';
 
@@ -309,7 +306,7 @@ fn complex(values: &FuncAccumulator) -> Result<Value, FormulaError> {
 /// `IMSUM` and `IMPRODUCT`: every argument, including cells of ranges.
 /// Blank cells in a range are skipped.
 fn fold(is_sum: bool, values: &FuncAccumulator) -> Result<Value, FormulaError> {
-    require_arity(values, 1, MAX_ARGUMENTS)?;
+    require_arity(values, 1, MAX_FUNCTION_ARGS)?;
     let mut suffix = Suffix(None);
     let mut result = if is_sum { Complex::ZERO } else { Complex::ONE };
 

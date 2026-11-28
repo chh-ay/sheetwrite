@@ -18,7 +18,7 @@ use super::super::value::{bool_from_value, compare_values, number_from_value};
 use super::super::EvalPass;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{FormulaError, Value};
+use crate::types::{FormulaError, Value, MAX_FUNCTION_ARGS};
 
 family_functions! {
     EXPAND,
@@ -30,8 +30,6 @@ family_functions! {
     WRAPCOLS,
     WRAPROWS,
 }
-
-const MAX_ARGUMENTS: usize = 255;
 
 /// Largest TOCOL and TOROW `ignore` code: 1 skips blanks, 2 skips errors, 3 skips both.
 const MAX_IGNORE_CODE: f64 = 3.0;
@@ -48,7 +46,7 @@ fn check_arity(function: Function, args: &[Ast]) -> Result<(), FormulaError> {
         Function::WRAPCOLS | Function::WRAPROWS => (2..=3).contains(&args.len()),
         Function::EXPAND => (2..=4).contains(&args.len()),
         // SORTBY(array, by_array1, [order1], by_array2, [order2], ...)
-        Function::SORTBY => (2..=MAX_ARGUMENTS).contains(&args.len()),
+        Function::SORTBY => (2..=MAX_FUNCTION_ARGS).contains(&args.len()),
     };
     if is_valid {
         Ok(())

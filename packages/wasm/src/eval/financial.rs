@@ -1,7 +1,7 @@
 //! Financial function family dispatch.
 
 use crate::calc::Func;
-use crate::types::{EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value, MAX_FUNCTION_ARGS};
 
 use super::functions::{number_arg, require_arity, FuncAccumulator, FuncValue};
 use super::value::aggregate_number;
@@ -64,7 +64,7 @@ fn pmt(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 fn npv(values: &FuncAccumulator) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 254)?;
+    require_arity(values, 2, MAX_FUNCTION_ARGS)?;
     let rate = number_arg(values, 0, None)?;
     let base = 1.0 + rate;
     let mut discount = base;
