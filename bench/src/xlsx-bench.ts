@@ -308,7 +308,8 @@ async function run_worker(
   // Without collections, the heap and ArrayBuffer growth across the operation is every byte it
   // allocated; in the timed run it would also depend on when the last collection happened.
   const { report: uncollected } = await spawn_worker(run, true);
-  if (uncollected.checksum !== report.checksum) {
+  // The baseline codec stamps the export time into its output, so only the current one compares.
+  if (engine === "current" && uncollected.checksum !== report.checksum) {
     throw new Error(
       `${engine} ${scenario.operation}:${scenario.name} changed its output with the collector off`,
     );
