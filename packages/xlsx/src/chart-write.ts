@@ -6,7 +6,7 @@ import type {
   SheetSnapshot,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1 } from "@sheetwrite/core";
+import { colToA1 } from "@sheetwrite/core/codec";
 
 import { locatePoints, type PivotCells, type PointCells } from "./chart-cells.js";
 import {

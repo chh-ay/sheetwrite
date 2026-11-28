@@ -8,7 +8,7 @@ import {
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
   validateWorkbookTableName,
   validWorkbookTableXmlElement,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { MAIN_NAMESPACES } from "./format.js";

@@ -3,7 +3,7 @@
  * the hidden metadata sheet, Excel's column width units and ISO dates.
  */
 
-import { dateToSerial } from "@sheetwrite/core";
+import { dateToSerial } from "@sheetwrite/core/codec";
 
 /** SpreadsheetML, as written; `MAIN_NAMESPACES` also accepts Strict OOXML. */
 export const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";

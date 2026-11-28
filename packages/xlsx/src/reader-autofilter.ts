@@ -10,7 +10,7 @@ import type {
   SheetSnapshot,
   SnapshotCell,
 } from "@sheetwrite/core";
-import { formatNumber, isDynamicDateFilter } from "@sheetwrite/core";
+import { formatNumber, isDynamicDateFilter } from "@sheetwrite/core/codec";
 
 import { type CellRect, parseCellRect } from "./cell-reference.js";
 import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";

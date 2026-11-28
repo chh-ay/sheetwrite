@@ -1,5 +1,5 @@
 import type { CellValue, Column } from "@sheetwrite/core";
-import { colToA1 } from "@sheetwrite/core";
+import { colToA1 } from "@sheetwrite/core/codec";
 
 import { columnWidthPixels } from "./format.js";
 import type { ParsedSheet } from "./reader-types.js";

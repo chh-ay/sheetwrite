@@ -5,7 +5,7 @@ import {
   DEFAULT_MAX_ITERATIONS,
   MAX_ITERATIONS,
   sheetNameKey,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import type { WorkbookSheetReference } from "./reader-types.js";

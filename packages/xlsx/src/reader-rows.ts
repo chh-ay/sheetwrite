@@ -1,5 +1,5 @@
 import type { CellValue, SheetSnapshot, SnapshotCell } from "@sheetwrite/core";
-import { cellA1 } from "@sheetwrite/core";
+import { cellA1 } from "@sheetwrite/core/codec";
 import { formulaContainsExternalReference } from "@sheetwrite/core/external-links";
 
 import { parseCellRect, parseCellReference } from "./cell-reference.js";
