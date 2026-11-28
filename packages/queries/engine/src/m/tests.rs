@@ -212,12 +212,18 @@ fn exported_sections_import_to_the_same_plans() {
     assert!(reported(2, None, "host-source"));
     assert_eq!(section.members[0], "Sales_report");
 
-    // Query names that differ only in letter case clash in Excel, for every alphabet.
-    let cased = emit_section(&[
-        query("Ä", MSourceKind::Host, None, vec![], vec![]),
-        query("ä", MSourceKind::Host, None, vec![], vec![]),
-    ]);
-    assert_eq!(cased.members, ["Ä", "ä (2)"]);
+    // Query names that differ only in letter case or in Unicode form clash, for every alphabet.
+    for (first, second) in [("Ä", "ä"), ("\u{00C4}", "A\u{0308}")] {
+        let cased = emit_section(&[
+            query(first, MSourceKind::Host, None, vec![], vec![]),
+            query(second, MSourceKind::Host, None, vec![], vec![]),
+        ]);
+        assert_eq!(
+            cased.members,
+            [first.to_owned(), format!("{second} (2)")],
+            "{first:?} and {second:?}"
+        );
+    }
 
     // A file source without a web locator is written as an error too, for a different reason.
     let local = emit_section(&[query(

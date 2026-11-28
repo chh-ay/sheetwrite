@@ -1,6 +1,6 @@
 [package]
 name = "sheetwrite-queries"
-version = "0.7.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT"
 description = "Optional columnar query steps with typed buffers and no source fetching."
@@ -12,6 +12,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
+
+# Names compare in NFC. The WebAssembly engine asks its JavaScript host to normalize them, so
+# only native builds, which run the tests, link these tables.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+unicode-normalization = "0.1"
 
 [profile.release]
 opt-level = 3

@@ -10,6 +10,7 @@
 
 use super::text::{field, identifier, member_name, number, text};
 use super::{MQuery, MSourceKind};
+use crate::name_key::{nfc, same_lower};
 use crate::plan::{
     Aggregate, AggregateOp, ColumnType, CompareOp, ErrorPolicy, JoinKind, Literal, Predicate, Step,
 };
@@ -716,29 +717,21 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     order
 }
 
-/// Whether two names are equal when letter case is ignored in every alphabet, as saved query
-/// names are compared (`toLowerCase` in core). Compares lowercase characters without building
-/// lowercase copies.
-fn same_ignoring_case(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
-}
-
-/// Member names for every query, unique when letter case is ignored, as Excel requires for
-/// query names. A name that had to change is reported as a difference.
+/// Member names for every query, unique as Excel requires for query names: compared in NFC
+/// with letter case ignored in every alphabet, as core compares saved query names
+/// (`normalize("NFC").toLowerCase()`). A name that had to change is reported as a difference.
 fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
     let mut members: Vec<String> = Vec::with_capacity(queries.len());
+    let mut keys: Vec<String> = Vec::with_capacity(queries.len());
 
     for (index, query) in queries.iter().enumerate() {
         let base = member_name(&query.name);
         let mut candidate = base.clone();
+        let mut key = nfc(&candidate).into_owned();
         let mut suffix = 2;
-        while members
-            .iter()
-            .any(|name| same_ignoring_case(name, &candidate))
-        {
+        while keys.iter().any(|taken| same_lower(taken, &key)) {
             candidate = format!("{base} ({suffix})");
+            key = nfc(&candidate).into_owned();
             suffix += 1;
         }
 
@@ -750,6 +743,7 @@ fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
             });
         }
 
+        keys.push(key);
         members.push(candidate);
     }
 

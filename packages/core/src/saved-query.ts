@@ -304,12 +304,12 @@ function validate_query_structure(
     }
     indexes.set(query.id, index);
 
-    const name = query.name.toLowerCase();
+    const name = query.name.normalize("NFC").toLowerCase();
     if (names.has(name)) {
       issues.push({
         path: `${item_path}.name`,
         code: "duplicate-id",
-        message: "Query names must be unique when letter case is ignored",
+        message: "Query names must be unique when letter case and Unicode form are ignored",
       });
     }
     names.add(name);

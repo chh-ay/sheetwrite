@@ -222,4 +222,22 @@ describe("AutoFilter", () => {
     ];
     expect(validateWorkbookSnapshot(bad_condition).ok).toBe(false);
   });
+
+  it("matches a case-insensitive contains filter's non-ASCII text when several filters apply", () => {
+    const { grid, store } = mount();
+    grid.setAutoFilter(RANGE);
+    const item = (row: number, value: string) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col: 0 },
+      value: { kind: "literal" as const, value },
+    });
+    grid.applyTransaction({ patches: [item(2, "École"), item(3, "école")] });
+
+    // A second filter sends both through the engine's multi-filter scan.
+    grid.setColumnFilter(0, { kind: "contains", text: "É" });
+    grid.setColumnFilter(1, { kind: "nonEmpty" });
+
+    // Excel ignores case for every letter, so both spellings match.
+    expect(shown(store)).toEqual(["Title", "Item", "École", "école", "Total"]);
+  });
 });

@@ -242,20 +242,24 @@ fn malformed_sources_and_duplicate_definitions_are_rejected() {
     );
 
     // Output columns become Excel table headers, which must differ in more than letter case
-    // in every alphabet.
-    let cased = SourceSpec::Json {
-        columns: vec![
-            column("upper", "Ä", ColumnType::Text),
-            column("lower", "ä", ColumnType::Text),
-        ],
-        path: Vec::new(),
-    };
-    assert_eq!(
-        parse_source(b"[]", &cased, &Limits::default())
-            .unwrap_err()
-            .code,
-        "duplicate-column"
-    );
+    // in every alphabet, and in more than Unicode form ("Ä" as one character or as "A" and a
+    // combining diaeresis), as core's NFC header key compares them.
+    for (first, second) in [("Ä", "ä"), ("\u{00C4}", "A\u{0308}")] {
+        let cased = SourceSpec::Json {
+            columns: vec![
+                column("first", first, ColumnType::Text),
+                column("second", second, ColumnType::Text),
+            ],
+            path: Vec::new(),
+        };
+        assert_eq!(
+            parse_source(b"[]", &cased, &Limits::default())
+                .unwrap_err()
+                .code,
+            "duplicate-column",
+            "{first:?} and {second:?}"
+        );
+    }
 }
 
 #[test]

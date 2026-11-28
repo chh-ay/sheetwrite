@@ -748,13 +748,6 @@ impl CellStore {
     /// The shape of an array expression before it is evaluated. `pass` is the
     /// pass that asks: a LET name reads its binding from the pass's LET frame,
     /// and the full engine's shape hooks share its compiled regex programs.
-    #[cfg_attr(
-        not(feature = "analysis"),
-        allow(
-            clippy::only_used_in_recursion,
-            reason = "only full-engine hooks read the pass"
-        )
-    )]
     pub(super) fn matrix_shape(
         &self,
         ast: &Ast,
